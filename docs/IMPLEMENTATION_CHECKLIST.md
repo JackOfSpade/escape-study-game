@@ -1,5 +1,7 @@
 # Persistent implementation checklist
 
+> Status note: this record was written while ChatGPT chats served study. That stack is now archived in `shelf/chatgpt/` (see `RE-ENABLE.md`), and study runs through the Claude CLI ([AI tasks](AI_TASKS.md)). References below to ChatGPT, handoff and Study Mode are historical.
+
 Source of truth: GAME_DESIGN_HANDOFF.md, ACCEPTANCE_TESTS.md and unchanged interview_prep_roadmap.md. Goal is active; this is a development build, not a completed acceptance report.
 
 ## Source verification

@@ -1,16 +1,29 @@
 # ChatGPT stack, shelved
 
-The ChatGPT chat workers, tunnel, connector and terminal apps were retired when the game moved to the Claude CLI. They live here so they can return if OpenAI restores unlimited chats. Nothing in this folder is built, type-checked or tested.
+The ChatGPT chat workers, tunnel, connector and terminal apps were retired when the game moved to the Claude CLI. They live here so they can return if ChatGPT chats become usable again. Nothing in this folder is built, type-checked or tested.
 
 The exact working stack before the move is the annotated tag `archive/chatgpt-stack-v1`, also on the branch `shelf/chatgpt-stack`.
 
 ## To re-enable
 
-Restoring from the tag is the reliable path, because files here keep their old relative imports:
+Two routes. The first needs no merging and is the safest.
 
-1. Check out `archive/chatgpt-stack-v1`, or restore its `scripts/`, `public/terminal-mcp-app.html`, `tests/` and `package.json` onto a new branch.
-2. Restore the worker's bridge wiring in `scripts/bridge-server.mjs` and `scripts/study-bridge-server.mjs`.
-3. Follow `docs/CHATGPT_HANDOFF.md` to run the tunnel and connector.
+**Run the old stack beside the new one.** The tag holds the complete working game as it was:
+
+```sh
+git worktree add ../zombie-chatgpt archive/chatgpt-stack-v1
+cd ../zombie-chatgpt && npm ci && npm run import:curriculum
+```
+
+Saves live in the browser origin, so give it a different port from the Claude build, and read `docs/CHATGPT_HANDOFF.md` there for the tunnel and connector. Do not open a save written by the Claude build in it, because the old build does not know the `claude-cli` provider; use a copy of the older save instead.
+
+**Bring the stack back into this branch.** On a new branch:
+
+1. Move every file under this folder back to its same relative path with `git mv shelf/chatgpt/<path> <path>`, except `RE-ENABLE.md`. The scripts, public page, `src/direct-study.ts`, docs and tests all keep their old relative imports.
+2. Restore `package.json` scripts `bridge:mcp` (`node scripts/chatgpt-handoff-mcp.mjs`) and `bridge:configure` (`node scripts/chatgpt-tunnel-config.mjs`).
+3. Rewire `scripts/bridge-server.mjs`, `scripts/bridge-service.mjs`, `scripts/study-bridge-server.mjs` and `scripts/serve.mjs`. They changed to serve the Claude gateway; `git diff archive/chatgpt-stack-v1 HEAD -- scripts/<file>` shows each change to reverse.
+4. Put back the small pieces listed under "Removed from files that stay", then the shelved tests, which need the old `native-study-harness.ts` as well.
+5. Run `npx tsc --noEmit -p .`, `npm test` and `npx playwright test`. Expect work in steps 3 and 4; the tag is the reference for how each file looked.
 
 ## What git does not hold
 
@@ -18,13 +31,29 @@ Note these before removing any of them, because they cannot be restored from the
 
 - `.local/chatgpt-handoff`, `.local/chatgpt-public` and `.local/bridge-service`
 - `~/.cloudflared/*`, the Cloudflare tunnel and its DNS record
-- The ChatGPT app registration: disable it rather than deleting it, and keep its name, URL and scopes
+- The ChatGPT app registration: it is disabled, not deleted. Keep its name, URL and scopes so it can be turned back on
+- The Cloudflare tunnel: disabled, not deleted. Its tunnel ID, credentials file in `~/.cloudflared/` and DNS record are only on this computer
 
-## Still in the main tree
+## Everything shelved
 
-- `scripts/lib/ai-contracts.mjs` holds the operation contracts and answer validators the Claude gateway uses. The shelved `scripts/chatgpt-handoff-queue.mjs` carries its own older copy of them, including the ChatGPT delivery wording, the `terminal-direct` completion rules and the topic assessment instruction.
-- The `chatgpt-handoff` provider value, the `DirectStudySession` and `Encounter.directStudy` model types and `releaseRetiredChatRequests` stay so existing saves keep loading. `src/topic-assessment.ts`, `src/run-learning.ts` and `src/persistence.ts` still read saved sessions.
-- Saved run designs keep `chatgpt-handoff` as a valid `source`. Saved run-design drafts that carry a `chatCode` or queue `receipt` still load; both fields are dropped when read.
+All paths below are in this folder at the same relative path they had in the project.
+
+- `scripts/`: the ChatGPT handoff queue, routes, tools, MCP worker and public bridge (`chatgpt-handoff-*.mjs`, `chatgpt-public-bridge.mjs`), the tunnel (`chatgpt-tunnel-config.mjs`, `chatgpt-tunnel-supervisor.mjs`), the OAuth and security modules (`chatgpt-security/`), the terminal MCP apps (`terminal-relay-app.mjs`, `terminal-mcp-app.mjs`), the smoke scripts (`smoke-chatgpt-*.mjs`), and the helpers only they used (`lib/mcp-app.mjs`, `lib/diagnostic-state.mjs`).
+- `public/terminal-mcp-app.html`: the terminal app page for ChatGPT.
+- `src/direct-study.ts`: the ChatGPT-driven study session client.
+- `docs/CHATGPT_HANDOFF.md`: connector, tunnel and recovery setup. `docs/STUDY_MODE_BRIDGE.md`: the full operation contract as it was written for that bridge.
+- `tests/`: see "Tests" below.
+- `package.json` scripts `bridge:mcp` and `bridge:configure` were removed. They are only on the tag.
+
+## What stays for old saves
+
+Do not remove these. Saves from the ChatGPT era depend on them:
+
+- `Provider` in `src/model.ts` still accepts `"chatgpt-handoff"`, and `src/run-design-contract.mjs` still accepts it as a saved run design `source`. `src/provider-label.ts` and `src/learner.ts` keep reading it.
+- The model types `DirectStudySession` and `Encounter.directStudy`, and `src/persistence.ts`, still load saved sessions. `src/topic-assessment.ts` and `src/run-learning.ts` still read applied sessions so learning history counts them.
+- `releaseRetiredChatRequests` in `src/ai.ts` releases any request that was still waiting on the retired chat.
+- `scripts/lib/ai-contracts.mjs` holds the operation contracts the Claude gateway uses. The shelved `scripts/chatgpt-handoff-queue.mjs` has its own older copy, including ChatGPT delivery wording, the `terminal-direct` completion rules and the topic assessment instruction.
+- Tests that prove old saves load stay in `tests/` (for example `tests/knowledge-probe.test.ts`, `tests/completion-retry.test.ts`, `tests/group-retry.test.ts`).
 
 ## Moved out of the client
 

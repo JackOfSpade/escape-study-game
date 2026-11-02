@@ -1,5 +1,7 @@
 # Release readiness
 
+> Status note: this record was written while ChatGPT chats served study. That stack is now archived in `shelf/chatgpt/` (see `RE-ENABLE.md`), and study runs through the Claude CLI ([AI tasks](AI_TASKS.md)). References below to ChatGPT, handoff and Study Mode are historical.
+
 ## Maintenance release — 2026-10-20
 
 This release repairs learning continuity after repeated deaths, late assessments, interrupted requests and save failures. One continuation family consumes one formal visit; newer human work keeps its judgment when an older reply arrives. Assessment and generation retries retain their exact captured evidence/provider. Terminal gaps use scoped IDs and complete descriptions, including mathematical operators, and unsupported saved resolution flags are reconciled against retained observations. Raw attempts, conversations, drafts and evidence remain retained.

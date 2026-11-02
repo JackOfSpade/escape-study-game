@@ -1,6 +1,6 @@
 # Individual environmental writing and artwork
 
-New version 3 runs author actual instances through the existing ChatGPT bridge. The engine builds and validates the proposed world, then supplies its complete eligible surface inventory to the designer. Fresh quality requests establish room stories before writing batches of at most 24 objects, followed by global editorial review and targeted revision. Every surface needs exactly one accepted content entry. IDs identify walls, furniture, props and city faces; they do not depend on a game UUID or the order of unrelated objects.
+New version 3 runs author actual instances through the Claude CLI gateway. The engine builds and validates the proposed world, then supplies its complete eligible surface inventory to the designer. Fresh quality requests establish room stories before writing batches of at most 24 objects, followed by global editorial review and targeted revision. Every surface needs exactly one accepted content entry. IDs identify walls, furniture, props and city faces; they do not depend on a game UUID or the order of unrelated objects.
 
 ## What the designer can customize
 

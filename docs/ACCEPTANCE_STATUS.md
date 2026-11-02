@@ -1,5 +1,7 @@
 Latest explicit physics/control override (2026-10-17): solid player/NPC/zombie bodies and movable furniture now share a rigid-body solver. E releases a room-door latch, physical contact swings its persistent leaf, pushing shut re-latches it, and another E release permits the opposite swing. E near a released free end can grip/pull/release; NPCs use the same physical handle. Esc pause/restart preserves learning/work, Space jumps cover, and only WASD/arrows, E and Space control ordinary movement/interactions. Last-three-game logs retain bounded detail plus a whole-run summary. Current receipts are in [rigid-world physics evidence](evidence/rigid-world-physics.json). Original rows retain historical wording where superseded by this explicit user decision; human acceptance and the documented native/AI limitations remain outstanding.
 
+> Status note: this record was written while ChatGPT chats served study. That stack is now archived in `shelf/chatgpt/` (see `RE-ENABLE.md`), and study runs through the Claude CLI ([AI tasks](AI_TASKS.md)). References below to ChatGPT, handoff and Study Mode are historical.
+
 Current first-party maintenance evidence: [source-bound audit](evidence/first-party-maintenance.json). The code cleanup, storage/transport/runner fixes and physics optimization pass 570 core tests (one intentional skip), all 78 browser cases, all 13 restricted-runner cases and production build checks. Existing human and external-semantic acceptance qualifications below remain in force.
 
 # Acceptance verification status
