@@ -86,6 +86,13 @@ export interface Contract {
   };
 }
 export interface StudyState {
+  /** One finished question waiting for whichever new room opens next. Unused,
+   * it touches no schedule, scope or door health. */
+  preparedQuestion?: {
+    provider: Provider;
+    contract: Contract;
+    problem: Problem;
+  };
   /** Free-form AI impressions; separate from verified curriculum credit. */
   topicAssessments?: Record<
     string,

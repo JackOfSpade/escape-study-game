@@ -317,6 +317,116 @@ function refreshUnissuedPractice(g: Game, e: Encounter, r: Roadmap) {
   delete e.error;
   recordSpawn(g.study, contract, e.id, g.time);
 }
+const QUESTION_GENERATION_POLICY =
+  "@study Diagnose before teaching. Write a standalone question: the prompt alone must supply the essential scenario, interface, implementation, data, timing and business-rule facts needed to answer without using the chat. For classification, list the concrete items to classify and their relevant behavior, lifetime and source without supplying their classifications. For tracing, debugging or critique, supply the relevant code, event sequence or evidence. Distinguish fixed facts from intentional design choices; if the learner may choose an example or an approach, say so explicitly rather than expecting them to infer an unspecified implementation. Ask a bounded task that matches the supplied scenario; never paste a capability statement into an unrelated generic story. Every requirement in the rubric must be visible in the question; do not grade unstated assumptions or add unrelated decisions, personal history or edge cases. Before returning the question, check that it can be answered from the prompt alone and repair missing context without revealing the solution. For D1, keep the learner workspace starter empty; put essential scenario or code-reading material in the prompt without supplying the key explanation, endpoint update, worked result or a leading solution hint. Do not interpret an objective's implementation verb as a D1 implementation requirement. Preserve legitimate prior context and assistance attribution without presenting supplied steps as fresh independent understanding. Use probeRecords: build the question around open gaps inside the eligible scope with the facet they blocked as the apex; only a gap marked reuseInScopeDefinitions may add its exact facet id to scopeDefinitions, and existing stable scope definitions are copied exactly; do not spend the question on established facets unless the scope requires them; re-ask what a closed gap blocked. The prompt is read by the learner: never mention the scheduled scope, objective IDs, tiers, depth, scheduling or that this is a formal visit; ask the question in plain language. Keep it minimal: write the smallest self-contained diagnostic that exercises the objective, with one main problem and at most one or two directly connected follow-ups. Include only the essential facts, not pasted project context or a full-project audit. For code review, include the actual code under review, including any required helper and its authorization semantics; a prose proposal supports design review only. Prefer short snippets, traces or evidence, and never turn an objective's scope verbs into a D1 implementation task. The visible task and rubric must match, without leaking the solution. An honestly integrative objective may stay integrative on a small feature. A narrow example never establishes unrelated facets or mastery. " +
+  QUESTION_DESIGN_GUIDANCE;
+const QUESTION_PACING_GUIDANCE =
+  "Include estimatedSolveSeconds: a finite number from 30 to 900 estimating typical prepared learner time for the whole bounded question, including reading, reasoning, expected tutoring exchanges and any coding/testing. Exclude network/model queue waiting. This is game pacing metadata, not a grade, mastery claim, door HP or instruction to change difficulty. The game applies its own slower-player margin and safety bounds.";
+const QUESTION_RUNTIME_SUPPORT = {
+  scripts: ["python", "typescript"],
+  react:
+    "Optional D2+ TypeScript runtime: {language:typescript,environment:react,steps:[{kind:click|fill|press|expect-text|expect-count,selector:CSS,...}]}. Single TSX module default-exporting App; only installed React imports, no network, workers or external packages. At most eight bounded interaction/check steps. Runtime errors/DOM checks/preview are observations, never automatic correctness or ENV credit; TSX transpilation is not static TypeScript type checking. Docker runtime must be installed locally.",
+};
+/** The request for one generated question. It carries no run, floor or terminal
+ * facts, which is what lets a prepared question serve any room. */
+function generationPayload(
+  g: Game,
+  r: Roadmap,
+  contract: Contract,
+  requestId: string,
+  encounterId: string,
+) {
+  const study = g.study;
+  return {
+    requestId,
+    encounterId,
+    contract,
+    careerScopeGuidance: careerScopeGuidance(contract, studyFocus(study)),
+    generationPolicy: QUESTION_GENERATION_POLICY,
+    pacingGuidance: QUESTION_PACING_GUIDANCE,
+    runtimeSupport: QUESTION_RUNTIME_SUPPORT,
+    existingScopeDefinitions: study.learner?.scopes,
+    probeRecords: probeRecordsForTrack(g, contract.track, contract),
+    progressContext: trackProgressContext(study.learner!, r, contract.track),
+    curriculum: r.tracks[contract.track].curriculum,
+  };
+}
+const preparing = new WeakMap<object, Promise<void>>();
+/** Whether a prepared question is still the one the schedule would issue. */
+function stillSchedulable(r: Roadmap, g: Game, c: Contract) {
+  if (c.practice) return true;
+  if (g.study.learner?.attempts.some((a) => a.status === "in-progress"))
+    return false;
+  try {
+    const now = eligible(r, g.study);
+    return (
+      now.track === c.track &&
+      now.depth === c.depth &&
+      now.review === c.review &&
+      now.kind === c.kind &&
+      now.ledgerVersion === c.ledgerVersion &&
+      JSON.stringify(now.objectiveIds) === JSON.stringify(c.objectiveIds)
+    );
+  } catch {
+    return false;
+  }
+}
+/** Generate the next terminal's question ahead of time. It waits for the last
+ * assessment so the question knows which gaps that answer closed or exposed. */
+export function prepareNextQuestion(g: Game, r: Roadmap) {
+  const study = g.study;
+  if (
+    !live(g) ||
+    status().mode !== "claude-cli" ||
+    g.status !== "playing" ||
+    study.preparedQuestion ||
+    preparing.has(study) ||
+    study.assessments.some((a) => a.status === "pending") ||
+    Object.values(g.encounters).some(
+      (e) =>
+        !!e.generation ||
+        (e.history.length > 0 &&
+          e.state !== "consumed" &&
+          e.problemPresentedSequence !== undefined &&
+          e.owner === "human"),
+    )
+  )
+    return;
+  const provider = activeProvider();
+  let contract: Contract;
+  try {
+    contract = spawnContract(r, study);
+    study.learner ??= initialLearner(r);
+    if (!stillSchedulable(r, g, contract)) return;
+  } catch {
+    return;
+  }
+  const requestId = `gen-${g.id}-prepared-${crypto.randomUUID()}`;
+  const operation = request<Problem>(
+    "generate",
+    generationPayload(g, r, contract, requestId, "prepared"),
+  )
+    .then((problem) => {
+      // A dropped profile or provider cannot leave its question behind.
+      if (g.study !== study || status().mode !== provider) return;
+      problem.provenance = provider;
+      study.preparedQuestion = { provider, contract, problem };
+    })
+    // A failed preparation is silent: opening a terminal generates as usual.
+    .catch(() => {})
+    .finally(() => preparing.delete(study));
+  preparing.set(study, operation);
+}
+/** Hand over the ready question, dropping it if the schedule has moved on. */
+function takePrepared(g: Game, r: Roadmap) {
+  const prepared = g.study.preparedQuestion;
+  if (!prepared) return undefined;
+  delete g.study.preparedQuestion;
+  return prepared.provider === status().mode &&
+    stillSchedulable(r, g, prepared.contract)
+    ? prepared
+    : undefined;
+}
 async function ensureIndividualProblem(g: Game, e: Encounter, r: Roadmap) {
   if (e.problem || e.state === "consumed") return;
   if (g.study.profile === "live" && status().mode === "development") {
@@ -332,8 +442,16 @@ async function ensureIndividualProblem(g: Game, e: Encounter, r: Roadmap) {
     profile = study.profile,
     native = live(g);
   e.generation = generation;
+  let prepared: ReturnType<typeof takePrepared>,
+    regenerate = false;
   try {
     let p: Problem;
+    if (native && !e.studyOnly && !e.pendingGeneration) {
+      // Arriving during preparation joins that call rather than paying twice.
+      await preparing.get(study);
+      if (!generationCurrent(g, e, generation)) return;
+      prepared = takePrepared(g, r);
+    }
     if (
       e.pendingGeneration &&
       (!native ||
@@ -345,33 +463,14 @@ async function ensureIndividualProblem(g: Game, e: Encounter, r: Roadmap) {
     // The spawn policy keeps the formal visit reachable and rotates other
     // terminals across cooled topics; a saved generation keeps its contract.
     const contract =
+      prepared?.contract ??
       (e.pendingGeneration?.payload?.contract as Contract | undefined) ??
       (e.studyOnly ? eligible(r, study) : spawnContract(r, study));
-    if (native) {
-      const payload = e.pendingGeneration?.payload ?? {
-        requestId: generation,
-        encounterId: e.id,
-        contract,
-        careerScopeGuidance: careerScopeGuidance(contract, studyFocus(study)),
-        generationPolicy:
-          "@study Diagnose before teaching. Write a standalone question: the prompt alone must supply the essential scenario, interface, implementation, data, timing and business-rule facts needed to answer without using the chat. For classification, list the concrete items to classify and their relevant behavior, lifetime and source without supplying their classifications. For tracing, debugging or critique, supply the relevant code, event sequence or evidence. Distinguish fixed facts from intentional design choices; if the learner may choose an example or an approach, say so explicitly rather than expecting them to infer an unspecified implementation. Ask a bounded task that matches the supplied scenario; never paste a capability statement into an unrelated generic story. Every requirement in the rubric must be visible in the question; do not grade unstated assumptions or add unrelated decisions, personal history or edge cases. Before returning the question, check that it can be answered from the prompt alone and repair missing context without revealing the solution. For D1, keep the learner workspace starter empty; put essential scenario or code-reading material in the prompt without supplying the key explanation, endpoint update, worked result or a leading solution hint. Do not interpret an objective's implementation verb as a D1 implementation requirement. Preserve legitimate prior context and assistance attribution without presenting supplied steps as fresh independent understanding. Use probeRecords: build the question around open gaps inside the eligible scope with the facet they blocked as the apex; only a gap marked reuseInScopeDefinitions may add its exact facet id to scopeDefinitions, and existing stable scope definitions are copied exactly; do not spend the question on established facets unless the scope requires them; re-ask what a closed gap blocked. The prompt is read by the learner: never mention the scheduled scope, objective IDs, tiers, depth, scheduling or that this is a formal visit; ask the question in plain language. Keep it minimal: write the smallest self-contained diagnostic that exercises the objective, with one main problem and at most one or two directly connected follow-ups. Include only the essential facts, not pasted project context or a full-project audit. For code review, include the actual code under review, including any required helper and its authorization semantics; a prose proposal supports design review only. Prefer short snippets, traces or evidence, and never turn an objective's scope verbs into a D1 implementation task. The visible task and rubric must match, without leaking the solution. An honestly integrative objective may stay integrative on a small feature. A narrow example never establishes unrelated facets or mastery. " +
-          QUESTION_DESIGN_GUIDANCE,
-        pacingGuidance:
-          "Include estimatedSolveSeconds: a finite number from 30 to 900 estimating typical prepared learner time for the whole bounded question, including reading, reasoning, expected tutoring exchanges and any coding/testing. Exclude network/model queue waiting. This is game pacing metadata, not a grade, mastery claim, door HP or instruction to change difficulty. The game applies its own slower-player margin and safety bounds.",
-        runtimeSupport: {
-          scripts: ["python", "typescript"],
-          react:
-            "Optional D2+ TypeScript runtime: {language:typescript,environment:react,steps:[{kind:click|fill|press|expect-text|expect-count,selector:CSS,...}]}. Single TSX module default-exporting App; only installed React imports, no network, workers or external packages. At most eight bounded interaction/check steps. Runtime errors/DOM checks/preview are observations, never automatic correctness or ENV credit; TSX transpilation is not static TypeScript type checking. Docker runtime must be installed locally.",
-        },
-        existingScopeDefinitions: g.study.learner?.scopes,
-        probeRecords: probeRecordsForTrack(g, contract.track, contract),
-        progressContext: trackProgressContext(
-          study.learner!,
-          r,
-          contract.track,
-        ),
-        curriculum: r.tracks[contract.track].curriculum,
-      };
+    if (prepared) p = prepared.problem;
+    else if (native) {
+      const payload =
+        e.pendingGeneration?.payload ??
+        generationPayload(g, r, contract, generation, e.id);
       const provider = activeProvider();
       e.pendingGeneration = {
         provider,
@@ -408,7 +507,9 @@ async function ensureIndividualProblem(g: Game, e: Encounter, r: Roadmap) {
     if (!e.studyOnly)
       recordSpawn(g.study, p.contract, e.questionRoom ?? e.id, g.time);
   } catch (err) {
-    if (
+    // A stale prepared question costs one fresh generation, not an error.
+    if (prepared) regenerate = true;
+    else if (
       g.study === study &&
       study.profile === profile &&
       generationCurrent(g, e, generation)
@@ -417,6 +518,7 @@ async function ensureIndividualProblem(g: Game, e: Encounter, r: Roadmap) {
   } finally {
     if (e.generation === generation) delete e.generation;
   }
+  if (regenerate) await ensureIndividualProblem(g, e, r);
 }
 export function edit(
   g: Game,

@@ -41,6 +41,7 @@ import {
   assess,
   autonomousNpcWork,
   checkBridge,
+  prepareNextQuestion,
   closeChat,
   edit,
   ensureProblem,
@@ -3265,6 +3266,7 @@ function ui() {
       });
     }
   }
+  if (!game.paused) prepareNextQuestion(game, roadmap);
   if (active) {
     const e = game.encounters[active];
     if (!game.paused && !materializing) {
