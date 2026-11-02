@@ -7,7 +7,7 @@ export async function withCompletionProvider<T>(
   globalThis.fetch = async (url, init) => {
     if (String(url) === "/api/status")
       return Response.json({
-        mode: "chatgpt-handoff",
+        mode: "claude-cli",
         label: "Synthetic completion fixture",
         detail: "No external AI request",
         capabilities: ["complete"],

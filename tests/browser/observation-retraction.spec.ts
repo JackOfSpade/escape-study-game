@@ -19,7 +19,7 @@ for (const outcome of ["assisted", "contradicted"] as const) {
     await page.route("**/api/status", (route) =>
       route.fulfill({
         json: {
-          mode: "study-mode",
+          mode: "claude-cli",
           label: "Synthetic correction fixture",
           detail: "Controlled transport only; no native semantic certification",
           capabilities: ["reconcile-roadmap"],
@@ -28,7 +28,12 @@ for (const outcome of ["assisted", "contradicted"] as const) {
     );
     await page.route("**/api/bridge", async (route) => {
       const { operation, payload: p } = route.request().postDataJSON();
-      expect(operation).toBe("reconcile-roadmap");
+      // Background question preparation is not part of this test.
+      if (operation !== "reconcile-roadmap")
+        return route.fulfill({
+          status: 503,
+          json: { error: "Not part of this test" },
+        });
       const local = inspectMergedDocument(p.local).rows;
       await route.fulfill({
         json: {
@@ -84,7 +89,7 @@ for (const outcome of ["assisted", "contradicted"] as const) {
     });
     await page
       .getByRole("button", {
-        name: "Request native reconciliation",
+        name: "Request roadmap review",
         exact: true,
       })
       .click();

@@ -7,7 +7,7 @@ import { enterLegacyBuilding } from "./helpers/legacy-world";
 
 // The editor was removed from normal gameplay. These scoped API fixtures keep
 // reconciliation's captured-work transaction covered through the actual browser
-// module/transport boundary; native-study.spec.ts covers the player conversation.
+// module/transport boundary; embedded-terminal.spec.ts covers the player conversation.
 async function capturedWork(
   page: import("@playwright/test").Page,
   text: string,
@@ -49,7 +49,7 @@ for (const scenario of ["unchanged", "stale", "new-work"])
     await page.route("**/api/status", (route) =>
       route.fulfill({
         json: {
-          mode: "study-mode",
+          mode: "claude-cli",
           label: "Synthetic active-work fixture",
           detail: "Not genuine native certification",
           capabilities: [
@@ -65,6 +65,12 @@ for (const scenario of ["unchanged", "stale", "new-work"])
     );
     await page.route("**/api/bridge", async (route) => {
       const { operation, payload } = route.request().postDataJSON();
+      // Background preparation would race the explicit issuance below.
+      if (operation === "generate" && payload.encounterId === "prepared")
+        return route.fulfill({
+          status: 503,
+          json: { error: "Not part of this test" },
+        });
       if (operation === "generate") {
         const c = payload.contract;
         await route.fulfill({
@@ -255,7 +261,7 @@ for (const scenario of ["unchanged", "stale", "new-work"])
     });
     await page
       .getByRole("button", {
-        name: "Request native reconciliation",
+        name: "Request roadmap review",
         exact: true,
       })
       .click();

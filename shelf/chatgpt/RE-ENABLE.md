@@ -28,7 +28,7 @@ Note these before removing any of them, because they cannot be restored from the
 
 ## Moved out of the client
 
-- `src/direct-study.ts` is here, at the same relative path. It also needs `applyDirectCompletion` and `recordAttributedMessage` from `src/ai.ts`, and `topicAssessmentContext` and `recordTopicAssessments` from `src/topic-assessment.ts` (both of which still exist).
+- `src/direct-study.ts` is here, at the same relative path. It also needs `applyDirectCompletion` (a thin alias of `applyCompletion`, which `src/ai.ts` now exports) and `recordAttributedMessage` from `src/ai.ts`, and `topicAssessmentContext` and `recordTopicAssessments` from `src/topic-assessment.ts` (both of which still exist).
 
 ## Removed from files that stay
 
@@ -38,3 +38,13 @@ These small pieces are only on the tag `archive/chatgpt-stack-v1`:
 - `src/main.ts` and `src/game-shell.html`: the native study panel (`#native-study`), the copy-request, Connect and completion-retry flows, the ChatGPT tab handling, the `#chatgpt-prompt` and `#open-chatgpt` elements, the whole ChatGPT settings section (`#chatgpt-settings`, `#handoff-*`) and the silent reconnect at start-up.
 - `src/run-designer.ts`, `src/run-quality-designer.ts` and `src/run-design-ui.ts`: the chat code and queue receipt on drafts, `cancelDesignDraft`, `designChatPrompt` and the Connect ChatGPT step of the run-design dialog.
 - `src/ai.ts`: `applyDirectCompletion`, `recordAttributedMessage`, the `handoffAutonomous` gate on unattended NPC work and the `studyPrompt` field of the tutor payload.
+
+## Tests
+
+`shelf/chatgpt/tests/` holds the tests of retired behaviour. Several are whole-file copies of the original, kept beside a converted file of the same name in `tests/`; the converted file is the live one.
+
+- Whole files moved here: `bridge-client.test.ts` (queue, receipts, chat codes, outage grace), `direct-study.test.ts`, `browser/direct-study.spec.ts`, `browser/study-connection-recovery.spec.ts`, `browser/reconnect-button.spec.ts` and `browser/native-study-harness.ts` (the ChatGPT direct-study mock).
+- Single tests taken out of files that stay: `autonomous-work-chatgpt.test.ts`, `study-workspace-direct.test.ts`, `npc-voice-receipt.test.ts`, `run-designer-receipt.test.ts`, `environment-review-queue.test.ts`, `chat-catchup-queue.test.ts`, `browser/maintenance-handoff.spec.ts`.
+- Original copies of files that have a converted version in `tests/`: `npc-voice-bridge.test.mjs`, `terminal-dialogue-harness.test.ts`, `browser/run-designer.spec.ts`, `browser/roadmap-handoff.spec.ts`, `browser/study-workspace.spec.ts`, `browser/task-issuance.spec.ts`, `browser/terminal-selection.spec.ts` and `browser/topic-assessment.spec.ts`.
+
+They import the shelved queue and routes and the old `native-study-harness.ts`, so move them back together with those files.

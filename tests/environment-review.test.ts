@@ -556,7 +556,7 @@ test("replacing the canonical packet during a pending review cannot apply its la
   assert.match(g.study.environmentReviews![0].error!, /changed/);
 });
 
-test("ChatGPT practical review preserves exact provider/packet on retry and reload, rejects relabeling, and stays separate from academic proof", async () => {
+test("Claude practical review preserves exact provider/packet on retry and reload, rejects relabeling, and stays separate from academic proof", async () => {
   const { g, o, l } = await fixture();
   const before = structuredClone(l);
   let first!: EnvironmentReviewPayload;
@@ -569,9 +569,9 @@ test("ChatGPT practical review preserves exact provider/packet on retry and relo
       throw Error("Synthetic handoff outage");
     },
     false,
-    "chatgpt-handoff",
+    "claude-cli",
   );
-  assert.equal(first.provider, "chatgpt-handoff");
+  assert.equal(first.provider, "claude-cli");
   const restored = recover(decode(encode(g)));
   let wrongCalls = 0;
   assert.throws(
@@ -585,7 +585,7 @@ test("ChatGPT practical review preserves exact provider/packet on retry and relo
           return judgment(p);
         },
         true,
-        "study-mode",
+        "chatgpt-handoff",
       ),
     /original.*provider/,
   );
@@ -599,11 +599,11 @@ test("ChatGPT practical review preserves exact provider/packet on retry and relo
       return judgment(p, "partially-observed");
     },
     true,
-    "chatgpt-handoff",
+    "claude-cli",
   );
   const ledger = restored.study.learner!;
   assert.equal(restored.study.environmentReviews![0].state, "applied");
-  assert.equal(ledger.environmentEvidence![0].provenance, "chatgpt-handoff");
+  assert.equal(ledger.environmentEvidence![0].provenance, "claude-cli");
   assert.equal(
     curriculumReadiness(r, ledger, "PE").requirements.find(
       (d) => d.id === o.envId,
@@ -657,7 +657,7 @@ test("legacy native practical review retries its original provider-less body and
 test("provider change while an ENV response is pending cannot apply it or retry it through another provider", async () => {
   const { g, o, l } = await fixture();
   const original = globalThis.fetch;
-  let mode = "chatgpt-handoff",
+  let mode = "claude-cli",
     finish!: () => void;
   globalThis.fetch = async (url) => {
     if (url === "/api/status")
@@ -677,7 +677,7 @@ test("provider change while an ENV response is pending cannot apply it or retry 
     await checkBridge();
     const pending = reviewEnvironmentObservation(g, r, o.id);
     await waitUntil(() => finish !== undefined, "finish callback");
-    mode = "study-mode";
+    mode = "development";
     await checkBridge();
     finish();
     await pending;
@@ -685,7 +685,7 @@ test("provider change while an ENV response is pending cannot apply it or retry 
     assert.match(g.study.environmentReviews![0].error!, /provider changed/);
     assert.throws(
       () => reviewEnvironmentObservation(g, r, o.id, true),
-      /original.*provider/,
+      /Environment review is unavailable/,
     );
   } finally {
     globalThis.fetch = original;
@@ -703,28 +703,16 @@ test("provider change while an ENV response is pending cannot apply it or retry 
   }
 });
 
-// @ts-expect-error Actual transport module is intentionally plain JavaScript.
-import { createHandoffQueue } from "../scripts/chatgpt-handoff-queue.mjs";
-// @ts-expect-error Actual transport module is intentionally plain JavaScript.
-import { createHandoffRoutes } from "../scripts/chatgpt-handoff-routes.mjs";
-// @ts-expect-error Actual transport module is intentionally plain JavaScript.
-import { createStudyBridgeServer } from "../scripts/study-bridge-server.mjs";
+import { localHandoff } from "./helpers/local-handoff";
 
-test("actual loopback ChatGPT ENV queue accepts a corrected claim, applies only separate practical evidence and releases no job until enabled", async () => {
+test("the Claude gateway ENV review rejects invalid claims, applies only separate practical evidence and keeps the request frozen", async () => {
   const { g, o, l } = await fixture(),
     before = structuredClone(l);
-  const q = createHandoffQueue(),
-    server = createStudyBridgeServer({
-      handoff: createHandoffRoutes(q, { token: "synthetic-env-transport" }),
-    });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const address = server.address();
-  assert.ok(address && typeof address !== "string");
-  const base = `http://127.0.0.1:${address.port}`,
+  const relay = await localHandoff(),
     original = globalThis.fetch;
-  // Route actual client requests into this isolated relay; never the public bridge.
+  // Route actual client requests into this isolated gateway; never the public bridge.
   globalThis.fetch = (url, options) =>
-    original(new URL(String(url), base), {
+    original(new URL(String(url), relay.base), {
       ...options,
       headers: { ...options?.headers, Origin: "http://127.0.0.1:5173" },
     });
@@ -738,107 +726,42 @@ test("actual loopback ChatGPT ENV queue accepts a corrected claim, applies only 
       throw Error("capture only");
     },
     false,
-    "chatgpt-handoff",
+    "claude-cli",
   );
-  const post = (path: string, body: unknown, worker = false) =>
-    original(base + path, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(worker
-          ? { Authorization: "Bearer synthetic-env-transport" }
-          : { Origin: "http://127.0.0.1:5173" }),
-      },
-      body: JSON.stringify(body),
-    });
   try {
-    assert.equal(
-      (
-        await post("/api/bridge", {
-          operation: "review-environment",
-          payload: release,
-        })
-      ).status,
-      503,
-    );
-    assert.equal(q.snapshot().queued, 0);
-    await post("/api/handoff/control", { action: "enable", enabled: true });
     await checkBridge();
-    const status = await (await original(base + "/api/status")).json();
-    assert.equal(status.mode, "chatgpt-handoff");
+    const status = await (await original(relay.base + "/api/status")).json();
+    assert.equal(status.mode, "claude-cli");
     assert.ok(status.capabilities.includes("review-environment"));
-    const pending = reviewEnvironmentObservation(g, r, o.id, true);
-    let job: any;
-    for (let n = 0; n < 100; n++) {
-      job = await (
-        await post(
-          "/api/handoff/worker",
-          { action: "get", worker: "synthetic-env-worker" },
-          true,
-        )
-      ).json();
-      if (job.operation) break;
-      await new Promise((resolve) => setTimeout(resolve, 5));
-    }
-    assert.equal(job.operation, "review-environment");
-    assert.deepEqual(job.payload, release);
-    assert.match(job.instructions, /separate practical review/);
-    const good = judgment(job.payload, "partially-observed");
-    for (const bad of [
-      { ...good, observationFingerprint: "other" },
-      {
-        ...good,
-        reviewedOutputs: [
-          { kind: "supplied-output", excerpt: "invented output" },
-        ],
-      },
-      { ...good, classification: "observed" },
-    ]) {
-      const result = await post(
-        "/api/handoff/worker",
-        {
-          action: "submit",
-          worker: "synthetic-env-worker",
-          jobId: job.jobId,
-          claim: job.claim,
-          answer: bad,
-        },
-        true,
-      );
-      assert.equal(result.status, 409);
-      const same = await (
-        await post(
-          "/api/handoff/worker",
-          { action: "get", worker: "synthetic-env-worker" },
-          true,
-        )
-      ).json();
-      assert.equal(same.jobId, job.jobId);
-      assert.equal(same.claim, job.claim);
-    }
-    assert.equal(
-      (
-        await post(
-          "/api/handoff/worker",
+    let sent: any;
+    relay.answerWith((job) => {
+      sent = job;
+      const good = judgment(job.payload, "partially-observed");
+      return {
+        valid: good,
+        invalid: [
+          { ...good, observationFingerprint: "other" },
           {
-            action: "submit",
-            worker: "synthetic-env-worker",
-            jobId: job.jobId,
-            claim: job.claim,
-            answer: good,
+            ...good,
+            reviewedOutputs: [
+              { kind: "supplied-output", excerpt: "invented output" },
+            ],
           },
-          true,
-        )
-      ).status,
-      200,
-    );
-    await pending;
+          { ...good, classification: "observed" },
+        ],
+      };
+    });
+    await reviewEnvironmentObservation(g, r, o.id, true);
+    assert.equal(sent.operation, "review-environment");
+    assert.deepEqual(sent.payload, release);
+    assert.equal(relay.rejected, 3);
+    assert.equal(relay.completed, 1);
     assert.equal(
       g.study.environmentReviews![0].state,
       "applied",
       g.study.environmentReviews![0].error,
     );
-    assert.equal(l.environmentEvidence![0].provenance, "chatgpt-handoff");
+    assert.equal(l.environmentEvidence![0].provenance, "claude-cli");
     for (const key of [
       "cells",
       "attempts",
@@ -855,9 +778,6 @@ test("actual loopback ChatGPT ENV queue accepts a corrected claim, applies only 
     );
     const exported = await prepareRoadmapExport(r, restored.study.learner!);
     assert.ok(exported.content.includes(l.environmentEvidence![0].id));
-    const summary = await (await original(base + "/api/handoff/status")).text();
-    assert.ok(!summary.includes("SYNTHETIC_OUTPUT_SECRET"));
-    assert.equal(q.snapshot().done, 1);
   } finally {
     globalThis.fetch = async () =>
       Response.json({
@@ -868,7 +788,6 @@ test("actual loopback ChatGPT ENV queue accepts a corrected claim, applies only 
       });
     await checkBridge();
     globalThis.fetch = original;
-    server.closeAllConnections();
-    await new Promise<void>((resolve) => server.close(resolve));
+    await relay.close();
   }
 });

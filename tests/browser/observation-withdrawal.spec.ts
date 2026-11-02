@@ -50,7 +50,7 @@ test("reviewed source invalidation withdraws a prior imported pass without learn
   await page.route("**/api/status", (route) =>
     route.fulfill({
       json: {
-        mode: "study-mode",
+        mode: "claude-cli",
         label: "Synthetic withdrawal fixture",
         detail: "Synthetic transport test, not actual native certification",
         capabilities: ["reconcile-roadmap"],
@@ -59,7 +59,12 @@ test("reviewed source invalidation withdraws a prior imported pass without learn
   );
   await page.route("**/api/bridge", async (route) => {
     const { operation, payload: p } = route.request().postDataJSON();
-    expect(operation).toBe("reconcile-roadmap");
+    // Background question preparation is not part of this test.
+    if (operation !== "reconcile-roadmap")
+      return route.fulfill({
+        status: 503,
+        json: { error: "Not part of this test" },
+      });
     const canonical = p.candidate,
       local = inspectMergedDocument(p.local).rows;
     const decisions = [...inspectMergedDocument(p.candidate).rows]
@@ -188,7 +193,7 @@ test("reviewed source invalidation withdraws a prior imported pass without learn
     buffer: Buffer.from(candidate),
   });
   await page
-    .getByRole("button", { name: "Request native reconciliation", exact: true })
+    .getByRole("button", { name: "Request roadmap review", exact: true })
     .click();
   await expect(
     page.getByRole("button", { name: "Adopt reviewed roadmap", exact: true }),

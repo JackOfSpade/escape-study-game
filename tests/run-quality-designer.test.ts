@@ -31,7 +31,6 @@ const send: Send = async (request) =>
 function draft() {
   return createQualityDraft({
     targetRunId: "synthetic-quality-run",
-    chatCode: "QUALITY42",
     generationId: `design-${crypto.randomUUID()}`,
     seed: 42,
     recent: [],
@@ -144,48 +143,28 @@ test("quality generation explores, selects, reviews and authors each coherent ob
         return finalizeDesignedRun(candidate, saved);
       },
     }),
-    async (request, currentDraft, signal, progress) => {
+    async (request, currentDraft, signal) => {
       phases.push(request.phase);
-      const queued = activities.at(-1)!;
+      const started = activities.at(-1)!;
       assert.equal(
-        queued.state,
-        "queued",
-        "every captured request waits for pickup before showing activity",
+        started.state,
+        "working",
+        "a captured request shows work as soon as it is sent",
       );
-      requestedStages.push(queued.stage);
-      assert.equal(
-        activities.filter((event) => event.state === "working").length,
-        workingSignals,
-        "starting or accepting requests cannot invent worker activity",
-      );
+      requestedStages.push(started.stage);
       await Promise.resolve();
-      assert.equal(activities.at(-1), queued);
+      assert.equal(activities.at(-1), started);
       if (request.phase === "content-batch") {
-        assert.equal(queued.stage, "details");
+        assert.equal(started.stage, "details");
         assert.ok(
-          queued.detail.includes(
+          started.detail.includes(
             `group ${++authoredBatches} of ${batches.length}`,
           ),
           "batch progress follows the actual accepted object groups",
         );
       }
       workingSignals++;
-      progress("working");
-      assert.equal(activities.at(-1)?.state, "working");
-      assert.equal(activities.at(-1)?.stage, queued.stage);
-      if (request.phase === "concepts") {
-        progress("unknown");
-        const disconnected = activities.at(-1)!;
-        assert.equal(disconnected.state, "unknown");
-        assert.equal(disconnected.stage, queued.stage);
-        await Promise.resolve();
-        assert.equal(
-          activities.at(-1),
-          disconnected,
-          "loss of transport confirmation stays idle until a real event",
-        );
-      }
-      return send(request, currentDraft, signal, progress);
+      return send(request, currentDraft, signal);
     },
   );
   assert.deepEqual(phases, [
@@ -263,7 +242,6 @@ test("mid-batch interruption and reload keep accepted objects and the exact curr
       return send(request, ...args);
     },
   );
-  assert.equal(restored.chatCode, current.chatCode);
   assert.deepEqual(result.saved.design, design);
 });
 

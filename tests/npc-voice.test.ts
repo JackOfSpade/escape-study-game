@@ -1317,10 +1317,10 @@ test("cited attacker, injured ally and heard impact facts becoming stale cancel 
   }
 });
 
-test("pause, voices off and a new run discard the actual queued critic receipt", async (t) => {
+test("pause, voices off and a new run abort the in-flight critic request", async (t) => {
   for (const reason of ["pause", "off", "new-run"] as const) {
     const f = fixture(),
-      deleted: string[] = [],
+      aborted: boolean[] = [],
       submitted: unknown[] = [];
     t.mock.method(
       globalThis,
@@ -1329,29 +1329,23 @@ test("pause, voices off and a new run discard the actual queued critic receipt",
         const url = String(input);
         if (url === "/api/status")
           return Response.json({
-            mode: "chatgpt-handoff",
-            label: "Synthetic relay",
+            mode: "claude-cli",
+            label: "Synthetic gateway",
             capabilities: ["npc-chatter", "npc-chatter-review"],
             detail: "Offline fixture",
           });
         if (url === "/api/bridge") {
           submitted.push(JSON.parse(String(init?.body)));
-          return Response.json(
-            {
-              handoff: {
-                id: "synthetic-review-job",
-                hash: "synthetic-review-hash",
-              },
-            },
-            { status: 202 },
-          );
-        }
-        if (
-          url.startsWith("/api/bridge/result?") &&
-          init?.method === "DELETE"
-        ) {
-          deleted.push(url);
-          return new Response(null, { status: 204 });
+          // The reply never arrives; only the caller's signal can end it.
+          return new Promise<Response>((_resolve, reject) => {
+            const signal = init?.signal;
+            const end = () => {
+              aborted.push(true);
+              reject(signal?.reason ?? Error("aborted"));
+            };
+            if (signal?.aborted) end();
+            else signal?.addEventListener("abort", end, { once: true });
+          });
         }
         throw Error(`Unexpected synthetic transport request: ${url}`);
       },
@@ -1368,14 +1362,11 @@ test("pause, voices off and a new run discard the actual queued critic receipt",
       (submitted[0] as { operation: string }).operation,
       "npc-chatter-review",
     );
+    assert.equal(aborted.length, 0, "the critic is still waiting");
     if (reason === "pause") f.g.paused = true;
     if (reason === "off") f.g.settings.npcVoices = false;
     f.director.update(reason === "new-run" ? game() : f.g);
-    await until(() => deleted.length === 1);
-    assert.equal(
-      deleted[0],
-      "/api/bridge/result?id=synthetic-review-job&hash=synthetic-review-hash",
-    );
+    await until(() => aborted.length === 1);
     noSpeech(f);
     f.director.dispose();
     t.mock.restoreAll();

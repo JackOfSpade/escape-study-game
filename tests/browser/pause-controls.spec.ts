@@ -4,13 +4,13 @@ import { enterLegacyBuilding } from "./helpers/legacy-world";
 import { environmentDesignFixture } from "../helpers/environment-design";
 import {
   flushNativeSave,
-  mockNativeStudy,
+  mockClaudeStudy,
   nativeState,
   openNativeQuestion,
   seedLegacyDraft,
-} from "./native-study-harness";
+} from "./study-harness";
 async function setup(page: Page) {
-  await mockNativeStudy(page);
+  await mockClaudeStudy(page);
   await enterLegacyBuilding(page);
   await page.evaluate(() => {
     const g = (window as any).__deadAir.game,
@@ -86,16 +86,14 @@ test("player controls live in the pause dialog and developer tools stay hidden",
   expect(resumed.time).toBeGreaterThan(before.time);
   expect([resumed.x, resumed.y]).toEqual([before.x, before.y]);
 });
-test("Esc freezes survival during native study, preserves the captured legacy draft and survives reload without catch-up", async ({
+test("Esc freezes survival during a Claude question, preserves the captured legacy draft and survives reload without catch-up", async ({
   page,
 }) => {
   await setup(page);
   await seedLegacyDraft(page, "saved learner draft");
   const id = await openNativeQuestion(page);
-  await expect
-    .poll(async () => (await nativeState(page, id)).session?.state)
-    .toBe("pending");
-  const captured = (await nativeState(page, id)).session.payloadJson;
+  await expect(page.locator("#problem-title")).toHaveText("Synthetic question");
+  const captured = await nativeState(page, id);
   await page.locator("#world").focus();
   await page.keyboard.press("Escape");
   await expect(page.locator("#pause-menu")).toBeVisible();
@@ -126,8 +124,9 @@ test("Esc freezes survival during native study, preserves the captured legacy dr
   await page.keyboard.press("Escape");
   await expect(page.locator("#pause-menu")).not.toBeVisible();
   await page.locator("#world").focus();
-  expect((await nativeState(page, id)).session.payloadJson).toBe(captured);
-  expect(JSON.parse(captured).workspace).toBe("saved learner draft");
+  expect((await nativeState(page, id)).problem).toBe(captured.problem);
+  expect((await nativeState(page, id)).workspace).toBe("saved learner draft");
+  // A reload never reopens the terminal on its own.
   await expect(page.locator("#terminal")).toBeHidden();
   await page.waitForTimeout(250);
   const elapsed =
@@ -141,15 +140,16 @@ test("pause restart retains original progress and archives unfinished human work
   await setup(page);
   await seedLegacyDraft(page, "unfinished human reasoning survives restart");
   const id = await openNativeQuestion(page);
-  await expect
-    .poll(async () => (await nativeState(page, id)).session?.state)
-    .toBe("pending");
-  const captured = (await nativeState(page, id)).session.payloadJson;
+  await expect(page.locator("#problem-title")).toHaveText("Synthetic question");
+  const captured = await nativeState(page, id);
   const before = await page.evaluate(() => {
     const g = (window as any).__deadAir.game;
     return {
       id: g.id,
-      progress: g.study.learner,
+      progress: {
+        cells: g.study.learner?.cells,
+        evidence: g.study.learner?.evidence,
+      },
       source: g.study.learner?.sourceHash,
       encounters: Object.keys(g.encounters),
     };
@@ -158,29 +158,29 @@ test("pause restart retains original progress and archives unfinished human work
   await page.locator("#restart-game").click();
   await chooseDesignedRun(page);
   await expect(page.locator("#pause-menu")).not.toBeVisible();
-  const after = await page.evaluate((captured) => {
+  const after = await page.evaluate((id) => {
     const g = (window as any).__deadAir.game;
     return {
       id: g.id,
-      progress: g.study.learner,
+      progress: {
+        cells: g.study.learner?.cells,
+        evidence: g.study.learner?.evidence,
+      },
       source: g.study.learner?.sourceHash,
       archives: g.study.archives.map((e: any) => e.workspace),
-      archivedNative: g.study.archives.find(
-        (e: any) => e.directStudy?.id === JSON.parse(captured).requestId,
-      )?.directStudy,
+      archivedProblem: JSON.stringify(
+        g.study.archives.find((e: any) => e.id === id)?.problem,
+      ),
       paused: g.paused,
     };
-  }, captured);
+  }, id);
   expect(after.id).not.toBe(before.id);
   expect(after.progress).toEqual(before.progress);
   expect(after.source).toEqual(before.source);
   expect(after.archives).toContain(
     "unfinished human reasoning survives restart",
   );
-  expect(after.archivedNative.state).toBe("superseded");
-  expect(JSON.parse(after.archivedNative.payloadJson).problem).toEqual(
-    JSON.parse(captured).problem,
-  );
+  expect(after.archivedProblem).toBe(captured.problem);
   expect(after.paused).toBe(false);
 });
 test("E toggles a pivoting grip; old G/R/digit shortcuts do not act; Space vaults", async ({

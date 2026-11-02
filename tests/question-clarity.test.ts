@@ -34,7 +34,7 @@ test("a clarification-only terminal turn receives the clarity policy and preserv
   globalThis.fetch = async (url, init) => {
     if (String(url) === "/api/status")
       return Response.json({
-        mode: connected ? "chatgpt-handoff" : "development",
+        mode: connected ? "claude-cli" : "development",
         label: "Synthetic question clarity fixture",
         detail: "No real AI",
         capabilities: connected ? ["tutor"] : [],
@@ -85,7 +85,7 @@ test("a clarification-only terminal turn receives the clarity policy and preserv
       {
         requestId: "synthetic-before-clarification",
         questionSequence: 1,
-        provider: "chatgpt-handoff",
+        provider: "claude-cli",
         statement: "Synthetic previously established classification",
         at: "2026-10-20T12:00:00.000Z",
       },

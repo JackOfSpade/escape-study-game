@@ -30,19 +30,12 @@ const harborPhases = [
 
 async function designer(page: Page) {
   const calls: any[] = [],
-    cancelled: string[] = [],
     delivered: string[] = [],
-    results = new Map<string, object>(),
     pending = new Map<string, (design: object) => void>();
   let capable = true,
-    queued = false,
-    queuedPhase = "concepts",
-    delayed = false,
-    failedPoll = false,
-    outage = false,
-    working = false,
-    workerActivityAt: number | undefined,
-    unrelatedWorker = false;
+    holdAll = false,
+    holdPhase = "concepts",
+    failing = false;
   let answer = (_body: any) => harbor;
   let editReply = (_body: any, response: any) => response;
   const reply = (body: any, proposed: any) => {
@@ -87,41 +80,10 @@ async function designer(page: Page) {
       });
     if (url.pathname === "/api/status")
       return json({
-        mode: capable ? "chatgpt-handoff" : "development",
+        mode: capable ? "claude-cli" : "development",
         label: "Synthetic run designer",
         detail: "Offline browser fixture; no external model",
         capabilities: capable ? ["design-run"] : [],
-      });
-    if (url.pathname === "/api/handoff/status")
-      return json({
-        enabled: capable,
-        queued: calls.length,
-        working: working || unrelatedWorker ? 1 : 0,
-        done: results.size,
-        public: {
-          configured: false,
-          workerActive: working || unrelatedWorker,
-          terminalRelay: { activeSessions: working || unrelatedWorker ? 1 : 0 },
-        },
-        recent: [
-          ...(unrelatedWorker
-            ? [{ id: "another-chat-request", status: "working" }]
-            : []),
-          ...calls.map((c) => ({
-            id: c.payload.requestId,
-            status: results.has(c.payload.requestId)
-              ? "done"
-              : working
-                ? "working"
-                : "queued",
-            ...(workerActivityAt === undefined
-              ? {}
-              : {
-                  claimedAt: workerActivityAt,
-                  lastWorkerActivityAt: workerActivityAt,
-                }),
-          })),
-        ],
       });
     if (url.pathname === "/api/bridge" && request.method() === "POST") {
       const body = request.postDataJSON();
@@ -129,80 +91,34 @@ async function designer(page: Page) {
         return json({ error: "Unexpected synthetic operation" }, 400);
       calls.push(body);
       const id = body.payload.requestId;
-      if (delayed && body.payload.phase === "concepts") {
+      if (failing)
+        return json({ error: "Synthetic design request interrupted" }, 502);
+      // A held request stays in flight until the test finishes it.
+      if (holdAll && body.payload.phase === holdPhase) {
         const design = await new Promise<object>((resolve) =>
           pending.set(id, resolve),
         );
-        await json(reply(body, design));
+        await json(reply(body, design)).catch(() => {});
         delivered.push(id);
         return;
       }
-      return queued && body.payload.phase === queuedPhase
-        ? json({ handoff: { id, hash: `synthetic-${id}` } }, 202)
-        : json(reply(body, answer(body)));
-    }
-    if (url.pathname === "/api/bridge/result") {
-      const id = url.searchParams.get("id")!;
-      if (request.method() === "DELETE") {
-        cancelled.push(id);
-        return json({ cancelled: true });
-      }
-      if (outage)
-        return route.fulfill({
-          status: 503,
-          contentType: "text/html",
-          body: "Synthetic proxy unavailable",
-        });
-      if (failedPoll)
-        return json({ error: "Synthetic design request interrupted" }, 409);
-      return results.has(id)
-        ? json(results.get(id))
-        : json(
-            {
-              handoff: {
-                id,
-                status: working ? "working" : "queued",
-                ...(workerActivityAt === undefined
-                  ? {}
-                  : {
-                      claimedAt: workerActivityAt,
-                      lastWorkerActivityAt: workerActivityAt,
-                    }),
-              },
-            },
-            202,
-          );
+      return json(reply(body, answer(body)));
     }
     return json({ error: "No synthetic route" }, 404);
   });
   return {
     calls,
-    cancelled,
     delivered,
     setCapable(value: boolean) {
       capable = value;
     },
-    setQueued(value: boolean, phase = "concepts") {
-      queued = value;
-      queuedPhase = phase;
+    /** Keep requests for one phase in flight until `finish`. */
+    setHeld(value: boolean, phase = "concepts") {
+      holdAll = value;
+      holdPhase = phase;
     },
-    setDelayed(value: boolean) {
-      delayed = value;
-    },
-    setFailedPoll(value: boolean) {
-      failedPoll = value;
-    },
-    setOutage(value: boolean) {
-      outage = value;
-    },
-    setWorking(value: boolean) {
-      working = value;
-    },
-    setWorkerActivityAt(value: number) {
-      workerActivityAt = value;
-    },
-    setUnrelatedWorker(value: boolean) {
-      unrelatedWorker = value;
+    setFailing(value: boolean) {
+      failing = value;
     },
     setAnswer(value: (body: any) => any) {
       answer = value;
@@ -212,12 +128,9 @@ async function designer(page: Page) {
     },
     finish(call: any, design = harbor) {
       const waiting = pending.get(call.payload.requestId);
-      if (waiting) {
-        pending.delete(call.payload.requestId);
-        waiting(design);
-        return;
-      }
-      results.set(call.payload.requestId, reply(call, design));
+      if (!waiting) throw Error("No held request to finish");
+      pending.delete(call.payload.requestId);
+      waiting(design);
     },
   };
 }
@@ -312,342 +225,18 @@ async function pause(page: Page) {
   await flush(page);
 }
 
-for (const { clipboardDenied, popupBlocked } of [
-  { clipboardDenied: false, popupBlocked: false },
-  { clipboardDenied: true, popupBlocked: false },
-  { clipboardDenied: true, popupBlocked: true },
-]) {
-  test(`designer Connect prefills an unsent ChatGPT draft without showing the prompt, clipboard ${clipboardDenied ? "denied" : "available"}, popup ${popupBlocked ? "blocked" : "available"}`, async ({
-    page,
-    context,
-  }) => {
-    const relay = await designer(page);
-    relay.setQueued(true);
-    await context.route("https://chatgpt.com/**", (route) =>
-      route.fulfill({
-        contentType: "text/html",
-        body: "<title>Synthetic ChatGPT draft</title>",
-      }),
-    );
-    await page.addInitScript(
-      ({ clipboardDenied, popupBlocked }) => {
-        const nativeOpen = window.open.bind(window);
-        (window as any).__designerChatUrls = [];
-        window.open = (...args: Parameters<typeof window.open>) => {
-          (window as any).__designerChatUrls.push(String(args[0]));
-          return popupBlocked ? null : nativeOpen(...args);
-        };
-        Object.defineProperty(navigator, "clipboard", {
-          configurable: true,
-          value: {
-            writeText: async () => {
-              if (clipboardDenied)
-                throw new DOMException("Denied", "NotAllowedError");
-            },
-          },
-        });
-      },
-      { clipboardDenied, popupBlocked },
-    );
-    await open(page);
-    const before = await state(page);
-    await page.locator("#start").click();
-    await expect.poll(() => relay.calls.length).toBe(1);
-    const request = relay.calls[0];
-    const expectedPrompt = await page.evaluate(async () => {
-      const { readDesignDraft, designChatPrompt } = await import(
-        "/src/run-designer.ts" as string
-      );
-      const draft = readDesignDraft((window as any).__deadAir.game.id);
-      if (!draft) throw Error("Missing synthetic designer draft");
-      return designChatPrompt(draft);
-    });
-    const popup = popupBlocked ? undefined : page.waitForEvent("popup");
-    await page.locator("#run-design-connect").click();
-    const openedUrls = await page.evaluate(
-      () => (window as any).__designerChatUrls as string[],
-    );
-    expect(openedUrls).toHaveLength(1);
-    const url = new URL(openedUrls[0]);
-    expect(url.origin).toBe("https://chatgpt.com");
-    expect(url.searchParams.get("q")).toBe(expectedPrompt);
-    expect(url.searchParams.get("submit")).toBe("false");
-    if (popup) {
-      const chat = await popup;
-      await chat.waitForURL(openedUrls[0]);
-      await expect(chat).toHaveTitle("Synthetic ChatGPT draft");
-      await chat.close();
-    }
-    const dialog = page.locator("#run-design-dialog");
-    await expect(dialog).toHaveAttribute("data-state", "waiting");
-    await expect(page.locator("#run-design-loading")).toBeHidden();
-    await expect(page.locator("#run-design-status")).toContainText(
-      "Waiting for ChatGPT",
-    );
-    await expect(
-      page.locator('#run-design-steps [data-step="connect"]'),
-    ).toHaveAttribute("data-state", "active");
-    await expect(
-      page.locator('#run-design-steps [data-state="complete"]'),
-    ).toHaveCount(0);
-    await expect(dialog.locator("textarea, details")).toHaveCount(0);
-    await expect(
-      dialog.getByRole("button", { name: "Copy request" }),
-    ).toHaveCount(0);
-    await expect(
-      dialog.getByRole("link", { name: /^Open ChatGPT/ }),
-    ).toHaveAttribute("href", openedUrls[0]);
-    if (!clipboardDenied && !popupBlocked)
-      await dialog.screenshot({
-        path: ".artifacts/handoff/design/chatgpt-prefill-dialog.png",
-      });
-    expect(relay.calls).toHaveLength(1);
-    expect(await state(page)).toEqual(before);
-    await page.locator("#run-design-cancel").click();
-    await expect(dialog).toHaveCount(0);
-    await expect
-      .poll(() => relay.cancelled)
-      .toContain(request.payload.requestId);
-    expect(relay.calls).toHaveLength(1);
-    expect(await state(page)).toEqual(before);
-  });
-}
-
-test("the fallback ChatGPT link retries failed connector setup without advancing the pending design", async ({
-  page,
-  context,
-}) => {
-  const relay = await designer(page);
-  relay.setQueued(true);
-  await context.route("https://chatgpt.com/**", (route) =>
-    route.fulfill({
-      contentType: "text/html",
-      body: "<title>Synthetic recovery chat</title>",
-    }),
-  );
-  await page.addInitScript(() => {
-    // The initial click must retain a usable fallback when a popup is blocked.
-    window.open = () => null;
-  });
-  await open(page);
-  const before = await state(page);
-  await page.evaluate(async () => {
-    const { chooseRunDesign } = await import("/src/run-design-ui.ts" as string),
-      app = (window as any).__deadAir;
-    (window as any).__designRecoveryConnectCalls = 0;
-    void chooseRunDesign(app.game, app.roadmap, async () => {
-      const call = ++(window as any).__designRecoveryConnectCalls;
-      if (call === 1) throw Error("Synthetic connector startup failed");
-    });
-  });
-  await expect.poll(() => relay.calls.length).toBe(1);
-  await page.locator("#run-design-connect").click();
-  await expect
-    .poll(() =>
-      page.evaluate(() => (window as any).__designRecoveryConnectCalls),
-    )
-    .toBe(1);
-  const fallback = page.locator("#run-design-open"),
-    url = await fallback.getAttribute("href");
-  await expect(fallback).toBeVisible();
-  const popup = page.waitForEvent("popup");
-  await fallback.click();
-  const chat = await popup;
-  await chat.waitForURL(url!);
-  await expect(chat).toHaveTitle("Synthetic recovery chat");
-  await chat.close();
-  await expect
-    .poll(() =>
-      page.evaluate(() => (window as any).__designRecoveryConnectCalls),
-    )
-    .toBe(2);
-  await expect(page.locator("#run-design-dialog")).toHaveAttribute(
-    "data-state",
-    "waiting",
-  );
-  await expect(page.locator("#run-design-loading")).toBeHidden();
-  await expect(
-    page.locator('#run-design-steps [data-state="complete"]'),
-  ).toHaveCount(0);
-  expect(relay.calls).toHaveLength(1);
-  expect(await state(page)).toEqual(before);
-  await page.locator("#run-design-cancel").click();
-  await expect(page.locator("#run-design-dialog")).toHaveCount(0);
-  await expect
-    .poll(() => relay.cancelled)
-    .toContain(relay.calls[0].payload.requestId);
-  expect(await state(page)).toEqual(before);
-});
-
-test("setup progress follows this chat's claimed job and completed stages, stopping during a bridge outage", async ({
-  page,
-}) => {
-  const relay = await designer(page);
-  relay.setQueued(true);
-  relay.setUnrelatedWorker(true);
-  await open(page);
-  const original = await state(page);
-  await page.locator("#start").click();
-  await expect.poll(() => relay.calls.length).toBe(1);
-  const dialog = page.locator("#run-design-dialog"),
-    loading = page.locator("#run-design-loading"),
-    step = (name: string) =>
-      page.locator(`#run-design-steps [data-step="${name}"]`);
-  await expect(dialog).toHaveAttribute("data-state", "waiting");
-  await expect(loading).toBeHidden();
-  await expect(page.getByRole("progressbar")).not.toBeVisible();
-  await expect(page.locator("#run-design-retry")).toBeHidden();
-  await expect(step("connect")).toHaveAttribute("data-state", "active");
-  await expect(step("connect")).toHaveAttribute("aria-current", "step");
-  await expect(step("design")).toHaveAttribute("data-state", "pending");
-  // An active worker in another chat is not evidence this request was claimed.
-  await expectFrozen(page);
-  await expect(loading).toBeHidden();
-  await dialog.screenshot({
-    path: ".artifacts/handoff/design/reactive-setup-waiting.png",
-  });
-
-  relay.setWorking(true);
-  await expect(dialog).toHaveAttribute("data-state", "working");
-  await expect(loading).toBeVisible();
-  await expect(page.getByRole("progressbar")).toBeVisible();
-  await expect(step("connect")).toHaveAttribute("data-state", "complete");
-  await expect(step("design")).toHaveAttribute("data-state", "active");
-  await expect(step("design")).toHaveAttribute("aria-current", "step");
-  await expect(step("details")).toHaveAttribute("data-state", "pending");
-  await expect(step("review")).toHaveAttribute("data-state", "pending");
-  await dialog.screenshot({
-    path: ".artifacts/handoff/design/reactive-setup-working.png",
-  });
-
-  relay.setOutage(true);
-  await expect(dialog).toHaveAttribute("data-state", "reconnecting");
-  await expect(loading).toBeHidden();
-  await expect(step("design")).toHaveAttribute("data-state", "active");
-  await expect(step("details")).toHaveAttribute("data-state", "pending");
-  expect(await state(page)).toEqual(original);
-
-  relay.setWorking(false);
-  relay.setOutage(false);
-  relay.setQueued(true, "content-batch");
-  relay.finish(relay.calls[0]);
-  await expect
-    .poll(() => relay.calls.at(-1)?.payload.phase)
-    .toBe("content-batch");
-  await expect(dialog).toHaveAttribute("data-state", "waiting");
-  await expect(loading).toBeHidden();
-  await expect(step("connect")).toHaveAttribute("data-state", "complete");
-  await expect(step("design")).toHaveAttribute("data-state", "complete");
-  await expect(step("details")).toHaveAttribute("data-state", "active");
-  await expect(step("review")).toHaveAttribute("data-state", "pending");
-  expect(await state(page)).toEqual(original);
-
-  relay.setWorking(true);
-  await expect(dialog).toHaveAttribute("data-state", "working");
-  await expect(loading).toBeVisible();
-  await expect(page.locator("#run-design-status")).toContainText(/group 1 of/);
-  await page.setViewportSize({ width: 390, height: 844 });
-  const bounds = await dialog.boundingBox();
-  expect(bounds).not.toBeNull();
-  expect(bounds!.x).toBeGreaterThanOrEqual(0);
-  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390);
-  await expect
-    .poll(() =>
-      dialog.evaluate((element) => element.scrollWidth <= element.clientWidth),
-    )
-    .toBe(true);
-  await dialog.screenshot({
-    path: ".artifacts/handoff/design/reactive-setup-working-narrow.png",
-  });
-
-  relay.setQueued(true, "content-review");
-  relay.finish(relay.calls.at(-1));
-  await expect
-    .poll(() => relay.calls.at(-1)?.payload.phase)
-    .toBe("content-review");
-  await expect(step("details")).toHaveAttribute("data-state", "complete");
-  await expect(step("review")).toHaveAttribute("data-state", "active");
-  await expect(step("review")).not.toHaveAttribute("data-state", "complete");
-  relay.setQueued(false);
-  relay.finish(relay.calls.at(-1));
-  await prepared(page);
-  expect((await state(page)).status).toBe("ready");
-  expect((await gameplayState(page)).time).toBe(0);
-});
-
-test("a silent design worker exposes recovery, preserves its saved batch on reload and accepts a late reply", async ({
-  page,
-}) => {
-  const relay = await designer(page);
-  relay.setQueued(true, "content-batch");
-  relay.setWorking(true);
-  relay.setWorkerActivityAt(Date.now());
-  await open(page);
-  const original = await state(page);
-  await page.locator("#start").click();
-  await expect
-    .poll(() => relay.calls.at(-1)?.payload.phase)
-    .toBe("content-batch");
-  const batch = relay.calls.at(-1),
-    dialog = page.locator("#run-design-dialog");
-  await expect(dialog).toHaveAttribute("data-state", "working");
-  relay.setWorkerActivityAt(Date.now() - 6 * 60_000);
-  await expect(dialog).toHaveAttribute("data-state", "stalled");
-  await expect(page.locator("#run-design-loading")).toBeHidden();
-  await expect(page.locator("#run-design-title")).toHaveText("Check ChatGPT");
-  await expect(page.locator("#run-design-status")).toContainText(
-    "if it stopped, ask it to continue",
-  );
-  await expect(
-    page.getByRole("button", { name: "Resume in ChatGPT" }),
-  ).toBeVisible();
-  await expect(
-    page.locator('#run-design-steps [data-step="details"]'),
-  ).toHaveAttribute("data-state", "active");
-  expect(await state(page)).toEqual(original);
-  expect(relay.cancelled).toEqual([]);
-  await dialog.screenshot({
-    path: ".artifacts/handoff/design/stalled-worker-recovery.png",
-  });
-
-  await page.reload();
-  await page.getByRole("button", { name: "Prepare game" }).click();
-  await expect(page.locator("#run-design-dialog")).toHaveAttribute(
-    "data-state",
-    "stalled",
-  );
-  expect(relay.calls.at(-1)).toEqual(batch);
-  expect(relay.cancelled).toEqual([]);
-  relay.setWorkerActivityAt(Date.now());
-  await expect(page.locator("#run-design-dialog")).toHaveAttribute(
-    "data-state",
-    "working",
-  );
-  relay.setQueued(false);
-  relay.finish(batch);
-  await prepared(page);
-  expect((await state(page)).status).toBe("ready");
-  expect((await gameplayState(page)).time).toBe(0);
-  await page.locator("#start").click();
-  await expect.poll(async () => (await state(page)).status).toBe("playing");
-  await expect
-    .poll(async () => (await gameplayState(page)).time)
-    .toBeGreaterThan(0);
-});
-
 test("prepared runs wait for an explicit Start before gameplay and across reload", async ({
   page,
 }) => {
   const relay = await designer(page);
-  relay.setQueued(true);
+  relay.setHeld(true);
   await open(page);
   await page.locator("#start").click();
   await expect.poll(() => relay.calls.length).toBe(1);
   await expect(page.locator("#run-design-dialog")).toBeVisible();
-  await expect(page.getByRole("progressbar")).not.toBeVisible();
   await expect(page.locator("#run-design-dialog")).toHaveAttribute(
     "data-state",
-    "waiting",
+    "working",
   );
   const loading = await expectFrozen(page);
   expect(loading.time).toBe(0);
@@ -660,7 +249,7 @@ test("prepared runs wait for an explicit Start before gameplay and across reload
     path: ".artifacts/handoff/design/ai-design-loading-narrow.png",
   });
   await page.setViewportSize(viewport);
-  relay.setQueued(false);
+  relay.setHeld(false);
   relay.finish(relay.calls[0]);
   await prepared(page);
   await expect(page.locator("#start-card")).toContainText(
@@ -703,14 +292,13 @@ test("new-game AI design reaches the full app and a saved reload keeps the exact
   await pause(page);
   const before = await state(page);
   expect(relay.calls).toHaveLength(harborPhases.length);
-  expect(relay.calls[0].provider).toBe("chatgpt-handoff");
+  expect(relay.calls[0].provider).toBe("claude-cli");
   expect(relay.calls[0].payload.designVersion).toBe(3);
   expect(relay.calls[0].payload.version).toBe(3);
   expect(relay.calls.map((c) => c.payload.phase)).toEqual(harborPhases);
   expect(before.design.design.version).toBe(3);
   expect(before.environments[0].entries.length).toBeGreaterThan(50);
   expect(before.scenes[0].props.length).toBeGreaterThan(0);
-  expect(relay.calls[0].nativeScope.encounterId).toBe("run-design");
   expect(before.design.design.title).toBe(harbor.title);
   expect(before.floorNames).toEqual([
     ...harbor.floors.map((f: any) => f.name),
@@ -815,24 +403,18 @@ test("an offline restart preserves the accepted run until the replacement passes
   await startPrepared(page);
 });
 
-test("reloading a pending design retries the same captured request and chat rather than rerolling", async ({
+test("reloading a pending design retries the same captured request rather than rerolling", async ({
   page,
 }) => {
   const relay = await designer(page);
-  relay.setQueued(true);
+  relay.setHeld(true);
   await open(page);
   const originalId = (await state(page)).id;
   await page.locator("#start").click();
   await expect.poll(() => relay.calls.length).toBe(1);
-  await expect(page.locator("#run-design-status")).toContainText(
-    "Waiting for ChatGPT",
-  );
-  await page.screenshot({
-    path: ".artifacts/handoff/design/ai-design-waiting.png",
-  });
   await flush(page);
   const first = structuredClone(relay.calls[0]);
-  expect(first.chatCode).toMatch(/^[A-Z0-9]{8}$/);
+  expect(first).not.toHaveProperty("chatCode");
   await page.reload();
   await page.waitForFunction(() => !!(window as any).__deadAir);
   expect((await state(page)).id).toBe(originalId);
@@ -850,7 +432,7 @@ test("reloading while individual writing is pending retains the exact object inv
   page,
 }) => {
   const relay = await designer(page);
-  relay.setQueued(true, "content-batch");
+  relay.setHeld(true, "content-batch");
   await open(page);
   const original = await state(page);
   await page.locator("#start").click();
@@ -869,7 +451,7 @@ test("reloading while individual writing is pending retains the exact object inv
   await expect.poll(() => relay.calls.length).toBe(index + 2);
   expect(relay.calls[index + 1]).toEqual(captured);
   expect((await state(page)).id).toBe(original.id);
-  relay.setQueued(false);
+  relay.setHeld(false);
   relay.finish(captured);
   await startPrepared(page);
   expect((await state(page)).design.design.environment).toEqual(
@@ -908,7 +490,6 @@ test("restart sends recent fictional designs and repairs a repeated design befor
   expect(repair.payload.repair.errors.length).toBeGreaterThan(0);
   expect(repair.payload.generationId).toBe(repeat.payload.generationId);
   expect(repair.payload.requestId).not.toBe(repeat.payload.requestId);
-  expect(repair.chatCode).toBe(repeat.chatCode);
   expect(Object.keys(repeat.payload).sort()).toEqual([
     "concept",
     "designVersion",
@@ -963,7 +544,7 @@ test("editorial review resumes exactly after reload and revises only its identif
       };
     return response;
   });
-  relay.setQueued(true, "content-review");
+  relay.setHeld(true, "content-review");
   await open(page);
   const original = await state(page);
   await page.locator("#start").click();
@@ -983,7 +564,7 @@ test("editorial review resumes exactly after reload and revises only its identif
   await expect.poll(() => relay.calls.length).toBe(reviewIndex + 2);
   expect(relay.calls.at(-1)).toEqual(captured);
   expect((await state(page)).id).toBe(original.id);
-  relay.setQueued(false);
+  relay.setHeld(false);
   relay.finish(captured);
   await startPrepared(page);
   const after = await state(page);
@@ -1007,7 +588,7 @@ test("a late result from a cancelled design cannot replace the current run or th
   page,
 }) => {
   const relay = await designer(page);
-  relay.setQueued(true);
+  relay.setHeld(true);
   await open(page);
   const before = await state(page);
   await page.locator("#start").click();
@@ -1015,16 +596,12 @@ test("a late result from a cancelled design cannot replace the current run or th
   const cancelled = relay.calls[0];
   await page.locator("#run-design-cancel").click();
   await expect(page.locator("#run-design-dialog")).toHaveCount(0);
-  await expect
-    .poll(() => relay.cancelled)
-    .toContain(cancelled.payload.requestId);
   relay.finish(cancelled, harbor);
   expect(await state(page)).toEqual(before);
   await page.locator("#start").click();
   await expect.poll(() => relay.calls.length).toBe(2);
   const current = relay.calls[1];
   expect(current.payload.requestId).not.toBe(cancelled.payload.requestId);
-  expect(current.chatCode).not.toBe(cancelled.chatCode);
   relay.finish(current, orchard);
   await expect
     .poll(async () => (await state(page)).design?.design.title)
@@ -1045,7 +622,7 @@ test("cancelling before the bridge replies ignores that delayed reply while anot
   page,
 }) => {
   const relay = await designer(page);
-  relay.setDelayed(true);
+  relay.setHeld(true);
   await open(page);
   const before = await state(page);
   await page.locator("#start").click();
@@ -1079,12 +656,11 @@ test("cancelling before the bridge replies ignores that delayed reply while anot
   );
 });
 
-test("settled design failures retain receipts until Cancel or Escape without starting a run", async ({
+test("settled design failures keep the captured draft until Cancel or Escape without starting a run", async ({
   page,
 }) => {
   const relay = await designer(page);
-  relay.setQueued(true);
-  relay.setFailedPoll(true);
+  relay.setFailing(true);
   await open(page);
   const before = await state(page);
   for (const dismissal of ["cancel", "escape"]) {
@@ -1094,17 +670,15 @@ test("settled design failures retain receipts until Cancel or Escape without sta
     );
     await expect(page.locator("#run-design-retry")).toBeEnabled();
     const call = relay.calls.at(-1)!;
-    expect(relay.cancelled).not.toContain(call.payload.requestId);
-    const receipt = await page.evaluate(
-      () =>
-        JSON.parse(localStorage.getItem("dead-air-run-design-draft-v1")!)
-          .receipt,
+    const draft = await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("dead-air-run-design-draft-v1")!),
     );
-    expect(receipt.requestId).toBe(call.payload.requestId);
+    expect(draft.request.requestId).toBe(call.payload.requestId);
+    expect(draft).not.toHaveProperty("chatCode");
+    expect(draft).not.toHaveProperty("receipt");
     if (dismissal === "escape") await page.keyboard.press("Escape");
     else await page.locator(`#run-design-${dismissal}`).click();
     await expect(page.locator("#run-design-dialog")).toHaveCount(0);
-    await expect.poll(() => relay.cancelled).toContain(call.payload.requestId);
     expect(
       await page.evaluate(() =>
         localStorage.getItem("dead-air-run-design-draft-v1"),
@@ -1120,9 +694,7 @@ test("settled design failures retain receipts until Cancel or Escape without sta
   );
   await expect(page.locator("#run-design-procedural")).toHaveCount(0);
   const retry = relay.calls.at(-1)!;
-  relay.setFailedPoll(false);
-  relay.setQueued(false);
-  relay.finish(retry);
+  relay.setFailing(false);
   await page.locator("#run-design-retry").click();
   await startPrepared(page);
   const after = await state(page);

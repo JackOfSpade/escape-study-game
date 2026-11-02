@@ -11,11 +11,11 @@ import {
   enterNativeGame,
   flushNativeSave,
   killHumanInStep,
-  mockNativeStudy,
+  mockClaudeStudy,
   nativeState,
   openNativeQuestion,
   seedLegacyDraft,
-} from "./native-study-harness";
+} from "./study-harness";
 
 // No browser smoke case may accidentally release real model/bridge work.
 // Explicit synthetic provider routes below override this safe default.
@@ -54,12 +54,12 @@ async function expectHumanDrawn(page: Page) {
     )
     .toBe(true);
 }
-test("real browser: launch, movement, native study capture, running survival and exact save/reload", async ({
+test("real browser: launch, movement, Claude terminal capture, running survival and exact save/reload", async ({
   page,
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  const relay = await mockNativeStudy(page);
+  const relay = await mockClaudeStudy(page);
   await enterNativeGame(page);
   await selectTopDown(page);
   await expectHumanDrawn(page);
@@ -78,15 +78,14 @@ test("real browser: launch, movement, native study capture, running survival and
     "exact persisted legacy draft / boundary reasoning",
   );
   const id = await openNativeQuestion(page);
-  await expect.poll(() => relay.calls.length).toBe(1);
-  const captured = (await nativeState(page, id)).session.payloadJson;
+  await expect(page.locator("#problem-title")).toHaveText("Synthetic question");
+  const captured = await nativeState(page, id);
   const pos = await page.evaluate(() => {
     const a = (window as any).__deadAir.game.survivors[0];
     return [a.x, a.y];
   });
-  // Keyboard-owned controls do not move the human. Native conversation typing
-  // occurs in another document; this game has no answer composer.
-  await page.locator("#native-study-copy").focus();
+  // Typing in the terminal's composer does not move the human.
+  await page.locator("#chat-input").focus();
   await page.keyboard.type("wasd");
   expect(
     await page.evaluate(() => {
@@ -98,7 +97,7 @@ test("real browser: launch, movement, native study capture, running survival and
   await expect
     .poll(async () => (await nativeState(page, id)).time)
     .toBeGreaterThan(time + 0.5);
-  expect(JSON.parse(captured).workspace).toBe(
+  expect(captured.workspace).toBe(
     "exact persisted legacy draft / boundary reasoning",
   );
   await openGameMenu(page);
@@ -107,22 +106,25 @@ test("real browser: launch, movement, native study capture, running survival and
   await page.locator("#resume-game").click();
   await flushNativeSave(page);
   await page.reload();
-  await expect.poll(() => relay.calls.length).toBe(2);
-  expect((await nativeState(page, id)).session.payloadJson).toBe(captured);
-  expect(relay.calls[1].payload).toEqual(JSON.parse(captured));
+  await page.waitForFunction(() => !!(window as any).__deadAir);
+  const restored = await nativeState(page, id);
+  expect(restored.problem).toBe(captured.problem);
+  expect(restored.workspace).toBe(captured.workspace);
+  // A reload never reopens the terminal on its own, and asks nothing new.
   await expect(page.locator("#terminal")).toBeHidden();
+  expect(relay.tutorCalls()).toHaveLength(0);
   await expectHumanDrawn(page);
   expect(errors).toEqual([]);
   await page.screenshot({
-    path: "test-results/playable-native-study.png",
+    path: "test-results/playable-claude-terminal.png",
     fullPage: false,
   });
 });
 
-test("physical station access respects occlusion while an issued native question keeps its captured draft", async ({
+test("physical station access respects occlusion while an issued Claude question keeps its captured draft", async ({
   page,
 }) => {
-  const relay = await mockNativeStudy(page);
+  const relay = await mockClaudeStudy(page);
   await enterNativeGame(page);
   await detachAuthoredScene(page);
   await selectTopDown(page);
@@ -140,14 +142,19 @@ test("physical station access respects occlusion while an issued native question
   await page.locator("#world").focus();
   await page.keyboard.press("e");
   expect(relay.calls).toHaveLength(0);
-  await expect(page.locator("#native-study")).toBeHidden();
+  await expect(page.locator("#terminal")).toBeHidden();
   await page.evaluate(() => {
     (window as any).__deadAir.game.floors[0].tiles[15][20] = 0;
   });
   await page.keyboard.press("e");
-  await expect.poll(() => relay.calls.length).toBe(1);
-  const payload = relay.calls[0].payload;
-  expect(payload.workspace).toBe("draft kept behind a new obstruction");
+  await expect(page.locator("#terminal")).toBeVisible();
+  const opened = await page.evaluate(
+    () => (window as any).__deadAir.game.floors[0].stations[0].encounter,
+  );
+  expect((await nativeState(page, opened)).workspace).toBe(
+    "draft kept behind a new obstruction",
+  );
+  const issued = (await nativeState(page, opened)).problem;
   const reachable = () =>
     page.evaluate(async () => {
       const root = "/src/",
@@ -181,14 +188,13 @@ test("physical station access respects occlusion while an issued native question
   });
   await expect.poll(reachable).toBe(false);
   await expect
-    .poll(async () => (await nativeState(page, payload.encounterId)).station)
+    .poll(async () => (await nativeState(page, opened)).station)
     .toBeUndefined();
-  await expect(page.locator("#native-study")).toBeVisible();
-  expect(
-    (await nativeState(page, payload.encounterId)).session.payloadJson,
-  ).toBe(JSON.stringify(payload));
-  await expect(page.locator("#terminal")).toBeHidden();
-  expect(relay.calls).toHaveLength(1);
+  // The issued question and its draft stay exactly as captured.
+  expect((await nativeState(page, opened)).problem).toBe(issued);
+  expect((await nativeState(page, opened)).workspace).toBe(
+    "draft kept behind a new obstruction",
+  );
 });
 
 test("UI settings and curriculum stay in the pause menu; narrow layout remains usable", async ({
@@ -402,17 +408,22 @@ test("finite 360 vision: see through closed doors in both palettes, walls and di
   expect(errors).toEqual([]);
 });
 
-test("partial development work survives combat death while a fresh run closes its old chat without transferring its lock", async ({
+test("partial development work survives combat death while a fresh run archives its question without transferring its lock", async ({
   page,
 }) => {
-  const relay = await mockNativeStudy(page);
+  const relay = await mockClaudeStudy(page);
   await enterNativeGame(page);
   const draft =
     "Preserved human partial reasoning: a boundary remains unresolved.";
   await seedLegacyDraft(page, draft);
-  const id = await openNativeQuestion(page);
-  await expect.poll(() => relay.calls.length).toBe(1);
-  const payload = relay.calls[0].payload;
+  const id = await openNativeQuestion(page, "development");
+  const issued = (await nativeState(page, id)).problem;
+  // A reply is still in flight when the run ends.
+  relay.hold();
+  relay.gap();
+  await page.locator("#chat-input").fill("I do not know this part");
+  await page.locator("#chat-input").press("Enter");
+  await expect.poll(() => relay.tutorCalls().length).toBe(1);
   const oldRun = await page.evaluate(() => (window as any).__deadAir.game.id);
   await killHumanInStep(page);
   await expect(page.locator("#start-card")).toBeHidden();
@@ -435,46 +446,32 @@ test("partial development work survives combat death while a fresh run closes it
     (e: any) => e.id === id && e.runId === oldRun,
   );
   expect(archive.workspace).toBe(draft);
-  expect(archive.problem).toEqual(payload.problem);
-  expect(archive.directStudy.payloadJson).toBe(JSON.stringify(payload));
-  expect(archive.directStudy.state).toBe("superseded");
+  expect(JSON.stringify(archive.problem)).toBe(issued);
   expect(state.evidence).toEqual([]);
   expect(state.attempts).toEqual([]);
-  // A fresh run archives the old question as history and closes its chat.
-  // A late host reply must not reopen it or add a gap to the new run.
-  relay.finish(payload.requestId, "gap");
-  await expect
-    .poll(() =>
-      page.evaluate((oldRun) => {
-        const g = (window as any).__deadAir.game;
-        return g.study.archives.find(
-          (e: any) => e.runId === oldRun && e.directStudy,
-        )?.directStudy.state;
-      }, oldRun),
-    )
-    .toBe("superseded");
+  // A late reply from the old run must not reopen it, add a gap or a key to
+  // the new run, or transfer the old question's lock.
+  relay.release();
+  await page.waitForTimeout(600);
   expect(
     await page.evaluate(() => (window as any).__deadAir.game.survivors[0].keys),
   ).toBe(0);
-  const next = await openNativeQuestion(page);
-  await expect.poll(() => relay.calls.length).toBe(2);
+  const next = await openNativeQuestion(page, "development");
   const current = await nativeState(page, next);
-  expect(current.session.questionFingerprint).not.toBe(
-    payload.questionFingerprint,
-  );
-  expect(JSON.parse(current.session.payloadJson).workspace).not.toBe(draft);
+  expect(current.problem).not.toBe(issued);
+  expect(current.workspace).not.toBe(draft);
   expect(current.keys).toBe(0);
-  const retained = await page.evaluate((oldRun) => {
+  const retained = await page.evaluate(() => {
     const g = (window as any).__deadAir.game;
     return {
-      state: g.study.archives.find(
-        (e: any) => e.runId === oldRun && e.directStudy,
-      )?.directStudy.state,
       gaps: g.study.knowledgeGaps ?? [],
       evidence: g.study.learner.evidence,
     };
-  }, oldRun);
-  expect(retained).toEqual({ state: "superseded", gaps: [], evidence: [] });
+  });
+  // The late reply may still record the learner's own declared gap, labelled
+  // with the run it belongs to, but it adds no evidence and no key.
+  expect(retained.evidence).toEqual([]);
+  expect(retained.gaps.every((gap: any) => gap.runId === oldRun)).toBe(true);
 });
 
 for (const fixtureKind of ["checkpoint", "transfer", "historical"] as const) {
@@ -484,7 +481,7 @@ for (const fixtureKind of ["checkpoint", "transfer", "historical"] as const) {
     page,
   }) => {
     // This exercises the adapter with isolated synthetic responses. It does not
-    // establish that any genuine native ChatGPT Study Mode service is connected.
+    // establish that any genuine Claude CLI connection is working.
     if (finalRequirement) {
       const source = tier4RoadmapFixture(
         JSON.parse(await readFile("public/curriculum.json", "utf8")),
@@ -496,7 +493,7 @@ for (const fixtureKind of ["checkpoint", "transfer", "historical"] as const) {
     await page.route("**/api/status", (route) =>
       route.fulfill({
         json: {
-          mode: "study-mode",
+          mode: "claude-cli",
           label: "Test bridge fixture",
           detail: "Synthetic transport fixture only",
           capabilities: ["generate", "tutor", "group", "complete", "assess"],
@@ -616,7 +613,7 @@ for (const fixtureKind of ["checkpoint", "transfer", "historical"] as const) {
     await enterLegacyBuilding(page);
     await openGameMenu(page);
     await page.getByRole("button", { name: "Settings", exact: true }).click();
-    await page.getByText("ChatGPT handoff connection", { exact: true }).click();
+    await page.getByText("Study connection", { exact: true }).click();
     await page
       .getByRole("button", { name: "Start a live study run", exact: true })
       .click();
@@ -665,7 +662,7 @@ for (const fixtureKind of ["checkpoint", "transfer", "historical"] as const) {
       );
       await submit(d.game, e, d.roadmap);
     });
-    await expect(page.locator("#terminal")).toBeHidden();
+    await expect(page.locator("#terminal")).toBeVisible();
     await expect
       .poll(() =>
         page.evaluate(() => {
@@ -796,7 +793,7 @@ test("retained group API keeps private tutoring out of proposals and preserves N
   await page.route("**/api/status", (route) =>
     route.fulfill({
       json: {
-        mode: "study-mode",
+        mode: "claude-cli",
         label: "Synthetic retained API",
         detail: "No real AI",
         capabilities: ["generate", "group"],
@@ -815,7 +812,12 @@ test("retained group API keeps private tutoring out of proposals and preserves N
           contract: payload.contract,
         },
       });
-    expect(operation).toBe("group");
+    // Background question preparation is not part of this test.
+    if (operation !== "group")
+      return route.fulfill({
+        status: 503,
+        json: { error: "Not part of this test" },
+      });
     expect(JSON.stringify(payload)).not.toContain("PRIVATE_TUTOR_");
     return route.fulfill({
       json: {
@@ -864,15 +866,24 @@ test("retained group API keeps private tutoring out of proposals and preserves N
       thought: 10,
     });
     await api.ensureProblem(g, e, d.roadmap);
-    api.recordAttributedMessage(
-      g,
-      e,
-      "tutor",
-      "Terminal AI",
-      "tutor",
-      "PRIVATE_TUTOR_REPLY",
-      "study-mode",
-    );
+    // A private tutor reply, as the terminal conversation records one.
+    e.tutor.push({
+      id: "private-synthetic",
+      author: "Terminal AI",
+      kind: "tutor",
+      text: "PRIVATE_TUTOR_REPLY",
+      seq: ++g.seq,
+      worldTime: g.time,
+      provenance: "claude-cli",
+    });
+    e.history.push({
+      seq: g.seq,
+      author: "Terminal AI",
+      kind: "tutor",
+      text: "PRIVATE_TUTOR_REPLY",
+      at: g.time,
+      revision: e.revision,
+    });
     await api.send(g, e, "group", "Propose a boundary check", d.roadmap);
     const p = e.proposals?.[0];
     if (!p) throw Error(e.error ?? "No synthetic proposal returned");
@@ -1162,10 +1173,10 @@ test("roadmap review preview: uploaded Markdown reports ancestry and protected c
   ).toBe(before);
 });
 
-test("audio and accessibility: real sound output, mute, stable reduced-motion canvas and intact native study during Surge", async ({
+test("audio and accessibility: real sound output, mute, stable reduced-motion canvas and an intact Claude terminal during Surge", async ({
   page,
 }) => {
-  await mockNativeStudy(page);
+  await mockClaudeStudy(page);
   await page.goto("/");
   await selectTopDown(page);
   await startDesignedRun(page);
@@ -1267,7 +1278,7 @@ test("audio and accessibility: real sound output, mute, stable reduced-motion ca
     "test-results/audio-signal.json",
     JSON.stringify(
       {
-        kind: "Actual Chromium OfflineAudioContext signal measurements; synthetic acoustic scene, not human listening or native Study Mode evidence",
+        kind: "Actual Chromium OfflineAudioContext signal measurements; synthetic acoustic scene, not human listening or live-model evidence",
         ...audio,
       },
       null,
@@ -1307,16 +1318,14 @@ test("audio and accessibility: real sound output, mute, stable reduced-motion ca
   });
   await page.locator("#world").focus();
   await page.keyboard.press("e");
-  await expect(page.locator("#terminal")).toBeHidden();
+  await expect(page.locator("#terminal")).toBeVisible();
   const id = await page.evaluate(() => {
     const g = (window as any).__deadAir.game;
     return g.floors[0].stations[0].encounter as string;
   });
-  await expect
-    .poll(async () => (await nativeState(page, id)).session?.state)
-    .toBe("pending");
-  const captured = (await nativeState(page, id)).session.payloadJson;
-  await page.locator("#native-study-copy").focus();
+  const captured = (await nativeState(page, id)).problem;
+  expect(captured).toBeTruthy();
+  await page.locator("#chat-input").focus();
   await page.evaluate(() => {
     const g = (window as any).__deadAir.game;
     g.surge.state = "warning";
@@ -1336,8 +1345,8 @@ test("audio and accessibility: real sound output, mute, stable reduced-motion ca
   await expect(page.locator("#world-caption")).toContainText(
     "horde intensified",
   );
-  expect((await nativeState(page, id)).session.payloadJson).toBe(captured);
-  await expect(page.locator("#native-study-copy")).toBeFocused();
+  expect((await nativeState(page, id)).problem).toBe(captured);
+  await expect(page.locator("#chat-input")).toBeFocused();
   await page.screenshot({
     path: "test-results/surge-accessibility.png",
     fullPage: false,
@@ -1352,8 +1361,8 @@ test("audio and accessibility: real sound output, mute, stable reduced-motion ca
   await expect(page.locator("#world-caption")).not.toContainText(
     "horde intensified",
   );
-  expect((await nativeState(page, id)).session.payloadJson).toBe(captured);
-  await expect(page.locator("#native-study-copy")).toBeFocused();
+  expect((await nativeState(page, id)).problem).toBe(captured);
+  await expect(page.locator("#chat-input")).toBeFocused();
 });
 
 test("equipment UI: readable effects, no wasted healing or blocked shots, physical door access and saved charges", async ({
@@ -1692,9 +1701,8 @@ test("environment packet survives an actual browser-storage write failure and ca
 });
 
 for (const { storageFailure, provider } of [
-  { storageFailure: false, provider: "study-mode" },
-  { storageFailure: true, provider: "study-mode" },
-  { storageFailure: false, provider: "chatgpt-handoff" },
+  { storageFailure: false, provider: "claude-cli" },
+  { storageFailure: true, provider: "claude-cli" },
 ])
   test(`practical ${provider} review: explicit outage retry, separate ENV pass, inert judgment, complete export and reload${storageFailure ? " with save outage" : ""}`, async ({
     page,
@@ -1703,9 +1711,7 @@ for (const { storageFailure, provider } of [
     // learner work below are synthetic and never certify real human progress.
     let releaseReview: (() => void) | undefined;
     let calls = 0,
-      first: any,
-      held: any,
-      released = false;
+      first: any;
     const reviewReply = (p: any) => ({
       requestId: p.requestId,
       sourceHash: p.sourceHash,
@@ -1728,14 +1734,19 @@ for (const { storageFailure, provider } of [
         json: {
           mode: provider,
           label: "Synthetic ENV reviewer",
-          detail: "Not native verification",
+          detail: "Not live-model verification",
           capabilities: ["review-environment"],
         },
       }),
     );
     await page.route("**/api/bridge", async (route) => {
       const { operation, payload: p } = route.request().postDataJSON();
-      expect(operation).toBe("review-environment");
+      // Background question preparation is not part of this test.
+      if (operation !== "review-environment")
+        return route.fulfill({
+          status: 503,
+          json: { error: "Not part of this test" },
+        });
       expect(p.provider).toBe(provider);
       calls++;
       if (calls === 1) {
@@ -1747,38 +1758,10 @@ for (const { storageFailure, provider } of [
         return;
       }
       expect(p).toEqual(first);
-      if (provider === "chatgpt-handoff") {
-        // A handoff relay acknowledges the queued job at once (202 receipt)
-        // and the client polls /api/bridge/result; the submission itself has
-        // a short per-attempt deadline (bridge-client.ts, aed2f79).
-        held = p;
-        releaseReview = () => {
-          released = true;
-        };
-        await route.fulfill({
-          status: 202,
-          json: {
-            handoff: { id: p.requestId, hash: `synthetic-${p.requestId}` },
-          },
-        });
-        return;
-      }
       await new Promise<void>((resolve) => {
         releaseReview = resolve;
       });
       await route.fulfill({ json: reviewReply(p) });
-    });
-    await page.route("**/api/bridge/result?**", (route) => {
-      const url = new URL(route.request().url());
-      expect(provider).toBe("chatgpt-handoff");
-      expect(url.searchParams.get("id")).toBe(held?.requestId);
-      expect(url.searchParams.get("hash")).toBe(`synthetic-${held?.requestId}`);
-      return released
-        ? route.fulfill({ json: reviewReply(held) })
-        : route.fulfill({
-            status: 202,
-            json: { handoff: { id: held.requestId, status: "working" } },
-          });
     });
     await page.goto("/");
     // This review never needs the first-person city. Software WebGL makes
@@ -1915,9 +1898,7 @@ for (const { storageFailure, provider } of [
       "PE:ENV06 · P · applied",
     );
     await expect(page.locator("#environment-observation-list")).toContainText(
-      provider === "chatgpt-handoff"
-        ? "Reviewed through ChatGPT handoff"
-        : "Reviewed through configured Study Mode bridge",
+      "Reviewed through Claude CLI",
     );
     expect(
       await page.evaluate(

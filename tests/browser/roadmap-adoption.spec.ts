@@ -92,7 +92,7 @@ for (const scenario of [
     await page.route("**/api/status", (route) =>
       route.fulfill({
         json: {
-          mode: "study-mode",
+          mode: "claude-cli",
           label: "Synthetic adoption fixture",
           detail: "Not actual native certification",
           capabilities: ["reconcile-roadmap"],
@@ -101,7 +101,12 @@ for (const scenario of [
     );
     await page.route("**/api/bridge", async (route) => {
       const { operation, payload } = route.request().postDataJSON();
-      expect(operation).toBe("reconcile-roadmap");
+      // Background question preparation is not part of this test.
+      if (operation !== "reconcile-roadmap")
+        return route.fulfill({
+          status: 503,
+          json: { error: "Not part of this test" },
+        });
       payloads.push(payload);
       calls++;
       if (scenario === "saved" && calls === 1) {
@@ -195,7 +200,7 @@ for (const scenario of [
     });
     await page
       .getByRole("button", {
-        name: "Request native reconciliation",
+        name: "Request roadmap review",
         exact: true,
       })
       .click();
@@ -220,9 +225,14 @@ for (const scenario of [
       interruptedRelease();
       await openGameMenu(page);
       await page.locator("#curriculum-button").click();
+      // The reload ended the in-flight request: nothing was applied, and the
+      // saved reconciliation can be retried exactly.
       await expect(page.locator("#roadmap-adoption-controls")).toContainText(
-        "interrupted",
+        "Retry saved reconciliation",
       );
+      await expect(
+        page.getByRole("button", { name: "Adopt reviewed roadmap" }),
+      ).toHaveCount(0);
       expect(calls).toBe(1);
       await page
         .getByRole("button", { name: "Retry saved reconciliation" })

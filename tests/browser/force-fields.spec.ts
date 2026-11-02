@@ -1,12 +1,12 @@
 import { startDesignedRun } from "./helpers/designed-run";
 import { expect, test } from "@playwright/test";
 import { selectTopDown } from "./helpers/view-mode";
-import { mockNativeStudy, nativeState } from "./native-study-harness";
-test("fresh run uses force fields, personal keys and native ChatGPT study", async ({
+import { mockClaudeStudy } from "./study-harness";
+test("fresh run uses force fields, personal keys and the embedded Claude terminal", async ({
   page,
 }) => {
   const errors: string[] = [];
-  const relay = await mockNativeStudy(page);
+  const relay = await mockClaudeStudy(page);
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
   await startDesignedRun(page);
@@ -26,6 +26,9 @@ test("fresh run uses force fields, personal keys and native ChatGPT study", asyn
     g.zombies = [];
     g.nextSpawn = Number.MAX_SAFE_INTEGER;
     Object.assign(g.survivors[0], { x: st.x, y: st.y });
+    // A live run starts with no pre-made practice questions.
+    g.study.profile = "live";
+    for (const each of Object.values<any>(g.encounters)) delete each.problem;
     await ensureProblem(g, e, r);
     return {
       rules: g.rules,
@@ -64,29 +67,25 @@ test("fresh run uses force fields, personal keys and native ChatGPT study", asyn
   });
   await page.locator("#world").focus();
   await page.keyboard.press("e");
-  // The generated question leaves the gameplay canvas for native ChatGPT.
-  await expect.poll(() => relay.calls.length).toBe(1);
-  const payload = relay.calls[0].payload;
-  expect(payload.problem.title).toBeTruthy();
-  expect(payload.mode).toBe("terminal-direct");
-  expect(
-    (await nativeState(page, payload.encounterId)).session.questionFingerprint,
-  ).toBe(payload.questionFingerprint);
-  await expect(page.locator("#terminal")).toBeHidden();
-  await expect(page.locator("#chat-input")).toBeHidden();
-  await expect(page.locator("#workspace")).toBeHidden();
-  await expect(page.locator("#native-study-status")).toContainText("ChatGPT");
+  // The generated question opens in the embedded terminal.
+  await expect(page.locator("#terminal")).toBeVisible();
+  await expect(page.locator("#problem-title")).toHaveText("Synthetic question");
+  expect(relay.calls.length).toBeGreaterThan(0);
+  expect(relay.calls.every((call) => call.provider === "claude-cli")).toBe(
+    true,
+  );
+  await expect(page.locator("#chat-input")).toBeVisible();
   await expect(page.locator("#hud-keys")).toHaveText("0 keys");
   await expect(page.locator(".dashboard")).toBeHidden();
   const world = (await page.locator(".world").boundingBox())!;
-  expect(world.width).toBeGreaterThan(1000);
+  // The world shares the screen with the embedded terminal.
+  expect(world.width).toBeGreaterThan(200);
   await page.screenshot({
     path: ".artifacts/force-fields-desktop.png",
     fullPage: true,
   });
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.locator("#native-study-copy")).toBeVisible();
-  await expect(page.locator("#terminal")).toBeHidden();
+  await expect(page.locator("#terminal")).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

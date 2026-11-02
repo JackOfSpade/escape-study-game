@@ -51,6 +51,10 @@ export async function localHandoff() {
     get rejected() {
       return rejected.length;
     },
+    /** Register the gateway's answer for requests sent by the game client. */
+    answerWith(reply: (job: Job) => Reply) {
+      answer = reply;
+    },
     async request(
       operation: string,
       payload: unknown,

@@ -415,7 +415,8 @@ function resumeQuestions() {
   if (
     e &&
     e.state !== "consumed" &&
-    (e.problem || e.pendingGeneration) &&
+    // A question that never reached Claude (connection down) also retries.
+    (e.problem || e.pendingGeneration || e.error) &&
     !e.generation
   )
     void prepareQuestion(e);
@@ -1264,8 +1265,11 @@ async function interact() {
   lastQuestion = e.id;
   game.lastStudyEncounter = e.id;
   if (e.mode === "solo") e.owner = "human";
+  // Start preparing first: an untouched preloaded practice question is
+  // refreshed to the current track before the terminal presents it.
+  const preparing = prepareQuestion(e);
   showEmbeddedTerminal(e);
-  await prepareQuestion(e);
+  await preparing;
 }
 let workLogSignature = "";
 let proposalSignature = "";
@@ -2563,7 +2567,8 @@ function ui() {
       ? `${a.keys ?? 0} KEYS`
       : `${a.inventory.reduce((n, i) => n + i.weight, 0)} / ${CONFIG.capacity} KG`;
   document.body.classList.toggle("force-fields", game.rules === "force-fields");
-  $("#study-connection-settings").hidden = status().mode === "claude-cli";
+  // Starting a live run stays available once connected; only the recheck is not.
+  $("#reconnect").hidden = status().mode === "claude-cli";
   const sig = JSON.stringify([a.inventory, a.keys, game.rules]);
   if (sig !== inventorySignature) {
     inventorySignature = sig;

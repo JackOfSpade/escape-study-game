@@ -45,7 +45,7 @@ async function syntheticDesigner(page: Page, activate = true) {
           json: state.restoring
             ? state.previousStatus
             : {
-                mode: "chatgpt-handoff",
+                mode: "claude-cli",
                 label: "Synthetic run designer",
                 detail: "Offline fixture; no external model",
                 capabilities: ["design-run"],

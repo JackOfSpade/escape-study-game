@@ -74,7 +74,7 @@ test("retrying an assessment durably captures its pending request before a reply
   await page.route("**/api/status", (route) =>
     route.fulfill({
       json: {
-        mode: "study-mode",
+        mode: "claude-cli",
         label: "Synthetic assessment fixture",
         detail: "Synthetic transport only",
         capabilities: ["assess"],
@@ -105,7 +105,7 @@ test("retrying an assessment durably captures its pending request before a reply
       g.nextSpawn = Number.MAX_SAFE_INTEGER;
       g.study.profile = "live";
       e.problem = devProblem(g, r);
-      e.problem.provenance = "study-mode";
+      e.problem.provenance = "claude-cli";
       await assess(g, e, r);
       await save(g);
     });
@@ -133,7 +133,7 @@ test("retrying an assessment durably captures its pending request before a reply
         { load } = await import(root + "persistence.ts");
       return (await load())?.study.assessments[0]?.request;
     });
-    expect(request?.provider).toBe("study-mode");
+    expect(request?.provider).toBe("claude-cli");
     expect(JSON.parse(request!.payloadJson).packet.sourceHash).toMatch(
       /^[a-f0-9]{64}$/,
     );

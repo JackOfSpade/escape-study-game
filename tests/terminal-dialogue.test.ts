@@ -23,7 +23,7 @@ async function fixture(
   globalThis.fetch = async (url, init) => {
     if (String(url) === "/api/status")
       return Response.json({
-        mode: connected ? "chatgpt-handoff" : "development",
+        mode: connected ? "claude-cli" : "development",
         label: "Synthetic",
         detail: "No real AI",
         capabilities: connected ? ["tutor"] : [],
@@ -50,7 +50,7 @@ async function fixture(
     globalThis.fetch = original;
   }
 }
-test("one private @study conversation accumulates answers and awards one key only on explicit completion", async () =>
+test("one private tutor conversation accumulates answers and awards one key only on explicit completion", async () =>
   fixture(async (g, e, calls, reply) => {
     const keys = g.survivors[0].keys ?? 0;
     await send(g, e, "tutor", "My initial prediction", r);
@@ -66,8 +66,8 @@ test("one private @study conversation accumulates answers and awards one key onl
     assert.equal(calls.length, 2);
     assert.ok(calls.every((c) => c.operation === "tutor"));
     for (const c of calls) {
-      assert.ok(c.payload.prompt.startsWith("@study\n"));
-      assert.equal(c.payload.studyPrompt, "@study");
+      assert.ok(!c.payload.prompt.startsWith("@study"));
+      assert.equal(c.payload.studyPrompt, undefined);
       assert.equal(c.payload.mode, "terminal-dialogue");
       assert.deepEqual(c.payload.problem, e.problem);
       assert.match(c.payload.instruction, /Assume the learner already has/);
@@ -252,7 +252,7 @@ test("a declared gap lets Terminal AI concede the key, records the gap with the 
     assert.equal(gaps[0].encounter, `${e.runId}/${e.id}`);
     assert.deepEqual(gaps[0].objectiveIds, e.problem.contract.objectiveIds);
     assert.match(gaps[0].statement, /don't know what the boundary/);
-    assert.equal(gaps[0].provider, "chatgpt-handoff");
+    assert.equal(gaps[0].provider, "claude-cli");
     assert.equal(
       g.study.visits.filter((v: any) => v.encounter === e.id).length <= 1,
       true,

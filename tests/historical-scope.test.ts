@@ -61,7 +61,7 @@ test("generated questions cannot replace scheduler review/version or strip histo
   globalThis.fetch = async (input, init) => {
     if (String(input) === "/api/status")
       return response({
-        mode: "study-mode",
+        mode: "claude-cli",
         label: "Synthetic boundary fixture",
         capabilities: [],
         detail: "Not native Study Mode.",

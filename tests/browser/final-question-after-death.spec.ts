@@ -3,32 +3,24 @@ import {
   enterNativeGame,
   flushNativeSave,
   killHumanInStep,
-  mockNativeStudy,
+  mockClaudeStudy,
   nativeState,
   openNativeQuestion,
-} from "./native-study-harness";
+} from "./study-harness";
 
-test("combat death preserves the pending native question without forcing a menu; final answers still count", async ({
+test("combat death keeps the open question answerable without forcing a menu; final answers still count", async ({
   page,
 }) => {
-  const relay = await mockNativeStudy(page);
+  const relay = await mockClaudeStudy(page);
   await enterNativeGame(page);
   const id = await openNativeQuestion(page);
-  await expect.poll(() => relay.calls.length).toBe(1);
-  const pending = await nativeState(page, id),
-    payload = relay.calls[0].payload;
+  const pending = await nativeState(page, id);
+  expect(pending.problem).toBeTruthy();
   await killHumanInStep(page);
   await expect(page.locator("body")).toHaveClass(/spectating/);
   await expect(page.locator("#start-card")).toBeHidden();
-  await expect(page.locator("#terminal")).toBeHidden();
-  await expect(page.locator("#native-study-status")).toContainText(
-    "Continue in ChatGPT",
-  );
   const died = await nativeState(page, id);
-  expect(died.session.questionFingerprint).toBe(
-    pending.session.questionFingerprint,
-  );
-  expect(died.session.state).toBe("pending");
+  expect(died.problem).toBe(pending.problem);
   expect(died.alive).toBe(false);
   expect(died.station).toBeUndefined();
   expect(typeof died.endedAt).toBe("number");
@@ -37,18 +29,21 @@ test("combat death preserves the pending native question without forcing a menu;
     .toBeGreaterThan(died.time + 0.25);
   await page.getByRole("button", { name: "Run summary" }).click();
   await expect(
-    page.getByRole("button", { name: "Continue in ChatGPT" }),
+    page.getByRole("button", { name: "Continue in the terminal" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Continue in ChatGPT" }).click();
+  await page.getByRole("button", { name: "Continue in the terminal" }).click();
   await expect(page.locator("#start-card")).toBeHidden();
-  expect(relay.calls).toHaveLength(1);
-  relay.finish(payload.requestId, "gap");
+  await expect(page.locator("#terminal")).toBeVisible();
+  expect(relay.tutorCalls()).toHaveLength(0);
+  relay.gap();
+  await page.locator("#chat-input").fill("Honestly I do not know this part");
+  await page.locator("#chat-input").press("Enter");
+  await expect.poll(() => relay.tutorCalls().length).toBe(1);
   await expect
-    .poll(async () => (await nativeState(page, id)).session.state)
-    .toBe("applied");
+    .poll(async () => (await nativeState(page, id)).gaps.length)
+    .toBe(1);
   const finished = await nativeState(page, id);
   expect(finished.keys).toBe(pending.keys);
-  expect(finished.gaps).toHaveLength(1);
   expect(
     finished.tutor.some(
       (m: any) => m.kind === "human" && m.text.includes("do not know"),
@@ -58,65 +53,46 @@ test("combat death preserves the pending native question without forcing a menu;
   await expect(page.locator("#reward-toast")).toBeHidden();
   await flushNativeSave(page);
   await page.reload();
+  await page.waitForFunction(() => !!(window as any).__deadAir);
   const restored = await nativeState(page, id);
   expect(restored.keys).toBe(pending.keys);
   expect(restored.gaps).toHaveLength(1);
-  expect(restored.session.state).toBe("applied");
 });
 
-test("a pending native question resumes after death and page reload with the same snapshot", async ({
+test("an open question survives death and page reload with the same issued question", async ({
   page,
 }) => {
-  const relay = await mockNativeStudy(page);
+  const relay = await mockClaudeStudy(page);
   await enterNativeGame(page);
   const id = await openNativeQuestion(page);
-  await expect.poll(() => relay.calls.length).toBe(1);
-  const payload = relay.calls[0].payload;
+  const issued = (await nativeState(page, id)).problem;
   await killHumanInStep(page);
   await expect(page.locator("#start-card")).toBeHidden();
   await flushNativeSave(page);
+  const asked = relay.calls.filter((c) => c.operation === "generate").length;
   await page.reload();
-  await expect.poll(() => relay.calls.length).toBe(2);
-  expect(relay.calls[1].payload).toEqual(payload);
   await expect(page.locator("#start-card")).toBeHidden();
   await expect(page.locator("#spectator")).toBeVisible();
-  relay.finish(payload.requestId);
-  await expect
-    .poll(async () => (await nativeState(page, id)).session.state)
-    .toBe("applied");
+  expect((await nativeState(page, id)).problem).toBe(issued);
+  expect(relay.calls.filter((c) => c.operation === "generate")).toHaveLength(
+    asked,
+  );
   expect((await nativeState(page, id)).keys).toBe(0);
 });
 
-test("delayed generation survives combat death and reload, resumes its exact request, then opens native study without a menu", async ({
+test("a delayed generation survives combat death and reload, resumes its exact request, then opens the final question without a menu", async ({
   page,
 }) => {
-  const relay = await mockNativeStudy(page);
+  const relay = await mockClaudeStudy(page);
   const generations: any[] = [];
   let generated: any;
+  // The first request is lost with the connection; later ones are answered.
   await page.route("**/api/bridge", async (route) => {
     const body = route.request().postDataJSON();
     if (body.operation !== "generate") return route.fallback();
     generations.push(body);
-    await route.fulfill({
-      status: 202,
-      json: {
-        handoff: {
-          id: "synthetic-delayed-generation",
-          hash: "synthetic-exact-generation",
-        },
-      },
-    });
-  });
-  await page.route("**/api/bridge/result**", async (route) => {
-    if (
-      new URL(route.request().url()).searchParams.get("id") !==
-      "synthetic-delayed-generation"
-    )
-      return route.fallback();
-    await route.fulfill({
-      status: generated ? 200 : 202,
-      json: generated ?? { status: "pending" },
-    });
+    if (!generated) return route.abort("connectionreset");
+    await route.fulfill({ json: generated });
   });
   await enterNativeGame(page);
   const id = await page.evaluate(() => {
@@ -143,15 +119,12 @@ test("delayed generation survives combat death and reload, resumes its exact req
   });
   await page.locator("#world").focus();
   await page.keyboard.press("e");
-  await expect.poll(() => generations.length).toBe(1);
-  await expect(page.locator("#native-study-status")).toContainText(
-    "Preparing your saved question",
-  );
-  await expect(page.locator("#native-study-retry")).toBeHidden();
-  const original = generations[0];
+  await expect
+    .poll(() => generations.some((g) => g.payload.encounterId === id))
+    .toBe(true);
+  const original = generations.find((g) => g.payload.encounterId === id);
   expect(original.payload.requestId).toBeTruthy();
   await killHumanInStep(page);
-  await expect(page.locator("#start-card")).toBeHidden();
   await expect(page.locator("#spectator")).toBeVisible();
   await page.evaluate(async () => {
     const root = "/src/",
@@ -161,15 +134,7 @@ test("delayed generation survives combat death and reload, resumes its exact req
     await save((window as any).__deadAir.game);
     await flushSaves();
   });
-  await page.reload();
-  await expect.poll(() => generations.length).toBe(2);
-  expect(generations[1]).toEqual(original);
-  await expect(page.locator("#start-card")).toBeHidden();
-  await expect(page.locator("#native-study-status")).toContainText(
-    "Preparing your saved question",
-  );
-  await expect(page.locator("#spectator")).toBeVisible();
-  expect(relay.calls).toHaveLength(0);
+  const lost = generations.length;
   const contract = original.payload.contract;
   generated = {
     title: "Synthetic delayed question",
@@ -196,29 +161,25 @@ test("delayed generation survives combat death and reload, resumes its exact req
         },
     ),
   };
-  await expect.poll(() => relay.calls.length).toBe(1);
-  const native = relay.calls[0].payload;
-  expect(native.problem.title).toBe("Synthetic delayed question");
-  expect(native.problem.contract).toEqual(contract);
+  await page.reload();
+  await page.getByRole("button", { name: "Run summary" }).click();
+  await page.getByRole("button", { name: "Continue in the terminal" }).click();
+  await expect.poll(() => generations.length).toBeGreaterThan(lost);
+  expect(generations.at(-1)).toEqual(original);
   await expect(page.locator("#start-card")).toBeHidden();
-  await expect(page.locator("#terminal")).toBeHidden();
-  await expect(page.locator("#native-study-status")).toContainText(
-    "Continue in ChatGPT",
+  await expect(page.locator("#terminal")).toBeVisible();
+  await expect(page.locator("#problem-title")).toHaveText(
+    "Synthetic delayed question",
   );
-  relay.finish(native.requestId, "gap");
+  relay.gap();
+  await page.locator("#chat-input").fill("I do not know the boundary");
+  await page.locator("#chat-input").press("Enter");
   await expect
-    .poll(async () => (await nativeState(page, id)).session.state)
-    .toBe("applied");
+    .poll(async () => (await nativeState(page, id)).gaps.length)
+    .toBe(1);
   const result = await nativeState(page, id);
   expect(result.status).toBe("dead");
   expect(result.keys).toBe(0);
-  expect(result.gaps).toHaveLength(1);
-  expect(generations).toHaveLength(2);
-  expect(relay.calls.filter((call) => call.operation === "tutor")).toHaveLength(
-    1,
-  );
-  expect(
-    relay.calls.filter((call) => call.operation === "assess"),
-  ).toHaveLength(1);
+  expect(relay.tutorCalls()).toHaveLength(1);
   await expect(page.locator("#reward-toast")).toBeHidden();
 });

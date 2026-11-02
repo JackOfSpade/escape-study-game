@@ -15,7 +15,7 @@ test("correcting an older original score retains an actually recorded later pass
   await page.route("**/api/status", (route) =>
     route.fulfill({
       json: {
-        mode: "study-mode",
+        mode: "claude-cli",
         label: "Synthetic later-evidence fixture",
         detail: "Controlled transport; no real native semantic certification",
         capabilities: ["reconcile-roadmap"],
@@ -24,7 +24,12 @@ test("correcting an older original score retains an actually recorded later pass
   );
   await page.route("**/api/bridge", async (route) => {
     const { operation, payload } = route.request().postDataJSON();
-    expect(operation).toBe("reconcile-roadmap");
+    // Background question preparation is not part of this test.
+    if (operation !== "reconcile-roadmap")
+      return route.fulfill({
+        status: 503,
+        json: { error: "Not part of this test" },
+      });
     await route.fulfill({ json: fixture.proposal(payload) });
   });
   await page.goto("/");
@@ -49,7 +54,7 @@ test("correcting an older original score retains an actually recorded later pass
     buffer: Buffer.from(fixture.raw),
   });
   await page
-    .getByRole("button", { name: "Request native reconciliation", exact: true })
+    .getByRole("button", { name: "Request roadmap review", exact: true })
     .click();
   await expect(
     page.getByRole("button", { name: "Adopt reviewed roadmap", exact: true }),

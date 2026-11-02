@@ -37,7 +37,7 @@ test("source-qualified branch review exposes unresolved history, downloads exact
   await page.route("**/api/status", (route) =>
     route.fulfill({
       json: {
-        mode: "study-mode",
+        mode: "claude-cli",
         label: "Synthetic branch fixture",
         detail: "Synthetic transport test, not actual native certification",
         capabilities: ["reconcile-roadmap"],
@@ -46,7 +46,12 @@ test("source-qualified branch review exposes unresolved history, downloads exact
   );
   await page.route("**/api/bridge", async (route) => {
     const { operation, payload: p } = route.request().postDataJSON();
-    expect(operation).toBe("reconcile-roadmap");
+    // Background question preparation is not part of this test.
+    if (operation !== "reconcile-roadmap")
+      return route.fulfill({
+        status: 503,
+        json: { error: "Not part of this test" },
+      });
     const canonical = revision(p.local, p.localHash, 11),
       local = inspectMergedDocument(p.local).rows;
     const decisions = [...inspectMergedDocument(p.candidate).rows]
@@ -124,7 +129,7 @@ test("source-qualified branch review exposes unresolved history, downloads exact
     buffer: Buffer.from(candidate),
   });
   await page
-    .getByRole("button", { name: "Request native reconciliation", exact: true })
+    .getByRole("button", { name: "Request roadmap review", exact: true })
     .click();
   await expect(
     page.getByRole("button", { name: "Adopt reviewed roadmap", exact: true }),

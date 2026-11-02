@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { startDesignedRun } from "./helpers/designed-run";
 import { openGameMenu } from "./helpers/game-menu";
-import { flushNativeSave, mockNativeStudy } from "./native-study-harness";
+import { flushNativeSave, mockClaudeStudy } from "./study-harness";
 
 async function rawDurableSave(page: Page) {
   return page.evaluate(async () => {
@@ -86,7 +86,7 @@ test("a failed full-run import stays open with a clear unsaved warning", async (
 test("hiding a paused study tab synchronously checkpoints incomplete local work", async ({
   page,
 }) => {
-  await mockNativeStudy(page);
+  await mockClaudeStudy(page);
   await page.goto("/");
   await page.locator("#study-only-toggle").click();
   await flushNativeSave(page);
@@ -116,7 +116,7 @@ test("hiding a paused study tab synchronously checkpoints incomplete local work"
 test("an unreadable checkpoint stays protected through lifecycle saves until a valid backup is restored", async ({
   page,
 }) => {
-  await mockNativeStudy(page);
+  await mockClaudeStudy(page);
   await page.addInitScript(() => {
     if (!sessionStorage.getItem("synthetic-corrupt-save-seeded")) {
       localStorage.setItem("dead-air-save-v1", "synthetic damaged checkpoint");

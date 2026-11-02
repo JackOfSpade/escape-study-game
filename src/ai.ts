@@ -1640,9 +1640,9 @@ async function evaluateSubmission(
       e.state = "in-progress";
   }
 }
-// Both legacy answer reviews and conversational completion use the same reward
-// and evidence path. Only a validated provider reply may reach this function.
-function applyCompletion(
+// Every validated completion uses this exactly-once reward and evidence path.
+// Only a validated provider reply may reach it; tests apply a fixed verdict here.
+export function applyCompletion(
   g: Game,
   e: Encounter,
   r: Roadmap,

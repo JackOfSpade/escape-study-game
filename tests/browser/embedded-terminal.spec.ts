@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { enterNativeGame } from "./native-study-harness";
+import { enterNativeGame } from "./study-harness";
 
 /** Fake Claude CLI gateway: no model, connector or real save is involved. */
 async function mockClaude(page: Page) {
@@ -78,7 +78,6 @@ test("Claude CLI serves a question and conversation inside the game, pausing onl
   await expect(page.locator("#terminal")).toBeVisible();
   await expect(page.locator("body")).toHaveClass(/terminal-open/);
   await expect(page.locator("#problem-title")).toHaveText("Embedded question");
-  await expect(page.locator("#native-study")).toBeHidden();
   const generated = claude.calls.filter((c) => c.operation === "generate");
   expect(generated).toHaveLength(1);
   expect(generated[0]).not.toHaveProperty("chatCode");

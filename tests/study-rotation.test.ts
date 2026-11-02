@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { applyDirectCompletion, ensureProblem } from "../src/ai";
+import { applyCompletion, ensureProblem } from "../src/ai";
 import { completionVerdict } from "../src/completion-verdict";
 import { beginVisit, eligible, initialStudy } from "../src/curriculum";
 import { complete } from "../src/engine";
@@ -112,7 +112,7 @@ function finishHuman(g: ReturnType<typeof world>, e: Encounter) {
     } satisfies Submission;
     e.submissions.push(s);
   }
-  applyDirectCompletion(
+  applyCompletion(
     g,
     e,
     roadmap,
