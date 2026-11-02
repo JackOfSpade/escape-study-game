@@ -352,6 +352,12 @@ function generationPayload(
   };
 }
 const preparing = new WeakMap<object, Promise<void>>();
+/** A failed preparation must wait, or a signed-out CLI would spend a call on
+ * every interface tick. It backs off from one minute up to thirty. */
+const preparationBackoff = new WeakMap<
+  object,
+  { failures: number; retryAt: number }
+>();
 /** Whether a prepared question is still the one the schedule would issue. */
 function stillSchedulable(r: Roadmap, g: Game, c: Contract) {
   if (c.practice) return true;
@@ -373,6 +379,36 @@ function stillSchedulable(r: Roadmap, g: Game, c: Contract) {
 }
 /** Generate the next terminal's question ahead of time. It waits for the last
  * assessment so the question knows which gaps that answer closed or exposed. */
+/** Saves from the ChatGPT era can hold work waiting on a chat that no longer
+ * exists. Free it so the player can carry on in the game's own terminal; the
+ * question and the learner's own work stay. */
+export function releaseRetiredChatRequests(g: Game) {
+  if (status().mode !== "claude-cli") return;
+  for (const e of [...Object.values(g.encounters), ...g.study.archives]) {
+    if (e.pendingGeneration && e.pendingGeneration.provider !== "claude-cli")
+      delete e.pendingGeneration;
+    const session = e.directStudy;
+    if (
+      session &&
+      session.provider === "chatgpt-handoff" &&
+      ["pending", "interrupted", "paused"].includes(session.state)
+    )
+      delete e.directStudy;
+    for (const job of e.tutorRequests ?? [])
+      if (job.state === "pending" && job.provider !== "claude-cli")
+        job.state = "superseded";
+    for (const submission of e.submissions)
+      if (
+        submission.status === "pending" &&
+        submission.completionRequest?.provider !== "claude-cli"
+      ) {
+        submission.status = "error";
+        submission.feedback =
+          "This answer was waiting on the retired ChatGPT connection. Submit it again.";
+        delete submission.completionRequest;
+      }
+  }
+}
 export function prepareNextQuestion(g: Game, r: Roadmap) {
   const study = g.study;
   if (
@@ -381,6 +417,7 @@ export function prepareNextQuestion(g: Game, r: Roadmap) {
     g.status !== "playing" ||
     study.preparedQuestion ||
     preparing.has(study) ||
+    (preparationBackoff.get(study)?.retryAt ?? 0) > Date.now() ||
     study.assessments.some((a) => a.status === "pending") ||
     Object.values(g.encounters).some(
       (e) =>
@@ -411,9 +448,16 @@ export function prepareNextQuestion(g: Game, r: Roadmap) {
       if (g.study !== study || status().mode !== provider) return;
       problem.provenance = provider;
       study.preparedQuestion = { provider, contract, problem };
+      preparationBackoff.delete(study);
     })
     // A failed preparation is silent: opening a terminal generates as usual.
-    .catch(() => {})
+    .catch(() => {
+      const failures = (preparationBackoff.get(study)?.failures ?? 0) + 1;
+      preparationBackoff.set(study, {
+        failures,
+        retryAt: Date.now() + Math.min(30, 2 ** (failures - 1)) * 60_000,
+      });
+    })
     .finally(() => preparing.delete(study));
   preparing.set(study, operation);
 }

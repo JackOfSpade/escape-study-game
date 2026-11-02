@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { checkBridge, ensureProblem, prepareNextQuestion } from "../src/ai";
+import {
+  checkBridge,
+  ensureProblem,
+  prepareNextQuestion,
+  releaseRetiredChatRequests,
+} from "../src/ai";
 import { initialStudy } from "../src/curriculum";
 import type { Contract, Problem, Roadmap } from "../src/model";
 import { createPlayableGame } from "../src/world";
@@ -186,10 +191,48 @@ test("a failed preparation is silent and a terminal still generates", async () =
     prepareNextQuestion(g, r);
     await new Promise((done) => setTimeout(done, 20));
     assert.equal(g.study.preparedQuestion, undefined);
+    prepareNextQuestion(g, r);
+    await new Promise((done) => setTimeout(done, 20));
+    assert.equal(
+      fake.calls.length,
+      1,
+      "backs off instead of retrying each tick",
+    );
     fail = false;
     await ensureProblem(g, hall, r);
     assert.equal(hall.error, undefined);
     assert.ok(hall.problem);
+  } finally {
+    await fake.restore();
+  }
+});
+
+test("work waiting on the retired ChatGPT chat is freed for the game's terminal", async () => {
+  const { g, hall, other } = world();
+  const fake = await bridge((p) => Response.json(problem(p.contract)));
+  try {
+    hall.pendingGeneration = {
+      provider: "chatgpt-handoff",
+      requestId: "old",
+      payload: {},
+    };
+    other.directStudy = {
+      provider: "chatgpt-handoff",
+      state: "pending",
+    } as never;
+    other.tutorRequests = [
+      { provider: "chatgpt-handoff", state: "pending" },
+    ] as never;
+    other.submissions = [
+      { status: "pending", completionRequest: { provider: "chatgpt-handoff" } },
+    ] as never;
+    releaseRetiredChatRequests(g);
+    assert.equal(hall.pendingGeneration, undefined);
+    assert.equal(other.directStudy, undefined);
+    assert.equal((other.tutorRequests as any)[0].state, "superseded");
+    assert.equal(other.submissions[0].status, "error");
+    await ensureProblem(g, hall, r);
+    assert.ok(hall.problem, "the terminal can generate again");
   } finally {
     await fake.restore();
   }

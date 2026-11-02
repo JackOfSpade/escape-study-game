@@ -126,6 +126,16 @@ function classifyFailure(result, stderr, exitCode) {
       "Claude usage limit reached. Your work is saved; retry once the limit resets.",
       429,
     );
+  if (/already in use/i.test(text))
+    return new ClaudeGatewayError(
+      "CLAUDE_SESSION_IN_USE",
+      "Conversation exists",
+    );
+  if (/no conversation found/i.test(text))
+    return new ClaudeGatewayError(
+      "CLAUDE_SESSION_MISSING",
+      "Conversation missing",
+    );
   if (LOGIN.test(text))
     return new ClaudeGatewayError(
       "CLAUDE_NOT_SIGNED_IN",
@@ -308,6 +318,9 @@ export function createClaudeGateway({
         if (error) reject(error);
         else resolve(value);
       };
+      // Decoding per chunk would garble a character split across chunks.
+      child.stdout.setEncoding("utf8");
+      child.stderr.setEncoding("utf8");
       child.stdout.on("data", (chunk) => {
         buffer += chunk;
         let at;
@@ -366,19 +379,36 @@ export function createClaudeGateway({
     const id = key && sessionUuid(key);
     await slot(operation);
     try {
+      const cancelled = () =>
+        new ClaudeGatewayError("CLAUDE_CANCELLED", "Request cancelled", 499);
       const job = { operation, payload };
       let prompt = user,
         problem;
       // A rejected answer gets one correction, as the worker chat's retry did.
       for (let attempt = 0; attempt < 2; attempt++) {
-        const session = id ? { id, resume: started.has(id) } : undefined;
-        const text = await runOnce({
-          profile,
-          system,
-          user: prompt,
-          session,
-          signal,
-        });
+        if (signal?.aborted) throw cancelled();
+        let text;
+        for (let sessionTries = 0; ; sessionTries++) {
+          const session = id ? { id, resume: started.has(id) } : undefined;
+          try {
+            text = await runOnce({
+              profile,
+              system,
+              user: prompt,
+              session,
+              signal,
+            });
+            break;
+          } catch (error) {
+            // Which turn a conversation is on is only remembered in memory, so
+            // a restart or a failed first turn must correct itself here.
+            if (!id || sessionTries > 0) throw error;
+            if (error.code === "CLAUDE_SESSION_IN_USE") started.add(id);
+            else if (error.code === "CLAUDE_SESSION_MISSING")
+              started.delete(id);
+            else throw error;
+          }
+        }
         if (id) started.add(id);
         const answer = firstJsonObject(text);
         try {
@@ -398,27 +428,40 @@ export function createClaudeGateway({
       release();
     }
   }
-  /** Same request id: join the running call or reuse its answer, never pay twice. */
+  /** Same request id: join the running call or reuse its answer, never pay
+   * twice. The call stops only when every caller waiting on it has gone. */
   function run(operation, payload, { signal } = {}) {
     const requestId = payload?.requestId;
     const key =
       typeof requestId === "string" && requestId
-        ? `${operation}\u0000${requestId}\u0000${JSON.stringify(payload).length}`
+        ? `${operation}\u0000${requestId}\u0000${createHash("sha256").update(JSON.stringify(payload)).digest("hex")}`
         : undefined;
     for (const [k, entry] of finished)
       if (now() - entry.at > 10 * 60_000) finished.delete(k);
     if (key && finished.has(key))
       return Promise.resolve(finished.get(key).answer);
-    if (key && inFlight.has(key)) return inFlight.get(key);
-    const promise = execute(operation, payload, signal).then((answer) => {
-      if (key) finished.set(key, { answer, at: now() });
-      return answer;
-    });
+    const entry = (key && inFlight.get(key)) ?? {
+      cancel: new AbortController(),
+      callers: 0,
+    };
+    entry.callers++;
+    const leave = () => {
+      if (--entry.callers === 0) entry.cancel.abort();
+    };
+    if (signal?.aborted) leave();
+    else signal?.addEventListener("abort", leave, { once: true });
+    if (entry.promise) return entry.promise;
+    entry.promise = execute(operation, payload, entry.cancel.signal).then(
+      (answer) => {
+        if (key) finished.set(key, { answer, at: now() });
+        return answer;
+      },
+    );
     if (key) {
-      inFlight.set(key, promise);
-      promise.finally(() => inFlight.delete(key)).catch(() => {});
+      inFlight.set(key, entry);
+      entry.promise.finally(() => inFlight.delete(key)).catch(() => {});
     }
-    return promise;
+    return entry.promise;
   }
   return { run, enabled: () => true };
 }

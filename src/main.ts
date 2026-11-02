@@ -42,6 +42,7 @@ import {
   autonomousNpcWork,
   checkBridge,
   prepareNextQuestion,
+  releaseRetiredChatRequests,
   closeChat,
   edit,
   ensureProblem,
@@ -453,6 +454,7 @@ function hideNativeRequest() {
   nativeRequestIdentity = undefined;
 }
 function resumeNativeQuestions() {
+  releaseRetiredChatRequests(game);
   resumeDirectStudies(game, roadmap, nativeStudyChanged);
   const e = lastQuestion ? game.encounters[lastQuestion] : undefined;
   if (
@@ -1209,7 +1211,7 @@ function startCard() {
   if (game.status === "ready")
     card.innerHTML = `<span class="eyebrow">${game.preparingRun ? "A NEW ESCAPE" : "YOUR ESCAPE IS READY"}</span><h2>${game.design ? escape(game.design.design.title) : "The dead are<br>on your heels."}</h2><p>${game.design ? escape(game.design.design.premise) : "Twenty survivors. Four floors. Four seats.<br>Choose your route. Learn your way out."}</p>${game.preparingRun ? "<p>ChatGPT will prepare your game session before play.</p>" : '<p id="run-ready-status" role="status">Your escape is ready. Take your time. Nothing moves until you press Start.</p>'}<button id="start">${game.preparingRun ? "Prepare game ↗" : "Start game ↗"}</button><small class="agent-only">${escape(status().detail)}</small>`;
   else
-    card.innerHTML = `<span class="eyebrow">${game.status === "escaped" ? "TRANSMISSION RECEIVED" : "SIGNAL LOST"}</span><h2>${game.status === "escaped" ? "You made it." : "Your work survives."}</h2><p>${escape(game.notice)}<br>${game.stats.rescued} extracted · ${game.stats.deaths} lost · ${Math.floor(game.endedAt ?? game.time)} seconds</p>${finishable ? '<button id="finish-question">Continue in ChatGPT ↗</button>' : ""}<button id="again">Begin another run ↗</button><button id="backup" class="quiet agent-only">Export work & evidence</button><button id="spectate" class="quiet">Watch the building ↗</button>`;
+    card.innerHTML = `<span class="eyebrow">${game.status === "escaped" ? "TRANSMISSION RECEIVED" : "SIGNAL LOST"}</span><h2>${game.status === "escaped" ? "You made it." : "Your work survives."}</h2><p>${escape(game.notice)}<br>${game.stats.rescued} extracted · ${game.stats.deaths} lost · ${Math.floor(game.endedAt ?? game.time)} seconds</p>${finishable ? '<button id="finish-question">${status().mode === "claude-cli" ? "Continue in the terminal" : "Continue in ChatGPT ↗"}</button>' : ""}<button id="again">Begin another run ↗</button><button id="backup" class="quiet agent-only">Export work & evidence</button><button id="spectate" class="quiet">Watch the building ↗</button>`;
   document.getElementById("start")?.addEventListener("click", begin);
   document.getElementById("finish-question")?.addEventListener("click", () => {
     if (finishable) openFinalQuestion(finishable);
@@ -1508,7 +1510,9 @@ async function interact() {
       pending.generation)
   ) {
     game.notice =
-      "Finish your current question in ChatGPT before opening another station.";
+      status().mode === "claude-cli"
+        ? "Your question is still being prepared. It will open in a moment."
+        : "Finish your current question in ChatGPT before opening another station.";
     return;
   }
   if (e.mode === "solo" && e.owner && e.owner !== "human") {
@@ -1565,8 +1569,14 @@ function waitingOnEmbeddedReply() {
   return (
     !!e &&
     (!!e.generation ||
-      !!e.tutorRequests?.some((j) => j.state === "pending") ||
-      e.submissions.some((s) => s.status === "pending"))
+      !!e.tutorRequests?.some(
+        (j) => j.state === "pending" && j.provider === "claude-cli",
+      ) ||
+      e.submissions.some(
+        (s) =>
+          s.status === "pending" &&
+          s.completionRequest?.provider === "claude-cli",
+      ))
   );
 }
 function renderTerminal(force = false) {
@@ -1806,13 +1816,15 @@ function renderTerminal(force = false) {
     "#completion-connection",
     reconnectProgress ??
       (disconnected
-        ? "ChatGPT is disconnected. Your work is saved. Connect ChatGPT sets everything up and opens ChatGPT for you."
+        ? "The study connection is unavailable. Your work is saved. Check that Claude CLI is installed and signed in, then retry."
         : unheard
           ? "ChatGPT isn't listening for this terminal yet. Connect ChatGPT opens a new chat and copies the request for you to paste."
           : ""),
   );
   $("#connect-completion").hidden =
-    (!disconnected && !unheard) || reconnectBusy;
+    status().mode === "claude-cli" ||
+    (!disconnected && !unheard) ||
+    reconnectBusy;
   const openLink = $<HTMLAnchorElement>("#open-chatgpt");
   $("#chatgpt-prompt").hidden =
     !terminalRequestShown || (!disconnected && !unheard && !reconnectBusy);
@@ -2841,7 +2853,7 @@ $("#reconnect").onclick = () => {
 $("#live-profile").onclick = async () => {
   if (status().mode === "development") {
     game.notice =
-      "Enable the ChatGPT handoff or connect a verified study bridge before starting a live profile.";
+      "Check that Claude CLI is installed and signed in before starting a live profile.";
     setText("#live-profile-status", game.notice);
     return;
   }
@@ -3212,6 +3224,7 @@ function ui() {
       ? `${a.keys ?? 0} KEYS`
       : `${a.inventory.reduce((n, i) => n + i.weight, 0)} / ${CONFIG.capacity} KG`;
   document.body.classList.toggle("force-fields", game.rules === "force-fields");
+  $("#chatgpt-settings").hidden = status().mode === "claude-cli";
   const sig = JSON.stringify([a.inventory, a.keys, game.rules]);
   if (sig !== inventorySignature) {
     inventorySignature = sig;

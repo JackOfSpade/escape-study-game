@@ -235,3 +235,84 @@ test("the limit on running calls lets a player's request pass queued chatter", a
   await Promise.all([blocker, chatter, player]);
   assert.equal(order[0], "player");
 });
+
+test("a request cancelled while queued never starts a process", async () => {
+  const calls = [];
+  const cancel = new AbortController();
+  let first;
+  const base = fakeSpawn(["hang"], calls);
+  const g = createClaudeGateway({
+    env,
+    cwd: dir,
+    maxRunning: 1,
+    validate: () => {},
+    spawn: (...args) => (first = base(...args)),
+  });
+  const blocker = g.run("complete", {}).catch(() => {});
+  const queued = g.run("complete", {}, { signal: cancel.signal });
+  await new Promise((r) => setImmediate(r));
+  cancel.abort();
+  first.kill();
+  await blocker;
+  await assert.rejects(queued, { code: "CLAUDE_CANCELLED" });
+  assert.equal(calls.length, 1);
+});
+
+test("a joined call survives one caller leaving and stops when all have", async () => {
+  const calls = [];
+  let child;
+  const base = fakeSpawn(["hang"], calls);
+  const g = createClaudeGateway({
+    env,
+    cwd: dir,
+    validate: () => {},
+    spawn: (...args) => (child = base(...args)),
+  });
+  const a = new AbortController();
+  const b = new AbortController();
+  const payload = { requestId: "shared" };
+  const first = g.run("complete", payload, { signal: a.signal });
+  const second = g.run("complete", payload, { signal: b.signal });
+  await new Promise((r) => setImmediate(r));
+  a.abort();
+  await new Promise((r) => setImmediate(r));
+  assert.ok(!child.killed, "the other caller is still waiting");
+  b.abort();
+  await assert.rejects(first, { code: "CLAUDE_CANCELLED" });
+  await assert.rejects(second, { code: "CLAUDE_CANCELLED" });
+  assert.equal(calls.length, 1);
+});
+
+test("a design conversation recovers after a restart or a lost session", async () => {
+  const fail = (result) => ({
+    result: { type: "result", subtype: "error", is_error: true, result },
+  });
+  const restarted = [];
+  const afterRestart = gateway(
+    [fail("Session ID x is already in use."), '{"ok":1}'],
+    restarted,
+  );
+  assert.deepEqual(
+    await afterRestart.run("design-run", { generationId: "design-a" }),
+    { ok: 1 },
+  );
+  assert.ok(restarted[0].args.includes("--session-id"));
+  assert.ok(restarted[1].args.includes("--resume"));
+  const lost = [];
+  const afterLoss = gateway(
+    ['{"ok":1}', fail("No conversation found"), '{"ok":2}'],
+    lost,
+  );
+  await afterLoss.run("design-run", {
+    requestId: "a",
+    generationId: "design-b",
+  });
+  assert.deepEqual(
+    await afterLoss.run("design-run", {
+      requestId: "b",
+      generationId: "design-b",
+    }),
+    { ok: 2 },
+  );
+  assert.ok(lost[2].args.includes("--session-id"));
+});
