@@ -570,6 +570,8 @@ export interface Encounter {
   executions?: import("./execution").WorkspaceExecution[];
   runId?: string;
   problemPresentedSequence?: number;
+  /** Wall-clock time the problem was first presented; orders topic assessments. */
+  problemPresentedAt?: number;
   pendingGeneration?: {
     /** Legacy saved generation requests were always ChatGPT handoffs. */
     provider?: Provider;

@@ -22,6 +22,7 @@ import {
 import { FramePerformance } from "./frame-performance";
 import gameShell from "./game-shell.html?raw";
 import { escapeHtml as escape } from "./html";
+import { markdownToHtml } from "./markdown";
 import {
   assess,
   autonomousNpcWork,
@@ -1458,13 +1459,16 @@ function renderTerminal(force = false) {
   )
     $("#terminal-provenance").textContent +=
       " · Resolved in your imported roadmap. Your original puzzle and draft remain playable; finishing grants gameplay rewards without another academic visit.";
-  setText(
-    "#problem",
-    e.problem?.prompt ??
-      (e.state === "consumed"
-        ? "Other survivors have already used this one-time terminal. No saved question is available for this simulated NPC-only outcome. It grants no human learning credit. Find an unused terminal to work toward your personal access."
-        : (e.error ??
-          "Generating a stable curriculum-scoped problem. You can leave immediately.")),
+  setHtml(
+    $("#problem"),
+    e.problem?.prompt !== undefined
+      ? markdownToHtml(e.problem.prompt)
+      : escape(
+          e.state === "consumed"
+            ? "Other survivors have already used this one-time terminal. No saved question is available for this simulated NPC-only outcome. It grants no human learning credit. Find an unused terminal to work toward your personal access."
+            : (e.error ??
+                "Generating a stable curriculum-scoped problem. You can leave immediately."),
+        ),
   );
   if (force || document.activeElement !== editor || e.state === "consumed") {
     if (editor.value !== e.workspace) editor.value = e.workspace;
@@ -1749,7 +1753,7 @@ function renderTerminal(force = false) {
     messages
       .map(
         (m) =>
-          `<div class="message ${m.kind}"><strong>${escape(game.survivors.find((a) => a.id === m.author)?.name ?? m.author)}</strong><p>${escape(m.text)}</p></div>`,
+          `<div class="message ${m.kind}"><strong>${escape(game.survivors.find((a) => a.id === m.author)?.name ?? m.author)}</strong><div class="message-body">${markdownToHtml(m.text)}</div></div>`,
       )
       .join("") +
     (tab === "tutor"
@@ -1758,7 +1762,7 @@ function renderTerminal(force = false) {
           .filter(Boolean)
           .map(
             (text) =>
-              `<div class="message tutor"><strong>Terminal AI</strong><p>${escape(text!)}</p></div>`,
+              `<div class="message tutor"><strong>Terminal AI</strong><div class="message-body">${markdownToHtml(text!)}</div></div>`,
           )
           .join("")
       : "");

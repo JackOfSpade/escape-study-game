@@ -29,7 +29,10 @@ async function mockClaude(page: Page) {
       const c = body.payload.contract;
       return json({
         title: "Embedded question",
-        prompt: "Why does the leading index column matter?",
+        prompt:
+          "Why does the leading index column matter?\n\n```python\nprint('" +
+          "x".repeat(600) +
+          "')\n```",
         starter: "",
         rubric: ["fixture"],
         contract: c,
@@ -45,7 +48,10 @@ async function mockClaude(page: Page) {
     }
     if (body.operation === "tutor") {
       await new Promise<void>((resolve) => (held.release = resolve));
-      return json({ text: "What would the planner do then?", complete: false });
+      return json({
+        text: "What would the planner do then?\n\n```sql\nSELECT 1;\n```",
+        complete: false,
+      });
     }
     return json({ error: "Unexpected operation" }, 400);
   });
@@ -78,6 +84,24 @@ test("Claude CLI serves a question and conversation inside the game, pausing onl
   await expect(page.locator("#terminal")).toBeVisible();
   await expect(page.locator("body")).toHaveClass(/terminal-open/);
   await expect(page.locator("#problem-title")).toHaveText("Embedded question");
+  // The fenced block renders as code, with no literal fence and no page growth.
+  await expect(page.locator("#problem pre code")).toHaveCount(1);
+  await expect(page.locator("#problem")).not.toContainText("```");
+  const problemPre = page.locator("#problem pre");
+  expect(
+    await problemPre.evaluate(
+      (el) =>
+        el.scrollWidth > el.clientWidth &&
+        getComputedStyle(el).overflowX === "auto",
+    ),
+  ).toBe(true);
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
   const generated = claude.calls.filter((c) => c.operation === "generate");
   expect(generated).toHaveLength(1);
   expect(generated[0]).not.toHaveProperty("chatCode");
@@ -93,6 +117,8 @@ test("Claude CLI serves a question and conversation inside the game, pausing onl
   await expect(page.locator("#messages")).toContainText(
     "What would the planner do then?",
   );
+  await expect(page.locator("#messages pre code")).toHaveText("SELECT 1;");
+  await expect(page.locator("#messages")).not.toContainText("```");
   await expect.poll(() => gameTime(page)).toBeGreaterThan(frozen);
 });
 

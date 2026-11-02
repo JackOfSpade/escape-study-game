@@ -669,6 +669,7 @@ export function presentProblem(g: Game, e: Encounter, r?: Roadmap) {
     e.id,
   );
   e.problemPresentedSequence = ev.seq;
+  if (e.problemPresentedAt === undefined) e.problemPresentedAt = Date.now();
   e.history.push({
     seq: ev.seq,
     author: "generator",
@@ -1089,6 +1090,7 @@ export function retryTutorRequest(
           recordTopicAssessments(g, e, topicUpdates, {
             requestId: job.id,
             questionFingerprint: `${e.id}:${fnv1a(JSON.stringify(e.problem))}`,
+            startedAt: e.problemPresentedAt,
             sourceHash:
               payload.topicAssessmentContext?.sourceHash ?? r?.sourceHash,
           });

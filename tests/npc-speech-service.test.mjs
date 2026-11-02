@@ -272,8 +272,9 @@ test("tickets expire on access and timer cleanup removes unconsumed WAV files", 
 test("timeouts and service close abort synthesis and remove temporary state", async (t) => {
   let aborted = false;
   const f = await fixture(t, {
-    synthesisMs: 20,
+    synthesisMs: 250,
     render: ({ signal }) => {
+      if (signal.aborted) aborted = true;
       signal.addEventListener(
         "abort",
         () => {
