@@ -13,6 +13,7 @@ export function createStudyBridgeServer({
   handoff,
   speech,
   claude,
+  control,
 } = {}) {
   return createServer(async (req, res) => {
     res.setHeader("Content-Type", "application/json");
@@ -29,6 +30,7 @@ export function createStudyBridgeServer({
       return;
     }
     try {
+      if (control?.route(req, res)) return;
       if (speech && (await speech.route(req, res))) return;
       if (handoff && (await handoff.route(req, res))) return;
       if (req.url === "/api/execute") {

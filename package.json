@@ -32,8 +32,6 @@
     "prebenchmark:cooperation": "npm run import:curriculum",
     "benchmark:npc-work": "tsx scripts/benchmark-npc-work.ts",
     "prebenchmark:npc-work": "npm run import:curriculum",
-    "bridge:mcp": "node scripts/chatgpt-handoff-mcp.mjs",
-    "bridge:configure": "node scripts/chatgpt-tunnel-config.mjs",
     "test:game": "tsx scripts/game-test.ts",
     "test:agents": "tsx scripts/game-test.ts --json - --artifacts .artifacts/game-tests",
     "test:dialogue": "tsx --test tests/npc-chatter.test.ts tests/npc-voice.test.ts tests/npc-dialogue-realism.test.ts tests/npc-voice-bridge.test.mjs",

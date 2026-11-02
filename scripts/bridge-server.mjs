@@ -1,25 +1,13 @@
 import { safeEqual } from "./lib/safe-equal.mjs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { join, resolve } from "node:path";
-import { createStudyBridgeServer } from "./study-bridge-server.mjs";
-import { createHandoffQueue } from "./chatgpt-handoff-queue.mjs";
-import { createHandoffRoutes } from "./chatgpt-handoff-routes.mjs";
-import { createPublicHandoffBridge } from "./chatgpt-public-bridge.mjs";
-import { createTunnelSupervisor } from "./chatgpt-tunnel-supervisor.mjs";
-import { createNpcSpeechService } from "./npc-speech-service.mjs";
 import { createClaudeGateway } from "./claude-gateway.mjs";
-import {
-  loadGameTunnelConfig,
-  tunnelDirectory,
-  privateDirectory,
-  writePrivate,
-} from "./chatgpt-tunnel-config.mjs";
-const defaultHandoff = fileURLToPath(
-  new URL("../.local/chatgpt-handoff/", import.meta.url),
-);
+import { createStudyBridgeServer } from "./study-bridge-server.mjs";
+import { createNpcSpeechService } from "./npc-speech-service.mjs";
+import { privateDirectory, writePrivate } from "./lib/private-fs.mjs";
 
-/** This process owns the relay, worker session and tunnel. Game launchers may
- * disconnect without ending it; its own exit still ends the tunnel watchdog. */
+/** This process owns AI calls, speech and code execution. Game launchers may
+ * disconnect without ending it. */
 export async function startBridgeService(boot, options = {}) {
   if (
     boot.version !== 1 ||
@@ -31,36 +19,6 @@ export async function startBridgeService(boot, options = {}) {
   )
     throw Error("Invalid bridge bootstrap");
   privateDirectory(boot.directory);
-  const handoffDirectory = options.handoffDirectory ?? defaultHandoff;
-  const queue = createHandoffQueue({
-    file: join(handoffDirectory, "jobs.json"),
-  });
-  let publicBridge, supervisor;
-  try {
-    const config =
-      options.publicConfig === null
-        ? null
-        : (options.publicConfig ?? loadGameTunnelConfig());
-    if (config) {
-      publicBridge = createPublicHandoffBridge({
-        hostname: config.hostname,
-        queue,
-        directory: options.publicDirectory ?? tunnelDirectory,
-        connectorRanges: config.connectorRanges,
-      });
-      supervisor = createTunnelSupervisor(config);
-    }
-  } catch (error) {
-    if (error.code !== "ENOENT")
-      console.error(
-        "Public connector configuration needs repair. Local play remains available.",
-      );
-  }
-  const handoff = createHandoffRoutes(queue, {
-    tokenFile: join(handoffDirectory, "worker-token"),
-    publicBridge,
-    supervisor,
-  });
   const identity = {
     version: 1,
     running: true,
@@ -72,16 +30,10 @@ export async function startBridgeService(boot, options = {}) {
   const speech = createNpcSpeechService();
   const server = createStudyBridgeServer({
     speech,
-    claude:
-      (options.aiProvider ?? process.env.STUDY_AI_PROVIDER) === "chatgpt"
-        ? undefined
-        : createClaudeGateway(),
-    endpoint: process.env.STUDY_MODE_BRIDGE_URL,
-    key: process.env.STUDY_MODE_BRIDGE_TOKEN,
-    handoff: {
-      ...handoff,
-      async route(req, res) {
-        if (req.url !== "/_bridge-service") return handoff.route(req, res);
+    claude: options.claude ?? createClaudeGateway(),
+    control: {
+      route(req, res) {
+        if (req.url !== "/_bridge-service") return false;
         const token = req.headers["x-bridge-control"];
         if (req.headers.origin || !safeEqual(token, boot.token)) {
           res.writeHead(403);
@@ -108,12 +60,7 @@ export async function startBridgeService(boot, options = {}) {
   async function close() {
     if (closing) return;
     closing = true;
-    // Temporary audio must be aborted/deleted even if releasing the durable
-    // study queue or stopping an external connector subsequently fails.
     await speech.close();
-    queue.enable(false);
-    await supervisor?.stop();
-    await publicBridge?.close();
     server.closeAllConnections();
     server.close(() => process.exit(0));
   }
@@ -127,15 +74,6 @@ export async function startBridgeService(boot, options = {}) {
     server.once("error", reject);
     server.listen(boot.port, "127.0.0.1", resolve);
   });
-  if (publicBridge)
-    try {
-      await publicBridge.listen();
-    } catch {
-      console.error(
-        "Public game connector socket could not open. Tunnel remains stopped.",
-      );
-      supervisor = undefined;
-    }
   for (const signal of ["SIGINT", "SIGTERM"])
     process.on(signal, () => {
       void close();
@@ -143,7 +81,7 @@ export async function startBridgeService(boot, options = {}) {
   console.log(
     `Persistent study bridge: http://127.0.0.1:${boot.port} (loopback only)`,
   );
-  return { status: identity, queue, publicBridge, server };
+  return { status: identity, server };
 }
 export function bootstrapBridge(options = {}) {
   if (!process.send)
