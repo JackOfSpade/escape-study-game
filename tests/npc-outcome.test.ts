@@ -414,12 +414,12 @@ test("actual HTTP reconstruction requires a separate correlated semantic validat
   try {
     await inspectNpcOutcome(f.g, f.e, r, {
       ...f.adapter,
-      provider: "chatgpt-handoff",
+      provider: "claude-cli",
       request: (op, p: any) =>
         relay.request(op, p, () => {
           if (op === "materialize-outcome") {
             const valid = f.candidate(p);
-            valid.problem.provenance = "chatgpt-handoff";
+            valid.problem.provenance = "claude-cli";
             return {
               valid,
               invalid: [
@@ -458,7 +458,7 @@ test("actual HTTP reconstruction requires a separate correlated semantic validat
     assert.equal(outcomeIsVisible(f.g, f.e, r), true);
     assert.equal(f.e.accepted, accepted);
     assert.equal(JSON.stringify(f.g.study), before);
-    assert.equal(relay.queue.snapshot().done, 2);
+    assert.equal(relay.completed, 2);
     assert.equal(f.e.executions?.length ?? 0, 0);
   } finally {
     await relay.close();

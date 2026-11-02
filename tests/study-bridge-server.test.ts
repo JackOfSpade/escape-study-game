@@ -1,8 +1,10 @@
-// Actual HTTP relay, synthetic provider. This verifies transport, never native Study Mode identity.
+// Actual HTTP relay with a fake gateway. This verifies transport and routing, never model output.
 import assert from "node:assert/strict";
-import { createServer, request, type Server } from "node:http";
+import { request, type Server } from "node:http";
 import test from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
+// @ts-expect-error Local .mjs module is exercised directly without a declaration shim.
+import { AI_OPERATIONS } from "../scripts/lib/ai-contracts.mjs";
 // @ts-expect-error Local .mjs server is exercised directly without a declaration shim.
 import { createStudyBridgeServer } from "../scripts/study-bridge-server.mjs";
 
@@ -18,49 +20,27 @@ async function close(server: Server) {
     server.close((error) => (error ? reject(error) : resolve())),
   );
 }
-test("actual relay forwards complete reconciliation files with configured auth and rejects cross-origin or unknown operations", async () => {
-  const calls: { path: string; auth?: string; body: string }[] = [];
-  let malformed = false;
-  const capabilities = [
-    "generate",
-    "tutor",
-    "complete",
-    "assess",
-    "group",
-    "reconcile-roadmap",
-  ];
-  const provider = createServer(async (req, res) => {
-    let body = "";
-    for await (const chunk of req) body += chunk;
-    calls.push({ path: req.url!, auth: req.headers.authorization, body });
-    if (malformed) {
-      res.writeHead(200, { "Content-Type": "text/html" });
-      res.end("<html>Temporary provider error</html>");
-      return;
-    }
-    res.setHeader("Content-Type", "application/json");
-    res.end(
-      JSON.stringify(
-        req.url === "/capabilities"
-          ? { mode: "study-mode", capabilities }
-          : {
-              requestId: "synthetic-transport",
-              canonical: JSON.parse(body).candidate,
-            },
-      ),
-    );
-  });
-  const endpoint = await listen(provider);
-  const relay = createStudyBridgeServer({
-    endpoint,
-    key: "synthetic-test-token",
-  });
+const origin = "http://127.0.0.1:5173";
+function fakeGateway() {
+  const calls: { operation: string; payload: unknown }[] = [];
+  return {
+    calls,
+    enabled: () => true,
+    async run(operation: string, payload: unknown) {
+      calls.push({ operation, payload });
+      return { echoed: payload };
+    },
+  };
+}
+test("actual relay forwards a complete large reconciliation to the gateway and rejects cross-origin or unknown operations", async () => {
+  const claude = fakeGateway();
+  const relay = createStudyBridgeServer({ claude });
   const base = await listen(relay);
   try {
     const status = await (await fetch(base + "api/status")).json();
-    assert.equal(status.mode, "study-mode");
+    assert.equal(status.mode, "claude-cli");
+    assert.deepEqual(status.capabilities, AI_OPERATIONS);
     assert.ok(status.capabilities.includes("reconcile-roadmap"));
-    assert.match(status.detail, /identity must be verified/);
     // Exceeds the old 1.5 MB route cap, within the complete-document context limit.
     const candidate = "Untrusted source data only. ".repeat(65_000);
     const payload = {
@@ -68,64 +48,61 @@ test("actual relay forwards complete reconciliation files with configured auth a
       local: "original",
       candidate,
     };
-    const response = await fetch(base + "api/bridge", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Origin: "http://127.0.0.1:5173",
-      },
-      body: JSON.stringify({ operation: "reconcile-roadmap", payload }),
-    });
-    assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), {
-      requestId: payload.requestId,
-      canonical: candidate,
-    });
-    assert.equal(calls[1].path, "/reconcile-roadmap");
-    assert.equal(calls[1].auth, "Bearer synthetic-test-token");
-    assert.deepEqual(JSON.parse(calls[1].body), payload);
-    const count = calls.length;
-    for (const [origin, operation, expected] of [
-      ["https://untrusted.invalid", "reconcile-roadmap", 403],
-      ["http://127.0.0.1:5173", "unrecognized-operation", 400],
-      ["http://127.0.0.1:5173", "design-run", 409],
-    ] as const) {
-      const result = await fetch(base + "api/bridge", {
+    const post = (origin: string, operation: string, extra = {}) =>
+      fetch(base + "api/bridge", {
         method: "POST",
-        headers: { Origin: origin },
-        body: JSON.stringify({ operation, payload }),
+        headers: { "Content-Type": "application/json", Origin: origin },
+        body: JSON.stringify({ operation, payload, ...extra }),
       });
-      assert.equal(result.status, expected);
-    }
-    assert.equal(calls.length, count);
-    malformed = true;
+    const response = await post(origin, "reconcile-roadmap");
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { echoed: payload });
+    assert.equal(claude.calls.length, 1);
+    assert.equal(claude.calls[0].operation, "reconcile-roadmap");
+    assert.deepEqual(claude.calls[0].payload, payload);
+    for (const [from, operation, expected] of [
+      ["https://untrusted.invalid", "reconcile-roadmap", 403],
+      [origin, "unrecognized-operation", 400],
+    ] as const)
+      assert.equal((await post(from, operation)).status, expected);
+    assert.equal(claude.calls.length, 1);
+  } finally {
+    await close(relay);
+  }
+});
+test("actual relay reports a gateway failure without taking itself down", async () => {
+  const claude = {
+    enabled: () => true,
+    async run() {
+      throw Object.assign(Error("Synthetic gateway failure"), {
+        status: 429,
+        code: "SYNTHETIC",
+      });
+    },
+  };
+  const relay = createStudyBridgeServer({ claude });
+  const base = await listen(relay);
+  try {
     const failed = await fetch(base + "api/bridge", {
       method: "POST",
-      body: JSON.stringify({ operation: "reconcile-roadmap", payload }),
+      body: JSON.stringify({ operation: "reconcile-roadmap", payload: {} }),
     });
-    assert.equal(failed.status, 502);
-    assert.match((await failed.json()).error, /SyntaxError/);
-    malformed = false;
-    // A malformed provider response cannot take down the local relay.
+    assert.equal(failed.status, 429);
+    assert.deepEqual(await failed.json(), {
+      error: "Synthetic gateway failure",
+      code: "SYNTHETIC",
+    });
     assert.equal(
       (await (await fetch(base + "api/status")).json()).mode,
-      "study-mode",
+      "claude-cli",
     );
   } finally {
     await close(relay);
-    await close(provider);
   }
 });
 test("actual relay preserves UTF-8 split across network chunks and bounds incoming bytes", async () => {
-  const received: unknown[] = [];
-  const provider = createServer(async (req, res) => {
-    const chunks: Buffer[] = [];
-    for await (const chunk of req) chunks.push(chunk);
-    const payload = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-    received.push(payload);
-    res.end(JSON.stringify(payload));
-  });
-  const relay = createStudyBridgeServer({ endpoint: await listen(provider) });
+  const claude = fakeGateway();
+  const relay = createStudyBridgeServer({ claude });
   const base = await listen(relay);
   try {
     const payload = { candidate: "中文 🧟 café — exact source" };
@@ -157,8 +134,11 @@ test("actual relay preserves UTF-8 split across network chunks and bounds incomi
       },
     );
     assert.equal(response.status, 200);
-    assert.deepEqual(JSON.parse(response.body), payload);
-    assert.deepEqual(received, [payload]);
+    assert.deepEqual(JSON.parse(response.body), { echoed: payload });
+    assert.deepEqual(
+      claude.calls.map((call) => call.payload),
+      [payload],
+    );
     // Fewer than six million JS characters, but more than six million UTF-8 bytes.
     const oversized = await fetch(base + "api/bridge", {
       method: "POST",
@@ -169,13 +149,12 @@ test("actual relay preserves UTF-8 split across network chunks and bounds incomi
     });
     assert.equal(oversized.status, 413);
     assert.match((await oversized.json()).error, /Request too large/);
-    assert.equal(received.length, 1);
+    assert.equal(claude.calls.length, 1);
   } finally {
     await close(relay);
-    await close(provider);
   }
 });
-test("actual relay without a configured provider reports development and never accepts native reconciliation", async () => {
+test("actual relay without a gateway reports development and never accepts AI work", async () => {
   const relay = createStudyBridgeServer(),
     base = await listen(relay);
   try {
@@ -191,34 +170,15 @@ test("actual relay without a configured provider reports development and never a
     await close(relay);
   }
 });
-
-// @ts-expect-error Actual handoff module is intentionally plain JavaScript.
-import { createHandoffQueue } from "../scripts/chatgpt-handoff-queue.mjs";
-// @ts-expect-error Actual handoff module is intentionally plain JavaScript.
-import { createHandoffRoutes } from "../scripts/chatgpt-handoff-routes.mjs";
-test("relay rejects stale or unknown captured providers before enqueueing or forwarding private packets, including legacy optional native jobs", async () => {
-  let calls = 0;
-  const upstream = createServer(async (req, res) => {
-    for await (const _ of req) {
-    }
-    calls++;
-    res.end(JSON.stringify({ text: "synthetic" }));
-  });
-  const endpoint = await listen(upstream),
-    queue = createHandoffQueue();
-  const relay = createStudyBridgeServer({
-      endpoint,
-      handoff: createHandoffRoutes(queue, { token: "synthetic-routing-token" }),
-    }),
+test("relay rejects a saved request captured under another provider before it reaches the gateway", async () => {
+  const claude = fakeGateway();
+  const relay = createStudyBridgeServer({ claude }),
     base = await listen(relay);
-  const post = (operation: string, payload: unknown) =>
+  const post = (body: Record<string, unknown>) =>
     fetch(base + "api/bridge", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Origin: "http://127.0.0.1:5173",
-      },
-      body: JSON.stringify({ operation, payload }),
+      headers: { "Content-Type": "application/json", Origin: origin },
+      body: JSON.stringify(body),
     });
   const operations = [
     "materialize-work",
@@ -226,8 +186,9 @@ test("relay rejects stale or unknown captured providers before enqueueing or for
     "review-environment",
     "group",
     "complete",
+    "tutor",
   ];
-  const body = (operation: string, provider?: string) => ({
+  const payload = (operation: string, provider?: string) => ({
     requestId: `synthetic-${operation}`,
     ...(provider ? { provider } : {}),
     mode:
@@ -238,84 +199,38 @@ test("relay rejects stale or unknown captured providers before enqueueing or for
           : undefined,
   });
   try {
+    for (const operation of operations)
+      for (const provider of ["chatgpt-handoff", "study-mode", "untrusted"]) {
+        assert.equal(
+          (await post({ operation, payload: payload(operation, provider) }))
+            .status,
+          409,
+        );
+        assert.equal(
+          (await post({ operation, provider, payload: payload(operation) }))
+            .status,
+          409,
+        );
+      }
+    assert.equal(claude.calls.length, 0);
     for (const operation of operations) {
       assert.equal(
-        (await post(operation, body(operation, "chatgpt-handoff"))).status,
-        409,
+        (await post({ operation, payload: payload(operation) })).status,
+        200,
       );
       assert.equal(
-        (await post(operation, body(operation, "untrusted"))).status,
-        409,
+        (
+          await post({
+            operation,
+            provider: "claude-cli",
+            payload: payload(operation, "claude-cli"),
+          })
+        ).status,
+        200,
       );
     }
-    assert.equal(calls, 0);
-    const envelope = (provider: string) =>
-      fetch(base + "api/bridge", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Origin: "http://127.0.0.1:5173",
-        },
-        body: JSON.stringify({
-          operation: "tutor",
-          provider,
-          payload: {
-            requestId: "synthetic-legacy-private",
-            text: "PRIVATE_ENVELOPE_FIXTURE",
-          },
-        }),
-      });
-    assert.equal((await envelope("chatgpt-handoff")).status, 409);
-    assert.equal(calls, 0);
-    queue.enable(true);
-    assert.equal((await envelope("study-mode")).status, 409);
-    assert.equal((await envelope("development")).status, 409);
-    assert.equal(queue.snapshot().queued, 0);
-    for (const operation of operations) {
-      assert.equal((await post(operation, body(operation))).status, 409);
-      assert.equal(
-        (await post(operation, body(operation, "study-mode"))).status,
-        409,
-      );
-      assert.equal(
-        (await post(operation, body(operation, "untrusted"))).status,
-        409,
-      );
-    }
-    assert.equal(queue.snapshot().queued, 0);
-    assert.equal(calls, 0);
-    assert.equal(
-      (
-        await post(
-          "review-environment",
-          body("review-environment", "chatgpt-handoff"),
-        )
-      ).status,
-      202,
-    );
-    assert.equal(queue.snapshot().queued, 1);
-    queue.enable(false);
-    assert.equal(
-      (
-        await post(
-          "review-environment",
-          body("review-environment", "study-mode"),
-        )
-      ).status,
-      200,
-    );
-    assert.equal(calls, 1);
-    assert.equal(
-      (await post("review-environment", body("review-environment"))).status,
-      200,
-    );
-    assert.equal(
-      calls,
-      2,
-      "Legacy native body still reaches only its original route",
-    );
+    assert.equal(claude.calls.length, operations.length * 2);
   } finally {
     await close(relay);
-    await close(upstream);
   }
 });

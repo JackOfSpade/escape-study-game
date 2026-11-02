@@ -3,10 +3,7 @@ import { createHash } from "node:crypto";
 import { accessSync, constants, mkdirSync, statSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
-import {
-  handoffInstructions,
-  validateAnswer,
-} from "./chatgpt-handoff-queue.mjs";
+import { taskInstructions, validateAnswer } from "./lib/ai-contracts.mjs";
 
 /** Every AI task's model and effort, chosen by blind quality scoring against
  * cost. Aliases always resolve to the latest version of each model. */
@@ -103,7 +100,7 @@ export function buildPrompt(operation, payload) {
     ? `\n\nReference data for this task, part of the request:\n${JSON.stringify(stable)}`
     : "";
   return {
-    system: `${GATEWAY_PREAMBLE}\n\n${operation === "tutor" ? `${TUTOR_POLICY}\n\n` : ""}${handoffInstructions(operation, payload)}${reference}`,
+    system: `${GATEWAY_PREAMBLE}\n\n${operation === "tutor" ? `${TUTOR_POLICY}\n\n` : ""}${taskInstructions(operation, payload)}${reference}`,
     user: JSON.stringify(rest),
   };
 }

@@ -22,6 +22,5 @@ Note these before removing any of them, because they cannot be restored from the
 
 ## Still in the main tree
 
-- `scripts/chatgpt-handoff-queue.mjs` holds the operation contracts and answer validators the Claude gateway uses, and the queue that test fixtures use.
-- `scripts/chatgpt-handoff-routes.mjs` serves those test fixtures only.
+- `scripts/lib/ai-contracts.mjs` holds the operation contracts and answer validators the Claude gateway uses. The shelved `scripts/chatgpt-handoff-queue.mjs` carries its own older copy of them, including the ChatGPT delivery wording, the `terminal-direct` completion rules and the topic assessment instruction.
 - `src/direct-study.ts` and the `chatgpt-handoff` provider stay so existing saves keep loading.
