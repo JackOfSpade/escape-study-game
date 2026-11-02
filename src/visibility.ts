@@ -39,6 +39,8 @@ export function blocksSight(o: Furniture) {
   return (
     OPAQUE.has(o.kind) &&
     !o.destroyed &&
+    // Access doors hide what is behind them only in the rendered scene. Zombies
+    // keep sensing through them, so door health stays a real time budget.
     !o.field &&
     (!o.open || !!o.door) &&
     !(o.kind === "gate" && o.turning < 0)

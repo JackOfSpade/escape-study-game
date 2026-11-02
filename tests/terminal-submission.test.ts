@@ -31,7 +31,7 @@ async function transport(
   globalThis.fetch = async (url, init) =>
     String(url) === "/api/status"
       ? Response.json({
-          mode: connected ? "chatgpt-handoff" : "development",
+          mode: connected ? "claude-cli" : "development",
           label: "Synthetic transport",
           detail: "No external AI",
           capabilities: connected ? ["complete", "tutor", "group"] : [],

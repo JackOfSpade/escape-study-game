@@ -1,3 +1,4 @@
+import { providerLabel } from "./provider-label";
 import { eligible } from "./curriculum";
 import {
   type Provider,
@@ -322,7 +323,7 @@ export function presentNpcOutcome(g: Game, e: Encounter, r: Roadmap) {
     seq: ev.seq,
     author: job.candidate.authors[0],
     kind: "workspace-view",
-    text: `Reconstructed now through ${job.payload.provider === "chatgpt-handoff" ? "ChatGPT handoff" : "configured Study Mode bridge"} from simulated NPC-only work; no historical execution.\n${job.candidate.problem.prompt}\n${job.candidate.solution}`,
+    text: `Reconstructed now through ${providerLabel(job.payload.provider)} from simulated NPC-only work; no historical execution.\n${job.candidate.problem.prompt}\n${job.candidate.solution}`,
     at: g.time,
     revision: e.revision,
     presented: ev.seq,

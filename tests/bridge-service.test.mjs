@@ -47,13 +47,10 @@ async function fixture() {
     });
     return { status: response.status, data: await response.json() };
   };
-  const control = (body) =>
-    api("/api/handoff/control", body, { Origin: "http://127.0.0.1:5173" });
   return {
     root,
     options,
     api,
-    control,
     async close() {
       await stopBridge(options);
       rmSync(root, { recursive: true, force: true });
@@ -246,62 +243,6 @@ test("unresponsive startup and pre-shutdown checks remain conservative", async (
   }
 });
 
-test("game launcher exits and restarts without rotating the worker or losing a pending claim", async () => {
-  const f = await fixture();
-  try {
-    const first = await launcher(f.options);
-    assert.equal(first.reused, false);
-    await f.control({ action: "enable", enabled: true });
-    const worker = await f.control({ action: "worker" });
-    assert.equal(worker.status, 200);
-    assert.ok(worker.data.session);
-    const token = readFileSync(join(f.root, "handoff/worker-token"), "utf8");
-    const queued = await f.api("/api/bridge", {
-      provider: "chatgpt-handoff",
-      operation: "tutor",
-      payload: {
-        requestId: "synthetic-lifecycle-tutor",
-        problem: { prompt: "Synthetic question only" },
-        message: "Synthetic answer context only",
-      },
-    });
-    assert.equal(queued.status, 202);
-    const claimed = await f.api(
-      "/api/handoff/worker",
-      { action: "get", worker: "synthetic-claim" },
-      { Authorization: `Bearer ${token}` },
-    );
-    assert.equal(claimed.data.operation, "tutor");
-    const again = await launcher(f.options);
-    assert.equal(again.pid, first.pid);
-    assert.equal(again.instance, first.instance);
-    assert.equal(again.reused, true);
-    const status = (await f.api("/api/handoff/status")).data;
-    assert.equal(status.enabled, true);
-    assert.equal(status.autonomousWork, false);
-    assert.equal(status.public.workerActive, true);
-    assert.equal(
-      readFileSync(join(f.root, "handoff/worker-token"), "utf8"),
-      token,
-    );
-    const retained = await f.api(
-      "/api/handoff/worker",
-      { action: "get", worker: "synthetic-claim" },
-      { Authorization: `Bearer ${token}` },
-    );
-    assert.deepEqual(retained.data, claimed.data);
-    await f.control({ action: "enable", enabled: false });
-    await launcher(f.options);
-    assert.equal(
-      (await f.api("/api/handoff/status")).data.enabled,
-      false,
-      "a game restart must not undo revoked sharing",
-    );
-  } finally {
-    await f.close();
-  }
-});
-
 test("concurrent starters reuse one bridge; management rejects browser origins and missing tokens", async () => {
   const f = await fixture();
   try {
@@ -330,47 +271,6 @@ test("concurrent starters reuse one bridge; management rejects browser origins a
       /another service/,
     );
     assert.equal((await bridgeStatus(f.options)).running, true);
-  } finally {
-    await f.close();
-  }
-});
-
-test("an actual relay crash creates a fresh disabled worker session while retaining captured work", async () => {
-  const f = await fixture();
-  try {
-    const before = await ensureBridge(f.options);
-    await f.control({ action: "enable", enabled: true });
-    await f.control({ action: "worker" });
-    const receipt = await f.api("/api/bridge", {
-      provider: "chatgpt-handoff",
-      operation: "tutor",
-      payload: {
-        requestId: "synthetic-crash",
-        message: "Preserved fictional context",
-      },
-    });
-    assert.equal(receipt.status, 202);
-    process.kill(before.pid, "SIGKILL"); // This test's isolated, authenticated synthetic child only.
-    for (let i = 0; i < 100; i++) {
-      await wait(10);
-      if (!(await bridgeStatus(f.options)).running) break;
-    }
-    const after = await ensureBridge(f.options);
-    assert.notEqual(after.instance, before.instance);
-    const status = (await f.api("/api/handoff/status")).data;
-    assert.equal(status.enabled, false);
-    assert.equal(status.autonomousWork, false);
-    assert.equal(status.public.workerActive, false);
-    assert.equal(status.queued, 1);
-    await f.control({ action: "enable", enabled: true }); // Explicit synthetic reauthorization, never automatic restart restoration.
-    assert.equal(
-      (
-        await f.api(
-          `/api/bridge/result?id=${receipt.data.handoff.id}&hash=${receipt.data.handoff.hash}`,
-        )
-      ).status,
-      202,
-    );
   } finally {
     await f.close();
   }
@@ -444,16 +344,10 @@ test("the actual dev-launcher shutdown stops its game child and leaves the bridg
   try {
     await start();
     const first = await bridgeStatus(f.options);
-    await f.control({ action: "enable", enabled: true });
-    await f.control({ action: "worker" });
     await stop();
     assert.equal((await bridgeStatus(f.options)).pid, first.pid);
     await start();
     assert.equal((await bridgeStatus(f.options)).pid, first.pid);
-    assert.equal(
-      (await f.api("/api/handoff/status")).data.public.workerActive,
-      true,
-    );
     await stop();
   } finally {
     await stop();

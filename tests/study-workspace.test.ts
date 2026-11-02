@@ -164,34 +164,13 @@ test("consumed generation and displayed NPC-owned work cannot block a new study 
   assert.notEqual(next, npc);
 });
 
-test("a human native session on a consumed NPC lock remains resumable for learning", () => {
-  const g = createPlayableGame(130, r);
-  enterStudyWorkspace(g);
-  const npc = Object.values(g.encounters)[0];
-  npc.state = "consumed";
-  npc.owner = "npc-only";
-  npc.directStudy = {
-    id: "synthetic-human-session",
-    createdAt: 1,
-    provider: "chatgpt-handoff",
-    payloadJson: "{}",
-    questionFingerprint: "synthetic-fingerprint",
-    state: "pending",
-  };
-  assert.equal(workspaceQuestion(g), npc);
-  assert.equal(nextWorkspaceQuestion(g, r), npc);
-  assert.equal(workspaceSelectedQuestion(g), npc);
-  npc.directStudy.state = "applied";
-  assert.equal(workspaceQuestion(g), undefined);
-});
-
 test("live study-only generation receives the exact formal contract and preserves physical pacing", async () => {
   const original = globalThis.fetch;
   const sent: any[] = [];
   globalThis.fetch = async (url, init) => {
     if (String(url) === "/api/status")
       return Response.json({
-        mode: "study-mode",
+        mode: "claude-cli",
         label: "Synthetic",
         detail: "No live model",
         capabilities: ["generate"],
@@ -231,7 +210,7 @@ test("live study-only generation receives the exact formal contract and preserve
     // original contract rather than adopting a provider-supplied scope.
     assert.deepEqual(sent[0].contract, JSON.parse(JSON.stringify(formal)));
     assert.deepEqual(e.problem?.contract, formal);
-    assert.equal(e.problem?.provenance, "study-mode");
+    assert.equal(e.problem?.provenance, "claude-cli");
     assert.deepEqual(g.fieldPacing, pacing);
   } finally {
     globalThis.fetch = original;

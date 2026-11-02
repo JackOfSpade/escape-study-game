@@ -21,7 +21,7 @@ function fixture() {
     prompt: "Transport fixture only",
     starter: "",
     rubric: [],
-    provenance: "study-mode",
+    provenance: "claude-cli",
     contract,
     scopeDefinitions: [
       {
@@ -38,7 +38,7 @@ function fixture() {
 }
 async function connection(handler: typeof fetch) {
   const original = globalThis.fetch;
-  let mode = "study-mode";
+  let mode = "claude-cli";
   globalThis.fetch = async (url, init) =>
     String(url) === "/api/status"
       ? Response.json({
@@ -51,7 +51,7 @@ async function connection(handler: typeof fetch) {
   await checkBridge();
   return {
     async reconnect() {
-      mode = "study-mode";
+      mode = "claude-cli";
       await checkBridge();
     },
     async disconnect() {
@@ -81,7 +81,7 @@ test("an offline assessment freezes the original partial work before reconnect a
     const assessment = g.study.assessments[0],
       captured = assessment.request;
     assert.equal(assessment.status, "review-required");
-    assert.equal(captured?.provider, "study-mode");
+    assert.equal(captured?.provider, "claude-cli");
     assert.ok(captured, "An offline attempt lost its frozen assessment packet");
     assert.equal(bodies.length, 0);
     const ledger = JSON.stringify(g.study.learner),

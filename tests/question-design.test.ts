@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-// @ts-expect-error Direct .mjs transport test.
-import { createHandoffQueue } from "../scripts/chatgpt-handoff-queue.mjs";
+// @ts-expect-error Direct .mjs contract test.
+import { taskInstructions } from "../scripts/lib/ai-contracts.mjs";
 import { checkBridge, ensureProblem } from "../src/ai";
 import { eligible, initialStudy } from "../src/curriculum";
 import {
@@ -17,7 +17,6 @@ import {
 } from "../scripts/lib/study-question-policy.mjs";
 
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
-const worker = "synthetic-question-design-worker";
 
 const minimalPolicy = [
   /smallest self-contained diagnostic that exercises the objective/,
@@ -36,7 +35,7 @@ function fixtureFetch(sent: any[]) {
   return (async (input: unknown, init?: RequestInit) => {
     if (String(input) === "/api/status")
       return Response.json({
-        mode: "study-mode",
+        mode: "claude-cli",
         label: "Isolated question design fixture",
         capabilities: ["generate", "tutor", "group", "complete", "assess"],
         detail: "Test fixture only; not a native Study Mode verification.",
@@ -75,7 +74,7 @@ test("live generation payload carries the minimal concrete problem policy and ke
     const e = g.encounters[g.floors[0].stations[0].encounter];
     await ensureProblem(g, e, r);
     assert.equal(sent.length, 1);
-    assert.equal(e.problem?.provenance, "study-mode");
+    assert.equal(e.problem?.provenance, "claude-cli");
     const policy: string = sent[0].generationPolicy;
     assert.ok(policy.includes(QUESTION_DESIGN_GUIDANCE));
     for (const requirement of minimalPolicy) assert.match(policy, requirement);
@@ -118,7 +117,7 @@ test("a saved generation retries with its exact captured payload and request ide
       generationPolicy: "Synthetic earlier captured policy text.",
     };
     e.pendingGeneration = {
-      provider: "study-mode",
+      provider: "claude-cli",
       requestId: "gen-synthetic-saved",
       payload: structuredClone(captured),
     };
@@ -135,18 +134,19 @@ test("a saved generation retries with its exact captured payload and request ide
   }
 });
 
-test("handoff generate instructions require minimal concrete problems with unchanged contracts", () => {
-  const q = createHandoffQueue();
-  q.enable(true);
+test("generate instructions require minimal concrete problems with unchanged contracts", () => {
   const contract = {
     id: "synthetic-review",
     objectiveIds: ["SYNTHETIC:REVIEW"],
     scopes: ["Review an authorization change."],
     depth: 2,
   };
-  q.enqueue("generate", { requestId: "synthetic-minimal", contract });
-  const job = q.get(worker);
-  assert.deepEqual(job.payload.contract, contract);
+  const job = {
+    instructions: taskInstructions("generate", {
+      requestId: "synthetic-minimal",
+      contract,
+    }) as string,
+  };
   assert.ok(job.instructions.includes(QUESTION_DESIGN_GUIDANCE));
   for (const requirement of minimalPolicy)
     assert.match(job.instructions, requirement);
@@ -159,15 +159,14 @@ test("handoff generate instructions require minimal concrete problems with uncha
   assert.doesNotMatch(job.instructions, /establishes the most at once/);
 });
 
-test("handoff tutor instructions use focused questioning without breadth inflation", () => {
-  const q = createHandoffQueue();
-  q.enable(true);
-  q.enqueue("tutor", {
-    requestId: "synthetic-tutor",
-    problem: { prompt: "Synthetic task; never real learner proof" },
-    messages: [{ text: "PRIVATE_SYNTHETIC_TUTOR_CONTEXT" }],
-  });
-  const job = q.get(worker);
+test("tutor instructions use focused questioning without breadth inflation", () => {
+  const job = {
+    instructions: taskInstructions("tutor", {
+      requestId: "synthetic-tutor",
+      problem: { prompt: "Synthetic task; never real learner proof" },
+      messages: [{ text: "PRIVATE_SYNTHETIC_TUTOR_CONTEXT" }],
+    }) as string,
+  };
   assert.ok(job.instructions.includes(QUESTION_ADAPTATION_GUIDANCE));
   assert.match(
     job.instructions,

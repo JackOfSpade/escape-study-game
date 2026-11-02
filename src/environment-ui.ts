@@ -1,3 +1,4 @@
+import { providerLabel } from "./provider-label";
 import { escapeHtml as escape } from "./html";
 import {
   environmentExecutions,
@@ -66,7 +67,7 @@ export function renderEnvironmentObservations(
       );
       if (button) {
         const detail = document.createElement("p");
-        detail.textContent = `Reviewed through ${entry.provenance === "chatgpt-handoff" ? "ChatGPT handoff" : "configured Study Mode bridge"}. This packet: ${entry.judgment.classification}. Covered: ${entry.judgment.covered.join("; ") || "none observed"}. Remaining: ${entry.judgment.remaining.join("; ") || "none in reviewed scope"}. ENV status is separate from independent academic proof.`;
+        detail.textContent = `Reviewed through ${providerLabel(entry.provenance)}. This packet: ${entry.judgment.classification}. Covered: ${entry.judgment.covered.join("; ") || "none observed"}. Remaining: ${entry.judgment.remaining.join("; ") || "none in reviewed scope"}. ENV status is separate from independent academic proof.`;
         button.closest("article")?.append(detail);
       }
     }

@@ -1,7 +1,7 @@
 import { detachAuthoredScene } from "./helpers/synthetic-world";
 import { startDesignedRun } from "./helpers/designed-run";
 import { expect, test, type Page } from "./helpers/offline-test";
-import { flushNativeSave, mockNativeStudy } from "./native-study-harness";
+import { flushNativeSave, mockClaudeStudy } from "./study-harness";
 import { openGameMenu, openPlayerMenu } from "./helpers/game-menu";
 
 async function startFirstPerson(
@@ -475,10 +475,10 @@ test("Space snapshots camera facing only when the real vault handler runs", asyn
   expect((await pose(page)).heading.y).toBeCloseTo(0, 5);
 });
 
-test("the docked study HUD keeps mouse capture until text focus and completed questions leave look and E available", async ({
+test("the embedded terminal releases mouse capture once for text entry and completed questions leave look and E available", async ({
   page,
 }) => {
-  const relay = await mockNativeStudy(page);
+  const relay = await mockClaudeStudy(page);
   await startFirstPerson(page, "synthetic");
   await page.evaluate(async () => {
     const d = (window as any).__deadAir,
@@ -487,6 +487,9 @@ test("the docked study HUD keeps mouse capture until text focus and completed qu
       e = Object.values(g.encounters).find((e: any) => e.floor === 0) as any;
     const { ensureProblem } = await import("/src/ai.ts" as string);
     e.owner = "human";
+    // A live run starts with no pre-made practice questions.
+    g.study.profile = "live";
+    for (const each of Object.values<any>(g.encounters)) delete each.problem;
     await ensureProblem(g, e, d.roadmap);
     g.floors[0].stations = [
       { id: "first-person-terminal", encounter: e.id, x: a.x + 0.8, y: a.y },
@@ -501,12 +504,13 @@ test("the docked study HUD keeps mouse capture until text focus and completed qu
     "view3d",
   );
   await page.keyboard.press("e");
-  await expect(page.locator("#native-study")).toBeVisible();
-  await expect.poll(() => relay.calls.length).toBe(1);
-  expect(await page.evaluate(() => document.pointerLockElement?.id)).toBe(
-    "view3d",
-  );
-  expect(await page.evaluate(() => (window as any).__lookLockExits)).toBe(0);
+  await expect(page.locator("#terminal")).toBeVisible();
+  expect(relay.calls.length).toBeGreaterThan(0);
+  expect(relay.tutorCalls()).toHaveLength(0);
+  // The terminal is a panel with text fields, so it releases mouse capture
+  // exactly once; the run keeps going and typing never moves the survivor.
+  expect(await page.evaluate(() => document.pointerLockElement)).toBeNull();
+  expect(await page.evaluate(() => (window as any).__lookLockExits)).toBe(1);
   expect(
     await page.evaluate(() => !!(window as any).__deadAir.game.paused),
   ).toBe(false);
@@ -515,36 +519,31 @@ test("the docked study HUD keeps mouse capture until text focus and completed qu
     .poll(() => page.evaluate(() => (window as any).__deadAir.game.time))
     .toBeGreaterThan(time);
 
-  const resumedLook = await look(page);
-  await page.keyboard.down("ArrowRight");
-  await expect
-    .poll(async () => (await look(page)).yaw - resumedLook.yaw)
-    .toBeGreaterThan(0.25);
-  await page.keyboard.up("ArrowRight");
-  expect(await page.evaluate(() => (window as any).__lookLockExits)).toBe(0);
-  await page.evaluate(() => {
-    navigator.clipboard.writeText = async () => {
-      throw new Error("Synthetic clipboard denial");
-    };
-  });
-  await page.locator("#native-study-copy").click();
   const before = await pose(page),
     fixedLook = await look(page),
-    field = page.locator("#native-study-request");
+    field = page.locator("#chat-input");
   await expect(field).toBeVisible();
   await field.focus();
   await page.keyboard.type("wasd e ");
   await expect(field).toBeFocused();
   expect(await page.evaluate(() => document.pointerLockElement)).toBeNull();
-  expect(await page.evaluate(() => (window as any).__lookLockExits)).toBe(1);
   expect(await pose(page)).toEqual(before);
   expect(await look(page)).toEqual(fixedLook);
   await expect(page.locator("#pause-menu")).toBeHidden();
 
-  relay.finish(relay.calls[0].payload.requestId);
-  await expect(page.locator("#native-study-status")).toHaveText(
-    "Question complete. Result saved.",
-  );
+  relay.solve();
+  await field.press("Enter");
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        Object.values<any>((window as any).__deadAir.game.encounters).some(
+          (e) => e.state === "consumed",
+        ),
+      ),
+    )
+    .toBe(true);
+  await page.locator("#leave").click();
+  await expect(page.locator("#terminal")).toBeHidden();
   await page.evaluate(async () => {
     const d = (window as any).__deadAir,
       a = d.game.survivors[0],
@@ -602,7 +601,6 @@ test("the docked study HUD keeps mouse capture until text focus and completed qu
   expect(await page.evaluate(() => document.pointerLockElement?.id)).toBe(
     "view3d",
   );
-  await expect(page.locator("#native-study")).toBeVisible();
   await expect(page.locator("#pause-menu")).toBeHidden();
 });
 

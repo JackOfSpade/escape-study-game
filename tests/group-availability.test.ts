@@ -56,7 +56,7 @@ for (const action of ["retreat", "vault", "stairs"] as const)
     globalThis.fetch = async (url, init) => {
       if (String(url) === "/api/status")
         return Response.json({
-          mode: "chatgpt-handoff",
+          mode: "claude-cli",
           label: "Controlled availability",
           detail: "Fixture only",
           capabilities: ["group"],

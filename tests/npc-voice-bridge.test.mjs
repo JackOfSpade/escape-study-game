@@ -1,25 +1,23 @@
-// Isolated temporary queues, synthetic workers and fake PCM; no live connector.
+// Isolated fake gateway, synthetic situations and fake PCM; no live model.
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import { createServer } from "node:http";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import {
-  createHandoffQueue,
-  NPC_CHATTER_TTL_MS,
-} from "../scripts/chatgpt-handoff-queue.mjs";
-import { createHandoffRoutes } from "../scripts/chatgpt-handoff-routes.mjs";
 import { createStudyBridgeServer } from "../scripts/study-bridge-server.mjs";
 import { createNpcSpeechService } from "../scripts/npc-speech-service.mjs";
 import { sha256 } from "../scripts/lib/digest.mjs";
+import {
+  AI_OPERATIONS,
+  taskInstructions,
+  validateAnswer,
+} from "../scripts/lib/ai-contracts.mjs";
 import {
   buildNpcDialogueReview,
   npcDialogueCandidateSource,
 } from "../scripts/lib/npc-dialogue-policy.mjs";
 
-const origin = "http://127.0.0.1:5173",
-  worker = "synthetic-npc-worker";
+const origin = "http://127.0.0.1:5173";
 const chatter = (id = "synthetic-chatter-1") => ({
   version: 1,
   requestId: id,
@@ -72,14 +70,7 @@ const reviewAnswer = (request, verdict = "accept") => ({
       ? "A brief grounded evacuation check-in."
       : "There is no reason for that small talk now.",
 });
-async function tempQueue(t, options = {}) {
-  const directory = await mkdtemp(join(tmpdir(), "npc-voice-bridge-test-")),
-    file = join(directory, "jobs.json"),
-    queue = createHandoffQueue({ file, ...options });
-  t.after(() => rm(directory, { recursive: true, force: true }));
-  queue.enable(true);
-  return { queue, directory, file };
-}
+
 async function listen(t, server) {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   t.after(async () => {
@@ -91,16 +82,24 @@ async function listen(t, server) {
 function post(base, path, body, headers = {}) {
   return fetch(base + path, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Origin: origin,
-      ...headers,
-    },
+    headers: { "Content-Type": "application/json", Origin: origin, ...headers },
     body: JSON.stringify(body),
   });
 }
-const resultPath = (receipt) =>
-  `/api/bridge/result?id=${receipt.id}&hash=${receipt.hash}`;
+/** A gateway whose answers pass through the real validators, as in production. */
+function gateway(reply) {
+  return {
+    enabled: () => true,
+    async run(operation, payload) {
+      const job = { operation, payload };
+      const value = reply(job);
+      validateAnswer(job, value);
+      return value;
+    },
+  };
+}
+const rejects = (job, bad, pattern) =>
+  assert.throws(() => validateAnswer(job, bad), pattern);
 
 function fakeWave() {
   const bytes = Buffer.alloc(44 + 4410);
@@ -119,53 +118,15 @@ function fakeWave() {
   return bytes;
 }
 
-test("ambient jobs yield priority and transport capacity to every study operation", () => {
-  const queue = createHandoffQueue();
-  queue.enable(true);
-  const voice = queue.enqueue("npc-chatter", chatter());
-  const operations = ["assess", "group", "complete", "generate", "tutor"];
-  const receipts = operations.map((operation) =>
-    queue.enqueue(operation, {
-      requestId: `synthetic-${operation}`,
-      submitter: "human",
-    }),
-  );
-  const served = operations.map((_, i) => queue.get(`study-worker-${i}`));
-  assert.deepEqual(
-    served.map((job) => job.operation),
-    ["tutor", "generate", "complete", "group", "assess"],
-  );
-  assert.deepEqual(
-    new Set(served.map((job) => job.jobId)),
-    new Set(receipts.map((r) => r.id)),
-  );
-  assert.equal(queue.get(worker).jobId, voice.id);
-  const small = createHandoffQueue({ maxJobs: 4 });
-  small.enable(true);
-  for (let i = 0; i < 4; i++)
-    small.enqueue("npc-chatter", chatter(`ambient-${i}`));
-  const study = small.enqueue("tutor", {
-    requestId: "synthetic-important-study",
-  });
-  assert.equal(
-    small.snapshot().queued,
-    1,
-    "temporary voices leave capacity for retained study",
-  );
-  assert.equal(small.get(worker).jobId, study.id);
-});
-
 test("NPC replies retain exact identity and reject markup, tool envelopes and altered contracts", () => {
-  const queue = createHandoffQueue();
-  queue.enable(true);
   const request = chatter(),
-    receipt = queue.enqueue("npc-chatter", request),
-    job = queue.get(worker),
-    valid = answer(request);
-  assert.match(job.instructions, /plain-text line/);
-  assert.match(job.instructions, /untrusted evidence/);
+    job = { operation: "npc-chatter", payload: request },
+    valid = answer(request),
+    instructions = taskInstructions("npc-chatter", request);
+  assert.match(instructions, /plain-text line/);
+  assert.match(instructions, /untrusted evidence/);
   assert.doesNotMatch(
-    job.instructions,
+    instructions,
     /^@study/,
     "ambient speech must not turn into a tutoring session",
   );
@@ -182,293 +143,15 @@ test("NPC replies retain exact identity and reject markup, tool envelopes and al
     { ...valid, tool_calls: [{ name: "execute" }] },
     { ...valid, toolOutput: "Synthetic output" },
     { ...valid, text: { tool: "execute" } },
-  ]) {
-    assert.throws(
-      () => queue.submit(worker, job.jobId, job.claim, bad),
-      /exact NPC\/request identity/,
-    );
-    assert.equal(queue.result(receipt.id, receipt.hash).status, "pending");
-  }
-  assert.equal(
-    queue.submit(worker, job.jobId, job.claim, valid).status,
-    "accepted",
-  );
-  assert.deepEqual(queue.result(receipt.id, receipt.hash), {
-    status: "done",
-    answer: valid,
-  });
-});
-
-test("temporary chatter has a four-job ceiling, idempotent retries and a fixed two-minute lifetime", () => {
-  let clock = 1000;
-  const queue = createHandoffQueue({ now: () => clock });
-  queue.enable(true);
-  const requests = Array.from({ length: 4 }, (_, i) =>
-      chatter(`synthetic-limited-${i}`),
-    ),
-    receipts = requests.map((p) => queue.enqueue("npc-chatter", p)),
-    job = queue.get(worker);
-  assert.deepEqual(
-    queue.enqueue("npc-chatter", requests[0]),
-    receipts[0],
-    "a retry at capacity returns its original receipt instead of rejecting the waiting game",
-  );
-  assert.throws(
-    () => queue.enqueue("npc-chatter", chatter("fifth")),
-    /excessive/,
-  );
-  clock += NPC_CHATTER_TTL_MS - 1;
-  assert.equal(queue.snapshot().queued + queue.snapshot().working, 4);
-  clock++;
-  assert.equal(queue.snapshot().queued + queue.snapshot().working, 0);
-  assert.throws(
-    () => queue.result(receipts[0].id, receipts[0].hash),
-    /Unknown exact/,
-  );
-  assert.throws(
-    () => queue.submit(worker, job.jobId, job.claim, answer(requests[0])),
-    /Wrong worker/,
-  );
-  assert.equal(
-    queue.enqueue("npc-chatter", chatter("fresh-after-expiry")).id.length > 0,
-    true,
-  );
-});
-
-test("situational prompts and generated voices never enter the durable queue file", async (t) => {
-  const { queue, file } = await tempQueue(t),
-    request = chatter("SYNTHETIC_EPHEMERAL_REQUEST"),
-    study = queue.enqueue("tutor", {
-      requestId: "retained-synthetic-study",
-      text: "synthetic study fixture",
-    }),
-    voice = queue.enqueue("npc-chatter", request);
-  // A selector isolates the voice to exercise claiming/submission while retained study exists.
-  const job = queue.get(
-      worker,
-      undefined,
-      (j) => j.operation === "npc-chatter",
-    ),
-    reply = { ...answer(request), text: "SYNTHETIC_EPHEMERAL_SPOKEN_LINE" };
-  queue.submit(worker, job.jobId, job.claim, reply);
-  for (const marker of [
-    request.requestId,
-    request.actorId,
-    reply.text,
-    voice.id,
-    "npc-chatter",
   ])
-    assert.equal(
-      (await readFile(file, "utf8")).includes(marker),
-      false,
-      marker,
-    );
-  const disk = JSON.parse(await readFile(file, "utf8"));
-  assert.equal(disk.jobs.length, 1);
-  assert.equal(disk.jobs[0].id, study.id);
-  const restored = createHandoffQueue({ file });
-  restored.enable(true);
-  assert.throws(() => restored.result(voice.id, voice.hash), /Unknown exact/);
-  assert.equal(restored.result(study.id, study.hash).status, "pending");
-});
-
-test("HTTP cancellation discards only exact ambient receipts and preserves study jobs", async (t) => {
-  const { queue } = await tempQueue(t),
-    handoff = createHandoffRoutes(queue, { token: "synthetic-worker-token" }),
-    base = await listen(t, createStudyBridgeServer({ handoff }));
-  const voiceResponse = await post(base, "/api/bridge", {
-    operation: "npc-chatter",
-    provider: "chatgpt-handoff",
-    payload: chatter(),
-  });
-  assert.equal(voiceResponse.status, 202);
-  const voice = (await voiceResponse.json()).handoff,
-    studyResponse = await post(base, "/api/bridge", {
-      operation: "tutor",
-      provider: "chatgpt-handoff",
-      payload: { requestId: "synthetic-cannot-cancel-study" },
-    }),
-    study = (await studyResponse.json()).handoff;
-  const denied = await fetch(base + resultPath(voice), {
-    method: "DELETE",
-    headers: { Origin: "http://localhost:9999" },
-  });
-  assert.equal(denied.status, 403);
-  assert.equal(
-    (
-      await fetch(base + resultPath({ ...voice, hash: "wrong-hash" }), {
-        method: "DELETE",
-        headers: { Origin: origin },
-      })
-    ).status,
-    200,
-  );
-  assert.equal(
-    queue.result(voice.id, voice.hash).status,
-    "pending",
-    "a mismatched receipt cannot discard the actual voice request",
-  );
-  assert.equal(
-    (
-      await fetch(base + resultPath(study), {
-        method: "DELETE",
-        headers: { Origin: origin },
-      })
-    ).status,
-    409,
-  );
-  assert.equal(queue.result(study.id, study.hash).status, "pending");
-  assert.equal(
-    (
-      await fetch(base + resultPath(voice), {
-        method: "DELETE",
-        headers: { Origin: origin },
-      })
-    ).status,
-    200,
-  );
-  assert.throws(() => queue.result(voice.id, voice.hash), /Unknown exact/);
-  assert.equal(queue.result(study.id, study.hash).status, "pending");
-});
-
-test("ambient forwarding binds both captured provider fields and never crosses provider state", async (t) => {
-  let upstreamCalls = 0;
-  const upstream = createServer(async (req, res) => {
-      for await (const _ of req) {
-        /* consume synthetic request only */
-      }
-      upstreamCalls++;
-      res.setHeader("Content-Type", "application/json");
-      res.end("{}");
-    }),
-    endpoint = await listen(t, upstream),
-    { queue } = await tempQueue(t),
-    handoff = createHandoffRoutes(queue, { token: "synthetic-worker-token" }),
-    base = await listen(t, createStudyBridgeServer({ endpoint, handoff }));
-  const context = dialogue("synthetic-provider-review"),
-    review = await buildNpcDialogueReview(context, draft(context), 0);
-  for (const body of [
-    {
-      operation: "npc-chatter",
-      provider: "study-mode",
-      payload: chatter("top-level-mismatch"),
-    },
-    {
-      operation: "npc-chatter",
-      provider: "chatgpt-handoff",
-      payload: { ...chatter("payload-mismatch"), provider: "study-mode" },
-    },
-    {
-      operation: "npc-chatter-review",
-      provider: "study-mode",
-      payload: review,
-    },
-    {
-      operation: "npc-chatter-review",
-      provider: "chatgpt-handoff",
-      payload: { ...review, provider: "study-mode" },
-    },
-  ])
-    assert.equal((await post(base, "/api/bridge", body)).status, 409);
-  assert.equal(queue.snapshot().queued, 0);
-  assert.equal(upstreamCalls, 0);
-  queue.enable(false);
-  for (const [operation, payload] of [
-    ["npc-chatter", chatter("provider-changed")],
-    ["npc-chatter-review", review],
-  ])
-    assert.equal(
-      (
-        await post(base, "/api/bridge", {
-          operation,
-          provider: "chatgpt-handoff",
-          payload,
-        })
-      ).status,
-      409,
-    );
-  assert.equal(upstreamCalls, 0);
-});
-
-test("the actual loopback bridge carries a validated line into a one-use local WAV without study side effects", async (t) => {
-  const { queue, directory } = await tempQueue(t),
-    rendered = [],
-    speech = createNpcSpeechService({
-      tempRoot: directory,
-      render: async (request) => {
-        rendered.push(request);
-        return fakeWave();
-      },
-    });
-  t.after(() => speech.close());
-  const handoff = createHandoffRoutes(queue, {
-      token: "synthetic-worker-token",
-    }),
-    base = await listen(t, createStudyBridgeServer({ handoff, speech })),
-    status = await (await fetch(base + "/api/status")).json();
-  assert.ok(status.capabilities.includes("npc-chatter"));
-  assert.equal(
-    (await (await fetch(base + "/api/speech/status")).json()).available,
-    true,
-  );
-  const request = chatter("synthetic-audible-line"),
-    response = await post(base, "/api/bridge", {
-      operation: "npc-chatter",
-      provider: "chatgpt-handoff",
-      payload: request,
-    }),
-    receipt = (await response.json()).handoff,
-    job = queue.get(worker),
-    reply = answer(request);
-  queue.submit(worker, job.jobId, job.claim, reply);
-  assert.deepEqual(
-    await (await fetch(base + resultPath(receipt))).json(),
-    reply,
-  );
-  const spokenResponse = await post(base, "/api/speech", {
-      requestId: reply.requestId,
-      actorId: reply.actorId,
-      text: reply.text,
-      voice: "steady",
-    }),
-    spoken = await spokenResponse.json();
-  assert.equal(spokenResponse.status, 200);
-  assert.equal(spoken.text, reply.text);
-  assert.equal(rendered[0].text, reply.text);
-  const wav = await fetch(base + spoken.audio.url);
-  assert.equal(wav.headers.get("content-type"), "audio/wav");
-  assert.deepEqual(Buffer.from(await wav.arrayBuffer()), fakeWave());
-  assert.equal((await fetch(base + spoken.audio.url)).status, 410);
-  assert.equal(speech.status().pending, 0);
-  const tempDirectories = (await readdir(directory)).filter((name) =>
-    name.startsWith("zombie-npc-speech-"),
-  );
-  for (const child of tempDirectories)
-    assert.deepEqual(await readdir(join(directory, child)), []);
-  assert.equal(
-    (
-      await fetch(base + resultPath(receipt), {
-        method: "DELETE",
-        headers: { Origin: origin },
-      })
-    ).status,
-    200,
-  );
-  assert.equal(queue.snapshot().done, 0);
-  assert.equal(
-    JSON.parse(await readFile(join(directory, "jobs.json"), "utf8")).jobs
-      .length,
-    0,
-  );
+    rejects(job, bad, /exact NPC\/request identity/);
+  validateAnswer(job, valid);
 });
 
 test("new dialogue drafts allow creative speech or silence but require correlated known evidence", () => {
   for (const silent of [false, true]) {
-    const queue = createHandoffQueue();
-    queue.enable(true);
     const request = dialogue(silent ? "synthetic-silence" : "synthetic-speech"),
-      receipt = queue.enqueue("npc-chatter", request),
-      job = queue.get(worker),
+      job = { operation: "npc-chatter", payload: request },
       reply = silent
         ? {
             requestId: request.requestId,
@@ -477,64 +160,35 @@ test("new dialogue drafts allow creative speech or silence but require correlate
             reason: "Quiet is useful here.",
           }
         : draft(request);
-    assert.match(job.instructions, /Silence is a valid/);
-    assert.doesNotMatch(job.instructions, /^@study/);
+    assert.match(
+      taskInstructions("npc-chatter", request),
+      /Silence is a valid/,
+    );
     for (const bad of [
       answer(request),
       { ...draft(request), evidence: ["hidden.enemies"] },
       { ...draft(request), evidence: [] },
       { ...draft(request), actorId: "npc-elsewhere" },
     ])
-      assert.throws(
-        () => queue.submit(worker, job.jobId, job.claim, bad),
-        /NPC dialogue draft/,
-      );
-    assert.equal(
-      queue.submit(worker, job.jobId, job.claim, reply).status,
-      "accepted",
-    );
-    assert.deepEqual(queue.result(receipt.id, receipt.hash).answer, reply);
+      rejects(job, bad, /NPC dialogue draft/);
+    validateAnswer(job, reply);
   }
-  const queue = createHandoffQueue();
-  queue.enable(true);
-  assert.throws(
-    () =>
-      queue.enqueue("npc-chatter", {
-        ...dialogue(),
-        dialogue: { version: 1, facts: [] },
-      }),
-    /Invalid or excessive/,
-  );
 });
 
 test("critic packets and replies bind the exact draft, not just a plausible-looking NPC identity", async () => {
-  const queue = createHandoffQueue();
-  queue.enable(true);
   const context = dialogue(),
     candidate = draft(context),
-    request = await buildNpcDialogueReview(context, candidate, 0);
+    request = await buildNpcDialogueReview(context, candidate, 0),
+    job = { operation: "npc-chatter-review", payload: request },
+    reply = reviewAnswer(request);
   assert.equal(
     request.candidateFingerprint,
     sha256(npcDialogueCandidateSource(candidate)),
   );
-  for (const bad of [
-    { ...request, candidateFingerprint: "f".repeat(64) },
-    { ...request, candidate: { ...candidate, text: "A different candidate." } },
-    { ...request, actorId: "npc-other" },
-    { ...request, runId: "different-run" },
-    { ...request, capturedAt: context.capturedAt + 1 },
-    { ...request, candidate: { ...candidate, evidence: ["unknown.fact"] } },
-    { ...request, attempt: 2 },
-  ])
-    assert.throws(
-      () => queue.enqueue("npc-chatter-review", bad),
-      /Invalid or excessive/,
-    );
-  const receipt = queue.enqueue("npc-chatter-review", request),
-    job = queue.get(worker),
-    reply = reviewAnswer(request);
-  assert.match(job.instructions, /Evaluate the candidate independently/);
-  assert.doesNotMatch(job.instructions, /^@study/);
+  assert.match(
+    taskInstructions("npc-chatter-review", request),
+    /Evaluate the candidate independently/,
+  );
   for (const bad of [
     { ...reply, candidateFingerprint: "0".repeat(64) },
     { ...reply, requestId: context.requestId },
@@ -543,15 +197,8 @@ test("critic packets and replies bind the exact draft, not just a plausible-look
     { ...reply, issues: ["arbitrary-score"] },
     { ...reply, replacement: "Do not play this unreviewed replacement." },
   ])
-    assert.throws(
-      () => queue.submit(worker, job.jobId, job.claim, bad),
-      /NPC dialogue review/,
-    );
-  assert.equal(
-    queue.submit(worker, job.jobId, job.claim, reply).status,
-    "accepted",
-  );
-  assert.deepEqual(queue.result(receipt.id, receipt.hash).answer, reply);
+    rejects(job, bad, /NPC dialogue review/);
+  validateAnswer(job, reply);
 });
 
 test("conversation replies must target a heard turn and the critic binds their exact continuation intent", async () => {
@@ -588,45 +235,7 @@ test("conversation replies must target a heard turn and the critic binds their e
     evidence: ["speech:spoken-water-call", "setting.outbreak"],
     conversation: { intent: "continue", replyTo: "spoken-water-call" },
   };
-  for (const modify of [
-    (bad) => {
-      bad.recentLines = [];
-    },
-    (bad) => {
-      bad.recentLines[0].actorId = "unheard-actor";
-    },
-    (bad) => {
-      bad.recentLines[0].conversationId = "unrelated-exchange";
-    },
-    (bad) => {
-      bad.recentLines[0].turn = 2;
-    },
-    (bad) => {
-      bad.recentLines[0].at = 21;
-    },
-    (bad) => {
-      bad.conversation.expiresAt = 20;
-    },
-    (bad) => {
-      bad.conversation.expiresAt = 51;
-    },
-    (bad) => {
-      bad.conversation.turn = 5;
-    },
-  ]) {
-    const queue = createHandoffQueue(),
-      bad = structuredClone(context);
-    queue.enable(true);
-    modify(bad);
-    assert.throws(
-      () => queue.enqueue("npc-chatter", bad),
-      /Invalid or excessive/,
-    );
-  }
-  const queue = createHandoffQueue();
-  queue.enable(true);
-  const receipt = queue.enqueue("npc-chatter", context),
-    job = queue.get(worker);
+  const job = { operation: "npc-chatter", payload: context };
   for (const bad of [
     { ...candidate, conversation: undefined },
     { ...candidate, conversation: { intent: "invite" } },
@@ -636,16 +245,8 @@ test("conversation replies must target a heard turn and the critic binds their e
     },
     { ...candidate, evidence: ["setting.outbreak"] },
   ])
-    assert.throws(
-      () => queue.submit(worker, job.jobId, job.claim, bad),
-      /NPC dialogue draft/,
-    );
-  queue.submit(worker, job.jobId, job.claim, candidate);
-  assert.deepEqual(
-    queue.result(receipt.id, receipt.hash).answer.conversation,
-    candidate.conversation,
-  );
-  queue.discardChatter(receipt.id, receipt.hash);
+    rejects(job, bad, /NPC dialogue draft/);
+  validateAnswer(job, candidate);
   const packet = await buildNpcDialogueReview(context, candidate, 0),
     close = await buildNpcDialogueReview(
       context,
@@ -656,20 +257,15 @@ test("conversation replies must target a heard turn and the critic binds their e
       0,
     );
   assert.notEqual(packet.candidateFingerprint, close.candidateFingerprint);
-  assert.throws(
-    () =>
-      queue.enqueue("npc-chatter-review", {
-        ...packet,
-        candidate: { ...candidate, conversation: close.candidate.conversation },
-      }),
-    /Invalid or excessive/,
+  validateAnswer(
+    { operation: "npc-chatter-review", payload: packet },
+    reviewAnswer(packet),
   );
-  const reviewReceipt = queue.enqueue("npc-chatter-review", packet),
-    reviewJob = queue.get(worker);
-  queue.submit(worker, reviewJob.jobId, reviewJob.claim, reviewAnswer(packet));
-  assert.equal(
-    queue.result(reviewReceipt.id, reviewReceipt.hash).answer.verdict,
-    "accept",
+  // A verdict for the "continue" candidate cannot stand in for the "close" one.
+  rejects(
+    { operation: "npc-chatter-review", payload: close },
+    reviewAnswer(packet),
+    /NPC dialogue review/,
   );
   const legacy = draft(dialogue("synthetic-no-conversation-canonical"));
   assert.equal(
@@ -686,140 +282,86 @@ test("conversation replies must target a heard turn and the critic binds their e
   );
 });
 
-test("drafts and critics share one temporary capacity, expiry and study-priority budget", async () => {
-  let clock = 1000;
-  const queue = createHandoffQueue({ now: () => clock, maxJobs: 4 });
-  queue.enable(true);
-  const contexts = Array.from({ length: 2 }, (_, i) =>
-    dialogue(`synthetic-mixed-${i}`),
-  );
-  const reviews = await Promise.all(
-    contexts.map((p) => buildNpcDialogueReview(p, draft(p), 0)),
-  );
-  const receipts = contexts.map((p) => queue.enqueue("npc-chatter", p));
-  receipts.push(...reviews.map((p) => queue.enqueue("npc-chatter-review", p)));
-  assert.equal(queue.snapshot().queued, 4);
-  assert.deepEqual(
-    queue.enqueue("npc-chatter-review", reviews[0]),
-    receipts[2],
-  );
-  assert.throws(
-    () => queue.enqueue("npc-chatter", dialogue("synthetic-fifth")),
-    /excessive/,
-  );
-  const study = queue.enqueue("tutor", {
-    requestId: "synthetic-priority-study",
-  });
+test("the actual loopback bridge carries a validated line into a one-use local WAV without study side effects", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "npc-voice-bridge-test-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const rendered = [],
+    speech = createNpcSpeechService({
+      tempRoot: directory,
+      render: async (request) => {
+        rendered.push(request);
+        return fakeWave();
+      },
+    }),
+    request = chatter("synthetic-audible-line"),
+    reply = answer(request);
+  t.after(() => speech.close());
+  const base = await listen(
+      t,
+      createStudyBridgeServer({
+        speech,
+        claude: gateway(() => reply),
+      }),
+    ),
+    status = await (await fetch(base + "/api/status")).json();
+  assert.ok(status.capabilities.includes("npc-chatter"));
   assert.equal(
-    queue.snapshot().queued,
-    1,
-    "both kinds yield capacity to retained study",
+    (await (await fetch(base + "/api/speech/status")).json()).available,
+    true,
   );
-  assert.equal(queue.get(worker).jobId, study.id);
-  for (const r of receipts)
-    assert.throws(() => queue.result(r.id, r.hash), /Unknown exact/);
-  const expiring = queue.enqueue("npc-chatter-review", reviews[0]);
-  clock += NPC_CHATTER_TTL_MS;
-  assert.equal(queue.snapshot().queued, 0);
-  assert.throws(
-    () => queue.result(expiring.id, expiring.hash),
-    /Unknown exact/,
-  );
-  assert.equal(queue.result(study.id, study.hash).status, "pending");
-});
-
-test("critic context, candidate and verdict never persist and old saved ambient reviews are discarded", async (t) => {
-  const { queue, file } = await tempQueue(t),
-    context = dialogue("SYNTHETIC_PRIVATE_EPHEMERAL_DRAFT"),
-    request = await buildNpcDialogueReview(context, draft(context), 0),
-    study = queue.enqueue("tutor", { requestId: "synthetic-retained-context" }),
-    receipt = queue.enqueue("npc-chatter-review", request),
-    job = queue.get(
-      worker,
-      undefined,
-      (j) => j.operation === "npc-chatter-review",
-    ),
-    reply = reviewAnswer(request, "silence");
-  queue.submit(worker, job.jobId, job.claim, reply);
-  const raw = await readFile(file, "utf8");
-  for (const marker of [
-    context.requestId,
-    request.candidate.text,
-    receipt.id,
-    request.candidateFingerprint,
-    "npc-chatter-review",
-  ])
-    assert.equal(raw.includes(marker), false, marker);
-  const disk = JSON.parse(raw);
-  disk.jobs.push({
-    id: receipt.id,
-    operation: "npc-chatter-review",
-    requestId: request.requestId,
-    hash: sha256(
-      JSON.stringify({ operation: "npc-chatter-review", payload: request }),
-    ),
+  const response = await post(base, "/api/bridge", {
+    operation: "npc-chatter",
+    provider: "claude-cli",
     payload: request,
-    status: "queued",
-    createdAt: 1000,
   });
-  await writeFile(file, JSON.stringify(disk), { mode: 0o600 });
-  const restored = createHandoffQueue({ file });
-  restored.enable(true);
-  assert.throws(
-    () => restored.result(receipt.id, receipt.hash),
-    /Unknown exact/,
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), reply);
+  const spokenResponse = await post(base, "/api/speech", {
+      requestId: reply.requestId,
+      actorId: reply.actorId,
+      text: reply.text,
+      voice: "steady",
+    }),
+    spoken = await spokenResponse.json();
+  assert.equal(spokenResponse.status, 200);
+  assert.equal(spoken.text, reply.text);
+  assert.equal(rendered[0].text, reply.text);
+  const wav = await fetch(base + spoken.audio.url);
+  assert.equal(wav.headers.get("content-type"), "audio/wav");
+  assert.deepEqual(Buffer.from(await wav.arrayBuffer()), fakeWave());
+  assert.equal((await fetch(base + spoken.audio.url)).status, 410);
+  assert.equal(speech.status().pending, 0);
+  const tempDirectories = (await readdir(directory)).filter((name) =>
+    name.startsWith("zombie-npc-speech-"),
   );
-  assert.equal(restored.result(study.id, study.hash).status, "pending");
+  for (const child of tempDirectories)
+    assert.deepEqual(await readdir(join(directory, child)), []);
 });
 
-test("the real review HTTP operation returns an editor verdict, supports exact cancellation and retains study", async (t) => {
-  const { queue } = await tempQueue(t),
-    handoff = createHandoffRoutes(queue, { token: "synthetic-worker-token" }),
-    base = await listen(t, createStudyBridgeServer({ handoff })),
-    context = dialogue("synthetic-off-topic-review"),
+test("the real review HTTP operation returns an editor verdict the validators accept", async (t) => {
+  const context = dialogue("synthetic-off-topic-review"),
     candidate = { ...draft(context), text: "How's the weather today?" },
-    request = await buildNpcDialogueReview(context, candidate, 0);
+    request = await buildNpcDialogueReview(context, candidate, 0),
+    reply = reviewAnswer(request, "revise"),
+    base = await listen(
+      t,
+      createStudyBridgeServer({ claude: gateway(() => reply) }),
+    );
   assert.ok(
     (await (await fetch(base + "/api/status")).json()).capabilities.includes(
       "npc-chatter-review",
     ),
   );
+  assert.ok(AI_OPERATIONS.includes("npc-chatter-review"));
   const response = await post(base, "/api/bridge", {
     operation: "npc-chatter-review",
-    provider: "chatgpt-handoff",
+    provider: "claude-cli",
     payload: request,
   });
-  assert.equal(response.status, 202);
-  const receipt = (await response.json()).handoff,
-    job = queue.get(worker),
-    reply = reviewAnswer(request, "revise");
-  queue.submit(worker, job.jobId, job.claim, reply);
+  assert.equal(response.status, 200);
   assert.deepEqual(
-    await (await fetch(base + resultPath(receipt))).json(),
+    await response.json(),
     reply,
     "valid evidence IDs never override an editor's semantic rejection",
   );
-  const study = queue.enqueue("tutor", {
-    requestId: "synthetic-review-keeps-study",
-  });
-  assert.equal(
-    (
-      await fetch(base + resultPath(receipt), {
-        method: "DELETE",
-        headers: { Origin: "https://unrelated.example" },
-      })
-    ).status,
-    403,
-  );
-  assert.equal(
-    (
-      await fetch(base + resultPath(receipt), {
-        method: "DELETE",
-        headers: { Origin: origin },
-      })
-    ).status,
-    200,
-  );
-  assert.throws(() => queue.result(receipt.id, receipt.hash), /Unknown exact/);
-  assert.equal(queue.result(study.id, study.hash).status, "pending");
 });

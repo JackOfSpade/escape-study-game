@@ -45,18 +45,6 @@ export async function isolateRunnerBridge(page: Page, executionBase?: string) {
           detail: "Only the local restricted execution route is connected.",
         },
       });
-    if (path === "/api/handoff/status")
-      return route.fulfill({
-        json: {
-          enabled: false,
-          autonomousWork: false,
-          queued: 0,
-          working: 0,
-          done: 0,
-          public: { configured: false },
-          tunnel: { state: "off", verified: false },
-        },
-      });
     return route.fulfill({
       status: 503,
       json: { error: "Study requests are isolated in this runner fixture" },

@@ -116,7 +116,7 @@ test("concurrent live room requests generate once, and retry after reload keeps 
   globalThis.fetch = async (url, init) => {
     if (String(url) === "/api/status")
       return Response.json({
-        mode: "chatgpt-handoff",
+        mode: "claude-cli",
         label: "Synthetic",
         detail: "No external AI",
         capabilities: ["generate"],

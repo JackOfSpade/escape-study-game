@@ -15,7 +15,7 @@ test("original checkpoint correction exposes complete historical review before a
   await page.route("**/api/status", (route) =>
     route.fulfill({
       json: {
-        mode: "study-mode",
+        mode: "claude-cli",
         label: "Synthetic original checkpoint review",
         detail:
           "Controlled transport fixture, not real native semantic certification",
@@ -26,7 +26,12 @@ test("original checkpoint correction exposes complete historical review before a
   let requests = 0;
   await page.route("**/api/bridge", async (route) => {
     const { operation, payload } = route.request().postDataJSON();
-    expect(operation).toBe("reconcile-roadmap");
+    // Background question preparation is not part of this test.
+    if (operation !== "reconcile-roadmap")
+      return route.fulfill({
+        status: 503,
+        json: { error: "Not part of this test" },
+      });
     const reply = fixture.proposal(payload);
     await route.fulfill({
       json: {
@@ -55,7 +60,7 @@ test("original checkpoint correction exposes complete historical review before a
     buffer: Buffer.from(fixture.raw),
   });
   await page
-    .getByRole("button", { name: "Request native reconciliation", exact: true })
+    .getByRole("button", { name: "Request roadmap review", exact: true })
     .click();
   const controls = page.locator("#roadmap-adoption-controls");
   await expect(controls).toContainText(

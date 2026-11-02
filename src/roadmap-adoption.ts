@@ -1,3 +1,4 @@
+import { PROVIDERS } from "./model";
 import {
   preserveLaterBaselineEvidence,
   reviewBaselineCorrections,
@@ -138,7 +139,7 @@ export async function compileRoadmapAdoption(
   if (
     (await sha256(JSON.stringify(payload))) !== job.requestHash ||
     (payload.provider !== undefined &&
-      !["study-mode", "chatgpt-handoff"].includes(payload.provider)) ||
+      !PROVIDERS.includes(payload.provider)) ||
     (await sha256(JSON.stringify(p))) !== job.proposalHash ||
     (await sha256(payload.local)) !== payload.localHash ||
     (await sha256(payload.candidate)) !== payload.candidateHash

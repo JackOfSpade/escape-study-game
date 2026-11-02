@@ -1,7 +1,7 @@
 import { isRecord as object } from "./is-record.mjs";
 
 /**
- * Knowledge-probe reply fields shared by the handoff queue, the live terminal
+ * Knowledge-probe reply fields shared by the Claude gateway, the live terminal
  * relay app and the synthetic demo app. The game validates the same shape
  * again in src/knowledge-probe.ts (parseProbeReply); this module only keeps
  * the transport-side checks and JSON Schema in one place.

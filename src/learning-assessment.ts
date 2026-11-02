@@ -1,4 +1,5 @@
-import { bridgeRequest, nativeStudyScope, status } from "./bridge-client";
+import { PROVIDERS } from "./model";
+import { bridgeRequest, status } from "./bridge-client";
 import { evidencePacket, syncLearningView } from "./curriculum";
 import { applyLearningAssessment, encounterKey } from "./learner";
 import type { Assessment, Encounter, Game, Roadmap } from "./model";
@@ -79,10 +80,7 @@ export async function assess(
       "Physical contribution retained; no persisted human learning task was issued. No academic credit.";
     return;
   }
-  if (
-    !["study-mode", "chatgpt-handoff"].includes(e.problem.provenance) ||
-    study.profile !== "live"
-  ) {
+  if (!PROVIDERS.includes(e.problem.provenance) || study.profile !== "live") {
     a.status = "review-required";
     a.provenance = "Development simulation cannot award academic credit.";
     return;
@@ -92,11 +90,10 @@ export async function assess(
     if (!learner)
       throw Error("Live learner ledger is missing; refusing to reset progress");
     a.request ??= {
-      provider:
-        (connected(g) ? status().mode : e.problem.provenance) ===
-        "chatgpt-handoff"
-          ? "chatgpt-handoff"
-          : "study-mode",
+      provider: ((mode) =>
+        mode === "chatgpt-handoff" || mode === "claude-cli"
+          ? mode
+          : "study-mode")(connected(g) ? status().mode : e.problem.provenance),
       payloadJson: JSON.stringify({
         requestId: id,
         packet: evidencePacket(e, r, cutoff, learner, acceptedCutoff),
@@ -145,9 +142,7 @@ export async function assess(
         | "scopeReviews"
         | "helpAttributions"
       >
-    >("assess", payload, undefined, {
-      nativeScope: nativeStudyScope(g, e),
-    });
+    >("assess", payload);
     checkSnapshot();
     a.findings = response.findings;
     a.historicalMappings = response.historicalMappings;

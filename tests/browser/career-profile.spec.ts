@@ -2,10 +2,10 @@ import { expect, test, type Page } from "@playwright/test";
 import {
   enterNativeGame,
   flushNativeSave,
-  mockNativeStudy,
+  mockClaudeStudy,
   nativeState,
   openNativeQuestion,
-} from "./native-study-harness";
+} from "./study-harness";
 
 async function inspect(page: Page) {
   await page.evaluate(() => (window as any).__deadAir.openAgentMenu());
@@ -39,7 +39,7 @@ const sourceEvidence = (page: Page) =>
 test("the role profile is explicit, reversible and persists without replacing issued study or original evidence", async ({
   page,
 }) => {
-  const relay = await mockNativeStudy(page);
+  const relay = await mockClaudeStudy(page);
   await enterNativeGame(page);
   const id = await openNativeQuestion(page);
   await expect.poll(() => relay.calls.length).toBe(1);
@@ -57,9 +57,7 @@ test("the role profile is explicit, reversible and persists without replacing is
   );
   await page.locator("#career-focus").selectOption("full");
   await expect(page.locator("#career-focus")).toHaveValue("full");
-  expect((await nativeState(page, id)).session.questionFingerprint).toBe(
-    pending.session.questionFingerprint,
-  );
+  expect((await nativeState(page, id)).problem).toBe(pending.problem);
   expect(await sourceEvidence(page)).toBe(before);
   await flushNativeSave(page);
   await page.reload();
@@ -70,9 +68,7 @@ test("the role profile is explicit, reversible and persists without replacing is
   await expect(page.locator("#career-focus")).toHaveValue(
     "product-feature-owner",
   );
-  expect((await nativeState(page, id)).session.questionFingerprint).toBe(
-    pending.session.questionFingerprint,
-  );
+  expect((await nativeState(page, id)).problem).toBe(pending.problem);
   expect(await sourceEvidence(page)).toBe(before);
   await flushNativeSave(page);
   await page.reload();

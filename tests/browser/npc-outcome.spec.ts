@@ -3,9 +3,9 @@
 import { expect, test } from "@playwright/test";
 import { enterLegacyBuilding } from "./helpers/legacy-world";
 import { openGameMenu } from "./helpers/game-menu";
-import { mockNativeStudy } from "./native-study-harness";
+import { mockClaudeStudy } from "./study-harness";
 
-for (const provider of ["study-mode", "chatgpt-handoff"])
+for (const provider of ["claude-cli"])
   for (const failure of [false, true])
     test(`NPC outcome API ${provider}: ${failure ? "deferred validation and exact saved retry" : "validated reconstruction persists without credit"}`, async ({
       page,
@@ -241,10 +241,10 @@ for (const provider of ["study-mode", "chatgpt-handoff"])
       await expect(page.locator("#terminal")).toBeHidden();
     });
 
-test("native study cannot steal an NPC's solo terminal; an NPC's later accepted answer stays intact while native learning is retained", async ({
+test("the Claude terminal cannot steal an NPC's solo terminal; an NPC's later accepted answer stays intact while the learner's reply is retained", async ({
   page,
 }) => {
-  const relay = await mockNativeStudy(page);
+  const relay = await mockClaudeStudy(page);
   await enterLegacyBuilding(page);
   const ids = await page.evaluate(() => {
     const d = (window as any).__deadAir,
@@ -285,14 +285,25 @@ test("native study cannot steal an NPC's solo terminal; an NPC's later accepted 
       e = g.encounters[ids.available],
       s = g.floors[0].stations.find((s: any) => s.id === ids.station),
       root = "/src/";
-    e.mode = "shared";
-    delete e.owner;
+    e.mode = "solo";
+    e.owner = g.survivors[0].id;
+    // A live run starts with no pre-made practice questions.
+    g.study.profile = "live";
+    for (const each of Object.values<any>(g.encounters)) delete each.problem;
     Object.assign(g.survivors[0], { floor: 0, x: s.x, y: s.y });
     const { ensureProblem } = await import(/* @vite-ignore */ root + "ai.ts");
     await ensureProblem(g, e, d.roadmap);
     await d.interact();
   }, ids);
-  await expect.poll(() => relay.calls.length).toBe(1);
+  await expect(page.locator("#terminal")).toBeVisible();
+  // The learner answers; the reply stays in flight while the NPC is accepted.
+  relay.hold();
+  relay.solve();
+  await page
+    .locator("#chat-input")
+    .fill("My own reasoning about the boundary.");
+  await page.locator("#chat-input").press("Enter");
+  await expect.poll(() => relay.tutorCalls().length).toBe(1);
   const accepted = await page.evaluate(async (ids) => {
     const g = (window as any).__deadAir.game,
       e = g.encounters[ids.available],
@@ -323,15 +334,17 @@ test("native study cannot steal an NPC's solo terminal; an NPC's later accepted 
       cycle: g.study.learner.cycle,
     };
   }, ids);
-  relay.finish(relay.calls[0].payload.requestId);
+  relay.release();
   await expect
     .poll(() =>
       page.evaluate(
-        (id) => (window as any).__deadAir.game.encounters[id].directStudy.state,
+        (id) =>
+          (window as any).__deadAir.game.encounters[id].tutorRequests?.at(-1)
+            ?.state,
         ids.available,
       ),
     )
-    .toBe("applied");
+    .not.toBe("pending");
   const after = await page.evaluate((id) => {
     const g = (window as any).__deadAir.game,
       e = g.encounters[id];
@@ -353,12 +366,6 @@ test("native study cannot steal an NPC's solo terminal; an NPC's later accepted 
   expect(after.access).toEqual(accepted.access);
   expect(after.cycle).toBe(accepted.cycle);
   expect(after.evidence).toEqual([]);
-  expect(
-    after.tutor.some(
-      (m: any) =>
-        m.kind === "human" && m.provenance === "chatgpt-host-model-transcript",
-    ),
-  ).toBe(true);
-  await expect(page.locator("#terminal")).toBeHidden();
+  expect(after.tutor.some((m: any) => m.kind === "human")).toBe(true);
   await expect(page.locator("#reward-toast")).toBeHidden();
 });

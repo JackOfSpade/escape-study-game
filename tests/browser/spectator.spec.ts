@@ -3,8 +3,8 @@ import { expect, test } from "@playwright/test";
 import {
   flushNativeSave,
   killHumanInStep,
-  mockNativeStudy,
-} from "./native-study-harness";
+  mockClaudeStudy,
+} from "./study-harness";
 const state = (page: import("@playwright/test").Page) =>
   page.evaluate(() => {
     const d = (window as any).__deadAir,
@@ -23,7 +23,7 @@ const state = (page: import("@playwright/test").Page) =>
 test("after combat death the live building can be watched, paused and reloaded with a free camera", async ({
   page,
 }) => {
-  await mockNativeStudy(page);
+  await mockClaudeStudy(page);
   await page.goto("/");
   await startDesignedRun(page);
   await page.evaluate(() => {

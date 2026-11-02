@@ -29,7 +29,7 @@ async function connection(handler: typeof fetch) {
   globalThis.fetch = async (url, init) =>
     String(url) === "/api/status"
       ? Response.json({
-          mode: "chatgpt-handoff",
+          mode: "claude-cli",
           label: "Controlled handoff",
           detail: "Synthetic test transport only",
           capabilities: ["complete", "assess"],
@@ -112,6 +112,7 @@ test("saved completion refuses a changed provider or captured revision before se
     assert.equal(e.state, "in-progress");
     assert.match(s.feedback, /original completion provider/);
     g.study.profile = "live";
+    saved.provider = "claude-cli";
     const payload = JSON.parse(saved.payloadJson);
     payload.submission.content = "Changed after capture";
     saved.payloadJson = JSON.stringify(payload);

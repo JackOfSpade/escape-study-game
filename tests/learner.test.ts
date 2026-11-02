@@ -704,7 +704,7 @@ test("controlled bridge fixture: live snapshot completion awards access before s
   globalThis.fetch = async (input, init) => {
     if (String(input) === "/api/status")
       return response({
-        mode: "study-mode",
+        mode: "claude-cli",
         label: "Isolated transport fixture",
         capabilities: ["generate", "tutor", "group", "complete", "assess"],
         detail:
@@ -753,7 +753,7 @@ test("controlled bridge fixture: live snapshot completion awards access before s
     g.status = "playing";
     const e = g.encounters["f0-room0"];
     await ai.ensureProblem(g, e, r);
-    assert.equal(e.problem!.provenance, "study-mode");
+    assert.equal(e.problem!.provenance, "claude-cli");
     ai.edit(
       g,
       e,

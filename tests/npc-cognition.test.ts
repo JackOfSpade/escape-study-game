@@ -47,7 +47,7 @@ async function liveFixture(handler: (payload: any) => Promise<Response>) {
   globalThis.fetch = async (input, init) =>
     String(input) === "/api/status"
       ? response({
-          mode: "study-mode",
+          mode: "claude-cli",
           label: "Synthetic group boundary",
           capabilities: [],
           detail: "Not native Study Mode",

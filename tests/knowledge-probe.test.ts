@@ -1472,7 +1472,7 @@ test("live question generation sends the track's probe records and a policy that
   globalThis.fetch = async (input, init) => {
     if (String(input) === "/api/status")
       return Response.json({
-        mode: "study-mode",
+        mode: "claude-cli",
         label: "Isolated transport fixture",
         capabilities: ["generate", "tutor", "group", "complete", "assess"],
         detail: "Test fixture only; not a native Study Mode verification.",
@@ -1524,7 +1524,7 @@ test("live question generation sends the track's probe records and a policy that
     ];
     const e = g.encounters[g.floors[0].stations[0].encounter];
     await ensureProblem(g, e, r);
-    assert.equal(e.problem?.provenance, "study-mode");
+    assert.equal(e.problem?.provenance, "claude-cli");
     assert.equal(generatePayload.probeRecords.note, PROBE_RECORDS_NOTE);
     assert.deepEqual(
       generatePayload.probeRecords.openGaps.map((x: any) => x.facetId),

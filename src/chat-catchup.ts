@@ -285,9 +285,7 @@ export function generateCatchup(
           m.author,
           "npc",
           `Recorded work by ${speaker.name}, through draft v${job.sourceRevision} (summary shown now, not prior dialogue):\n${m.text}`,
-          job.provider === "chatgpt-handoff"
-            ? "chatgpt-handoff-catch-up"
-            : "study-mode-catch-up",
+          `${job.provider ?? "study-mode"}-catch-up`,
           m.refs,
         );
         delivered.requestId = job.id;

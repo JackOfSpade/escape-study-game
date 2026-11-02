@@ -2,11 +2,11 @@ import { expect, test, type Page } from "@playwright/test";
 import { openPlayerMenu } from "./helpers/game-menu";
 import {
   enterNativeGame,
-  mockNativeStudy,
+  mockClaudeStudy,
   nativeState,
   openNativeQuestion,
   seedLegacyDraft,
-} from "./native-study-harness";
+} from "./study-harness";
 
 async function openSettings(page: Page) {
   await openPlayerMenu(page);
@@ -80,8 +80,9 @@ async function displayedSizes(page: Page) {
   });
 }
 
+let relay: Awaited<ReturnType<typeof mockClaudeStudy>>;
 test.beforeEach(async ({ page }) => {
-  await mockNativeStudy(page);
+  relay = await mockClaudeStudy(page);
 });
 
 test("one size slider scales text and the rendered world together and survives reload", async ({
@@ -151,21 +152,19 @@ test("maximum size keeps Settings and study controls usable on a narrow screen",
   await enterNativeGame(page);
   await seedLegacyDraft(page, "Draft kept while resizing");
   const id = await openNativeQuestion(page);
-  await expect
-    .poll(async () => (await nativeState(page, id)).session?.state)
-    .toBe("pending");
-  const captured = (await nativeState(page, id)).session.payloadJson;
+  await expect(page.locator("#problem-title")).toHaveText("Synthetic question");
+  const asked = relay.calls.length;
   await openSettings(page);
   await setScale(page, 150);
   await expect(page.locator("#settings")).toBeInViewport({ ratio: 0.98 });
   await page.locator("#settings-close").click();
   await expect(page.locator("#settings")).toBeHidden();
   await page.locator("#resume-game").click();
-  expect((await nativeState(page, id)).session.payloadJson).toBe(captured);
-  expect(JSON.parse(captured).workspace).toBe("Draft kept while resizing");
-  await expect(page.locator("#terminal")).toBeHidden();
+  expect(relay.calls).toHaveLength(asked);
+  expect((await nativeState(page, id)).state).not.toBe("consumed");
+  await expect(page.locator("#terminal")).toBeVisible();
 
-  for (const id of ["native-study-copy", "pause-toggle"]) {
+  for (const id of ["pause-toggle"]) {
     const control = page.locator(`#${id}`);
     await control.scrollIntoViewIfNeeded();
     await expect(control).toBeInViewport();
@@ -175,5 +174,5 @@ test("maximum size keeps Settings and study controls usable on a narrow screen",
       () => document.documentElement.scrollWidth <= innerWidth + 1,
     ),
   ).toBe(true);
-  await expect(page.locator("#terminal")).toBeHidden();
+  await expect(page.locator("#terminal")).toBeVisible();
 });

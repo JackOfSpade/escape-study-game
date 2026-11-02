@@ -1,3 +1,4 @@
+import { PROVIDERS } from "./model";
 import {
   curriculumReadiness,
   ensureFinalProgress,
@@ -603,7 +604,7 @@ export function beginLearningAttempt(
   at = new Date().toISOString(),
 ): LearningAttempt {
   checkSource(r, l);
-  if (!["study-mode", "chatgpt-handoff"].includes(e.problem?.provenance ?? ""))
+  if (!PROVIDERS.includes(e.problem?.provenance ?? ""))
     throw Error("Development tasks cannot create real learning attempts");
   const key = encounterKey(e),
     existing = l.attempts.find((a) => a.encounter === key);
@@ -995,7 +996,7 @@ export function applyLearningAssessment(
   provider: Provider | "test-fixture" = "study-mode",
 ) {
   checkSource(r, l);
-  if (!["study-mode", "chatgpt-handoff"].includes(e.problem?.provenance ?? ""))
+  if (!PROVIDERS.includes(e.problem?.provenance ?? ""))
     throw Error("Development tasks cannot award academic evidence");
   if ((l.mode === "test") !== (provider === "test-fixture"))
     throw Error("Test and live evidence cannot mix");
@@ -1012,6 +1013,7 @@ export function applyLearningAssessment(
     cutoff: a.evidenceCutoffSequence,
     visitOutcome: a.visitOutcome,
     sourceVersion: a.sourceVersion,
+    // Receipts signed before the Claude CLI carry this provider; keep their hash.
     ...(provider === "chatgpt-handoff" ? { provider } : {}),
   });
   const receipt = l.receipts[a.id];

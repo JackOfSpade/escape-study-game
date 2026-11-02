@@ -723,7 +723,7 @@ function dialogueFacts(
     add(
       `threat:${threat.id}`,
       "threat",
-      `You can see a zombie ${proximity(threat.position)}, ${direction.text}${threat.behindForceField ? ", beyond a force field" : ", without an intervening force field"}.`,
+      `You can see a zombie ${proximity(threat.position)}, ${direction.text}${threat.behindForceField ? ", beyond a closed door" : ", with nothing between you"}.`,
       [
         threat.id,
         proximity(threat.position),

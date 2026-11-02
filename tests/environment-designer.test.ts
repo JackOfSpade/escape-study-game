@@ -125,7 +125,6 @@ test("a content transport interruption and reload resume the same captured packe
   );
   const restored = parseDesignDraft(JSON.parse(captured));
   assert.equal(restored.version, 2);
-  assert.equal(restored.chatCode, draft.chatCode);
   let calls = 0;
   const result = await prepareDesignedRun(
     restored,

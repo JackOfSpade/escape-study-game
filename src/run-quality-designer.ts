@@ -1,8 +1,4 @@
-import {
-  isHandoffReceipt,
-  type HandoffProgress,
-  type HandoffReceipt,
-} from "./bridge-client";
+const designSource = () => "claude-cli" as const;
 import {
   parseSavedRunDesign,
   runDesignFingerprint,
@@ -52,9 +48,7 @@ interface ReviewLedger {
 export interface QualityDesignDraft {
   version: 3;
   targetRunId: string;
-  chatCode: string;
   request: QualityRunDesignRequest;
-  receipt?: HandoffReceipt & { requestId: string };
   /** One counter for the current exact authoring task, never transport retries. */
   attempts: number;
   failure: { fingerprint: string | null; repeats: number };
@@ -74,7 +68,6 @@ type QualitySend = (
   request: QualityRunDesignRequest,
   draft: QualityDesignDraft,
   signal: AbortSignal,
-  progress: (phase: HandoffProgress) => void,
 ) => Promise<unknown>;
 
 function emptyReview(): ReviewLedger {
@@ -201,13 +194,14 @@ export function parseQualityDraft(value: unknown): QualityDesignDraft {
   exactKeys(d, [
     "version",
     "targetRunId",
-    "chatCode",
     "request",
     "attempts",
     "failure",
     "exhausted",
     "pauseReason",
     "reviews",
+    // Drafts saved by the retired chat carried a chat code and queue receipt.
+    ...(record(d) && Object.hasOwn(d, "chatCode") ? ["chatCode"] : []),
     ...(record(d) && Object.hasOwn(d, "receipt") ? ["receipt"] : []),
   ]);
   requireThat(
@@ -215,10 +209,7 @@ export function parseQualityDraft(value: unknown): QualityDesignDraft {
     "draft exceeds its bounded storage size",
   );
   requireThat(
-    d.version === 3 &&
-      printable(d.targetRunId, 1, 128) &&
-      typeof d.chatCode === "string" &&
-      /^[A-Z0-9]{6,16}$/u.test(d.chatCode),
+    d.version === 3 && printable(d.targetRunId, 1, 128),
     "invalid identity",
   );
   const request = parseQualityRequest(d.request);
@@ -236,11 +227,6 @@ export function parseQualityDraft(value: unknown): QualityDesignDraft {
       (d.failure.fingerprint === null) === (d.failure.repeats === 0),
     "invalid repair history",
   );
-  if (d.receipt)
-    requireThat(
-      isHandoffReceipt(d.receipt) && d.receipt.requestId === request.requestId,
-      "receipt does not match the exact request",
-    );
   exactKeys(d.reviews, ["structure", "content"]);
   const reviews = {
     structure: readReview(d.reviews.structure),
@@ -295,16 +281,15 @@ export function parseQualityDraft(value: unknown): QualityDesignDraft {
       "batch does not follow the saved accepted prefix",
     );
   }
-  return {
-    ...structuredClone(d),
-    request,
-    reviews,
-  };
+  const saved: QualityDesignDraft & { chatCode?: unknown; receipt?: unknown } =
+    { ...structuredClone(d), request, reviews };
+  delete saved.chatCode;
+  delete saved.receipt;
+  return saved;
 }
 
 export function createQualityDraft(identity: {
   targetRunId: string;
-  chatCode: string;
   generationId: string;
   seed: number;
   recent: RunDesignSummary[];
@@ -313,7 +298,6 @@ export function createQualityDraft(identity: {
   return parseQualityDraft({
     version: 3,
     targetRunId: identity.targetRunId,
-    chatCode: identity.chatCode,
     request: {
       version: 3,
       designVersion: 3,
@@ -342,7 +326,7 @@ export function retryQualityDraft(draft: QualityDesignDraft) {
   draft.attempts = 1;
   draft.failure = { fingerprint: null, repeats: 0 };
   // An approved editorial review stays approved when only the local final
-  // world check failed. Retry that exact candidate; do not ask ChatGPT to
+  // world check failed. Retry that exact candidate; do not ask the model to
   // revise content for an engine or storage error it cannot diagnose.
   if (retryFinalWorld) return;
   const stage = currentStage(draft.request),
@@ -543,7 +527,6 @@ export async function prepareQualityRun<T>(
       requestId: `design-${crypto.randomUUID()}`,
     });
     draft.request = request;
-    delete draft.receipt;
     if (reset) {
       draft.attempts = 1;
       draft.failure = { fingerprint: null, repeats: 0 };
@@ -726,7 +709,7 @@ export async function prepareQualityRun<T>(
       };
       const saved = parseSavedRunDesign({
         version: 1,
-        source: "chatgpt-handoff",
+        source: designSource(),
         requestId: request.requestId,
         generationId: request.generationId,
         fingerprint: runDesignFingerprint(design),
@@ -829,29 +812,16 @@ export async function prepareQualityRun<T>(
 
     options.progress?.(message(request));
     await capture();
-    const activity = (state: HandoffProgress) =>
-      options.activity?.({ ...activityDetail(request), state });
-    activity("queued");
-    const raw = await send(request, draft, signal, (phase) => {
-      activity(phase);
-      options.progress?.(
-        phase === "working"
-          ? message(request)
-          : phase === "stalled"
-            ? "No recent activity from ChatGPT. Check the connected chat and ask it to continue if it stopped. Your exact request is saved."
-            : phase === "queued"
-              ? "Waiting for ChatGPT. Continue in the connected chat to finish this run."
-              : "Waiting for the bridge to reconnect. This exact authoring request is saved.",
-      );
-    });
+    options.activity?.({ ...activityDetail(request), state: "working" });
+    const raw = await send(request, draft, signal);
     signal.throwIfAborted();
     let reply;
     try {
       reply = parseQualityReply(raw, request);
     } catch (error) {
       signal.throwIfAborted();
-      // Malformed structure data cannot enter a repair candidate. The relay
-      // can correct the bound reply; an exact retry never discards this packet.
+      // Malformed structure data cannot enter a repair candidate; an exact
+      // retry never discards this packet.
       if (
         request.phase !== "content-batch" &&
         request.phase !== "content-revision"

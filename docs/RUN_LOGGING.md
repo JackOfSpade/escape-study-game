@@ -18,7 +18,7 @@ Diagnostics stay in this browser under `recent-game-diagnostics-v1`, separate fr
 - `firstObservedAt` / `partial`: whether observation began after the start of the run. Historical logs without an audit have unknown coverage.
 - `timeline`: compact human state, survivor/zombie counts by floor and world counters, sampled about every 30 simulation seconds. Compaction preserves the opening and distributed later checkpoints.
 - `ended`: the human's end time and observed final state. `data.observedAt` and `data.exact` distinguish a timely capture from first observing an already-ended save. Later spectator changes do not rewrite this evidence.
-- `events`: bounded lifecycle, error and native study transport metadata, including late response/application receipts. Captured metadata excludes question text, answers, transcripts, credentials and private curriculum.
+- `events`: bounded lifecycle, error and study request metadata, including late response/application receipts. Captured metadata excludes question text, answers, transcripts, credentials and private curriculum.
 - `performance.playable` and `performance.spectator`: separate aggregate FPS, slow-frame counts and maximum frame/simulation/work times. Their sample counts and measured wall duration make the coverage explicit.
 - `spectator`: compact recent spectator snapshots and important world events; post-death NPC activity cannot crowd the playable event history.
 - `dropped`: counts of removed detailed entries, compacted timeline samples, evicted events and spectator records. A bounded log is not a complete replay.

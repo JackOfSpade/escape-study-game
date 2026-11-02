@@ -380,7 +380,7 @@ test("new technical work after import is assessed and retained for review, while
   globalThis.fetch = async (url, init) => {
     if (String(url).endsWith("/api/status"))
       return Response.json({
-        mode: "study-mode",
+        mode: "claude-cli",
         label: "Synthetic follow-up reviewer",
         detail: "Not native certification",
         capabilities: ["generate", "tutor", "complete", "assess", "group"],

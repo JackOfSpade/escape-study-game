@@ -138,7 +138,7 @@ export const TERMINAL_DIALOGUE_FORMAT = {
 } as const;
 
 export const TERMINAL_DIALOGUE_INSTRUCTION =
-  "@study: Continue this private puzzle conversation. Judge the learner's accumulated answers against every part of the question and rubric. Return {text,complete,outcome?,knowledge?}. " +
+  "Continue this private puzzle conversation. Judge the learner's accumulated answers against every part of the question and rubric. Return {text,complete,outcome?,knowledge?}. " +
   PROBE_STANCE +
   ' Ask a focused follow-up with complete:false while a facet is still open. Set complete:true with outcome:"solved" when the learner\'s messages and saved work supply a correct, sufficiently supported solution; set complete:true with outcome:"gap" when the learner has declared they do not know what remains or wants to move on; do not require a prerequisite tree, and name those facets as gaps in knowledge.facets. In knowledge.facets use ids from probe.facets, or declare a prerequisite part the question did not list as a new id with partOf (a known facet id) and description, with status demonstrated, implied (with impliedBy) or gap; add knowledge.signal only when the learner supplies an answer to assess. Your own explanations are assistance, not learner evidence. Do not demand a separate submission or repeat already demonstrated reasoning. Do not claim execution without matching receipts. Gameplay completion is separate from independent mastery.';
 

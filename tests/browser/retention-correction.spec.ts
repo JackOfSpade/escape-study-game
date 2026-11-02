@@ -1,5 +1,5 @@
 import { openGameMenu } from "./helpers/game-menu";
-// Controlled source review only; no external ChatGPT or real learner grades.
+// Controlled source review only; no live model or real learner grades.
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { encode } from "../../src/persistence";
@@ -34,8 +34,8 @@ for (const removed of [0, 1])
     await page.route("**/api/status", (route) =>
       route.fulfill({
         json: {
-          mode: "chatgpt-handoff",
-          label: "Controlled ChatGPT transport",
+          mode: "claude-cli",
+          label: "Controlled Claude gateway",
           detail: "Local fixture only",
           capabilities: ["reconcile-roadmap"],
         },
@@ -43,8 +43,13 @@ for (const removed of [0, 1])
     );
     await page.route("**/api/bridge", async (route) => {
       const { operation, payload } = route.request().postDataJSON();
-      expect(operation).toBe("reconcile-roadmap");
-      expect(payload.provider).toBe("chatgpt-handoff");
+      // Background question preparation is not part of this test.
+      if (operation !== "reconcile-roadmap")
+        return route.fulfill({
+          status: 503,
+          json: { error: "Not part of this test" },
+        });
+      expect(payload.provider).toBe("claude-cli");
       expect(
         payload.context.retentionHistory.filter(
           (e: any) => e.scopeId === laterScope,
@@ -72,7 +77,7 @@ for (const removed of [0, 1])
     });
     await page
       .getByRole("button", {
-        name: "Request ChatGPT roadmap review",
+        name: "Request roadmap review",
         exact: true,
       })
       .click();
@@ -134,5 +139,5 @@ for (const removed of [0, 1])
     expect(saved.review).toEqual(JSON.parse(JSON.stringify(expected)));
     expect(saved.history).toEqual(JSON.parse(JSON.stringify(events)));
     expect(saved.cycle).toBe(g.study.learner!.cycle);
-    expect(saved.provider).toBe("chatgpt-handoff");
+    expect(saved.provider).toBe("claude-cli");
   });

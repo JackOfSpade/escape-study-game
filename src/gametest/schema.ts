@@ -62,7 +62,8 @@ export interface Check {
           | "falling"
           | "alive"
           | "latched"
-          | "absAngle";
+          | "absAngle"
+    | "doorOpen";
       }
     | { type: "count"; kind: "npc" | "zombie" }
     | {
@@ -502,6 +503,7 @@ export function parseScenario(value: string | unknown): Scenario {
             "falling",
             "alive",
             "latched",
+            "doorOpen",
             "absAngle",
           ].includes(String(q.field)),
         "Invalid entity property check.",

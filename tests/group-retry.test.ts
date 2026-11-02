@@ -36,7 +36,7 @@ async function connection(handler: typeof fetch) {
   globalThis.fetch = async (url, init) =>
     String(url) === "/api/status"
       ? Response.json({
-          mode: "chatgpt-handoff",
+          mode: "claude-cli",
           label: "Controlled handoff",
           detail: "Synthetic test transport only",
           capabilities: ["group"],
@@ -136,7 +136,7 @@ test("saved group request refuses provider changes and stale work before transpo
     await retryGroupRequest(g, e, job.id);
     assert.equal(calls, 1);
     assert.match(job.error!, /original group connection/);
-    job.provider = "chatgpt-handoff";
+    job.provider = "claude-cli";
     edit(g, e, "New public revision", e.revision, roadmap);
     await retryGroupRequest(g, e, job.id);
     assert.equal(calls, 1);

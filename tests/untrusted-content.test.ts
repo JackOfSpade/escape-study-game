@@ -56,7 +56,7 @@ test("H04 puzzle, tutor, NPC and code directives stay data; only scoped gameplay
   globalThis.fetch = async (url, init) => {
     if (url === "/api/status")
       return Response.json({
-        mode: "chatgpt-handoff",
+        mode: "claude-cli",
         label: "Synthetic hostile-output fixture",
         detail: "No external model",
         capabilities: ["generate", "tutor", "group", "complete", "assess"],
@@ -68,7 +68,7 @@ test("H04 puzzle, tutor, NPC and code directives stay data; only scoped gameplay
     );
     const body = JSON.parse(String(init?.body)),
       p = body.payload;
-    assert.equal(body.provider, "chatgpt-handoff");
+    assert.equal(body.provider, "claude-cli");
     wires.push(body.operation);
     if (body.operation === "generate")
       return Response.json({
@@ -168,7 +168,7 @@ test("H04 puzzle, tutor, NPC and code directives stay data; only scoped gameplay
     await ensureProblem(g, e, r);
     assert.ok(e.problem, e.error);
     assert.equal(e.problem.prompt, injection);
-    assert.equal(e.problem.provenance, "chatgpt-handoff");
+    assert.equal(e.problem.provenance, "claude-cli");
     assert.equal(physical(), baseline);
     assert.deepEqual(g.study.learner!.cells, originalCells);
     await send(

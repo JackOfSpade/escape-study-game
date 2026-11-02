@@ -30,18 +30,19 @@ async function mockSpeech(
   options: {
     texts?: string[];
     verdicts?: ("accept" | "revise" | "silence")[];
-    queuedReview?: boolean;
+    heldReview?: boolean;
     conversation?: "reply" | "silent";
   } = {},
 ) {
-  let release!: () => void;
+  let release!: () => void, releaseReview!: () => void;
   const generated = new Promise<void>((resolve) => {
       release = resolve;
     }),
+    reviewGate = new Promise<void>((resolve) => {
+      releaseReview = resolve;
+    }),
     requests: any[] = [],
     reviews: any[] = [],
-    reviewDiscards: string[] = [],
-    reviewPolls: string[] = [],
     synthesis: any[] = [],
     downloads: string[] = [],
     discards: string[] = [],
@@ -52,7 +53,7 @@ async function mockSpeech(
   await page.route("**/api/status", (route) =>
     route.fulfill({
       json: {
-        mode: "chatgpt-handoff",
+        mode: "claude-cli",
         label: "Synthetic offline relay",
         capabilities: ["npc-chatter", "npc-chatter-review"],
         detail: "No model is called.",
@@ -110,20 +111,8 @@ async function mockSpeech(
         .catch(() => {});
     } else if (body.operation === "npc-chatter-review") {
       reviews.push(body);
-      if (options.queuedReview) {
-        await route
-          .fulfill({
-            status: 202,
-            json: {
-              handoff: {
-                id: "synthetic-critic-receipt",
-                hash: "synthetic-critic-hash",
-              },
-            },
-          })
-          .catch(() => {});
-        return;
-      }
+      // The critic stays in flight until the test lets its verdict through.
+      if (options.heldReview) await reviewGate;
       const verdict =
         options.verdicts?.[
           Math.min(reviews.length - 1, options.verdicts.length - 1)
@@ -144,15 +133,6 @@ async function mockSpeech(
         })
         .catch(() => {});
     } else throw Error(`Unexpected synthetic operation: ${body.operation}`);
-  });
-  await page.route("**/api/bridge/result?**", async (route) => {
-    if (route.request().method() === "DELETE") {
-      reviewDiscards.push(route.request().url());
-      await route.fulfill({ status: 204 });
-    } else {
-      reviewPolls.push(route.request().url());
-      await route.fulfill({ status: 202, json: { pending: true } });
-    }
   });
   await page.route("**/api/speech", async (route) => {
     const body = route.request().postDataJSON();
@@ -186,10 +166,9 @@ async function mockSpeech(
   });
   return {
     release,
+    releaseReview,
     requests,
     reviews,
-    reviewDiscards,
-    reviewPolls,
     synthesis,
     downloads,
     discards,
@@ -632,16 +611,14 @@ test("a heard water request can remain unanswered without fabricating a reply or
 });
 
 for (const interrupted of ["pause", "off", "new-run"] as const) {
-  test(`a ${interrupted} while the critic is queued deletes its receipt and cannot start audio`, async ({
+  test(`a ${interrupted} while the critic is in flight cannot start audio from its late verdict`, async ({
     page,
   }) => {
-    const relay = await mockSpeech(page, { queuedReview: true });
+    const relay = await mockSpeech(page, { heldReview: true });
     try {
       await setupVoice(page);
       relay.release();
       await expect.poll(() => relay.reviews.length).toBe(1);
-      // A result poll proves the browser has received the queued receipt.
-      await expect.poll(() => relay.reviewPolls.length).toBeGreaterThan(0);
       await page.evaluate((interrupted) => {
         const s = (window as any).__voiceTest;
         if (interrupted === "pause") s.game.paused = true;
@@ -649,16 +626,16 @@ for (const interrupted of ["pause", "off", "new-run"] as const) {
         else s.game.id = "synthetic-new-run";
         s.director.update(s.game);
       }, interrupted);
-      await expect.poll(() => relay.reviewDiscards.length).toBe(1);
-      expect(relay.reviewDiscards[0]).toContain(
-        "id=synthetic-critic-receipt&hash=synthetic-critic-hash",
-      );
+      // An accepting verdict that arrives afterwards must change nothing.
+      relay.releaseReview();
+      await page.waitForTimeout(300);
       expect(relay.synthesis).toHaveLength(0);
       expect(relay.downloads).toHaveLength(0);
       expect((await voiceState(page)).bubble).toBeNull();
       expect((await voiceState(page)).playing).toBe(false);
     } finally {
       relay.release();
+      relay.releaseReview();
       await disposeVoice(page);
     }
   });

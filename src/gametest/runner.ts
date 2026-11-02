@@ -65,6 +65,10 @@ function read(
         throw Error(`${q.id} is not a hinged door`);
       return e.door.latched;
     }
+    if (q.field === "doorOpen") {
+      if (!("field" in e) || !e.field) throw Error(`${q.id} is not an access door`);
+      return e.field.leaf?.open ?? 0;
+    }
     if (q.field === "maxHp") {
       if (!("maxHp" in e))
         throw Error(`${q.id} has no furniture maximum health`);

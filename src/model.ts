@@ -2,7 +2,12 @@ import type { LearnerLedger, ScopeDefinition } from "./learning-model";
 import type { Sector } from "./floor-plan";
 export type Track = "PY" | "PE";
 /** A connected AI provider; development practice has no provider. */
-export type Provider = "study-mode" | "chatgpt-handoff";
+export type Provider = "study-mode" | "chatgpt-handoff" | "claude-cli";
+export const PROVIDERS: readonly string[] = [
+  "study-mode",
+  "chatgpt-handoff",
+  "claude-cli",
+];
 export interface Objective {
   id: string;
   target: number;
@@ -81,6 +86,13 @@ export interface Contract {
   };
 }
 export interface StudyState {
+  /** One finished question waiting for whichever new room opens next. Unused,
+   * it touches no schedule, scope or door health. */
+  preparedQuestion?: {
+    provider: Provider;
+    contract: Contract;
+    problem: Problem;
+  };
   /** Free-form AI impressions; separate from verified curriculum credit. */
   topicAssessments?: Record<
     string,
@@ -316,6 +328,14 @@ export type FurnitureKind =
   | "box"
   | "drawers"
   | "armchair";
+/** How a door looks; collision, access and health stay with the engine. */
+export interface DoorStyle {
+  material: "wood" | "steel" | "glass" | "fire" | "security";
+  color: string;
+  accent: string;
+  window: "none" | "slit" | "half" | "full";
+  label: string;
+}
 export interface Furniture extends Point {
   /** Immutable authored presentation; pose, damage and destruction stay native. */
   appearance?: {
@@ -337,7 +357,10 @@ export interface Furniture extends Point {
     direction?: number;
     exit: boolean;
     visitors?: string[];
+    /** Present only while the leaf is moving or held open. */
+    leaf?: { open: number; side: number; hold: number };
   };
+  doorStyle?: DoorStyle;
   physics?: PhysicsMotion;
   door?: DoorState;
   lastMoveTick?: number;
@@ -494,9 +517,6 @@ export interface Problem {
   scopeDefinitions?: ScopeDefinition[];
 }
 export interface TutorRequest {
-  transportPhase?: import("./bridge-client").HandoffProgress;
-  /** When transportPhase last changed (Date.now()); drives waiting hints. */
-  transportPhaseAt?: number;
   id: string;
   provider: Provider;
   payloadJson: string;
@@ -505,6 +525,8 @@ export interface TutorRequest {
   error?: string;
   responseMessageId?: string;
 }
+/** A question session the retired ChatGPT chat once ran. Saves still carry it,
+ * so learning history reads it; nothing creates or continues one any more. */
 export interface DirectStudySession {
   id: string;
   createdAt?: number;
@@ -516,7 +538,7 @@ export interface DirectStudySession {
   state: "pending" | "interrupted" | "paused" | "applied" | "superseded";
   responseDigest?: string;
   error?: string;
-  transportPhase?: import("./bridge-client").HandoffProgress;
+  transportPhase?: string;
   transportPhaseAt?: number;
 }
 export interface Encounter {
@@ -612,7 +634,7 @@ export interface Settings {
   view?: "first-person" | "top-down";
   /** Interface and world magnification; omitted by older saves (100%). */
   displayScale?: number;
-  /** Local preference only; server release and capability are also required. */
+  /** Saved by the retired ChatGPT worker settings; no longer read. */
   handoffAutonomous?: boolean;
   /** Temporary contextual computer speech; no clips are included in saves. */
   npcVoices?: boolean;
@@ -627,7 +649,7 @@ export interface Game {
   preparingRun?: boolean;
   /** Accepted AI blueprint and provenance. Loading never requests a replacement. */
   design?: import("./run-design-contract.mjs").SavedRunDesign;
-  /** Study workspace freezes the saved world while native study continues. */
+  /** Study workspace freezes the saved world while a question is open. */
   studyWorkspace?: { enabled: boolean; wasPaused: boolean; encounter?: string };
   fieldPacing?: import("./field-pacing").FieldPacing;
   rules?: "force-fields";

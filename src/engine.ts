@@ -2171,7 +2171,7 @@ function strikeFurniture(
     g,
     "barricade-hit",
     ob.field
-      ? "A zombie struck a force field."
+      ? "A zombie struck a door."
       : "A zombie struck a barricade.",
     floor,
     z.id,
@@ -2186,7 +2186,7 @@ function strikeFurniture(
     event(
       g,
       "breach",
-      `A ${ob.field ? "force field" : ob.kind === "gate" ? "main entrance" : ob.kind} broke apart.`,
+      `A ${ob.field ? "door" : ob.kind === "gate" ? "main entrance" : ob.kind} broke apart.`,
       floor,
     ).position = { x: position.x, y: position.y };
   }

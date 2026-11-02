@@ -11,9 +11,8 @@ import {
 } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { privateDirectory } from "./chatgpt-tunnel-config.mjs";
 import { sha256 } from "./lib/digest.mjs";
-import { assertOwnerOnly } from "./lib/private-fs.mjs";
+import { assertOwnerOnly, privateDirectory } from "./lib/private-fs.mjs";
 const project = fileURLToPath(new URL("../", import.meta.url));
 export const defaults = {
   directory: join(project, ".local/bridge-service"),

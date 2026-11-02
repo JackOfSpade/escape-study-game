@@ -1,4 +1,4 @@
-// Fictional environmental inscriptions and drawings. Shared by browser/relay;
+// Fictional environmental inscriptions and drawings. Shared by the browser and the bridge server;
 // this module accepts data only and never interprets HTML, SVG, URLs or code.
 const record = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const fail = (ok, message) => {

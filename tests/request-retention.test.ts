@@ -23,7 +23,7 @@ async function fixture(
   globalThis.fetch = async (url, init) => {
     if (String(url) === "/api/status")
       return Response.json({
-        mode: connected ? "chatgpt-handoff" : "development",
+        mode: connected ? "claude-cli" : "development",
         label: "Synthetic",
         detail: "No real AI",
         capabilities: connected ? ["tutor"] : [],
@@ -156,7 +156,7 @@ test("recover migrates existing saves: settled live jobs and all archived jobs s
     });
   const applied: TutorRequest = {
     id: "applied-job",
-    provider: "chatgpt-handoff",
+    provider: "claude-cli",
     payloadJson: big("applied-job"),
     questionSequence: 1,
     state: "applied",
@@ -170,7 +170,7 @@ test("recover migrates existing saves: settled live jobs and all archived jobs s
   g.study.archives.push(archivedEncounter);
   (other.tutorRequests ??= []).push({
     id: "pending-job",
-    provider: "chatgpt-handoff",
+    provider: "claude-cli",
     payloadJson: big("pending-job"),
     questionSequence: 1,
     state: "pending",

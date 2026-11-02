@@ -1,6 +1,5 @@
 import { studyMapHtml } from "./study-map";
 import { eligible, syncLearningView } from "./curriculum";
-import { unfinishedDirectStudy } from "./direct-study";
 import { encounterKey, interruptLearningAttempt } from "./learner";
 import type { Encounter, Game, Roadmap } from "./model";
 
@@ -36,13 +35,6 @@ export function workspaceQuestion(g: Game): Encounter | undefined {
     selected && candidates.includes(selected) && matches(selected)
       ? selected
       : candidates.find(matches);
-  // A human can still answer a consumed NPC lock for separate learning
-  // assessment. The native session owns that work even without a world reward.
-  const direct = preferSelected(
-    [...current, ...g.study.archives],
-    unfinishedDirectStudy,
-  );
-  if (direct) return direct;
   const pending = preferSelected(
     current,
     (e) =>
@@ -90,7 +82,6 @@ export function nextWorkspaceQuestion(g: Game, roadmap: Roadmap): Encounter {
       if (
         unfinished.has(encounterKey(e)) &&
         e.state === "consumed" &&
-        !unfinishedDirectStudy(e) &&
         assessmentForQuestion(g, e)?.status === "applied"
       ) {
         interruptLearningAttempt(learner, e);

@@ -415,7 +415,7 @@ test("actual HTTP team-work handoff corrects malformed notes without applying NP
           };
         }),
       false,
-      { provider: "chatgpt-handoff" },
+      { provider: "claude-cli" },
     );
     assert.equal(
       e.materializations![0].state,
@@ -426,7 +426,7 @@ test("actual HTTP team-work handoff corrects malformed notes without applying NP
     assert.equal(e.group.length, 0);
     assert.equal(e.proposals![0].autonomous, undefined);
     assert.equal(JSON.stringify(g.study), before);
-    assert.equal(relay.queue.snapshot().done, 1);
+    assert.equal(relay.completed, 1);
   } finally {
     await relay.close();
   }

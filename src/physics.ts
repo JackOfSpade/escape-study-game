@@ -1,5 +1,5 @@
 import { trafficVelocity } from "./local-traffic";
-import { fieldAllows, updateFields } from "./force-fields";
+import { fieldAllows, updateDoorLeaves, updateFields } from "./force-fields";
 import {
   Box,
   Circle,
@@ -1015,6 +1015,7 @@ class PhysicsLayer {
         if (Math.abs(angle) > 0.06) d.swung = true;
       }
     }
+    updateDoorLeaves(this.g, dt);
     const moved: Furniture[] = [];
     for (const r of this.records.values()) {
       const e = r.entity,

@@ -10,7 +10,16 @@ export interface RunStory {
   title: string;
   lines: string[];
 }
+export interface RunDoorDesign {
+  material: "wood" | "steel" | "glass" | "fire" | "security";
+  color: string;
+  accent: string;
+  window: "none" | "slit" | "half" | "full";
+  label: string;
+  health: number;
+}
 export interface LegacyRunFloorDesign {
+  doors?: RunDoorDesign[];
   /** Required for version 2 designs; absent from historical version 1 data. */
   scene?: SceneFloorDesign;
   name: string;
@@ -34,6 +43,7 @@ export interface LegacyRunExteriorDesign {
   skyline: { minHeight: number; maxHeight: number; damageRate: number };
 }
 export interface LegacyRunDesign {
+  mainDoor?: RunDoorDesign;
   version: 1 | 2;
   title: string;
   premise: string;
@@ -97,6 +107,7 @@ export interface RunStructureV3 extends Omit<
   LegacyRunDesign,
   "version" | "floors" | "exterior"
 > {
+  mainDoor?: RunDoorDesign;
   version: 3;
   floors: RunFloorStructureV3[];
   exterior: RunExteriorStructureV3;
@@ -108,7 +119,7 @@ export interface RunDesignV3 extends RunStructureV3 {
 export type RunDesign = LegacyRunDesign | RunDesignV3;
 export interface SavedRunDesign {
   version: 1;
-  source: "chatgpt-handoff" | "fixture";
+  source: "chatgpt-handoff" | "claude-cli" | "fixture";
   requestId: string;
   generationId: string;
   fingerprint: string;

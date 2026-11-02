@@ -43,7 +43,7 @@ function problem(contract: Problem["contract"]): Problem {
     prompt: "Synthetic lifecycle fixture",
     starter: "Retained starter",
     rubric: ["fixture"],
-    provenance: "study-mode",
+    provenance: "claude-cli",
     contract,
     scopeDefinitions: contract.objectiveIds.map((id, i) => ({
       id: `${id}/D${contract.depth}`,
@@ -59,7 +59,7 @@ async function bridge(handler: (body: any) => Promise<Response>) {
   globalThis.fetch = async (input, init) =>
     String(input) === "/api/status"
       ? Response.json({
-          mode: "study-mode",
+          mode: "claude-cli",
           label: "Synthetic lifecycle bridge",
           detail: "Not native verification",
           capabilities: [],
@@ -210,23 +210,16 @@ test("native generation retries its exact saved packet after an outage and reloa
     assert.equal(e.problem, undefined);
     assert.ok(e.pendingGeneration);
     const restored = recover(decode(encode(g)));
-    const transport = globalThis.fetch;
-    globalThis.fetch = async () =>
-      Response.json({
-        mode: "chatgpt-handoff",
-        label: "Different synthetic provider",
-        detail: "Fixture only",
-        capabilities: [],
-      });
-    await checkBridge();
+    // A save made under the retired chat cannot be retried over this connection.
+    const saved = restored.encounters[e.id].pendingGeneration!;
+    saved.provider = "chatgpt-handoff";
     await ensureProblem(restored, restored.encounters[e.id], r);
     assert.equal(packets.length, 1);
     assert.match(
       restored.encounters[e.id].error!,
       /original generation provider/,
     );
-    globalThis.fetch = transport;
-    await checkBridge();
+    saved.provider = "claude-cli";
     await ensureProblem(restored, restored.encounters[e.id], r);
     assert.deepEqual(packets[1], packets[0]);
     assert.equal(
@@ -335,7 +328,7 @@ test("a received native question retains its scope registration if connection st
     await checkBridge();
     finish(Response.json(problem(payload.contract)));
     await pending;
-    assert.equal(e.problem?.provenance, "study-mode");
+    assert.equal(e.problem?.provenance, "claude-cli");
     assert.ok(g.study.learner!.scopes[e.problem!.scopeDefinitions![0].id]);
     assert.equal(g.study.learner!.evidence.length, 0);
   } finally {

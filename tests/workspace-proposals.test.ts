@@ -277,7 +277,7 @@ test("native group candidates materialize edits only after human review with fai
   globalThis.fetch = async (input, init) => {
     if (String(input) === "/api/status")
       return Response.json({
-        mode: "study-mode",
+        mode: "claude-cli",
         label: "Synthetic patch fixture",
         detail: "Not native service proof",
         capabilities: [],
