@@ -2,7 +2,7 @@
 
 The ChatGPT chat workers, tunnel, connector and terminal apps were retired when the game moved to the Claude CLI. They live here so they can return if ChatGPT chats become usable again. Nothing in this folder is built, type-checked or tested.
 
-The exact working stack before the move is the annotated tag `archive/chatgpt-stack-v1`, also on the branch `shelf/chatgpt-stack`.
+The exact working stack before the move is the annotated tag `archive/chatgpt-stack-v1`.
 
 ## To re-enable
 
