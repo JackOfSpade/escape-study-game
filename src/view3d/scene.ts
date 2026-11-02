@@ -24,6 +24,7 @@ import {
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { doorFrame } from "../doors";
 import { human } from "../engine";
+import { doorLeaves, doorSeeThrough, doorStyle } from "../door-style";
 import { fieldAllows } from "../force-fields";
 import { floorSectors } from "../floor-plan";
 import {
@@ -108,6 +109,7 @@ const PALETTES = {
   mutation: parsedPalette(mutation),
 };
 type Palette = ReturnType<typeof parsedPalette>;
+const DOOR_OPEN_ANGLE = Math.PI * 0.55;
 type Batch = "box" | "head" | "screen" | "field" | "panel" | "eye";
 interface Part {
   batch: Batch;
@@ -120,7 +122,145 @@ interface Part {
   d: number;
   tint: Tint;
   anchor?: "frame";
-  role?: "bar" | "pane" | "debris" | "leg" | "arm" | "damage";
+  role?:
+    "bar" | "pane" | "debris" | "leg" | "arm" | "damage" | "door" | "accent";
+  /** Swings around this hinge with a door's leaf. */
+  leaf?: { x: number; z: number; sign: number };
+}
+/** A frame, its leaves and a status light whose colour shows personal access
+ * and whose length shows the door's remaining health. */
+function doorParts(
+  parts: Part[],
+  o: Furniture,
+  part: (
+    x: number,
+    y: number,
+    z: number,
+    w: number,
+    h: number,
+    d: number,
+    tint?: Tint,
+    batch?: Batch,
+    role?: Part["role"],
+  ) => void,
+) {
+  const style = doorStyle(o),
+    vertical = o.h > o.w,
+    span = vertical ? o.h : o.w,
+    depth = vertical ? o.w : o.h,
+    place = (along: number, across = 0) =>
+      vertical ? { x: across, z: along } : { x: along, z: across },
+    box = (
+      along: number,
+      across: number,
+      y: number,
+      width: number,
+      height: number,
+      thick: number,
+      tint: Tint,
+      batch: Batch,
+      role?: Part["role"],
+      leaf?: Part["leaf"],
+    ) => {
+      const at = place(along, across);
+      part(
+        at.x,
+        y,
+        at.z,
+        vertical ? thick : width,
+        height,
+        vertical ? width : thick,
+        tint,
+        batch,
+        role,
+      );
+      if (leaf) parts[parts.length - 1].leaf = leaf;
+    };
+  for (const sign of [-1, 1])
+    box((sign * span) / 2, 0, 1.2, 0.13, 2.4, depth, "metal", "box");
+  box(0, 0, 2.35, span - 0.13, 0.09, depth, "metal", "box");
+  // Under the header on both faces, where the lintel cannot hide it.
+  for (const sign of [-1, 1])
+    box(
+      0,
+      (sign * depth) / 2 - sign * 0.03,
+      2.25,
+      span - 0.14,
+      0.07,
+      0.05,
+      "screen",
+      "screen",
+      "bar",
+    );
+  const seeThrough = doorSeeThrough(style),
+    damage = o.hp / Math.max(1, o.maxHp);
+  for (const { hinge, extend, width } of doorLeaves(span - 0.14)) {
+    const at = place(hinge),
+      leaf = { x: at.x, z: at.z, sign: (vertical ? -1 : 1) * extend },
+      size = width - 0.012,
+      middle = hinge + (extend * width) / 2,
+      along = (share: number) => hinge + extend * width * share,
+      slab = (
+        center: number,
+        y: number,
+        long: number,
+        height: number,
+        thick = 0.09,
+        tint: Tint = "body",
+        batch: Batch = "box",
+        role: Part["role"] | null = "door",
+      ) =>
+        box(
+          center,
+          0,
+          y,
+          long,
+          height,
+          thick,
+          tint,
+          batch,
+          role ?? undefined,
+          leaf,
+        );
+    if (style.material === "glass" || style.window === "full") {
+      slab(middle, 0.13, size, 0.18);
+      slab(middle, 2.21, size, 0.16);
+      slab(along(0.06), 1.15, size * 0.1, 1.94);
+      slab(along(0.94), 1.15, size * 0.1, 1.94);
+      slab(middle, 1.15, size * 0.78, 1.94, 0.04, "screen", "field", "pane");
+    } else if (style.window === "half") {
+      slab(middle, 0.62, size, 1.16);
+      slab(middle, 2.2, size, 0.16);
+      slab(along(0.06), 1.65, size * 0.1, 0.9);
+      slab(along(0.94), 1.65, size * 0.1, 0.9);
+      slab(middle, 1.65, size * 0.78, 0.9, 0.04, "screen", "field", "pane");
+    } else {
+      slab(middle, 1.16, size, 2.26);
+      if (style.window === "slit")
+        slab(along(0.5), 1.62, size * 0.2, 0.62, 0.11, "dark", "box", null);
+    }
+    if (style.material === "wood" && !seeThrough) {
+      slab(along(0.3), 0.62, size * 0.32, 0.78, 0.105, "body", "box", "accent");
+      slab(along(0.7), 0.62, size * 0.32, 0.78, 0.105, "body", "box", "accent");
+    }
+    if (style.material === "fire")
+      slab(middle, 0.3, size * 0.92, 0.1, 0.105, "body", "box", "accent");
+    if (style.material === "security") {
+      for (const height of [0.45, 1.14, 1.83])
+        slab(middle, height, size * 0.94, 0.08, 0.105, "body", "box", "accent");
+    }
+    if (style.material === "steel")
+      slab(middle, 0.22, size * 0.94, 0.26, 0.105, "body", "box", "accent");
+    slab(along(0.88), 1.05, 0.06, 0.2, 0.17, "metal", "box", null);
+    if (damage < 0.65) {
+      slab(along(0.34), 1.4, size * 0.5, 0.05, 0.11, "dark", "box", "damage");
+      slab(along(0.62), 0.75, size * 0.42, 0.05, 0.11, "dark", "box", "damage");
+    }
+    if (damage < 0.35) {
+      slab(along(0.48), 1.9, size * 0.34, 0.26, 0.112, "dark", "box", null);
+      slab(along(0.28), 0.42, size * 0.24, 0.3, 0.112, "dark", "box", null);
+    }
+  }
 }
 interface Visual {
   parts: Part[];
@@ -974,16 +1114,29 @@ export class FirstPersonView {
       this.furnitureParts(visual.parts, o);
     }
     const frame = doorFrame(o),
-      fieldColor = fieldAllows(o, a) ? palette.allowed : palette.blocked;
+      fieldColor = fieldAllows(o, a) ? palette.allowed : palette.blocked,
+      style = o.field ? doorStyle(o) : undefined,
+      swing = o.field?.leaf
+        ? o.field.leaf.side * o.field.leaf.open * DOOR_OPEN_ANGLE
+        : 0;
     for (const p of visual.parts) {
-      const anchor = p.anchor === "frame" ? frame : o,
-        angle = p.anchor === "frame" ? 0 : (o.angle ?? 0),
-        c = Math.cos(angle),
-        s = Math.sin(angle),
+      const swung = p.leaf ? p.leaf.sign * swing : 0,
+        swungCos = Math.cos(swung),
+        swungSin = Math.sin(swung),
+        leafX = p.leaf
+          ? p.leaf.x + (p.x - p.leaf.x) * swungCos - (p.z - p.leaf.z) * swungSin
+          : p.x,
+        leafZ = p.leaf
+          ? p.leaf.z + (p.x - p.leaf.x) * swungSin + (p.z - p.leaf.z) * swungCos
+          : p.z,
+        anchor = p.anchor === "frame" ? frame : o,
+        angle = p.anchor === "frame" ? 0 : (o.angle ?? 0) + swung,
+        c = Math.cos(o.field ? 0 : angle),
+        s = Math.sin(o.field ? 0 : angle),
         bar = p.role === "bar",
         vertical = o.h > o.w,
-        x = bar && !vertical ? p.x - (o.w * (1 - health)) / 2 : p.x,
-        z = bar && vertical ? p.z - (o.h * (1 - health)) / 2 : p.z,
+        x = bar && !vertical ? leafX - (o.w * (1 - health)) / 2 : leafX,
+        z = bar && vertical ? leafZ - (o.h * (1 - health)) / 2 : leafZ,
         broken = !o.field && !o.door && health < 0.45,
         lean =
           p.role === "damage"
@@ -1003,12 +1156,23 @@ export class FirstPersonView {
                 ? roomPalette?.accent
                 : undefined
           : undefined;
+      const doorColor =
+        p.role === "door"
+          ? style?.color
+          : p.role === "accent"
+            ? style?.accent
+            : p.role === "pane"
+              ? "#a9d3df"
+              : undefined;
       if (authoredColor) this.tint.set(authoredColor);
+      else if (doorColor) this.tint.set(doorColor);
       else
         this.tint.copy(
-          o.field ? fieldColor : this.color(p.tint, palette, o.kind),
+          o.field && p.tint === "screen"
+            ? fieldColor
+            : this.color(p.tint, palette, o.kind),
         );
-      if (p.tint === "body" && !o.field)
+      if (p.role === "door" || (p.tint === "body" && !o.field))
         this.tint.multiplyScalar(0.45 + 0.55 * health);
       this.pools[p.batch].set(
         p.slot,
@@ -1077,30 +1241,7 @@ export class FirstPersonView {
       return;
     }
     if (o.field) {
-      const vertical = d > w,
-        span = vertical ? d : w;
-      for (const sign of [-1, 1])
-        part(
-          vertical ? 0 : (sign * span) / 2,
-          1.2,
-          vertical ? (sign * span) / 2 : 0,
-          0.13,
-          2.4,
-          0.13,
-          "metal",
-        );
-      part(0, 1.15, 0, w, 2.27, d, "screen", "field", "pane");
-      part(
-        0,
-        2.45,
-        0,
-        vertical ? 0.09 : w,
-        0.09,
-        vertical ? d : 0.09,
-        "screen",
-        "screen",
-        "bar",
-      );
+      doorParts(parts, o, part);
       return;
     }
     const health = o.hp / Math.max(1, o.maxHp);

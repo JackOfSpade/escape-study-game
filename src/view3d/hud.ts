@@ -1,3 +1,4 @@
+import { doorStyle } from "../door-style";
 import { doorFrame } from "../doors";
 import {
   canBoard,
@@ -43,7 +44,7 @@ export function interactionPrompt(game: Game, yaw?: number) {
     if (!usable) return "Terminal in use";
     return "E · Open terminal";
   }
-  if (door?.field) return "E · Check force field access";
+  if (door?.field) return `E · Check access: ${doorStyle(door).label}`;
   if (door?.door && !door.door.latched)
     return "Push to swing door · E near handle to grip";
   return door ? "E · Release door latch" : "";

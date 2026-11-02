@@ -1,3 +1,4 @@
+import { doorStyle } from "../door-style";
 import { doorFrame } from "../doors";
 import { canReachStation, human } from "../engine";
 import type { Box } from "../furniture-geometry";
@@ -189,7 +190,8 @@ export function lookTargetPrompt(game: Game, target: LookTarget) {
   if (target.kind === "grip")
     return `E · Grip ${objectName(target.object.kind).toLowerCase()}`;
   if (target.kind === "door") {
-    if (target.object.field) return "E · Check force field access";
+    if (target.object.field)
+      return `E · Check access: ${doorStyle(target.object).label}`;
     return target.object.door?.latched
       ? "E · Release door latch"
       : "Push to swing door";

@@ -1,3 +1,4 @@
+import { doorStyle } from "./door-style";
 import { fieldAllows } from "./force-fields";
 import { drawBlood } from "./blood";
 import { camera } from "./camera";
@@ -425,8 +426,9 @@ export function render(
         health = Math.max(0, Math.min(1, o.hp / Math.max(1, o.maxHp))),
         damage = 1 - health;
       ctx.save();
-      ctx.globalAlpha = 0.08 + 0.18 * health;
-      ctx.fillStyle = color;
+      // The door's own colour; its outline shows personal access.
+      ctx.globalAlpha = o.field.leaf ? 0.2 : 0.35 + 0.55 * health;
+      ctx.fillStyle = doorStyle(o).color;
       ctx.fillRect(x, y, o.w, o.h);
       ctx.globalAlpha = 0.9;
       ctx.strokeStyle = color;

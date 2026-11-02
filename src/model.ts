@@ -316,6 +316,14 @@ export type FurnitureKind =
   | "box"
   | "drawers"
   | "armchair";
+/** How a door looks; collision, access and health stay with the engine. */
+export interface DoorStyle {
+  material: "wood" | "steel" | "glass" | "fire" | "security";
+  color: string;
+  accent: string;
+  window: "none" | "slit" | "half" | "full";
+  label: string;
+}
 export interface Furniture extends Point {
   /** Immutable authored presentation; pose, damage and destruction stay native. */
   appearance?: {
@@ -337,7 +345,10 @@ export interface Furniture extends Point {
     direction?: number;
     exit: boolean;
     visitors?: string[];
+    /** Present only while the leaf is moving or held open. */
+    leaf?: { open: number; side: number; hold: number };
   };
+  doorStyle?: DoorStyle;
   physics?: PhysicsMotion;
   door?: DoorState;
   lastMoveTick?: number;

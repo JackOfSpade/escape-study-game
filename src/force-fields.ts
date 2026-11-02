@@ -1,3 +1,4 @@
+import { presetDoorStyle } from "./door-style";
 import { pursuitLayout, pursuitLayoutErrors } from "./pursuit-layout";
 import { forwardFieldQuota } from "./office-plan";
 import {
@@ -80,7 +81,7 @@ export function useField(g: Game, a: Actor, o: Furniture) {
   if ((a.keys ?? 0) < 1) {
     if (a.id === "human")
       g.notice =
-        "Red force field: one key required, or solve a solo terminal on this floor for access. There is no other way through this wall.";
+        "Locked door: one key required, or solve a solo terminal on this floor for access. There is no other way through this wall.";
     return false;
   }
   a.keys = (a.keys ?? 0) - 1;
@@ -90,12 +91,12 @@ export function useField(g: Game, a: Actor, o: Furniture) {
   event(
     g,
     "field-key",
-    `${a.name} spent one key for personal force field access.`,
+    `${a.name} spent one key for personal access through a door.`,
     a.floor,
     a.id,
   );
   if (a.id === "human")
-    g.notice = "Key consumed. This field is permanently green for you.";
+    g.notice = "Key consumed. This door now always opens for you.";
   return true;
 }
 
@@ -192,6 +193,7 @@ export function redesign(
         g.seed,
         floor.furniture.filter((o) => /-room\d-door$/.test(o.id)),
       );
+      applyDoorDesign(g, floor, options.blueprint);
       if (g.design || options.blueprint) {
         const errors = [
           ...pursuitLayoutErrors(g, floor),
@@ -214,7 +216,35 @@ export function redesign(
     if (!used.has(id)) delete g.encounters[id];
   if (roadmap) preparePracticeRooms(g, roadmap);
   g.notice =
-    "Green fields let you pass; zombies must break them. E uses a key on red fields. The rear study hall stays open. Solve a solo terminal for stair access and a key.";
+    "Doors open for you when your access is green and close themselves when zombies come near; zombies must break them. E uses a key on a locked door. The rear study hall stays open. Solve a solo terminal for stair access and a key.";
+}
+
+/** A run design may restyle a door and set its starting health. Study pacing
+ * can still raise the hall entrance, so a design cannot shorten that promise. */
+function applyDoorDesign(
+  g: Game,
+  floor: Floor,
+  blueprint?: import("./run-design-contract.mjs").RunStructureV3,
+) {
+  const design = blueprint ?? g.design?.design;
+  const designed = design?.floors[floor.index]?.doors;
+  for (const o of floor.furniture) {
+    if (!o.field) continue;
+    const room = /room(\d+)-(?:door|forward)$/.exec(o.id)?.[1];
+    const choice =
+      o.id === "main-gate"
+        ? design?.mainDoor
+        : room !== undefined
+          ? designed?.[Number(room)]
+          : undefined;
+    if (!choice) {
+      o.doorStyle = presetDoorStyle(o.id, g.seed);
+      continue;
+    }
+    const { health, ...style } = choice;
+    o.doorStyle = style;
+    o.hp = o.maxHp = health;
+  }
 }
 
 const FIELD_RADIUS = 0.26;
@@ -279,12 +309,12 @@ function ejectFromField(g: Game, o: Furniture, a: Actor, side: number) {
   if (a.id === "human")
     g.notice =
       (a.keys ?? 0) > 0
-        ? "Red force field. Press E to spend a key."
-        : "Red force field: entry denied. A key or a solved solo terminal on this floor is required.";
+        ? "Locked door. Press E to spend a key."
+        : "Locked door: entry denied. A key or a solved solo terminal on this floor is required.";
   const ev = event(
     g,
     "field-denied",
-    `${a.name} was pushed back by a red force field.`,
+    `${a.name} was stopped by a locked door.`,
     a.floor,
     a.id,
   );
@@ -386,6 +416,76 @@ export function updateFields(g: Game, previous?: ReadonlyMap<string, Point>) {
       for (const a of people)
         if (!inFurniture(a, o, FIELD_RADIUS + 0.03))
           f.sides[a.id] = fieldSide(o, a);
+    }
+}
+export const DOOR_LEAF = {
+  openSeconds: 0.3,
+  closeSeconds: 0.55,
+  holdSeconds: 0.35,
+  reach: 1.1,
+  zombieRange: 6,
+} as const;
+function wantsDoorOpen(o: Furniture, a: Actor) {
+  if (inFurniture(a, o, FIELD_RADIUS + 0.2)) return true;
+  const axis = o.h >= o.w ? "x" : "y",
+    along = axis === "x" ? "y" : "x",
+    depth = (axis === "x" ? o.w : o.h) / 2,
+    span = (axis === "x" ? o.h : o.w) / 2,
+    toward = Math.sign(o[axis] - a[axis]);
+  return (
+    Math.abs(a[axis] - o[axis]) <= depth + DOOR_LEAF.reach &&
+    Math.abs(a[along] - o[along]) <= span + 0.3 &&
+    toward * (a.physics?.[axis] ?? 0) > 0.2
+  );
+}
+/** Doors open for whoever may pass, stay open, and close themselves once a
+ * zombie is near, so nobody has to remember to shut one. The leaf is presentation
+ * only: admission stays personal and zombies never slip past, which keeps health
+ * a real time budget. */
+export function updateDoorLeaves(g: Game, dt: number) {
+  for (const floor of g.floors)
+    for (const o of floor.furniture) {
+      const f = o.field;
+      if (!f) continue;
+      if (o.destroyed) {
+        delete f.leaf;
+        continue;
+      }
+      const opener = g.survivors.find(
+        (a) =>
+          a.alive &&
+          !a.escaped &&
+          a.floor === floor.index &&
+          fieldAllows(o, a) &&
+          wantsDoorOpen(o, a),
+      );
+      if (opener) {
+        const axis = o.h >= o.w ? "x" : "y";
+        const leaf = (f.leaf ??= {
+          open: 0,
+          side: Math.sign(o[axis] - opener[axis]) || 1,
+          hold: DOOR_LEAF.holdSeconds,
+        });
+        leaf.hold = DOOR_LEAF.holdSeconds;
+        leaf.open = Math.min(1, leaf.open + dt / DOOR_LEAF.openSeconds);
+        continue;
+      }
+      if (!f.leaf) continue;
+      if (
+        !g.zombies.some(
+          (z) =>
+            z.hp > 0 &&
+            z.floor === floor.index &&
+            Math.hypot(z.x - o.x, z.y - o.y) <= DOOR_LEAF.zombieRange,
+        )
+      )
+        continue;
+      if (f.leaf.hold > 0) {
+        f.leaf.hold -= dt;
+        continue;
+      }
+      f.leaf.open -= dt / DOOR_LEAF.closeSeconds;
+      if (f.leaf.open <= 0) delete f.leaf;
     }
 }
 const views = new WeakMap<

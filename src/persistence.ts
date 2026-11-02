@@ -91,7 +91,7 @@ export function decode(text: string): Game {
   }
   if (/hack/i.test(g.notice ?? ""))
     g.notice =
-      "Red force fields require a key. Solve a solo terminal or find a green entrance.";
+      "Locked doors require a key. Solve a solo terminal or find a green-lit entrance.";
 
   for (const floor of g.floors)
     for (const o of floor.furniture)

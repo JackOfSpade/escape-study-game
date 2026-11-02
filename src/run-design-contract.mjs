@@ -39,6 +39,26 @@ function object(v, names, path) {
     `${path} is missing a field`,
   );
 }
+const DOOR_MATERIALS = ["wood", "steel", "glass", "fire", "security"];
+const DOOR_WINDOWS = ["none", "slit", "half", "full"];
+function parseDoorDesign(d, path) {
+  object(d, ["material", "color", "accent", "window", "label", "health"], path);
+  requireThat(
+    DOOR_MATERIALS.includes(d.material),
+    `${path}.material is invalid`,
+  );
+  requireThat(DOOR_WINDOWS.includes(d.window), `${path}.window is invalid`);
+  for (const k of ["color", "accent"])
+    requireThat(
+      typeof d[k] === "string" && /^#[0-9a-fA-F]{6}$/u.test(d[k]),
+      `${path}.${k} needs a six-digit hex color`,
+    );
+  text(d.label, 32, `${path}.label`);
+  requireThat(
+    Number.isInteger(d.health) && d.health >= 400 && d.health <= 2400,
+    `${path}.health must be an integer from 400 to 2400`,
+  );
+}
 function text(v, max, path) {
   requireThat(
     typeof v === "string" &&
@@ -113,12 +133,14 @@ function parseBlueprint(v, provisional = false) {
       "city",
       "exterior",
       "pacing",
+      ...(Object.hasOwn(v, "mainDoor") ? ["mainDoor"] : []),
       ...(v3
         ? ["relationships", ...(!provisional ? ["environment"] : [])]
         : []),
     ],
     "design",
   );
+  if (Object.hasOwn(v, "mainDoor")) parseDoorDesign(v.mainDoor, "mainDoor");
   requireThat(
     v.version === 1 || v.version === 2 || v3,
     "unsupported design version",
@@ -161,9 +183,12 @@ function parseBlueprint(v, provisional = false) {
         ...(!v3 ? ["stories"] : []),
         "brokenGuard",
         ...(v.version >= 2 ? ["scene"] : []),
+        ...(Object.hasOwn(f, "doors") ? ["doors"] : []),
       ],
       p,
     );
+    if (Object.hasOwn(f, "doors"))
+      array(f.doors, 4, 4, `${p}.doors`, (d, q) => parseDoorDesign(d, q));
     text(f.name, 48, `${p}.name`);
     choice(f.family, ["stack", "columns", "serpentine"], `${p}.family`);
     array(f.roomOrder, 3, 3, `${p}.roomOrder`, (n, q) =>
@@ -686,6 +711,7 @@ The common required design fields and bounds are:
 version:as requested above; title(1-64 characters), premise(1-240), opening(1-200), roofName(1-48).
 footprint:{shape:rectangle|chamfered|stepped|waisted,width:36|38|40,top:integer2..4,inset:integer2..4,mirrored:boolean,shoulder:integer top+8..top+14}.
 floors:exactly4 entries in ascending order, each {name(1-48),family:stack|columns|serpentine,roomOrder:permutation[0,1,3],layoutSeed:uint32,roomTypes:4 entries indexed rooms0..3 each break|cubicles|meeting|storage|reception|manager,subroomKinds:1..4 unique entries office|meeting|storage|break,furnitureDensity:0.5..1.5,fieldQuotas:4 integers2..6 indexed rooms0..3 (the public entrance to room2 is always free; its outgoing field uses quota2),power:4 entries lit|dim|outage indexed rooms0..3 with room2 lit,stories:exactly6 {title(1-36),lines:1..4 strings each1-50},brokenGuard:{segment:3|4,bay:1|2}}. The six story cards are three wall posters, a whiteboard, a desk photo caption and a desk note. These are actual visible words, not instructions to a renderer. layoutSeed fills smaller geometrical details; family/order are your direct choices. Each ordinary floor keeps all four study rooms along the route; no bypasses. Free hall and entry remain readable.
+Optional doors, on any floor: doors:exactly4 DoorDesign where doors[r] is the door leading out of room r and doors[2] also covers the hall entrance, and mainDoor:DoorDesign at the top level for the building's main entrance. DoorDesign:{material:wood|steel|glass|fire|security,color:hex,accent:hex,window:none|slit|half|full,label:1..32 short name shown to the player,health:integer400..2400 starting hit points}. Vary doors so they fit each room and the premise. Glass, half and full windows can be seen through when closed, and doors close themselves when zombies come near. The engine always keeps door access rules and can raise the hall entrance's health to protect study time.
 roster:exactly19 {name:unique1-20 characters distinct from You,role:builder|analyst|rusher|medic|skeptic,skill:0.4..0.9,risk:0.2..0.8,social:0.2..0.8}. Build a varied ensemble; names referenced in stories must belong to it.
 city:{roadWidth:integer7..9,boulevardOffset:integer15..19,districtSize:integer18..25,buildingHeightMin:9..18,buildingHeightMax:25..45,damageRate:0..0.7,palette:3..6 six-digit hex colors}.
 exterior:{buildingName,buildingSubtitle,quarantineTitle,quarantineSubtitle:each1-48 characters,streetLabels:exactly8 strings1-28 characters,skyline:{minHeight:24..60,maxHeight:72..140,damageRate:0..0.7}}. All heights are metres.
@@ -695,4 +721,4 @@ Version 2 additionally requires scene:{version:1,rooms:[exactly4 RoomScene objec
 SceneFurniture:{id:lowercase slug1..24 unique within its floor,kind:chair|desk|sofa|fridge|shelf|officeChair|table|cabinet|cooler|plant|printer|whiteboard|partition|coffeeMaker|microwave|vending|cafeTable|coffeeTable|reception|screen|box|drawers|armchair,at:{x:0..1,y:0..1},angle:-180..180 degrees,color:hex,condition:intact|worn|damaged,owner:exact roster name|null,label:0..40,props:0..8 SceneProp}. Furniture at is the intended normalized point within its study room. The engine finds the nearest valid room position with your angle, keeping terminals, doorways, stairs and credentialed egress clear. It rejects impossible scenes for repair; it never silently removes an authored item. Intact furniture starts at full health, worn at85%, damaged at45%; dimensions, weight and behavior come from the engine's catalog. Use modest groups of meaningful furniture, varying real arrangements and routes as well as their stories.
 SceneProp:{id:lowercase slug1..24 unique within its floor,kind:mug|book|papers|pen|photo|note|plant|bottle|phone|box|lamp|trophy,at:{x:-1..1,y:-1..1},angle:-180..180 degrees,scale:0.65..1.25,color:hex,accent:hex,condition:intact|worn|damaged,owner:exact roster name|null,label:0..32,text:0..160}. Labels and text are printed on the object; do not repeat the same caption everywhere. Match objects and notes to their owner and room story. Props may only be hosted by desk,table,cafeTable,coffeeTable,reception,cabinet,shelf,drawers; all other furniture must have props:[]. Prop at is relative to its host's top:0 is centered,-1/+1 approach the edges. The engine fits the complete rotated object on that surface and performs bounded nearby packing if needed. Small props are attached cosmetic details; they move with the furniture and do not create separate invisible collision boxes. Their conditions are visual. Every furniture and prop id shares one floor-local namespace. IDs start with a letter and otherwise use lowercase letters,digits,hyphens. Owners must match the supplied roster exactly, or be null. Palette and object colors must be six-digit hex values.
 
-The engine always preserves the 180-second opening, safe terminal capacity, force-field access, climb credentials, real physics and curriculum rules. Avoid signs that contradict these rules. No additional fields. Strings must be printable single lines. Version 1 design must be below24000 UTF-8 bytes; version 2 below100000. Vary physical furniture kinds and visibly different normalized arrangements, not merely ids, colors, tiny position/angle nudges or tabletop props, when a recent spatial plan needs to change.`;
+The engine always preserves the 180-second opening, safe terminal capacity, door access, climb credentials, real physics and curriculum rules. Avoid signs that contradict these rules. No additional fields. Strings must be printable single lines. Version 1 design must be below24000 UTF-8 bytes; version 2 below100000. Vary physical furniture kinds and visibly different normalized arrangements, not merely ids, colors, tiny position/angle nudges or tabletop props, when a recent spatial plan needs to change.`;

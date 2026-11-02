@@ -42,13 +42,13 @@ The handoff instructions begin with `@study` and request a study-tutor approach.
 
 Formal assessment uses the frozen task and evidence cutoff, with human and assistant turns attributed separately. A scope-coverage review checks the complete original source criteria, not whether the learner's current answer was correct or independent. Supplied solutions cannot become independent proof, and execution claims require actual runner receipts. Native preparation returns through the same local validation and evidence transaction paths as other captured assessments.
 
-## Controls and force fields
+## Controls and access doors
 
 **Study only** opens a neutral **Learning workspace** from the main controls or Pause menu. It freezes and mutes the game, shows your learning progress, and lets you start the next scheduled question without finding a station. Copy the request into ChatGPT and answer there as usual. The dashboard confirms when the result is received and saved, then shows the separate progress assessment state. Failed saves and progress reviews offer retry buttons. Your study view survives reloads; **Exit study view** restores the prior run and pause state. Standalone study questions award no game items, while validated learning still follows the existing assessment process.
 
 Open a topic to read its saved AI assessment. Keyboard users can Tab into the map, move between topics with the arrow keys or Home/End, and open or close an assessment with Enter or Space. Tab then continues to the study controls.
 
-New runs use force fields, independent solo terminals and a continuous swarm. Existing saved runs keep their original objects, puzzles and rules; restart from Pause to use the redesign while retaining learning progress and archiving unfinished work.
+New runs use access doors, independent solo terminals and a continuous swarm. Existing saved runs keep their original objects, puzzles and rules; restart from Pause to use the redesign while retaining learning progress and archiving unfinished work.
 
 - WASD or arrows: move. Walk through translucent green fields. Translucent red fields block you; press E nearby to consume one key and grant permanent access to **you alone**. The rear study hall stays green without a pass limit on every floor, so reaching the first puzzle needs no key. Every survivor starts with zero keys; solving a solo puzzle earns the first key. Zombies must physically break either color before crossing.
 - Room entrances offer 3–5 free inward admissions by distinct survivors, selected deterministically from the seed. The visible counter never replenishes. When exhausted, the entrance turns red unless you have paid for personal access. The pass is consumed immediately on first touch. The first entrant keeps that crossing; later entrants are pushed back to their approach side even when overlapping the doorway. Physics touch order decides, with a stable actor-ID tie-break for exact ties. Repeated crossings by one survivor cannot drain the quota.

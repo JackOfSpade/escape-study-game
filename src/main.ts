@@ -1443,7 +1443,7 @@ async function interact() {
     return;
   }
   // A station wins only when it is nearer than the door in reach, or the
-  // player can use it; a neighbour's terminal never hides a red field.
+  // player can use it; a neighbour's terminal never hides a locked door.
   const usable = (s: typeof station) => {
     const e = s && game.encounters[s.encounter];
     return !!e && !(e.mode === "solo" && e.owner && e.owner !== "human");
@@ -1460,7 +1460,7 @@ async function interact() {
       const allowed = toggleDoor(game, a, door.id);
       if (allowed && (a.keys ?? 0) === before)
         game.notice =
-          "Green for you: walk through. Zombies must break the field.";
+          "This door opens for you: walk through. Zombies must break it.";
       persist();
       return;
     }
@@ -3150,14 +3150,14 @@ function ui() {
       ? "Review your saved work or begin another run."
       : game.time < spawnGrace(game)
         ? game.rules === "force-fields"
-          ? `Swarm begins in ${Math.ceil(spawnGrace(game) - game.time)}s. Walk through green fields. E uses a key on red fields. The rear study hall stays open.`
+          ? `Swarm begins in ${Math.ceil(spawnGrace(game) - game.time)}s. Green-lit doors open for you. E uses a key on a red-lit door. The rear study hall stays open.`
           : `Zombies spawn in ${Math.ceil(spawnGrace(game) - game.time)}s. E releases a door latch; move to push it open.`
         : a.floor === CONFIG.floors
           ? "Reach the helipad and press E while a helicopter is boarding. Four seats per trip."
           : a.access.includes(a.floor)
             ? "Your credential is personal. Walk into the staircase at the north edge of the floor. Space jumps; watch for broken guards."
             : game.rules === "force-fields"
-              ? "Solve a solo terminal for personal stair access and one key. Other entrance passes run out; the rear study hall stays open. E uses a key on red fields. Green fields still block zombies. Space jumps."
+              ? "Solve a solo terminal for personal stair access and one key. Other entrance passes run out; the rear study hall stays open. E uses a key on a red-lit door. Green fields still block zombies. Space jumps."
               : "Find a glowing terminal. Solo work or meaningful shared-room defense can earn your credential. Walk into light furniture to push it; E grips heavier pieces to drag and pivot. Space jumps; facing a barricade vaults it.";
   $("#pickup").textContent =
     game.status === "escaped"

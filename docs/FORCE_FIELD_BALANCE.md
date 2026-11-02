@@ -1,4 +1,14 @@
-# Force-field study balance
+# Door health and study balance
+
+Force fields are now physical access doors. `o.field` remains the door's access
+record, so saves keep working, and "field" below means the same door. A door
+swings open for anyone allowed through, stays open, and closes itself when a zombie comes within 6 tiles. Zombies never slip past
+an open leaf and keep sensing through closed doors, so health remains a real time
+budget. A run design can set a door's look and starting health (400 to 2,400 HP).
+Pacing can raise a pristine hall entrance above that, never lower it.
+
+A prepared question is unbound until a room opens it, so its estimate is adopted
+only when it is issued. An unused question cannot raise a door's health.
 
 Fresh study runs can size the public entrance force field on each floor to the
 expected work on that floor. This changes durability without changing the floor

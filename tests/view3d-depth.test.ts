@@ -283,7 +283,7 @@ test("whiteboard writing has a visible depth clearance even on thin office board
   }
 });
 
-test("terminals, pickup markings and force-field frames keep different finishes on distinct surfaces", () => {
+test("terminals, pickup markings and door frames keep different finishes on distinct surfaces", () => {
   const station = recorder();
   generators.station.call(
     station.view,
@@ -305,17 +305,28 @@ test("terminals, pickup markings and force-field frames keep different finishes 
   for (const vertical of [false, true]) {
     const field = recorder();
     generators.furnitureParts.call(field.view, field.parts, {
+      id: "synthetic-door",
       kind: "door",
+      doorStyle: {
+        material: "glass",
+        color: "#38474f",
+        accent: "#b9c6cc",
+        window: "full",
+        label: "Glass door",
+      },
       w: vertical ? 0.2 : 3,
       h: vertical ? 3 : 0.2,
       hp: 100,
       maxHp: 100,
       field: {},
     } as Furniture);
-    assert.equal(
-      field.parts.length,
-      4,
-      "posts, transparent pane and health bar stay visible",
+    assert.ok(
+      field.parts.filter((p) => p.batch === "field").length >= 2,
+      "each hinged leaf of a double door keeps its glass",
+    );
+    assert.ok(
+      field.parts.some((p) => p.batch === "screen"),
+      "the access and health light stays visible",
     );
     assert.deepEqual(competingFaces(field.parts), []);
   }
