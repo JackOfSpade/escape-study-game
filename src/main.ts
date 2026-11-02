@@ -42,6 +42,8 @@ import {
   autonomousNpcWork,
   checkBridge,
   prepareNextQuestion,
+  streamingReply,
+  watchStreamingReplies,
   releaseRetiredChatRequests,
   closeChat,
   edit,
@@ -1553,6 +1555,7 @@ function eligibleForUI() {
 const APPROVAL_HINT =
   "If ChatGPT shows an “Allow ChatGPT to use zombie-escape-study-game?” card in its chat, choose Always allow there; the card can sit behind the study terminal panel in full view.";
 const APPROVAL_HINT_AFTER_MS = 15_000;
+watchStreamingReplies(() => renderTerminal());
 /** The question and conversation appear in the game while Claude CLI serves it. */
 function showEmbeddedTerminal(e: Encounter) {
   if (active !== e.id) return;
@@ -2000,12 +2003,23 @@ function renderTerminal(force = false) {
       };
   }
   const messages = e[tab];
-  const html = messages
-    .map(
-      (m) =>
-        `<div class="message ${m.kind}"><strong>${escape(game.survivors.find((a) => a.id === m.author)?.name ?? m.author)}</strong><p>${escape(m.text)}</p></div>`,
-    )
-    .join("");
+  const html =
+    messages
+      .map(
+        (m) =>
+          `<div class="message ${m.kind}"><strong>${escape(game.survivors.find((a) => a.id === m.author)?.name ?? m.author)}</strong><p>${escape(m.text)}</p></div>`,
+      )
+      .join("") +
+    (tab === "tutor"
+      ? (e.tutorRequests ?? [])
+          .map((j) => (j.state === "pending" ? streamingReply(j) : undefined))
+          .filter(Boolean)
+          .map(
+            (text) =>
+              `<div class="message tutor"><strong>Terminal AI</strong><p>${escape(text!)}</p></div>`,
+          )
+          .join("")
+      : "");
   if (writtenHtml.get($("#messages")) !== html) {
     setHtml($("#messages"), html);
     $("#messages").scrollTop = $("#messages").scrollHeight;

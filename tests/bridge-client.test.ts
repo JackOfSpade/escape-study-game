@@ -886,3 +886,51 @@ test("run-design deadlines retain the exact queued request and completed designs
   );
   assert.deepEqual(methods, ["POST", "GET"]);
 });
+
+test("a streaming reply reports its text so far, then returns the answer", async () => {
+  const original = globalThis.fetch;
+  const bodies: any[] = [];
+  const status = () =>
+    Response.json({
+      mode: "claude-cli",
+      label: "Fake",
+      detail: "Fixture",
+      capabilities: [],
+    });
+  globalThis.fetch = (async (input: unknown, init?: RequestInit) => {
+    if (String(input) === "/api/status") return status();
+    bodies.push(JSON.parse(String(init?.body)));
+    return new Response(
+      '{"text":"Wh"}\n{"text":"Why?"}\n{"answer":{"text":"Why?","complete":false}}\n',
+      { headers: { "Content-Type": "application/x-ndjson" } },
+    );
+  }) as typeof fetch;
+  try {
+    await checkBridge();
+    const seen: string[] = [];
+    const answer = await bridgeRequest("tutor", { requestId: "s" }, undefined, {
+      onText: (text) => seen.push(text),
+    });
+    assert.deepEqual(seen, ["Wh", "Why?"]);
+    assert.equal((answer as any).text, "Why?");
+    assert.equal(bodies[0].stream, true);
+    globalThis.fetch = (async () =>
+      new Response('{"text":"Wh"}\n{"error":"Usage limit"}\n', {
+        headers: { "Content-Type": "application/x-ndjson" },
+      })) as typeof fetch;
+    await assert.rejects(
+      bridgeRequest("tutor", {}, undefined, { onText: () => {} }),
+      /Usage limit/,
+    );
+  } finally {
+    globalThis.fetch = (async () =>
+      Response.json({
+        mode: "development",
+        label: "Development fallback",
+        detail: "Fixture ended",
+        capabilities: [],
+      })) as typeof fetch;
+    await checkBridge();
+    globalThis.fetch = original;
+  }
+});

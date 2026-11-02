@@ -351,6 +351,14 @@ function generationPayload(
     curriculum: r.tracks[contract.track].curriculum,
   };
 }
+/** A tutor reply while it is still being written. Display only: never saved,
+ * and the validated answer replaces it. */
+const streamingReplies = new WeakMap<object, string>();
+let onStreamingReply: (() => void) | undefined;
+export const streamingReply = (job: object) => streamingReplies.get(job);
+export function watchStreamingReplies(listener: () => void) {
+  onStreamingReply = listener;
+}
 const preparing = new WeakMap<object, Promise<void>>();
 /** A failed preparation must wait, or a signed-out CLI would spend a call on
  * every interface tick. It backs off from one minute up to thirty. */
@@ -961,11 +969,22 @@ export function retryTutorRequest(
         job.responseMessageId = existing.id;
         return;
       }
-      const answer = await request("tutor", payload, (phase) => {
-        if (job.state !== "pending") return;
-        if (job.transportPhase !== phase) job.transportPhaseAt = Date.now();
-        job.transportPhase = phase;
-      });
+      const answer = await request(
+        "tutor",
+        payload,
+        (phase) => {
+          if (job.state !== "pending") return;
+          if (job.transportPhase !== phase) job.transportPhaseAt = Date.now();
+          job.transportPhase = phase;
+        },
+        {
+          onText: (text) => {
+            if (job.state !== "pending") return;
+            streamingReplies.set(job, text);
+            onStreamingReply?.();
+          },
+        },
+      ).finally(() => streamingReplies.delete(job));
       if (
         typeof answer.text !== "string" ||
         !answer.text.trim() ||

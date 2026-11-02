@@ -128,13 +128,26 @@ export function createStudyBridgeServer({
         res.on("close", () => {
           if (!res.writableEnded) cancel.abort();
         });
+        const streaming = parsed.stream === true;
+        if (streaming)
+          res.writeHead(200, { "Content-Type": "application/x-ndjson" });
+        const line = (value) => res.write(`${JSON.stringify(value)}\n`);
         try {
           const answer = await claude.run(parsed.operation, parsed.payload, {
             signal: cancel.signal,
+            ...(streaming ? { onText: (text) => line({ text }) } : {}),
           });
-          res.end(JSON.stringify(answer));
+          if (streaming) {
+            line({ answer });
+            res.end();
+          } else res.end(JSON.stringify(answer));
         } catch (error) {
           if (res.destroyed) return;
+          if (streaming) {
+            line({ error: error.message, code: error.code });
+            res.end();
+            return;
+          }
           res.writeHead(error.status ?? 502);
           res.end(JSON.stringify({ error: error.message, code: error.code }));
         }

@@ -11,6 +11,7 @@ import {
   claudeChildEnv,
   createClaudeGateway,
   firstJsonObject,
+  textFieldReader,
   taskProfile,
 } from "../scripts/claude-gateway.mjs";
 
@@ -315,4 +316,62 @@ test("a design conversation recovers after a restart or a lost session", async (
     { ok: 2 },
   );
   assert.ok(lost[2].args.includes("--session-id"));
+});
+
+test("the reply's text can be read as it is written", () => {
+  const read = textFieldReader();
+  assert.equal(read('{"te'), "");
+  assert.equal(read('xt":"Why'), "Why");
+  assert.equal(read(' \\"so\\"\\n\\u00'), 'Why "so"\n');
+  assert.equal(read('e9?","complete":false,"text":"no"}'), 'Why "so"\n\u00e9?');
+  const nested = textFieldReader();
+  assert.equal(
+    nested('{"knowledge":{"text":"hidden"},"note":"text","text":"shown"}'),
+    "shown",
+  );
+  const valueNamedText = textFieldReader();
+  assert.equal(valueNamedText('{"a":"text","b":"nope"}'), "");
+});
+
+test("streamed text arrives before the answer, and a correction clears it", async () => {
+  const seen = [];
+  const deltas = ['{"text":"Hel', 'lo","complete":false}'];
+  const spawn = (binary, args) => {
+    assert.ok(args.includes("--include-partial-messages"));
+    const child = new EventEmitter();
+    child.stdout = new PassThrough();
+    child.stderr = new PassThrough();
+    child.stdin = new PassThrough();
+    child.kill = () => {};
+    setImmediate(() => {
+      child.stdout.write(
+        `${JSON.stringify({ type: "system", subtype: "init", model: "claude-sonnet-5-5" })}\n`,
+      );
+      for (const text of deltas)
+        child.stdout.write(
+          `${JSON.stringify({ type: "stream_event", event: { delta: { type: "text_delta", text } } })}\n`,
+        );
+      child.stdout.write(
+        `${JSON.stringify({ type: "result", subtype: "success", is_error: false, result: deltas.join("") })}\n`,
+      );
+      child.stdout.end();
+      child.emit("close", 0);
+    });
+    return child;
+  };
+  let rejected = false;
+  const g = createClaudeGateway({
+    env,
+    cwd: dir,
+    spawn,
+    validate: () => {
+      if (!rejected) {
+        rejected = true;
+        throw Error("again");
+      }
+    },
+  });
+  const answer = await g.run("tutor", {}, { onText: (t) => seen.push(t) });
+  assert.equal(answer.text, "Hello");
+  assert.deepEqual(seen, ["Hel", "Hello", "", "Hel", "Hello"]);
 });

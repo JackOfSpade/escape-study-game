@@ -177,6 +177,25 @@ export async function discardRunDesign(receipt: HandoffReceipt) {
     { method: "DELETE", signal: AbortSignal.timeout(1500) },
   ).catch(() => {});
 }
+/** Each line is the text so far, then one final answer or error. */
+async function readStream(r: Response, onText: (text: string) => void) {
+  const reader = r.body!.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) throw Error("The reply ended before its answer arrived");
+    buffer += value;
+    let at;
+    while ((at = buffer.indexOf("\n")) >= 0) {
+      const event: unknown = JSON.parse(buffer.slice(0, at));
+      buffer = buffer.slice(at + 1);
+      if (!isRecord(event)) throw Error("Malformed bridge response");
+      if (typeof event.error === "string") throw Error(event.error);
+      if (isRecord(event.answer)) return event.answer;
+      if (typeof event.text === "string") onText(event.text);
+    }
+  }
+}
 export interface BridgeRequestOptions {
   /** Cancel optional presentation work when its owner is no longer active. */
   signal?: AbortSignal;
@@ -187,6 +206,8 @@ export interface BridgeRequestOptions {
   chatCode?: string;
   /** Preserve the exact receipt before polling, including across retries/reloads. */
   onQueued?: (receipt: HandoffReceipt) => void | Promise<void>;
+  /** Receives the reply's text so far while Claude CLI is still writing it. */
+  onText?: (text: string) => void;
   /** Stop renewing a released job after its owning session closes. */
   isActive?: () => boolean;
 }
@@ -249,6 +270,7 @@ export async function bridgeRequest<T extends object = Record<string, unknown>>(
     operation,
     payload,
     provider,
+    ...(provider === "claude-cli" && options?.onText ? { stream: true } : {}),
     ...(handoff && options?.nativeScope
       ? {
           nativeScope: options.nativeScope,
@@ -296,6 +318,11 @@ export async function bridgeRequest<T extends object = Record<string, unknown>>(
         await waitForHandoff(signal);
       }
     }
+    if (
+      options?.onText &&
+      r.headers.get("Content-Type")?.includes("application/x-ndjson")
+    )
+      return (await readStream(r, options.onText)) as T;
     let data = await readJson(r);
     if (r.status === 202) {
       if (!handoff || !isHandoffReceipt(data.handoff))
