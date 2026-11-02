@@ -12,6 +12,7 @@ export function createStudyBridgeServer({
   key,
   handoff,
   speech,
+  claude,
 } = {}) {
   return createServer(async (req, res) => {
     res.setHeader("Content-Type", "application/json");
@@ -35,6 +36,18 @@ export function createStudyBridgeServer({
         return;
       }
       if (req.url === "/api/status" && req.method === "GET") {
+        if (claude?.enabled()) {
+          res.end(
+            JSON.stringify({
+              mode: "claude-cli",
+              label: "Claude CLI",
+              capabilities: HANDOFF_OPERATIONS,
+              detail:
+                "AI tasks run through the signed-in Claude CLI on this computer.",
+            }),
+          );
+          return;
+        }
         let status = {
           mode: "development",
           label: "Development fallback",
@@ -79,6 +92,50 @@ export function createStudyBridgeServer({
           }
         }
         res.end(JSON.stringify(status));
+        return;
+      }
+      if (
+        req.url === "/api/bridge" &&
+        req.method === "POST" &&
+        claude?.enabled()
+      ) {
+        const parsed = await readJsonBody(req);
+        if (
+          !parsed ||
+          typeof parsed !== "object" ||
+          Array.isArray(parsed) ||
+          !HANDOFF_OPERATIONS.includes(parsed.operation)
+        )
+          throw new HttpInputError(400, "Unknown operation");
+        // A saved request belongs to the provider that captured it.
+        if (
+          [parsed.provider, parsed.payload?.provider].some(
+            (p) => p !== undefined && p !== "claude-cli",
+          )
+        ) {
+          res.writeHead(409);
+          res.end(
+            JSON.stringify({
+              error:
+                "Reconnect the captured request's original provider; nothing was forwarded",
+            }),
+          );
+          return;
+        }
+        const cancel = new AbortController();
+        res.on("close", () => {
+          if (!res.writableEnded) cancel.abort();
+        });
+        try {
+          const answer = await claude.run(parsed.operation, parsed.payload, {
+            signal: cancel.signal,
+          });
+          res.end(JSON.stringify(answer));
+        } catch (error) {
+          if (res.destroyed) return;
+          res.writeHead(error.status ?? 502);
+          res.end(JSON.stringify({ error: error.message, code: error.code }));
+        }
         return;
       }
       if (req.url === "/api/bridge" && req.method === "POST") {

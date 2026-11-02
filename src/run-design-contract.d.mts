@@ -119,7 +119,7 @@ export interface RunDesignV3 extends RunStructureV3 {
 export type RunDesign = LegacyRunDesign | RunDesignV3;
 export interface SavedRunDesign {
   version: 1;
-  source: "chatgpt-handoff" | "fixture";
+  source: "chatgpt-handoff" | "claude-cli" | "fixture";
   requestId: string;
   generationId: string;
   fingerprint: string;

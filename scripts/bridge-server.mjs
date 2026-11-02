@@ -7,6 +7,7 @@ import { createHandoffRoutes } from "./chatgpt-handoff-routes.mjs";
 import { createPublicHandoffBridge } from "./chatgpt-public-bridge.mjs";
 import { createTunnelSupervisor } from "./chatgpt-tunnel-supervisor.mjs";
 import { createNpcSpeechService } from "./npc-speech-service.mjs";
+import { createClaudeGateway } from "./claude-gateway.mjs";
 import {
   loadGameTunnelConfig,
   tunnelDirectory,
@@ -71,6 +72,10 @@ export async function startBridgeService(boot, options = {}) {
   const speech = createNpcSpeechService();
   const server = createStudyBridgeServer({
     speech,
+    claude:
+      (options.aiProvider ?? process.env.STUDY_AI_PROVIDER) === "chatgpt"
+        ? undefined
+        : createClaudeGateway(),
     endpoint: process.env.STUDY_MODE_BRIDGE_URL,
     key: process.env.STUDY_MODE_BRIDGE_TOKEN,
     handoff: {

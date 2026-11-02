@@ -81,9 +81,9 @@ const completionConnected = (g: Game, e: Encounter) =>
     e.problem?.provenance === "development" &&
     status().mode !== "development");
 const activeProvider = (): Provider =>
-  status().mode === "chatgpt-handoff" ? "chatgpt-handoff" : "study-mode";
+  status().mode === "development" ? "study-mode" : (status().mode as Provider);
 export const isNativeProvenance = (p?: string): p is Provider =>
-  p === "study-mode" || p === "chatgpt-handoff";
+  p === "study-mode" || p === "chatgpt-handoff" || p === "claude-cli";
 const autonomousAllowed = (g: Game) =>
   status().capabilities.includes("autonomous-work") &&
   (status().mode !== "chatgpt-handoff" ||
@@ -1152,10 +1152,13 @@ export async function send(
       interactiveConnected(g)
     ) {
       const provider =
-        status().mode === "study-mode" ||
-        (status().mode === "development" && problem.provenance === "study-mode")
-          ? "study-mode"
-          : "chatgpt-handoff";
+        status().mode === "claude-cli"
+          ? "claude-cli"
+          : status().mode === "study-mode" ||
+              (status().mode === "development" &&
+                problem.provenance === "study-mode")
+            ? "study-mode"
+            : "chatgpt-handoff";
       const id = `tutor-${g.id}-${e.id}-${g.seq}`;
       const payload = {
         requestId: id,
@@ -1408,11 +1411,13 @@ async function evaluateSubmission(
     if (!s.completionRequest) {
       // Bind a disconnected capture to the provider that generated the problem.
       const provider: Provider =
-        status().mode === "study-mode" ||
-        (status().mode === "development" &&
-          e.problem.provenance === "study-mode")
-          ? "study-mode"
-          : "chatgpt-handoff";
+        status().mode === "claude-cli"
+          ? "claude-cli"
+          : status().mode === "study-mode" ||
+              (status().mode === "development" &&
+                e.problem.provenance === "study-mode")
+            ? "study-mode"
+            : "chatgpt-handoff";
       const payload = {
         requestId: s.id,
         encounterId: e.id,

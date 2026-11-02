@@ -277,6 +277,8 @@ export interface DesignOptions<
     progress: (phase: HandoffProgress) => void,
   ) => Promise<unknown>;
 }
+const designSource = () =>
+  status().mode === "claude-cli" ? "claude-cli" : "chatgpt-handoff";
 /** Builds an isolated candidate. The caller alone commits it to the active run. */
 export async function prepareDesignedRun<T>(
   draft: DesignDraft,
@@ -286,7 +288,8 @@ export async function prepareDesignedRun<T>(
     options.send ??
     ((request, current, signal, progress) => {
       if (
-        status().mode !== "chatgpt-handoff" ||
+        (status().mode !== "chatgpt-handoff" &&
+          status().mode !== "claude-cli") ||
         !status().capabilities.includes("design-run")
       )
         throw Error(
@@ -334,7 +337,7 @@ export async function prepareDesignedRun<T>(
     const { design } = parseRunDesignReply(reply, draft.request);
     const saved: SavedRunDesign = {
       version: 1,
-      source: "chatgpt-handoff",
+      source: designSource(),
       requestId: draft.request.requestId,
       generationId: draft.request.generationId,
       fingerprint: runDesignFingerprint(design),
@@ -515,7 +518,7 @@ async function prepareAuthoredRun<T>(
           };
           const saved = parseSavedRunDesign({
             version: 1,
-            source: "chatgpt-handoff",
+            source: designSource(),
             requestId: request.requestId,
             generationId: request.generationId,
             fingerprint: runDesignFingerprint(design),

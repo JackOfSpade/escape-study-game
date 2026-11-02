@@ -1,3 +1,4 @@
+import { PROVIDERS } from "./model";
 import { sha256 } from "./digest";
 import type { LearnerLedger, LearningAttempt } from "./learning-model";
 import type { Encounter, Game } from "./model";
@@ -123,7 +124,7 @@ export function externalResolutionRow(l: LearnerLedger, a: LearningAttempt) {
     !receipt ||
     !declaration ||
     receipt.sourceHash !== l.sourceHash ||
-    !["study-mode", "chatgpt-handoff"].includes(receipt.provenance) ||
+    !PROVIDERS.includes(receipt.provenance) ||
     receipt.id !== receipt.proposal.requestId ||
     !Number.isFinite(Date.parse(v.at)) ||
     !Number.isInteger(v.humanCutoff) ||

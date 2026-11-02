@@ -3,6 +3,9 @@ import {
   type HandoffProgress,
   type HandoffReceipt,
 } from "./bridge-client";
+import { status as bridgeStatus } from "./bridge-client";
+const designSource = () =>
+  bridgeStatus().mode === "claude-cli" ? "claude-cli" : "chatgpt-handoff";
 import {
   parseSavedRunDesign,
   runDesignFingerprint,
@@ -726,7 +729,7 @@ export async function prepareQualityRun<T>(
       };
       const saved = parseSavedRunDesign({
         version: 1,
-        source: "chatgpt-handoff",
+        source: designSource(),
         requestId: request.requestId,
         generationId: request.generationId,
         fingerprint: runDesignFingerprint(design),

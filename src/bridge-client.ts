@@ -26,7 +26,8 @@ export async function checkBridge() {
       !isRecord(info) ||
       (info.mode !== "development" &&
         info.mode !== "study-mode" &&
-        info.mode !== "chatgpt-handoff") ||
+        info.mode !== "chatgpt-handoff" &&
+        info.mode !== "claude-cli") ||
       !Array.isArray(info.capabilities) ||
       !info.capabilities.every((cap: unknown) => typeof cap === "string") ||
       typeof info.label !== "string" ||
@@ -237,7 +238,7 @@ export async function bridgeRequest<T extends object = Record<string, unknown>>(
     if (handoff && Date.now() >= deadline) throw timeoutError();
   };
   const timeout = AbortSignal.timeout(
-    handoff ? budget : Math.min(budget, 45000),
+    handoff || provider === "claude-cli" ? budget : Math.min(budget, 45000),
   );
   const signal = options?.signal
     ? AbortSignal.any([timeout, options.signal])

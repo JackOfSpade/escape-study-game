@@ -1,3 +1,4 @@
+import { PROVIDERS } from "./model";
 import { canReachStation, human } from "./engine";
 import {
   groupSnapshot,
@@ -65,7 +66,7 @@ const allowed = (g: Game, e: Encounter, background = false) =>
   observedSharedWork(g, e) ||
   (background &&
     hasHumanStudyContext(e) &&
-    ["study-mode", "chatgpt-handoff"].includes(e.problem?.provenance ?? "") &&
+    PROVIDERS.includes(e.problem?.provenance ?? "") &&
     g.survivors.some((a) => npcAtWorkstation(g, e, a.id)));
 /** One coordinated request for fresh recorded work, never a periodic chat loop.
  * Failed/interrupted calls require explicit retry of the same saved payload. */

@@ -691,7 +691,7 @@ export function parseSavedRunDesign(v) {
     "saved design",
   );
   requireThat(v.version === 1, "unsupported saved design");
-  choice(v.source, ["chatgpt-handoff", "fixture"], "source");
+  choice(v.source, ["chatgpt-handoff", "claude-cli", "fixture"], "source");
   text(v.requestId, 128, "requestId");
   text(v.generationId, 128, "generationId");
   const design = parseRunDesign(v.design);

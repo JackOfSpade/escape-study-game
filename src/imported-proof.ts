@@ -1,3 +1,4 @@
+import { PROVIDERS } from "./model";
 import {
   facetMappingShapeValid,
   type FacetProof,
@@ -56,7 +57,7 @@ export function importedMappingValid(
   const d = l.scopes[m.scopeId];
   if (
     v.sourceHash !== r.sourceHash ||
-    !["study-mode", "chatgpt-handoff"].includes(v.provenance) ||
+    !PROVIDERS.includes(v.provenance) ||
     v.id !== v.proposal.requestId ||
     !d ||
     !facetMappingShapeValid(d, m)
@@ -220,7 +221,7 @@ export function importedEnvironmentStatus(
         .map((c) => c.trim());
       if (
         receipt.sourceHash !== r.sourceHash ||
-        !["study-mode", "chatgpt-handoff"].includes(receipt.provenance) ||
+        !PROVIDERS.includes(receipt.provenance) ||
         !c ||
         `${c[1]}; related scope ${c[2]}` !== scope ||
         c[3] !== m.status ||

@@ -69,7 +69,9 @@ export async function createAppServer({
           upstream.pipe(res);
         },
       );
-      proxy.setTimeout(65_000, () => proxy.destroy());
+      // An AI task legitimately outlasts this; the gateway enforces its own limit.
+      if (req.url !== "/api/bridge")
+        proxy.setTimeout(65_000, () => proxy.destroy());
       proxy.on("error", () => {
         reviveBridge();
         if (res.destroyed) return;

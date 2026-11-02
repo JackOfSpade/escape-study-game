@@ -2,7 +2,12 @@ import type { LearnerLedger, ScopeDefinition } from "./learning-model";
 import type { Sector } from "./floor-plan";
 export type Track = "PY" | "PE";
 /** A connected AI provider; development practice has no provider. */
-export type Provider = "study-mode" | "chatgpt-handoff";
+export type Provider = "study-mode" | "chatgpt-handoff" | "claude-cli";
+export const PROVIDERS: readonly string[] = [
+  "study-mode",
+  "chatgpt-handoff",
+  "claude-cli",
+];
 export interface Objective {
   id: string;
   target: number;

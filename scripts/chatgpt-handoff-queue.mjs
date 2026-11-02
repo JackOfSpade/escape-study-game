@@ -362,7 +362,7 @@ export function handoffInstructions(operation, payload) {
     contracts[operation]
   );
 }
-function validateAnswer(job, answer) {
+export function validateAnswer(job, answer) {
   if (!object(answer) || Buffer.byteLength(JSON.stringify(answer)) > 6_000_000)
     throw Error("Answer must be a bounded JSON object");
   const fail = (note) => {

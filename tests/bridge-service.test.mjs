@@ -1,3 +1,5 @@
+// These tests cover the shelved ChatGPT relay, which needs its provider chosen.
+process.env.STUDY_AI_PROVIDER = "chatgpt";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";

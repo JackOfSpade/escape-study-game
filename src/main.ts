@@ -86,6 +86,7 @@ import { executionText } from "./execution-presentation";
 import { surfacePoint } from "./furniture-geometry";
 import { historicalRecords } from "./historical-proof";
 import { encounterKey } from "./learner";
+import type { Provider } from "./model";
 import {
   type Encounter,
   type Game,
@@ -476,7 +477,8 @@ function prepareNativeQuestion(e: Encounter): Promise<void> {
       await generated;
       if (game !== requestGame || game.encounters[e.id] !== e) return;
       if (e.problem) {
-        await launchNativeQuestion(e);
+        if (status().mode === "claude-cli") showEmbeddedTerminal(e);
+        else await launchNativeQuestion(e);
         if (game.status === "dead" || game.status === "escaped") {
           $("#start-card").hidden = true;
           syncSpectatorBar();
@@ -569,7 +571,9 @@ function renderNativeStudy() {
   const e = displayedNativeQuestion();
   const panel = $("#native-study");
   panel.hidden =
-    !e || (!e.directStudy && !e.error && !e.pendingGeneration && !e.generation);
+    status().mode === "claude-cli" ||
+    !e ||
+    (!e.directStudy && !e.error && !e.pendingGeneration && !e.generation);
   if (panel.hidden || !e) {
     hideNativeRequest();
     return;
@@ -1372,6 +1376,11 @@ function openFinalQuestion(e: Encounter) {
   game.lastStudyEncounter = e.id;
   newStudyChat();
   $("#start-card").hidden = true;
+  if (status().mode === "claude-cli") {
+    active = e.id;
+    finalQuestion = true;
+    showEmbeddedTerminal(e);
+  }
   if (unfinishedDirectStudy(e))
     void retryDirectStudy(game, e, roadmap, nativeStudyChanged);
   else void prepareNativeQuestion(e);
@@ -1520,6 +1529,7 @@ async function interact() {
   if (e.mode === "solo") e.owner = "human";
   // Every terminal opening gets its own ChatGPT chat.
   newStudyChat();
+  if (status().mode === "claude-cli") showEmbeddedTerminal(e);
   await prepareNativeQuestion(e);
 }
 let workLogSignature = "";
@@ -1538,6 +1548,26 @@ function eligibleForUI() {
 const APPROVAL_HINT =
   "If ChatGPT shows an “Allow ChatGPT to use zombie-escape-study-game?” card in its chat, choose Always allow there; the card can sit behind the study terminal panel in full view.";
 const APPROVAL_HINT_AFTER_MS = 15_000;
+/** The question and conversation appear in the game while Claude CLI serves it. */
+function showEmbeddedTerminal(e: Encounter) {
+  if (active !== e.id) return;
+  $("#terminal").hidden = false;
+  document.body.classList.add("terminal-open");
+  renderTerminal(true);
+}
+/** A slow reply cannot kill the player, but typing and reading still carry risk. */
+function waitingOnEmbeddedReply() {
+  const e =
+    status().mode === "claude-cli" && active
+      ? game.encounters[active]
+      : undefined;
+  return (
+    !!e &&
+    (!!e.generation ||
+      !!e.tutorRequests?.some((j) => j.state === "pending") ||
+      e.submissions.some((s) => s.status === "pending"))
+  );
+}
 function renderTerminal(force = false) {
   if (!active || game.paused || $("#terminal").hidden) return;
   const e = game.encounters[active];
@@ -1614,13 +1644,15 @@ function renderTerminal(force = false) {
   );
   setText(
     "#terminal-provenance",
-    e.problem?.provenance === "chatgpt-handoff"
-      ? "ChatGPT handoff · Native Study Mode unverified"
-      : e.problem?.provenance === "study-mode"
-        ? "Study Mode bridge · Saved provider provenance"
-        : !e.problem && game.study.profile === "live"
-          ? "Live study request · Awaiting a validated problem"
-          : "Development practice · AI acceptance required · No academic credit",
+    e.problem?.provenance === "claude-cli"
+      ? "Claude CLI"
+      : e.problem?.provenance === "chatgpt-handoff"
+        ? "ChatGPT handoff · Native Study Mode unverified"
+        : e.problem?.provenance === "study-mode"
+          ? "Study Mode bridge · Saved provider provenance"
+          : !e.problem && game.study.profile === "live"
+            ? "Live study request · Awaiting a validated problem"
+            : "Development practice · AI acceptance required · No academic credit",
   );
   if (e.problem?.contract.practice)
     $("#terminal-provenance").textContent +=
@@ -2195,7 +2227,9 @@ function renderInspector() {
       r: roadmap,
       candidate,
       provider:
-        status().mode === "chatgpt-handoff" ? "chatgpt-handoff" : "study-mode",
+        status().mode === "development"
+          ? "study-mode"
+          : (status().mode as Provider),
       persist: persistOrThrow,
       reconcile:
         game.study.profile === "live" &&
@@ -3287,7 +3321,12 @@ function frame(time: number) {
     if (lookUiVisible()) firstPersonControls.release();
     firstPersonControls.turn(keys, elapsed);
   }
-  if (simulationActive(game) && !game.paused && !quitMenu) {
+  if (
+    simulationActive(game) &&
+    !game.paused &&
+    !quitMenu &&
+    !waitingOnEmbeddedReply()
+  ) {
     acc += elapsed;
     let count = 0;
     while (acc >= 1 / 30 && count++ < 6) {
