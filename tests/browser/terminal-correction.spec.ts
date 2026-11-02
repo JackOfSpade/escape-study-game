@@ -26,6 +26,9 @@ function revision(raw: string, hash: string, n: number) {
 test("closed assessment correction requires a source decision, reviews exact authority and persists invalidated proof through adoption/reload", async ({
   page,
 }) => {
+  // A long multi-step journey that can outlast the default allowance when the
+  // machine is busy.
+  test.slow();
   const r = JSON.parse(await readFile("public/curriculum.json", "utf8"));
   let initial = revision(r.raw, r.sourceHash, 10);
   let at = initial.indexOf(
