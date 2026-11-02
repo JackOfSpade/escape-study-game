@@ -160,7 +160,7 @@ const old = (topicId: string, depth = 1): TopicAssessmentRecord => ({
 });
 
 import { readFileSync } from "node:fs";
-import { checkBridge, ensureProblem, send } from "../src/ai";
+import { checkBridge, ensureProblem, presentProblem, send } from "../src/ai";
 import { topicAssessmentTopics } from "../scripts/lib/topic-assessment.mjs";
 import { createPlayableGame } from "../src/world";
 
@@ -219,7 +219,10 @@ test("a live terminal dialogue payload carries the topic assessment context; dev
     const topicIds = topicAssessmentTopics(e.problem.contract);
     assert.ok(topicIds.length > 0);
     assert.equal(calls[0].payload.mode, "terminal-dialogue");
-    assert.deepEqual(calls[0].payload.topicAssessmentContext.topicIds, topicIds);
+    assert.deepEqual(
+      calls[0].payload.topicAssessmentContext.topicIds,
+      topicIds,
+    );
   });
   await terminalFixture("development", async (g, e, calls) => {
     await send(g, e, "tutor", "My first answer", liveRoadmap);
@@ -273,6 +276,54 @@ test("terminal dialogue records topic assessments only after a valid completed r
       );
     assert.equal(Object.keys(g.study.topicAssessments).length, topicIds.length);
     assert.ok(calls.length >= 4);
+  });
+});
+
+test("terminal dialogue completion from an older question cannot overwrite a newer assessment", async () => {
+  await terminalFixture("live", async (g, e, _calls, reply) => {
+    // The terminal render presents the problem; re-rendering must not move it.
+    assert.equal(e.problemPresentedAt, undefined);
+    presentProblem(g, e, liveRoadmap);
+    const presentedAt = e.problemPresentedAt;
+    assert.equal(typeof presentedAt, "number");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    presentProblem(g, e, liveRoadmap);
+    assert.equal(e.problemPresentedAt, presentedAt);
+    await send(g, e, "tutor", "My first answer", liveRoadmap);
+    assert.equal(e.problemPresentedAt, presentedAt);
+    const topicIds: string[] = topicAssessmentTopics(e.problem.contract);
+    const depth = e.problem.contract.depth;
+    recordTopicAssessments(
+      g,
+      e,
+      topicIds.map((topicId) => ({
+        topicId,
+        text: `Newer question ${topicId}`,
+      })),
+      {
+        requestId: "synthetic-newer-request",
+        questionFingerprint: "d".repeat(64),
+        startedAt: presentedAt + 1_000_000,
+        updatedAt: "2026-10-26T12:00:00Z",
+      },
+    );
+    reply(async () =>
+      Response.json({
+        text: "Solved.",
+        complete: true,
+        topicAssessments: topicIds.map((topicId) => ({
+          topicId,
+          text: `Late older ${topicId}`,
+        })),
+      }),
+    );
+    await send(g, e, "tutor", "Final explanation", liveRoadmap);
+    assert.equal(e.state, "consumed");
+    for (const topicId of topicIds)
+      assert.equal(
+        g.study.topicAssessments[`${topicId}/D${depth}`].text,
+        `Newer question ${topicId}`,
+      );
   });
 });
 

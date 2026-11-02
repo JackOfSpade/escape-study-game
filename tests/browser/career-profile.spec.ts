@@ -39,6 +39,8 @@ const sourceEvidence = (page: Page) =>
 test("the role profile is explicit, reversible and persists without replacing issued study or original evidence", async ({
   page,
 }) => {
+  // Three full menu cycles and two page reloads in the first-person view.
+  test.slow();
   const relay = await mockClaudeStudy(page);
   await enterNativeGame(page);
   const id = await openNativeQuestion(page);
@@ -61,6 +63,7 @@ test("the role profile is explicit, reversible and persists without replacing is
   expect(await sourceEvidence(page)).toBe(before);
   await flushNativeSave(page);
   await page.reload();
+  await page.waitForFunction(() => !!(window as any).__deadAir);
   await inspect(page);
   await expect(page.locator("#career-focus")).toHaveValue("full");
   expect(await sourceEvidence(page)).toBe(before);
@@ -72,6 +75,7 @@ test("the role profile is explicit, reversible and persists without replacing is
   expect(await sourceEvidence(page)).toBe(before);
   await flushNativeSave(page);
   await page.reload();
+  await page.waitForFunction(() => !!(window as any).__deadAir);
   await inspect(page);
   await expect(page.locator("#career-focus")).toHaveValue(
     "product-feature-owner",

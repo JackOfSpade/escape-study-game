@@ -160,6 +160,12 @@ export async function chooseDesignedRun(page: Page) {
     const game = (window as any).__deadAir.game;
     return game.status === "playing" && !game.paused;
   });
+  // Starting a run records its design as recent, after the clearing above, and a
+  // repeated fixture would then fail the real novelty check on the next restart.
+  await page.evaluate(() => {
+    localStorage.removeItem("dead-air-run-design-history-v1");
+    localStorage.removeItem("dead-air-environment-history-v1");
+  });
   await expect(page.locator("#start-card")).toBeHidden();
   // Keep the setup allowance through Start and first-person initialization,
   // matching the prior helper's preparation budget before gameplay assertions.

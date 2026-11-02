@@ -587,7 +587,8 @@ body.spectating canvas.dragging {
 #problem {
   font-size: 12px;
   line-height: 1.65;
-  white-space: pre-wrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
   max-height: 210px;
   overflow: auto;
   margin-bottom: 20px;
@@ -655,6 +656,16 @@ body.spectating canvas.dragging {
   margin: 5px 0 0;
   white-space: pre-wrap;
   font-size: 11px;
+}
+.message-body {
+  margin: 5px 0 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}
+.message-body p {
+  margin: 0 0 6px;
+  white-space: normal;
 }
 #chat-form {
   display: flex;
@@ -1383,7 +1394,81 @@ body.reduced * {
     flex-wrap: wrap;
   }
   #study-terminal-slot #problem,
-  #study-terminal-slot .message p {
+  #study-terminal-slot .message p,
+  #study-terminal-slot .message-body {
     overflow-wrap: anywhere;
   }
+}
+
+/* Rendered markdown (src/markdown.ts) in the question prompt and chat. */
+.message {
+  min-width: 0;
+  max-width: 100%;
+}
+#problem p,
+#problem ul,
+#problem ol {
+  margin: 0 0 8px;
+}
+#problem p:last-child,
+#problem ul:last-child,
+#problem ol:last-child,
+#problem pre:last-child,
+.message-body > :last-child {
+  margin-bottom: 0;
+}
+#problem pre,
+.message-body pre {
+  max-width: 100%;
+  margin: 6px 0 8px;
+  padding: 8px 10px;
+  overflow-x: auto;
+  white-space: pre;
+  overflow-wrap: normal;
+  background: var(--bg);
+  color: var(--terminal);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font:
+    11px/1.5 ui-monospace,
+    monospace;
+  tab-size: 4;
+}
+#problem pre code,
+.message-body pre code {
+  padding: 0;
+  background: none;
+  border-radius: 0;
+  font: inherit;
+  white-space: inherit;
+  overflow-wrap: normal;
+}
+#problem code,
+.message-body code {
+  padding: 1px 4px;
+  background: var(--bg);
+  color: var(--terminal);
+  border-radius: 3px;
+  font:
+    0.92em ui-monospace,
+    monospace;
+}
+#problem ul,
+#problem ol,
+.message-body ul,
+.message-body ol {
+  margin: 4px 0 8px;
+  padding-left: 20px;
+}
+#problem h4,
+.message-body h4 {
+  margin: 8px 0 4px;
+  font-size: 1em;
+  line-height: 1.4;
+  color: var(--accent);
+}
+#problem strong,
+.message-body strong {
+  font-size: inherit;
+  color: var(--ink);
 }
