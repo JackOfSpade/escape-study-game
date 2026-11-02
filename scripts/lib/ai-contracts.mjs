@@ -5,6 +5,10 @@ import {
 import { validProbeKnowledge, validProbeOutcome } from "./probe-reply.mjs";
 import { isRecord as object } from "./is-record.mjs";
 import {
+  TOPIC_ASSESSMENT_INSTRUCTION,
+  validateTopicAssessments,
+} from "./topic-assessment.mjs";
+import {
   NPC_DIALOGUE_GENERATION_INSTRUCTION,
   NPC_DIALOGUE_REVIEW_INSTRUCTION,
   parseNpcDialogueDraft,
@@ -49,7 +53,9 @@ const contracts = {
     QUESTION_DESIGN_GUIDANCE,
   tutor:
     "For mode terminal-dialogue return {text:string,complete:boolean,outcome?:'solved'|'gap',knowledge?:{facets:[{id,status:'demonstrated'|'implied'|'gap',impliedBy?,note?,partOf?,description?}],signal?:{fluency:'fluent'|'partial'|'guessing'|'declared-gap',note?}}}. Follow payload.probe.stance: assume the learner already knows this and open with the highest-leverage question; one correct answer establishes every facet it depends on (mark those implied with impliedBy) instead of asking each rubric item in turn; read how the answer is given as evidence. Highest leverage means one focused question whose reasoning genuinely entails its prerequisites, never breadth inflation, unasked unrelated facets marked established or hidden full-project follow-up demands. Use complete:false with one focused follow-up while a facet is open. complete:true with outcome:'solved' when the accumulated answers solve it; When the learner wants to clarify a missing facet, optionally probe its parts next, one level down, with at most one directly relevant question; if the parts turn out known re-ask that facet itself (known parts never imply it). Never require a prerequisite tree. Use complete:true with outcome:'gap' when the learner has said they do not know what remains or wants to move on, naming only explicit missing facets; unasked siblings stay unknown and the game still grants its once-only key. knowledge.facets ids come from payload.probe.facets, or declare a prerequisite part the question did not list as a new id with partOf (a known facet id) and a short description so the gap is recorded at the part level. Never require a separate submission. Your own explanations are assistance, never learner evidence; gameplay rewards do not certify independent mastery. For other modes return {text:string}. Guide the learner's next reasoning step with a useful question or bounded hint. Use the exact task, draft and private transcript. Preserve prior assistance; never pretend supplied reasoning was independently demonstrated. Do not supply a completed solution by default. Tutoring has no gameplay fee or cooldown. " +
-    QUESTION_ADAPTATION_GUIDANCE,
+    QUESTION_ADAPTATION_GUIDANCE +
+    " " +
+    TOPIC_ASSESSMENT_INSTRUCTION,
   complete:
     "For mode retrospective-npc-outcome, return {requestId,complete:boolean,feedback:string,execution:'not-run'} with the exact requestId. Review the exact reconstructed candidate independently of simulated world success; no player qualification or reward is requested. For ordinary completion return {complete:boolean,feedback:string,qualified:string[]}. Evaluate the captured solution and actual attributed contributions, including useful physical defense. Do not require equal work or an extra examination for a defender. Gameplay completion is separate from individual mastery. Do not claim execution unless matching actual runner receipts exist.",
   assess:
@@ -337,6 +343,19 @@ export function validateAnswer(job, answer) {
           fail(
             "Terminal dialogue knowledge must be {facets:[{id,status:demonstrated|implied|gap,impliedBy?,note?,partOf?,description?}],signal?:{fluency}}",
           );
+        const context = job.payload.topicAssessmentContext;
+        const topicIds = object(context) ? context.topicIds : undefined;
+        try {
+          if (answer.complete === true && context !== undefined)
+            validateTopicAssessments(answer.topicAssessments, topicIds, true);
+          else if (answer.topicAssessments !== undefined)
+            validateTopicAssessments(
+              answer.topicAssessments,
+              Array.isArray(topicIds) ? topicIds : [],
+            );
+        } catch (error) {
+          fail(error instanceof Error ? error.message : String(error));
+        }
       }
       break;
     case "generate":

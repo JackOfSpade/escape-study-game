@@ -268,7 +268,7 @@ async function cleanOrphanSpeech(tempRoot, alive) {
 /**
  * Isolated loopback speech transport. A renderer injection is for deterministic
  * tests: async ({text,voice,voiceName,path,signal}) => PCM WAV bytes (or writes
- * `path`). Nothing enters the ChatGPT queue or durable game/learner storage.
+ * `path`). Nothing enters the Claude gateway or durable game/learner storage.
  */
 export function createNpcSpeechService(options = {}) {
   const render = options.render ?? renderMacSpeech,

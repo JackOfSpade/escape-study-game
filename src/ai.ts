@@ -63,6 +63,11 @@ import { humanUsingWorkspace, npcAtWorkstation } from "./npc-work-access";
 import { reconcileRoadmap } from "./roadmap-adoption";
 import { settleTutorRequest } from "./run-learning";
 import { assess } from "./learning-assessment";
+import {
+  recordTopicAssessments,
+  topicAssessmentContext,
+  validateTopicAssessments,
+} from "./topic-assessment";
 export { assess } from "./learning-assessment";
 import { canSee } from "./visibility";
 import { applyAutonomousProposal, proposalText } from "./workspace-proposals";
@@ -1009,6 +1014,11 @@ export function retryTutorRequest(
         throw Error(
           "An earlier answer check is still pending; no duplicate reward applied",
         );
+      // Validate the whole assessment list before any completion effect.
+      const topicUpdates =
+        dialogue && answer.complete === true && e.state !== "consumed"
+          ? validateTopicAssessments(e, answer.topicAssessments)
+          : [];
       const delivered = message(
         g,
         e,
@@ -1075,6 +1085,13 @@ export function retryTutorRequest(
         };
         e.submissions.push(submission);
         applyCompletion(g, e, r!, submission, verdict);
+        if (topicUpdates.length)
+          recordTopicAssessments(g, e, topicUpdates, {
+            requestId: job.id,
+            questionFingerprint: `${e.id}:${fnv1a(JSON.stringify(e.problem))}`,
+            sourceHash:
+              payload.topicAssessmentContext?.sourceHash ?? r?.sourceHash,
+          });
       }
       settleTutorRequest(job, "applied");
     } catch (error) {
@@ -1305,6 +1322,15 @@ export async function send(
               responseFormat: TERMINAL_DIALOGUE_FORMAT,
               instruction: TERMINAL_DIALOGUE_INSTRUCTION,
               probe: encounterProbeContract(e, problem),
+              ...(g.study.profile === "live" && r
+                ? {
+                    topicAssessmentContext: topicAssessmentContext(
+                      g,
+                      r,
+                      problem.contract,
+                    ),
+                  }
+                : {}),
             }
           : {}),
         problem,

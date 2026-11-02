@@ -95,3 +95,59 @@ test("Claude CLI serves a question and conversation inside the game, pausing onl
   );
   await expect.poll(() => gameTime(page)).toBeGreaterThan(frozen);
 });
+
+test("the study view shows the embedded terminal and returns it to the game layout", async ({
+  page,
+}) => {
+  const claude = await mockClaude(page);
+  await enterNativeGame(page);
+  await page.evaluate(() => {
+    (window as any).__deadAir.game.study.profile = "live";
+  });
+  await page.locator("#study-only-toggle").click();
+  await expect(page.locator("#study-workspace")).toBeVisible();
+  await expect(page.locator("#terminal")).toBeHidden();
+
+  await page.locator("#study-next").click();
+  const terminal = page.locator("#study-terminal-slot #terminal");
+  await expect(terminal).toBeVisible();
+  await expect(terminal.locator("#problem")).toContainText(
+    "Why does the leading index column matter?",
+  );
+  // The background preparation may also have run; the study question is its own.
+  expect(
+    claude.calls.filter(
+      (c) => c.operation === "generate" && c.payload.encounterId !== "prepared",
+    ),
+  ).toHaveLength(1);
+  // No horizontal scroll while the terminal is in the study view.
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
+
+  // The station reach check must not close a terminal that has no station.
+  await page.waitForTimeout(400);
+  await expect(terminal).toBeVisible();
+
+  await page.locator("#chat-input").fill("It decides what the index can seek.");
+  await page.locator("#chat-input").press("Enter");
+  await expect.poll(() => claude.held.release !== undefined).toBe(true);
+  claude.held.release!();
+  await expect(page.locator("#messages")).toContainText(
+    "What would the planner do then?",
+  );
+
+  await page.locator("#leave").click();
+  await expect(page.locator("#terminal")).toBeHidden();
+  await expect(page.locator("#study-workspace")).toBeVisible();
+
+  await page.locator("#study-only-exit").click();
+  await expect(page.locator("#study-workspace")).toBeHidden();
+  await expect(page.locator(".game-layout #terminal")).toHaveCount(1);
+  await expect(page.locator("#study-terminal-slot #terminal")).toHaveCount(0);
+  await expect(page.locator("#terminal")).toBeHidden();
+});

@@ -159,6 +159,123 @@ const old = (topicId: string, depth = 1): TopicAssessmentRecord => ({
   startedAt: 50,
 });
 
+import { readFileSync } from "node:fs";
+import { checkBridge, ensureProblem, send } from "../src/ai";
+import { topicAssessmentTopics } from "../scripts/lib/topic-assessment.mjs";
+import { createPlayableGame } from "../src/world";
+
+const liveRoadmap: Roadmap = JSON.parse(
+  readFileSync("public/curriculum.json", "utf8"),
+);
+async function terminalFixture(
+  profile: "live" | "development",
+  run: (
+    g: any,
+    e: any,
+    calls: any[],
+    reply: (fn: (p: any) => Promise<Response>) => void,
+  ) => Promise<void>,
+) {
+  const original = globalThis.fetch;
+  const calls: any[] = [];
+  let connected = false;
+  let respond = async (_p: any) =>
+    Response.json({ text: "What changes?", complete: false });
+  globalThis.fetch = async (url, init) => {
+    if (String(url) === "/api/status")
+      return Response.json({
+        mode: connected ? "claude-cli" : "development",
+        label: "Synthetic",
+        detail: "No real AI",
+        capabilities: connected ? ["tutor"] : [],
+      });
+    const p = JSON.parse(String(init?.body));
+    calls.push(p);
+    return respond(p);
+  };
+  try {
+    await checkBridge();
+    const g = createPlayableGame(717, liveRoadmap);
+    const e = g.encounters[g.floors[0].stations[0].encounter];
+    await ensureProblem(g, e, liveRoadmap);
+    e.mode = "solo";
+    e.owner = "human";
+    g.study.profile = profile;
+    connected = true;
+    await checkBridge();
+    await run(g, e, calls, (fn) => {
+      respond = fn;
+    });
+  } finally {
+    connected = false;
+    await checkBridge();
+    globalThis.fetch = original;
+  }
+}
+
+test("a live terminal dialogue payload carries the topic assessment context; development does not", async () => {
+  await terminalFixture("live", async (g, e, calls) => {
+    await send(g, e, "tutor", "My first answer", liveRoadmap);
+    const topicIds = topicAssessmentTopics(e.problem.contract);
+    assert.ok(topicIds.length > 0);
+    assert.equal(calls[0].payload.mode, "terminal-dialogue");
+    assert.deepEqual(calls[0].payload.topicAssessmentContext.topicIds, topicIds);
+  });
+  await terminalFixture("development", async (g, e, calls) => {
+    await send(g, e, "tutor", "My first answer", liveRoadmap);
+    assert.equal(calls[0].payload.mode, "terminal-dialogue");
+    assert.equal(calls[0].payload.topicAssessmentContext, undefined);
+  });
+});
+
+test("terminal dialogue records topic assessments only after a valid completed reply", async () => {
+  await terminalFixture("live", async (g, e, calls, reply) => {
+    await send(g, e, "tutor", "My first answer", liveRoadmap);
+    const topicIds: string[] = topicAssessmentTopics(e.problem.contract);
+    assert.equal(g.study.topicAssessments, undefined);
+    const keys = g.survivors[0].keys ?? 0;
+    // A completed reply with an invalid list applies nothing.
+    reply(async () =>
+      Response.json({
+        text: "Solved.",
+        complete: true,
+        topicAssessments: [{ topicId: "PY:T99", text: "Unknown topic." }],
+      }),
+    );
+    await send(g, e, "tutor", "My explanation", liveRoadmap);
+    assert.notEqual(e.state, "consumed");
+    assert.equal(e.submissions.length, 0);
+    assert.equal(g.survivors[0].keys ?? 0, keys);
+    assert.equal(g.study.topicAssessments, undefined);
+    // An unfinished reply leaves assessments unchanged.
+    reply(async () => Response.json({ text: "Go on.", complete: false }));
+    await send(g, e, "tutor", "More detail", liveRoadmap);
+    assert.equal(g.study.topicAssessments, undefined);
+    // A valid completion records the new text for each topic.
+    reply(async () =>
+      Response.json({
+        text: "Solved.",
+        complete: true,
+        topicAssessments: topicIds.map((topicId) => ({
+          topicId,
+          text: `Fresh assessment of ${topicId}`,
+        })),
+      }),
+    );
+    await send(g, e, "tutor", "Final explanation", liveRoadmap);
+    assert.equal(e.state, "consumed");
+    assert.equal(g.survivors[0].keys, keys + 1);
+    const depth = e.problem.contract.depth;
+    for (const topicId of topicIds)
+      assert.equal(
+        g.study.topicAssessments[`${topicId}/D${depth}`].text,
+        `Fresh assessment of ${topicId}`,
+      );
+    assert.equal(Object.keys(g.study.topicAssessments).length, topicIds.length);
+    assert.ok(calls.length >= 4);
+  });
+});
+
 test("completion refreshes only its own topic and depth, with no mastery effects", () => {
   const { g, e } = fixture();
   const other = old("PE:T01");

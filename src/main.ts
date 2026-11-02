@@ -662,6 +662,11 @@ function setStudyMode(enabled: boolean) {
   document.title = enabled ? "Learning workspace" : "zombie-escape-study-game";
   $(".game-layout").hidden = enabled;
   $("#study-workspace").hidden = !enabled;
+  placeTerminal(enabled);
+  if (enabled) {
+    const resumed = workspaceQuestion(game);
+    if (resumed) openStudyTerminal(resumed);
+  }
   try {
     if (enabled) localStorage.setItem(STUDY_VIEW_KEY, "1");
     else localStorage.removeItem(STUDY_VIEW_KEY);
@@ -708,6 +713,7 @@ $("#study-next").onclick = async () => {
     game.studyWorkspace!.encounter = encounterKey(e);
     lastQuestion = e.id;
     game.lastStudyEncounter = e.id;
+    openStudyTerminal(e);
     await prepareQuestion(e);
   } catch (error) {
     setText("#study-message", String(error));
@@ -1115,8 +1121,33 @@ function closeTerminal() {
   editor.blur();
   keys.clear();
   jumpRequested = false;
-  focusWorld();
+  if (!game.studyWorkspace?.enabled) focusWorld();
   persist();
+}
+/** The terminal sits in the game layout normally and moves into the study
+ * view's slot while that view is on; a comment marks where it came from. */
+let terminalHome: Comment | undefined;
+function placeTerminal(inStudy: boolean) {
+  const terminal = $("#terminal");
+  if (inStudy) {
+    if (!terminalHome) {
+      terminalHome = document.createComment("terminal-home");
+      terminal.before(terminalHome);
+    }
+    $("#study-terminal-slot").append(terminal);
+  } else if (terminalHome) {
+    terminalHome.replaceWith(terminal);
+    terminalHome = undefined;
+  }
+}
+/** Opens an encounter in the study view's terminal. It has no physical station. */
+function openStudyTerminal(e: Encounter) {
+  if (active && active !== e.id) closeTerminal();
+  lastQuestion = e.id;
+  game.lastStudyEncounter = e.id;
+  active = e.id;
+  finalQuestion = false;
+  showEmbeddedTerminal(e);
 }
 /** After death the last tutor question stays answerable; no station is
  * claimed and engine rewards skip the dead human. */
@@ -1135,6 +1166,12 @@ function openFinalQuestion(e: Encounter) {
 function leaveTerminal() {
   const post = finalQuestion;
   closeTerminal();
+  if (game.studyWorkspace?.enabled) {
+    renderStudyWorkspace();
+    renderStudyStatus();
+    $("#study-next").focus({ preventScroll: true });
+    return;
+  }
   if (!post) return;
   preserveRunLearning(game);
   persist();
@@ -1287,7 +1324,9 @@ watchStreamingReplies(() => renderTerminal());
 function showEmbeddedTerminal(e: Encounter) {
   if (active !== e.id) return;
   $("#terminal").hidden = false;
-  document.body.classList.add("terminal-open");
+  // The study view has no game layout for this class to rearrange.
+  if (!game.studyWorkspace?.enabled)
+    document.body.classList.add("terminal-open");
   renderTerminal(true);
 }
 /** A slow reply cannot kill the player, but typing and reading still carry risk. */
@@ -1310,7 +1349,12 @@ function waitingOnEmbeddedReply() {
   );
 }
 function renderTerminal(force = false) {
-  if (!active || game.paused || $("#terminal").hidden) return;
+  if (
+    !active ||
+    (game.paused && !game.studyWorkspace?.enabled) ||
+    $("#terminal").hidden
+  )
+    return;
   const e = game.encounters[active];
   tab = terminalChannel(e);
   setText(
@@ -2493,6 +2537,7 @@ function ui() {
   if (game.studyWorkspace?.enabled) {
     renderStudyStatus();
     renderStudyWorkspace();
+    renderTerminal();
     return;
   }
   if (!game.paused) completionAssessments();
@@ -2710,7 +2755,8 @@ function frame(time: number) {
       steps++;
       acc -= 1 / 30;
     }
-    if (active && game.status === "playing") {
+    // A study-only encounter has no physical station to stay near.
+    if (active && game.status === "playing" && !game.studyWorkspace?.enabled) {
       const e = game.encounters[active];
       if (
         !game.floors[human(game).floor].stations.some(

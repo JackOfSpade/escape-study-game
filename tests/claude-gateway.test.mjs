@@ -14,6 +14,7 @@ import {
   textFieldReader,
   taskProfile,
 } from "../scripts/claude-gateway.mjs";
+import { validateAnswer } from "../scripts/lib/ai-contracts.mjs";
 
 const dir = mkdtempSync(join(tmpdir(), "fake-claude-"));
 writeFileSync(join(dir, "claude"), "#!/bin/sh\n", { mode: 0o755 });
@@ -72,6 +73,68 @@ test("stable material goes in the system prompt, varying fields in the message",
   assert.ok(a.system.includes('"curriculum":{"big":true}'));
   assert.ok(!a.user.includes("curriculum"));
   assert.ok(a.user.includes("probeRecords"));
+});
+
+test("tutor instructions request topic assessments only on completion, without ChatGPT wording", () => {
+  const { system } = buildPrompt("tutor", {
+    mode: "terminal-dialogue",
+    topicAssessmentContext: { topicIds: ["PY:T01"] },
+  });
+  assert.ok(
+    system.includes(
+      "In the reply that sets complete:true, include topicAssessments:[{topicId,text}]",
+    ),
+  );
+  assert.ok(system.includes("replies with complete:false omit topicAssessments"));
+  assert.ok(!system.includes("finish_study_question"));
+  assert.ok(!/chatgpt/i.test(system));
+});
+
+test("topicAssessmentContext stays in the tutor message, not the cached system text", () => {
+  const prompt = buildPrompt("tutor", {
+    mode: "terminal-dialogue",
+    topicAssessmentContext: { topicIds: ["PY:T01"], marker: "volatile-marker" },
+  });
+  assert.ok(!prompt.system.includes("volatile-marker"));
+  assert.ok(prompt.user.includes("volatile-marker"));
+});
+
+test("terminal dialogue validation enforces topicAssessments on completion", () => {
+  const job = {
+    operation: "tutor",
+    payload: {
+      mode: "terminal-dialogue",
+      topicAssessmentContext: { topicIds: ["PY:T01", "PE:T02"] },
+    },
+  };
+  const base = { text: "Done.", complete: true, outcome: "solved" };
+  const good = [
+    { topicId: "PY:T01", text: "Solid." },
+    { topicId: "PE:T02", text: "Tentative." },
+  ];
+  assert.doesNotThrow(() =>
+    validateAnswer(job, { ...base, topicAssessments: good }),
+  );
+  assert.throws(() => validateAnswer(job, base), /topicAssessments/);
+  assert.throws(() =>
+    validateAnswer(job, {
+      ...base,
+      topicAssessments: [good[0], { topicId: "PY:T09", text: "Unknown." }],
+    }),
+  );
+  assert.throws(() =>
+    validateAnswer(job, { ...base, topicAssessments: [good[0]] }),
+  );
+  assert.doesNotThrow(() =>
+    validateAnswer(job, { text: "Next question?", complete: false }),
+  );
+  assert.throws(() =>
+    validateAnswer(job, {
+      text: "Next question?",
+      complete: false,
+      topicAssessments: [{ topicId: "PY:T09", text: "Unknown." }],
+    }),
+  );
 });
 
 test("each task runs its chosen model and effort, latest aliases only", () => {

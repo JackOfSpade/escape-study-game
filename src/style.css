@@ -1345,3 +1345,45 @@ body.reduced * {
   max-width: 100%;
   padding: 8px;
 }
+/* The embedded terminal lives in the study view as an ordinary block. */
+#study-terminal-slot {
+  min-width: 0;
+  max-width: 100%;
+}
+#study-terminal-slot #terminal {
+  position: static;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  min-height: 0;
+  margin: 24px 0 0;
+  overflow-x: hidden;
+}
+#study-terminal-slot #terminal[hidden] {
+  display: none;
+}
+#study-terminal-slot #terminal-body {
+  overflow-x: hidden;
+}
+#study-terminal-slot .terminal-layout {
+  grid-template-columns: minmax(0, 1.2fr) minmax(240px, 0.8fr);
+}
+#study-terminal-slot .conversation-panel {
+  height: auto;
+  min-height: 280px;
+}
+@media (max-width: 760px) {
+  #study-workspace {
+    padding: 24px 12px;
+  }
+  #study-terminal-slot .terminal-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  #study-terminal-slot .terminal-heading {
+    flex-wrap: wrap;
+  }
+  #study-terminal-slot #problem,
+  #study-terminal-slot .message p {
+    overflow-wrap: anywhere;
+  }
+}
