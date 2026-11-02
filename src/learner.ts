@@ -1013,6 +1013,7 @@ export function applyLearningAssessment(
     cutoff: a.evidenceCutoffSequence,
     visitOutcome: a.visitOutcome,
     sourceVersion: a.sourceVersion,
+    // Receipts signed before the Claude CLI carry this provider; keep their hash.
     ...(provider === "chatgpt-handoff" ? { provider } : {}),
   });
   const receipt = l.receipts[a.id];

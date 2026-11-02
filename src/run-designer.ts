@@ -1,11 +1,4 @@
-import {
-  bridgeRequest,
-  discardRunDesign,
-  isHandoffReceipt,
-  status,
-  type HandoffProgress,
-  type HandoffReceipt,
-} from "./bridge-client";
+import { bridgeRequest, status } from "./bridge-client";
 import {
   parseRunDesignRequest,
   parseRunDesignReply,
@@ -39,8 +32,6 @@ import type { RunDesignActivity } from "./run-design-progress";
 type LegacyRequest = Extract<RunDesignRequest, { version: 1 }>;
 interface DraftIdentity {
   targetRunId: string;
-  chatCode: string;
-  receipt?: HandoffReceipt & { requestId: string };
 }
 export interface LegacyDesignDraft extends DraftIdentity {
   version: 1;
@@ -70,31 +61,15 @@ export function parseDesignDraft(value: unknown): DesignDraft {
     !d ||
     (d.version !== 1 && d.version !== 2) ||
     typeof d.targetRunId !== "string" ||
-    d.targetRunId.length > 128 ||
-    !/^[A-Z0-9]{6,16}$/.test(d.chatCode)
+    d.targetRunId.length > 128
   )
     throw Error("Invalid saved run-design request");
   const request = parseRunDesignRequest(d.request);
   if (request.version !== d.version)
     throw Error("Saved design phase does not match its request version");
-  if (
-    d.receipt !== undefined &&
-    (!isHandoffReceipt(d.receipt) || d.receipt.requestId !== request.requestId)
-  )
-    throw Error("Invalid saved run-design receipt");
-  const identity = {
-    targetRunId: d.targetRunId,
-    chatCode: d.chatCode,
-    ...(d.receipt
-      ? {
-          receipt: {
-            requestId: request.requestId,
-            id: d.receipt.id,
-            hash: d.receipt.hash,
-          },
-        }
-      : {}),
-  };
+  // Drafts saved by the retired chat also carried a chat code and queue
+  // receipt; they are ignored and dropped here.
+  const identity = { targetRunId: d.targetRunId };
   if (d.version === 1 && request.version === 1)
     return { ...identity, version: 1, request };
   if (d.version !== 2 || request.version !== 2)
@@ -170,13 +145,6 @@ export function clearDesignDraft(targetRunId: string) {
     localStorage.removeItem(DRAFT_KEY);
   }
 }
-/** A settled request may still be queued; explicit dismissal cancels its receipt. */
-export async function cancelDesignDraft(draft: DesignDraft | undefined) {
-  if (draft?.receipt) {
-    const current = parseDesignDraft(draft);
-    await discardRunDesign(current.receipt!);
-  }
-}
 export function rememberDesign(saved: SavedRunDesign) {
   const next = summarizeRunDesign(saved.design);
   const recent = recentDesigns().filter((d) => d.title !== next.title);
@@ -207,15 +175,9 @@ export function newAuthoredDesignDraft(
   recentContent = recentEnvironment(),
 ): AuthoredDesignDraft {
   const generationId = `design-${crypto.randomUUID()}`;
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const chatCode = Array.from(
-    crypto.getRandomValues(new Uint8Array(8)),
-    (n) => alphabet[n % alphabet.length],
-  ).join("");
   return {
     version: 2,
     targetRunId,
-    chatCode,
     request: parseRunDesignRequest({
       version: 2,
       designVersion: 3,
@@ -244,7 +206,6 @@ export function newDesignDraft(
   );
   return createQualityDraft({
     targetRunId,
-    chatCode: identity.chatCode,
     generationId: identity.request.generationId,
     seed,
     recent,
@@ -274,11 +235,9 @@ export interface DesignOptions<
     request: R,
     draft: DesignDraft,
     signal: AbortSignal,
-    progress: (phase: HandoffProgress) => void,
   ) => Promise<unknown>;
 }
-const designSource = () =>
-  status().mode === "claude-cli" ? "claude-cli" : "chatgpt-handoff";
+const designSource = () => "claude-cli" as const;
 /** Builds an isolated candidate. The caller alone commits it to the active run. */
 export async function prepareDesignedRun<T>(
   draft: DesignDraft,
@@ -286,25 +245,16 @@ export async function prepareDesignedRun<T>(
 ) {
   const send =
     options.send ??
-    ((request, current, signal, progress) => {
+    ((request, _current, signal) => {
       if (
-        (status().mode !== "chatgpt-handoff" &&
-          status().mode !== "claude-cli") ||
+        status().mode !== "claude-cli" ||
         !status().capabilities.includes("design-run")
       )
         throw Error(
-          "AI run design is unavailable. Connect or update the ChatGPT bridge, then retry. Your current run stays saved.",
+          "The study connection is unavailable. Check that Claude CLI is installed and signed in, then retry. Your current run stays saved.",
         );
-      return bridgeRequest("design-run", request, progress, {
+      return bridgeRequest("design-run", request, {
         signal,
-        chatCode: current.chatCode,
-        onQueued: async (receipt) => {
-          // A delayed receipt must not recreate a draft that Cancel just removed.
-          if (signal.aborted) return;
-          current.receipt = { ...receipt, requestId: request.requestId };
-          await options.capture(current);
-        },
-        nativeScope: { runId: request.generationId, encounterId: "run-design" },
         isActive: () => !signal.aborted,
       });
     });
@@ -314,25 +264,13 @@ export async function prepareDesignedRun<T>(
     options.signal.throwIfAborted();
     await options.capture(draft);
     options.signal.throwIfAborted();
-    const activity = (state: HandoffProgress) =>
-      options.activity?.({
-        stage: "design",
-        state,
-        detail: "Designing your escape…",
-      });
-    activity("queued");
-    const reply = await send(draft.request, draft, options.signal, (phase) => {
-      activity(phase);
-      options.progress?.(
-        phase === "working"
-          ? "ChatGPT is designing your escape…"
-          : phase === "stalled"
-            ? "No recent activity from ChatGPT. Check the connected chat and ask it to continue if it stopped. Your exact request is saved."
-            : phase === "queued"
-              ? "Waiting for ChatGPT. Connect a chat with the request below to continue."
-              : "Waiting for the bridge to reconnect. Your exact request is saved.",
-      );
+    options.activity?.({
+      stage: "design",
+      state: "working",
+      detail: "Designing your escape…",
     });
+    options.progress?.("Designing your escape…");
+    const reply = await send(draft.request, draft, options.signal);
     options.signal.throwIfAborted();
     const { design } = parseRunDesignReply(reply, draft.request);
     const saved: SavedRunDesign = {
@@ -363,7 +301,6 @@ export async function prepareDesignedRun<T>(
       }
     }
     // The previous reply stays immutable. A repair is a new, correlated job.
-    delete draft.receipt;
     draft.request = parseRunDesignRequest({
       ...draft.request,
       requestId: `design-${crypto.randomUUID()}`,
@@ -377,10 +314,10 @@ export async function prepareDesignedRun<T>(
     await options.capture(draft);
     if (attempt + 1 === DESIGN_ATTEMPTS)
       throw Error(
-        "This design still needs repair after three attempts. Your request is saved; retry with ChatGPT or cancel.",
+        "This design still needs repair after three attempts. Your request is saved; retry it or cancel.",
       );
     options.progress?.(
-      "The design needs changes. Asking ChatGPT to repair it while keeping this run’s theme…",
+      "The design needs changes. Asking Claude to repair it while keeping this run’s theme…",
     );
   }
   throw Error("Run design did not complete");
@@ -427,30 +364,20 @@ async function prepareAuthoredRun<T>(
     await options.capture(draft);
     options.signal.throwIfAborted();
     const request = draft.request;
-    const activity = (state: HandoffProgress) =>
-      options.activity?.({
-        stage: request.phase === "structure" ? "design" : "details",
-        state,
-        detail:
-          request.phase === "structure"
-            ? "Designing the building…"
-            : "Writing room details…",
-      });
-    activity("queued");
-    const reply = await send(request, draft, options.signal, (phase) => {
-      activity(phase);
-      options.progress?.(
-        phase === "working"
-          ? request.phase === "structure"
-            ? "ChatGPT is designing the building and its occupants…"
-            : "ChatGPT is writing and illustrating the objects in this building…"
-          : phase === "stalled"
-            ? "No recent activity from ChatGPT. Check the connected chat and ask it to continue if it stopped. Your exact request is saved."
-            : phase === "queued"
-              ? "Waiting for ChatGPT. Continue in the connected chat to finish this run."
-              : "Waiting for the bridge to reconnect. Your exact request is saved.",
-      );
+    options.activity?.({
+      stage: request.phase === "structure" ? "design" : "details",
+      state: "working",
+      detail:
+        request.phase === "structure"
+          ? "Designing the building…"
+          : "Writing room details…",
     });
+    options.progress?.(
+      request.phase === "structure"
+        ? "Designing the building and its occupants…"
+        : "Writing and illustrating the objects in this building…",
+    );
+    const reply = await send(request, draft, options.signal);
     options.signal.throwIfAborted();
     let repair: unknown;
     let errors: string[] = [];
@@ -484,7 +411,6 @@ async function prepareAuthoredRun<T>(
             surfaceFingerprint: candidate.surfaceFingerprint,
             recentContent: draft.recentContent,
           }) as ContentRunDesignRequest;
-          delete draft.receipt;
           draft.request = contentRequest;
           draft.attempts.content = 1;
           await options.capture(draft);
@@ -541,7 +467,6 @@ async function prepareAuthoredRun<T>(
           errors = [error instanceof Error ? error.message : String(error)];
         }
     }
-    delete draft.receipt;
     const phase = request.phase;
     draft.request = parseRunDesignRequest({
       ...request,
@@ -562,15 +487,7 @@ async function prepareAuthoredRun<T>(
         "This design still needs changes after three attempts. Your exact repair request is saved; choose Retry or Cancel.",
       );
     options.progress?.(
-      "Asking ChatGPT to repair this design while keeping its setting and object bindings…",
+      "Asking Claude to repair this design while keeping its setting and object bindings…",
     );
   }
-}
-
-export function designChatPrompt(draft: DesignDraft) {
-  const purpose =
-    draft.version === 3
-      ? "Prioritize creative quality and meaningful variety over startup speed. Follow each captured concept, selection, authoring or review stage; make evidence-based improvements until the game's review process finishes."
-      : "Return the requested structure or object writing and artwork.";
-  return `Design my new zombie-escape-study-game run. Call get_current_study_question with chat: "${draft.chatCode}" and use this chat code on every fetch in this chat. Follow the game's captured design contract. ${purpose} Submit each captured stage with finish_study_preparation. Follow any bound next design phase or repair continuation; stop when the game has no further design request. This is fictional world design, not a study conversation. Do not fetch another chat's work. If the tools lack the chat argument, ask me to refresh the zombie-escape-study-game plugin tools.`;
 }

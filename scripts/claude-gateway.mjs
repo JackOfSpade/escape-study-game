@@ -32,7 +32,6 @@ export const TASK_PROFILES = Object.freeze({
     stableKeys: [
       "instruction",
       "responseFormat",
-      "studyPrompt",
       "learning",
       "probe",
       "problem",

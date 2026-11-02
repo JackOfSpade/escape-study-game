@@ -1,3 +1,4 @@
+import { providerLabel } from "./provider-label";
 import { PROVIDERS } from "./model";
 import { canReachStation, human } from "./engine";
 import {
@@ -284,7 +285,7 @@ export function materializeNpcWork(
       );
       for (const [i, n] of notes.entries()) {
         const w = payload.work.find((w) => w.id === result.notes![i].workId)!,
-          text = `Materialized now through ${provider === "chatgpt-handoff" ? "ChatGPT handoff" : "configured Study Mode bridge"} from ${w.stage} work at ${w.at.toFixed(2)}s; unvalidated and not executed.\n${n.patch ? proposalText(n.text, n.patch) : n.text}`;
+          text = `Materialized now through ${providerLabel(provider)} from ${w.stage} work at ${w.at.toFixed(2)}s; unvalidated and not executed.\n${n.patch ? proposalText(n.text, n.patch) : n.text}`;
         const ev = event(
           g,
           "npc-proposal",

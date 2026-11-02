@@ -23,4 +23,18 @@ Note these before removing any of them, because they cannot be restored from the
 ## Still in the main tree
 
 - `scripts/lib/ai-contracts.mjs` holds the operation contracts and answer validators the Claude gateway uses. The shelved `scripts/chatgpt-handoff-queue.mjs` carries its own older copy of them, including the ChatGPT delivery wording, the `terminal-direct` completion rules and the topic assessment instruction.
-- `src/direct-study.ts` and the `chatgpt-handoff` provider stay so existing saves keep loading.
+- The `chatgpt-handoff` provider value, the `DirectStudySession` and `Encounter.directStudy` model types and `releaseRetiredChatRequests` stay so existing saves keep loading. `src/topic-assessment.ts`, `src/run-learning.ts` and `src/persistence.ts` still read saved sessions.
+- Saved run designs keep `chatgpt-handoff` as a valid `source`. Saved run-design drafts that carry a `chatCode` or queue `receipt` still load; both fields are dropped when read.
+
+## Moved out of the client
+
+- `src/direct-study.ts` is here, at the same relative path. It also needs `applyDirectCompletion` and `recordAttributedMessage` from `src/ai.ts`, and `topicAssessmentContext` and `recordTopicAssessments` from `src/topic-assessment.ts` (both of which still exist).
+
+## Removed from files that stay
+
+These small pieces are only on the tag `archive/chatgpt-stack-v1`:
+
+- `src/bridge-client.ts`: handoff polling and receipts, chat codes (`newStudyChat`, `studyChatCode`), relay listening (`relayListening`, `relayServes`), the native scope (`nativeStudyScope`), `discardRunDesign`, the outage grace and the direct-study timeout. The third `onProgress` argument of `bridgeRequest` and the `onQueued`, `chatCode` and `nativeScope` options are gone.
+- `src/main.ts` and `src/game-shell.html`: the native study panel (`#native-study`), the copy-request, Connect and completion-retry flows, the ChatGPT tab handling, the `#chatgpt-prompt` and `#open-chatgpt` elements, the whole ChatGPT settings section (`#chatgpt-settings`, `#handoff-*`) and the silent reconnect at start-up.
+- `src/run-designer.ts`, `src/run-quality-designer.ts` and `src/run-design-ui.ts`: the chat code and queue receipt on drafts, `cancelDesignDraft`, `designChatPrompt` and the Connect ChatGPT step of the run-design dialog.
+- `src/ai.ts`: `applyDirectCompletion`, `recordAttributedMessage`, the `handoffAutonomous` gate on unattended NPC work and the `studyPrompt` field of the tutor payload.

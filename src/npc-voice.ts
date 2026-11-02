@@ -133,13 +133,13 @@ export const npcVoiceTransport: NpcVoiceTransport = {
     );
   },
   generate: (request, signal, isActive) =>
-    bridgeRequest("npc-chatter", request, undefined, {
+    bridgeRequest("npc-chatter", request, {
       signal,
       isActive,
       timeoutMs: NPC_VOICE_LIMITS.requestMs,
     }),
   review: (request, signal, isActive) =>
-    bridgeRequest("npc-chatter-review", request, undefined, {
+    bridgeRequest("npc-chatter-review", request, {
       signal,
       isActive,
       timeoutMs: NPC_VOICE_LIMITS.requestMs,
@@ -202,7 +202,7 @@ interface PlayingSpeech {
 
 /** One background request/temporary buffer at a time. It never blocks step(). */
 export class NpcVoiceDirector {
-  message = "NPC voices wait for the connected ChatGPT background worker.";
+  message = "NPC voices wait for the study connection.";
   private game?: Game;
   private runId = "";
   private lastTime = 0;
@@ -260,7 +260,7 @@ export class NpcVoiceDirector {
       this.message =
         game.settings.npcVoices === false
           ? "NPC voices are off."
-          : "NPC voices wait for the connected ChatGPT background worker.";
+          : "NPC voices wait for the study connection.";
       return;
     }
     this.active = true;

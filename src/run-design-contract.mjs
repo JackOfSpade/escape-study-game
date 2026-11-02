@@ -1,4 +1,4 @@
-// Shared by the browser and relay. Design replies are bounded JSON data only.
+// Shared by the browser and the bridge server. Design replies are bounded JSON data only.
 import { parseSceneDesign, parseSceneStructure } from "./scene-catalog.mjs";
 import {
   parseQualityRequest,
@@ -472,7 +472,6 @@ export function parseRunDesignRequest(v) {
   if (v?.version === 3) return parseQualityRequest(v);
   if (v?.version === 2) return parsePhasedRequest(v);
   // Composable maximum: five summaries, one valid candidate and repair errors.
-  // Native handoff chunks large packets; 40 KB is only its inline threshold.
   bounded(v, v?.designVersion === 2 ? 640000 : 512000);
   requireThat(record(v), "request must be an object");
   object(

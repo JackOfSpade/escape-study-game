@@ -27,7 +27,7 @@ export function assignRoomProblem(
     e.state = "in-progress";
   }
 }
-/** Local practice requires no connector. Live questions are generated on request. */
+/** Local practice requires no AI connection. Live questions are generated on request. */
 export function preparePracticeRooms(g: Game, roadmap: Roadmap) {
   if (g.study.profile !== "development") return;
   for (const e of Object.values(g.encounters)) {

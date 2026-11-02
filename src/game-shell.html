@@ -46,36 +46,6 @@
           >
         </div>
         <div id="start-card" class="overlay"></div>
-        <aside
-          id="native-study"
-          class="native-study"
-          aria-label="ChatGPT study connection"
-          hidden
-        >
-          <strong id="native-study-title"></strong>
-          <p id="native-study-status" role="status"></p>
-          <div>
-            <button id="native-study-copy" class="quiet">
-              Copy ChatGPT request
-            </button>
-            <button id="native-study-finish" class="quiet" hidden>
-              Copy completion retry
-            </button>
-            <button id="native-study-retry" class="quiet" hidden>
-              Retry connection
-            </button>
-            <button id="native-study-connect" class="quiet" hidden>
-              Connect ChatGPT
-            </button>
-          </div>
-          <textarea
-            id="native-study-request"
-            aria-label="ChatGPT request to copy"
-            rows="4"
-            readonly
-            hidden
-          ></textarea>
-        </aside>
         <div id="spectator" class="spectator" hidden>
           <span class="eyebrow">SPECTATING</span>
           <div id="spectator-floors" role="group" aria-label="Floor"></div>
@@ -259,25 +229,9 @@
               role="status"
               hidden
             ></p>
-            <button id="connect-completion" hidden>Connect ChatGPT</button>
-            <div id="chatgpt-prompt" hidden>
-              <label for="chatgpt-prompt-text"
-                >Paste this prompt into ChatGPT after choosing your model and
-                thinking level:</label
-              >
-              <textarea id="chatgpt-prompt-text" rows="3" readonly></textarea>
-              <button id="copy-chatgpt-prompt" class="quiet">
-                Copy prompt
-              </button>
-              <p id="chatgpt-copy-status" class="muted" role="status"></p>
-            </div>
-            <a
-              id="open-chatgpt"
-              class="quiet"
-              target="zombie-study-chatgpt"
-              hidden
-              >Open ChatGPT</a
-            >
+            <button id="retry-connection" class="quiet" hidden>
+              Retry connection
+            </button>
             <form id="chat-form">
               <textarea
                 rows="3"
@@ -308,10 +262,12 @@
           Retry progress review
         </button>
         <button id="study-save-retry" class="quiet" hidden>Retry saving</button>
+        <button id="study-question-retry" class="quiet" hidden>
+          Retry question
+        </button>
       </div>
       <p id="study-message" role="status" aria-live="polite"></p>
       <p id="study-save-status" role="status" aria-live="polite"></p>
-      <div id="study-connection-slot"></div>
     </section>
   </div>
 </section>
@@ -437,72 +393,12 @@
         Playtesting only. You pass every locked door and staircase
         without a key or credential. NPCs and zombies are unaffected.
       </p>
-      <details id="chatgpt-settings">
-        <summary>ChatGPT handoff connection</summary>
+      <details id="study-connection-settings">
+        <summary>Study connection</summary>
         <p>
-          Allow a connected ChatGPT worker to read your requested task, draft,
-          relevant tutor history and curriculum. Prompts request @study
-          tutoring. Requested survivor-solution inspections share public context
-          only. Legacy shared saves retain public group requests. Requested
-          practical reviews share your saved observation, attached output and
-          relevant assistance. Native Study Mode is unverified. Enabled NPC
-          voices share the nearby speaker's public task and perceived
-          surroundings with a background worker.
+          Study questions, tutoring and NPC voices run through Claude CLI on
+          this computer. It must be installed and signed in.
         </p>
-        <label
-          ><input id="handoff-enable" type="checkbox" /> Release live study
-          requests and enabled NPC voice requests to ChatGPT</label
-        ><label
-          ><input id="handoff-autonomous" type="checkbox" disabled /> Allow
-          unattended NPC drafts, code runs and submissions</label
-        >
-        <p>
-          In legacy shared runs, unattended work shares public task context for
-          puzzles you have joined. Seated survivors may edit and submit while
-          you are away; their work earns no personal mastery. It starts off on
-          every server launch. Turning it off holds queued work and rejects late
-          results.
-        </p>
-        <p id="handoff-status" role="status"></p>
-        <div id="handoff-replies"></div>
-        <button id="handoff-requeue" class="quiet">
-          Recover interrupted worker
-        </button>
-        <details>
-          <summary>ChatGPT connector setup</summary>
-          <p id="handoff-public-status"></p>
-          <input
-            id="handoff-mcp-url"
-            readonly
-            aria-label="ChatGPT connector URL"
-          /><button id="handoff-start-public" class="quiet">
-            Start game connector</button
-          ><button id="handoff-stop-public" class="quiet">
-            Stop game connector</button
-          ><button id="handoff-pair" class="quiet">Open ChatGPT pairing</button>
-          <p id="handoff-pairing-code" role="status"></p>
-          <button id="handoff-close-pair" class="quiet">
-            Close pairing window</button
-          ><button id="handoff-worker" class="quiet">
-            Create worker instructions</button
-          ><button id="handoff-stop-worker" class="quiet">
-            Stop worker &amp; sharing</button
-          ><button id="handoff-revoke" class="quiet">
-            Revoke ChatGPT connection
-          </button>
-          <p>
-            Connect this project's MCP worker to ChatGPT using the setup guide,
-            then paste these instructions in its dedicated chat.
-          </p>
-          <textarea
-            id="handoff-starter"
-            readonly
-            aria-label="ChatGPT worker instructions"
-          ></textarea
-          ><button id="handoff-copy" class="quiet">
-            Copy worker instructions
-          </button>
-        </details>
         <button id="reconnect" class="quiet">Recheck study connection</button
         ><button id="live-profile" class="quiet">Start a live study run</button>
         <p id="live-profile-status" role="status"></p>

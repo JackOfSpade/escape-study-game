@@ -901,16 +901,6 @@ body.reduced * {
   outline-offset: 2px;
 }
 
-#handoff-mcp-url,
-#handoff-starter {
-  width: 100%;
-  box-sizing: border-box;
-}
-#handoff-starter {
-  min-height: 120px;
-  resize: vertical;
-}
-
 #execution-preview {
   margin: 12px 0;
 }
@@ -1212,36 +1202,6 @@ body.reduced * {
   }
 }
 
-.native-study {
-  position: absolute;
-  z-index: 4;
-  left: 18px;
-  bottom: 92px;
-  max-width: min(410px, calc(100% - 36px));
-  padding: 12px 16px;
-  background: #112126ec;
-  border: 1px solid #42635f;
-  border-radius: 10px;
-  font-size: 0.82rem;
-}
-.native-study p {
-  margin: 5px 0 8px;
-}
-.native-study button {
-  padding: 5px 8px;
-  font-size: 0.75rem;
-}
-.native-study textarea {
-  display: block;
-  box-sizing: border-box;
-  width: 100%;
-  margin-top: 8px;
-  resize: vertical;
-}
-.native-study [hidden],
-.native-study[hidden] {
-  display: none;
-}
 .career-focus-label {
   display: block;
   margin: 16px 0 6px;
@@ -1353,8 +1313,7 @@ body.reduced * {
   content: "✓";
   font-size: 14px;
 }
-.run-design-dialog[data-state="error"] #run-design-status,
-.run-design-dialog[data-state="reconnecting"] #run-design-status {
+.run-design-dialog[data-state="error"] #run-design-status {
   color: var(--danger);
 }
 .run-design-actions {
@@ -1362,16 +1321,6 @@ body.reduced * {
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-}
-#run-design-open {
-  display: inline-block;
-  padding: 12px 17px;
-  border: 1px solid transparent;
-  border-radius: 5px;
-  background: var(--accent);
-  color: var(--bg);
-  font-weight: 700;
-  text-decoration: none;
 }
 #run-design-cancel {
   margin-left: auto;
@@ -1395,9 +1344,4 @@ body.reduced * {
 #career-focus {
   max-width: 100%;
   padding: 8px;
-}
-@container (max-width: 600px) {
-  .native-study {
-    bottom: 106px;
-  }
 }

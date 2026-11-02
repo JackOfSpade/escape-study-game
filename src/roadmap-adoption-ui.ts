@@ -46,14 +46,14 @@ export function renderRoadmapAdoption(host: HTMLElement, options: Options) {
   const { getGame, r, persist, reconcile, candidate, onAdopted } = options,
     g = getGame(),
     jobs = g.study.roadmapReconciliations ?? [];
-  const handoff = options.provider === "chatgpt-handoff",
-    label = handoff ? "ChatGPT roadmap review" : "Native reconciliation";
+  const claude = options.provider === "claude-cli",
+    label = `${claude ? "Claude CLI" : "Study bridge"} roadmap review`;
   const refresh = () => {
     const current = document.getElementById("roadmap-adoption-controls");
     const view = current && views.get(current);
     if (current && view) renderRoadmapAdoption(current, view);
   };
-  host.innerHTML = `<p>Working file: revision ${g.study.roadmapExport?.revision ?? r.revision}. ${g.study.learner?.roadmapAdoptions?.length ?? 0} reviewed import(s). Original curriculum source is preserved.</p><p>${label} proposes a complete working roadmap for your review. Adoption preserves this run's code, transcripts and original curriculum. It starts no study session and records no new demonstration.</p>${handoff ? "<p>Requesting review shares your complete local working roadmap and selected incoming file with your connected ChatGPT worker while sharing is enabled. This connection does not assert native Study Mode. Review the proposal before adopting it.</p>" : ""}${candidate && reconcile ? `<button id="reconcile-roadmap" type="button">${handoff ? "Request ChatGPT roadmap review" : "Request native reconciliation"}</button>` : !reconcile ? "<p>Roadmap reconciliation is unavailable. File comparison remains available; current learning stays active.</p>" : ""}<p id="roadmap-adoption-status" role="status"></p>${[
+  host.innerHTML = `<p>Working file: revision ${g.study.roadmapExport?.revision ?? r.revision}. ${g.study.learner?.roadmapAdoptions?.length ?? 0} reviewed import(s). Original curriculum source is preserved.</p><p>${label} proposes a complete working roadmap for your review. Adoption preserves this run's code, transcripts and original curriculum. It starts no study session and records no new demonstration.</p>${claude ? "<p>Requesting review shares your complete local working roadmap and selected incoming file with Claude CLI. Review the proposal before adopting it.</p>" : ""}${candidate && reconcile ? `<button id="reconcile-roadmap" type="button">Request roadmap review</button>` : !reconcile ? "<p>Roadmap reconciliation is unavailable. File comparison remains available; current learning stays active.</p>" : ""}<p id="roadmap-adoption-status" role="status"></p>${[
     ...jobs,
   ]
     .reverse()
@@ -140,7 +140,7 @@ export function renderRoadmapAdoption(host: HTMLElement, options: Options) {
         .at(-1);
       status(
         job?.state === "ready"
-          ? `${job.payload.provider === "chatgpt-handoff" ? "ChatGPT roadmap review" : "Native review"} ready. Inspect its complete proposal; nothing is adopted automatically.`
+          ? `${job.payload.provider === "claude-cli" ? "Claude CLI" : "Study bridge"} roadmap review ready. Inspect its complete proposal; nothing is adopted automatically.`
           : job?.error
             ? `Review needs attention; captured files retained. ${job.error}`
             : "No additional review was needed.",

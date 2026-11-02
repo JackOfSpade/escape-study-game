@@ -1,4 +1,3 @@
-import type { BridgeStatus } from "./bridge-client";
 import type { Game, Roadmap } from "./model";
 import {
   workspaceAssessment,
@@ -26,7 +25,6 @@ export function createStudyWorkspaceView(
   root: HTMLElement,
   roadmap: Roadmap,
   readState: () => WorkspaceViewState,
-  readBridge: () => BridgeStatus,
 ) {
   const progress = root.querySelector<HTMLElement>("#study-progress")!;
   const next = root.querySelector<HTMLButtonElement>("#study-next")!;
@@ -67,7 +65,6 @@ export function createStudyWorkspaceView(
   function renderAssessments() {
     const { game } = readState();
     const current = workspaceQuestion(game)?.problem?.contract;
-    const bridge = readBridge();
     for (const node of topics) {
       const topicId = node.dataset.topicKey ?? "";
       const tier = Number(node.dataset.tier);
@@ -100,12 +97,9 @@ export function createStudyWorkspaceView(
         ".study-topic-assessment-status",
         record?.sourceHash && record.sourceHash !== roadmap.sourceHash
           ? "The roadmap has changed since this assessment was written."
-          : !bridge.capabilities.includes("topic-assessments") &&
-              bridge.mode === "chatgpt-handoff"
-            ? "Assessment updates need the updated study bridge. Finish any active question, then restart the bridge and refresh this connector’s tools."
-            : record && inProgress
-              ? "A question on this topic is in progress. This assessment updates when it finishes."
-              : "",
+          : record && inProgress
+            ? "A question on this topic is in progress. This assessment updates when it finishes."
+            : "",
       );
       text(
         ".study-topic-assessment-body",
@@ -220,34 +214,24 @@ export function createStudyWorkspaceView(
     } else renderAssessments();
 
     const current = workspaceQuestion(game);
-    const stopped = current?.directStudy?.state === "paused";
-    const canStop =
-      current?.directStudy?.state === "pending" ||
-      current?.directStudy?.state === "interrupted";
     const assessment = workspaceAssessment(game);
     next.disabled =
-      !canStop &&
-      (starting ||
-        (!!current && !stopped) ||
-        saving ||
-        !!saveError ||
-        (assessment !== undefined && assessment.status !== "applied"));
+      starting ||
+      !!current ||
+      saving ||
+      !!saveError ||
+      (assessment !== undefined && assessment.status !== "applied");
     writeText(
       next,
-      canStop
-        ? "Stop question"
-        : stopped
-          ? "Resume in new chat"
-          : starting
-            ? "Preparing question…"
-            : current
-              ? "Question in progress"
-              : "Start next question",
+      starting
+        ? "Preparing question…"
+        : current
+          ? "Question in progress"
+          : "Start next question",
     );
     reviewRetry.hidden = assessment?.status !== "review-required";
     saveRetry.hidden = !saveError;
-    const received =
-      workspaceSelectedQuestion(game)?.directStudy?.state === "applied";
+    const received = workspaceSelectedQuestion(game)?.state === "consumed";
     writeText(
       saveStatus,
       saveError ||

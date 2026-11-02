@@ -16,11 +16,7 @@ import {
   TERMINAL_DIALOGUE_FORMAT,
   TERMINAL_DIALOGUE_INSTRUCTION,
 } from "./knowledge-probe";
-import {
-  bridgeRequest as request,
-  nativeStudyScope,
-  status,
-} from "./bridge-client";
+import { bridgeRequest as request, status } from "./bridge-client";
 export { checkBridge, status, type BridgeStatus } from "./bridge-client";
 import { browserSteps } from "../scripts/browser-runner/spec.mjs";
 import {
@@ -82,12 +78,18 @@ const completionConnected = (g: Game, e: Encounter) =>
     status().mode !== "development");
 const activeProvider = (): Provider =>
   status().mode === "development" ? "study-mode" : (status().mode as Provider);
-export const isNativeProvenance = (p?: string): p is Provider =>
+/** Work captured while disconnected is bound to the provider that wrote its
+ * question, or to Claude CLI, the only one that can serve it on reconnect. */
+const capturedProvider = (problem?: Problem): Provider =>
+  status().mode === "claude-cli"
+    ? "claude-cli"
+    : isAiProvenance(problem?.provenance)
+      ? problem.provenance
+      : "claude-cli";
+export const isAiProvenance = (p?: string): p is Provider =>
   p === "study-mode" || p === "chatgpt-handoff" || p === "claude-cli";
-const autonomousAllowed = (g: Game) =>
-  status().capabilities.includes("autonomous-work") &&
-  (status().mode !== "chatgpt-handoff" ||
-    g.settings.handoffAutonomous === true);
+const autonomousAllowed = () =>
+  status().capabilities.includes("autonomous-work");
 export function materializeObservedWork(g: Game, e: Encounter, retry = false) {
   if (!live(g) || !status().capabilities.includes("materialize-work")) return;
   const provider = activeProvider();
@@ -105,7 +107,7 @@ export function materializeObservedWork(g: Game, e: Encounter, retry = false) {
       ),
     retry,
     {
-      allowAutonomous: autonomousAllowed(g),
+      allowAutonomous: autonomousAllowed(),
       provider,
     },
   );
@@ -137,7 +139,7 @@ export function inspectCompletedNpcWork(
           "materialize-outcome",
         ),
       validate(p, c) {
-        if (!isNativeProvenance(p.provenance))
+        if (!isAiProvenance(p.provenance))
           throw Error(
             "Reconstructed problem must retain its saved provider provenance",
           );
@@ -165,7 +167,7 @@ async function optionalProviderRequest<
     live(g) &&
     status().mode === provider &&
     status().capabilities.includes(capability) &&
-    (!autonomous || autonomousAllowed(g));
+    (!autonomous || autonomousAllowed());
   if (!connected())
     throw Error(
       "Reconnect the original provider; captured request remains saved",
@@ -318,7 +320,7 @@ function refreshUnissuedPractice(g: Game, e: Encounter, r: Roadmap) {
   recordSpawn(g.study, contract, e.id, g.time);
 }
 const QUESTION_GENERATION_POLICY =
-  "@study Diagnose before teaching. Write a standalone question: the prompt alone must supply the essential scenario, interface, implementation, data, timing and business-rule facts needed to answer without using the chat. For classification, list the concrete items to classify and their relevant behavior, lifetime and source without supplying their classifications. For tracing, debugging or critique, supply the relevant code, event sequence or evidence. Distinguish fixed facts from intentional design choices; if the learner may choose an example or an approach, say so explicitly rather than expecting them to infer an unspecified implementation. Ask a bounded task that matches the supplied scenario; never paste a capability statement into an unrelated generic story. Every requirement in the rubric must be visible in the question; do not grade unstated assumptions or add unrelated decisions, personal history or edge cases. Before returning the question, check that it can be answered from the prompt alone and repair missing context without revealing the solution. For D1, keep the learner workspace starter empty; put essential scenario or code-reading material in the prompt without supplying the key explanation, endpoint update, worked result or a leading solution hint. Do not interpret an objective's implementation verb as a D1 implementation requirement. Preserve legitimate prior context and assistance attribution without presenting supplied steps as fresh independent understanding. Use probeRecords: build the question around open gaps inside the eligible scope with the facet they blocked as the apex; only a gap marked reuseInScopeDefinitions may add its exact facet id to scopeDefinitions, and existing stable scope definitions are copied exactly; do not spend the question on established facets unless the scope requires them; re-ask what a closed gap blocked. The prompt is read by the learner: never mention the scheduled scope, objective IDs, tiers, depth, scheduling or that this is a formal visit; ask the question in plain language. Keep it minimal: write the smallest self-contained diagnostic that exercises the objective, with one main problem and at most one or two directly connected follow-ups. Include only the essential facts, not pasted project context or a full-project audit. For code review, include the actual code under review, including any required helper and its authorization semantics; a prose proposal supports design review only. Prefer short snippets, traces or evidence, and never turn an objective's scope verbs into a D1 implementation task. The visible task and rubric must match, without leaking the solution. An honestly integrative objective may stay integrative on a small feature. A narrow example never establishes unrelated facets or mastery. " +
+  "Diagnose before teaching. Write a standalone question: the prompt alone must supply the essential scenario, interface, implementation, data, timing and business-rule facts needed to answer without using the chat. For classification, list the concrete items to classify and their relevant behavior, lifetime and source without supplying their classifications. For tracing, debugging or critique, supply the relevant code, event sequence or evidence. Distinguish fixed facts from intentional design choices; if the learner may choose an example or an approach, say so explicitly rather than expecting them to infer an unspecified implementation. Ask a bounded task that matches the supplied scenario; never paste a capability statement into an unrelated generic story. Every requirement in the rubric must be visible in the question; do not grade unstated assumptions or add unrelated decisions, personal history or edge cases. Before returning the question, check that it can be answered from the prompt alone and repair missing context without revealing the solution. For D1, keep the learner workspace starter empty; put essential scenario or code-reading material in the prompt without supplying the key explanation, endpoint update, worked result or a leading solution hint. Do not interpret an objective's implementation verb as a D1 implementation requirement. Preserve legitimate prior context and assistance attribution without presenting supplied steps as fresh independent understanding. Use probeRecords: build the question around open gaps inside the eligible scope with the facet they blocked as the apex; only a gap marked reuseInScopeDefinitions may add its exact facet id to scopeDefinitions, and existing stable scope definitions are copied exactly; do not spend the question on established facets unless the scope requires them; re-ask what a closed gap blocked. The prompt is read by the learner: never mention the scheduled scope, objective IDs, tiers, depth, scheduling or that this is a formal visit; ask the question in plain language. Keep it minimal: write the smallest self-contained diagnostic that exercises the objective, with one main problem and at most one or two directly connected follow-ups. Include only the essential facts, not pasted project context or a full-project audit. For code review, include the actual code under review, including any required helper and its authorization semantics; a prose proposal supports design review only. Prefer short snippets, traces or evidence, and never turn an objective's scope verbs into a D1 implementation task. The visible task and rubric must match, without leaking the solution. An honestly integrative objective may stay integrative on a small feature. A narrow example never establishes unrelated facets or mastery. " +
   QUESTION_DESIGN_GUIDANCE;
 const QUESTION_PACING_GUIDANCE =
   "Include estimatedSolveSeconds: a finite number from 30 to 900 estimating typical prepared learner time for the whole bounded question, including reading, reasoning, expected tutoring exchanges and any coding/testing. Exclude network/model queue waiting. This is game pacing metadata, not a grade, mastery claim, door HP or instruction to change difficulty. The game applies its own slower-player margin and safety bounds.";
@@ -387,7 +389,7 @@ function stillSchedulable(r: Roadmap, g: Game, c: Contract) {
 }
 /** Generate the next terminal's question ahead of time. It waits for the last
  * assessment so the question knows which gaps that answer closed or exposed. */
-/** Saves from the ChatGPT era can hold work waiting on a chat that no longer
+/** Older saves can hold work waiting on a chat connection that no longer
  * exists. Free it so the player can carry on in the game's own terminal; the
  * question and the learner's own work stay. */
 export function releaseRetiredChatRequests(g: Game) {
@@ -412,7 +414,7 @@ export function releaseRetiredChatRequests(g: Game) {
       ) {
         submission.status = "error";
         submission.feedback =
-          "This answer was waiting on the retired ChatGPT connection. Submit it again.";
+          "This answer was waiting on a connection that no longer exists. Submit it again.";
         delete submission.completionRequest;
       }
   }
@@ -483,7 +485,7 @@ async function ensureIndividualProblem(g: Game, e: Encounter, r: Roadmap) {
   if (e.problem || e.state === "consumed") return;
   if (g.study.profile === "live" && status().mode === "development") {
     e.error =
-      "Live Study Mode bridge unavailable; work is preserved. Reconnect to continue this live profile.";
+      "Live study connection unavailable; work is preserved. Reconnect to continue this live profile.";
     return;
   }
   if (e.generation) return;
@@ -507,6 +509,7 @@ async function ensureIndividualProblem(g: Game, e: Encounter, r: Roadmap) {
     if (
       e.pendingGeneration &&
       (!native ||
+        // Saves from before providers were recorded were ChatGPT handoffs.
         status().mode !== (e.pendingGeneration.provider ?? "chatgpt-handoff"))
     )
       throw Error(
@@ -529,9 +532,7 @@ async function ensureIndividualProblem(g: Game, e: Encounter, r: Roadmap) {
         requestId: generation,
         payload: structuredClone(payload),
       };
-      p = await request<Problem>("generate", payload, undefined, {
-        nativeScope: nativeStudyScope(g, e),
-      });
+      p = await request<Problem>("generate", payload);
       p.provenance = provider;
     } else
       p = devProblem(
@@ -642,7 +643,7 @@ export function presentProblem(g: Game, e: Encounter, r?: Roadmap) {
   if (
     r &&
     g.study.profile === "live" &&
-    isNativeProvenance(e.problem?.provenance) &&
+    isAiProvenance(e.problem?.provenance) &&
     e.state !== "consumed" &&
     !g.study.learner?.attempts.some((a) => a.encounter === encounterKey(e))
   ) {
@@ -729,7 +730,6 @@ function message(
   return m;
 }
 /** Record one attributed tutor/group message (shared with direct study). */
-export const recordAttributedMessage = message;
 export function presentMessages(
   g: Game,
   e: Encounter,
@@ -914,8 +914,6 @@ export function retryTutorRequest(
     profile = study.profile;
   job.state = "pending";
   delete job.error;
-  delete job.transportPhase;
-  delete job.transportPhaseAt;
   const operation = (async () => {
     try {
       if (!interactiveConnected(g) || status().mode !== job.provider)
@@ -969,22 +967,13 @@ export function retryTutorRequest(
         job.responseMessageId = existing.id;
         return;
       }
-      const answer = await request(
-        "tutor",
-        payload,
-        (phase) => {
+      const answer = await request("tutor", payload, {
+        onText: (text) => {
           if (job.state !== "pending") return;
-          if (job.transportPhase !== phase) job.transportPhaseAt = Date.now();
-          job.transportPhase = phase;
+          streamingReplies.set(job, text);
+          onStreamingReply?.();
         },
-        {
-          onText: (text) => {
-            if (job.state !== "pending") return;
-            streamingReplies.set(job, text);
-            onStreamingReply?.();
-          },
-        },
-      ).finally(() => streamingReplies.delete(job));
+      }).finally(() => streamingReplies.delete(job));
       if (
         typeof answer.text !== "string" ||
         !answer.text.trim() ||
@@ -1289,17 +1278,6 @@ export async function send(
     e.tutorRequests?.some((j) => j.state === "pending")
   )
     return;
-  // A native ChatGPT question session owns the private conversation; answers
-  // happen in ChatGPT and are never relayed per turn.
-  const direct = (e as { directStudy?: { state?: string } }).directStudy;
-  if (
-    channel === "tutor" &&
-    (direct?.state === "pending" || direct?.state === "interrupted")
-  ) {
-    e.error =
-      "This question is open in your ChatGPT conversation; answer it there. Your saved work is retained.";
-    return;
-  }
   if (channel === "tutor")
     for (const job of e.tutorRequests ?? [])
       if (job.state === "interrupted") settleTutorRequest(job, "superseded");
@@ -1316,14 +1294,7 @@ export async function send(
       g.study.profile === "live" ||
       interactiveConnected(g)
     ) {
-      const provider =
-        status().mode === "claude-cli"
-          ? "claude-cli"
-          : status().mode === "study-mode" ||
-              (status().mode === "development" &&
-                problem.provenance === "study-mode")
-            ? "study-mode"
-            : "chatgpt-handoff";
+      const provider = capturedProvider(problem);
       const id = `tutor-${g.id}-${e.id}-${g.seq}`;
       const payload = {
         requestId: id,
@@ -1357,8 +1328,7 @@ export async function send(
           .filter((j) => j.status === "finished")
           .map(executionEvidence),
         learning: problem.contract,
-        studyPrompt: "@study",
-        prompt: `@study\n${text}`,
+        prompt: text,
         curriculum: r.tracks[problem.contract.track].curriculum,
         progressContext: [
           trackProgressContext(g.study.learner, r, problem.contract.track),
@@ -1377,7 +1347,7 @@ export async function send(
       await retryTutorRequest(g, e, id, r);
     } else {
       e.error =
-        "Connect ChatGPT in Settings to ask your tutor. Your question and answer draft are saved.";
+        "The study connection is unavailable. Check that Claude CLI is installed and signed in, then retry. Your question and answer draft are saved.";
     }
     return;
   }
@@ -1471,7 +1441,7 @@ export async function submit(
   if (
     author !== "human" &&
     (!live(g) ||
-      !autonomousAllowed(g) ||
+      !autonomousAllowed() ||
       (candidate?.provider ?? "study-mode") !== status().mode ||
       !npcAtWorkstation(g, e, author) ||
       humanUsingWorkspace(g, e) ||
@@ -1561,7 +1531,7 @@ async function evaluateSubmission(
       throw Error(
         "Reconnect the original completion provider to retry this saved evaluation",
       );
-    if (author !== "human" && !autonomousAllowed(g))
+    if (author !== "human" && !autonomousAllowed())
       throw Error(
         "Unattended NPC work was disabled; captured submission retained without release",
       );
@@ -1574,15 +1544,8 @@ async function evaluateSubmission(
     }
     let result: { complete: boolean; feedback: string; qualified: string[] };
     if (!s.completionRequest) {
-      // Bind a disconnected capture to the provider that generated the problem.
-      const provider: Provider =
-        status().mode === "claude-cli"
-          ? "claude-cli"
-          : status().mode === "study-mode" ||
-              (status().mode === "development" &&
-                e.problem.provenance === "study-mode")
-            ? "study-mode"
-            : "chatgpt-handoff";
+      // Bind a disconnected capture to the provider that wrote the question.
+      const provider: Provider = capturedProvider(e.problem);
       const payload = {
         requestId: s.id,
         encounterId: e.id,
@@ -1664,7 +1627,7 @@ async function evaluateSubmission(
         );
     } else {
       throw Error(
-        "Connect ChatGPT in Settings to check this answer. No AI acceptance was received; your captured answer is saved.",
+        "The study connection is unavailable. Check that Claude CLI is installed and signed in, then retry. No AI acceptance was received; your captured answer is saved.",
       );
     }
     result = completionVerdict(result);
@@ -1762,19 +1725,6 @@ function applyCompletion(
     }
   }
 }
-/** Apply an already validated direct-study completion through the shared
- * exactly-once reward and assessment path. */
-export function applyDirectCompletion(
-  g: Game,
-  e: Encounter,
-  r: Roadmap,
-  s: Submission,
-  result: ReturnType<typeof completionVerdict>,
-  onAssessment?: () => void,
-) {
-  applyCompletion(g, e, r, s, result, onAssessment);
-}
-
 /** Opt-in public NPC work. Never retries a captured submission or failed batch. */
 const autonomousRuns = new WeakMap<Game, Promise<void>>();
 export function autonomousNpcWork(
@@ -1783,7 +1733,7 @@ export function autonomousNpcWork(
 ): Promise<void> | undefined {
   if (
     !live(g) ||
-    !autonomousAllowed(g) ||
+    !autonomousAllowed() ||
     !status().capabilities.includes("materialize-work") ||
     g.status !== "playing"
   )
@@ -1794,7 +1744,7 @@ export function autonomousNpcWork(
   for (const e of Object.values(g.encounters)) {
     if (
       !hasHumanStudyContext(e) ||
-      !isNativeProvenance(e.problem?.provenance) ||
+      !isAiProvenance(e.problem?.provenance) ||
       e.mode !== "shared" ||
       e.state === "consumed" ||
       humanUsingWorkspace(g, e) ||

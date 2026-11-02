@@ -1,5 +1,5 @@
 import { PROVIDERS } from "./model";
-import { bridgeRequest, nativeStudyScope, status } from "./bridge-client";
+import { bridgeRequest, status } from "./bridge-client";
 import { evidencePacket, syncLearningView } from "./curriculum";
 import { applyLearningAssessment, encounterKey } from "./learner";
 import type { Assessment, Encounter, Game, Roadmap } from "./model";
@@ -142,9 +142,7 @@ export async function assess(
         | "scopeReviews"
         | "helpAttributions"
       >
-    >("assess", payload, undefined, {
-      nativeScope: nativeStudyScope(g, e),
-    });
+    >("assess", payload);
     checkSnapshot();
     a.findings = response.findings;
     a.historicalMappings = response.historicalMappings;

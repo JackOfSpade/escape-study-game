@@ -517,9 +517,6 @@ export interface Problem {
   scopeDefinitions?: ScopeDefinition[];
 }
 export interface TutorRequest {
-  transportPhase?: import("./bridge-client").HandoffProgress;
-  /** When transportPhase last changed (Date.now()); drives waiting hints. */
-  transportPhaseAt?: number;
   id: string;
   provider: Provider;
   payloadJson: string;
@@ -528,6 +525,8 @@ export interface TutorRequest {
   error?: string;
   responseMessageId?: string;
 }
+/** A question session the retired ChatGPT chat once ran. Saves still carry it,
+ * so learning history reads it; nothing creates or continues one any more. */
 export interface DirectStudySession {
   id: string;
   createdAt?: number;
@@ -539,7 +538,7 @@ export interface DirectStudySession {
   state: "pending" | "interrupted" | "paused" | "applied" | "superseded";
   responseDigest?: string;
   error?: string;
-  transportPhase?: import("./bridge-client").HandoffProgress;
+  transportPhase?: string;
   transportPhaseAt?: number;
 }
 export interface Encounter {
@@ -635,7 +634,7 @@ export interface Settings {
   view?: "first-person" | "top-down";
   /** Interface and world magnification; omitted by older saves (100%). */
   displayScale?: number;
-  /** Local preference only; server release and capability are also required. */
+  /** Saved by the retired ChatGPT worker settings; no longer read. */
   handoffAutonomous?: boolean;
   /** Temporary contextual computer speech; no clips are included in saves. */
   npcVoices?: boolean;
@@ -650,7 +649,7 @@ export interface Game {
   preparingRun?: boolean;
   /** Accepted AI blueprint and provenance. Loading never requests a replacement. */
   design?: import("./run-design-contract.mjs").SavedRunDesign;
-  /** Study workspace freezes the saved world while native study continues. */
+  /** Study workspace freezes the saved world while a question is open. */
   studyWorkspace?: { enabled: boolean; wasPaused: boolean; encounter?: string };
   fieldPacing?: import("./field-pacing").FieldPacing;
   rules?: "force-fields";

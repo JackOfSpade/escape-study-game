@@ -36,7 +36,7 @@ export function settleTutorRequest(
   releaseRequestContext(job);
 }
 
-/** Saved direct ChatGPT question session (structural; mirrors the model type). */
+/** Saved question session from the retired chat (structural; mirrors the model type). */
 interface SavedDirectStudy {
   id: string;
   provider: string;
@@ -95,13 +95,13 @@ export function recoverDirectStudy(e: Encounter): void {
   const malformed = (reason: string) => {
     if (s.state === "applied" || s.state === "superseded") return;
     s.state = "interrupted";
-    s.error = `Saved ChatGPT question is malformed (${reason}); it cannot be retried.`;
+    s.error = `Saved chat question is malformed (${reason}); it cannot be retried.`;
   };
   delete s.transportPhase;
   delete s.transportPhaseAt;
   if (typeof s.state !== "string" || !DIRECT_STATES.has(s.state)) {
     s.state = "interrupted";
-    s.error = "Saved ChatGPT question had an unknown state; retry is required.";
+    s.error = "Saved chat question had an unknown state; it cannot be retried.";
   }
   if (
     typeof s.id !== "string" ||
@@ -132,7 +132,7 @@ export function recoverDirectStudy(e: Encounter): void {
   if (s.state === "pending") {
     s.state = "interrupted";
     s.error =
-      "Application restarted while the ChatGPT question was open; it resumes with the exact saved question.";
+      "Application restarted while this question was open in the retired chat; the saved question is kept but cannot be resumed.";
   }
 }
 
