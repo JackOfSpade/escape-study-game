@@ -2,7 +2,7 @@
 
 Force fields are now physical access doors. `o.field` remains the door's access
 record, so saves keep working, and "field" below means the same door. A door
-swings open for anyone allowed through, stays open, and closes itself when a zombie comes within 6 tiles. Zombies never slip past
+rests closed. The player opens one they have access to with E and NPCs open theirs by walking up; it closes itself once the doorway clears. Access stays personal, so a door someone else opened remains an invisible wall for anyone without a key, a solved terminal or a free pass. Zombies never slip past
 an open leaf and keep sensing through closed doors, so health remains a real time
 budget. A run design can set a door's look and starting health (400 to 2,400 HP).
 Pacing can raise a pristine hall entrance above that, never lower it.

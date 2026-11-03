@@ -247,6 +247,7 @@ test("jumping never bypasses a denied field and personally allowed fields remain
     "the full-height locked field remains solid during the jump",
   );
   field.field!.authorized.push(a.id);
+  field.field!.leaf = { open: 1, side: 1, hold: 30 };
   jumpElevated(g, a);
   for (let i = 0; i < 90; i++) stepElevated(g, a, { x: 1, y: 0 }, 1 / 60);
   assert.ok(a.x > 16, "personal permission applies to the elevated body too");
@@ -273,6 +274,7 @@ function quotaRoom() {
       crossing: [],
       sides: {},
       touchVersion: 1,
+      leaf: { open: 1, side: 1, hold: 30 },
     },
   });
   delete field.door;
@@ -304,6 +306,15 @@ test("an airborne human consumes its real free field pass before landing beyond 
   );
   assert.equal(g.events.filter((e) => e.type === "field-entry").length, 1);
   assert.equal(g.events.filter((e) => e.type === "field-sealed").length, 1);
+});
+
+test("jumping cannot carry an admitted human through a closed door", () => {
+  const { g, a, field } = quotaRoom();
+  delete field.field!.leaf;
+  for (let i = 0; i < 30; i++)
+    step(g, 1 / 30, { x: 1, y: 0, grab: false, jump: i === 0 });
+  assert.ok(a.x < 14, "the closed leaf stops the jump at its face");
+  assert.equal(field.field!.used, 0, "no pass is spent on a closed door");
 });
 
 test("airborne and native actors compete for the last pass by actual first contact in either order", () => {

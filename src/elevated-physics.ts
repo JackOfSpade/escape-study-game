@@ -6,7 +6,7 @@ import {
   stairAccessPortals,
   type ExteriorStructure,
 } from "./exterior-structure";
-import { fieldAllows } from "./force-fields";
+import { fieldPassable } from "./force-fields";
 import {
   CONFIG,
   devPass,
@@ -283,7 +283,7 @@ function intervals(
         o.destroyed ||
         (o.open && !o.door) ||
         (o.kind === "gate" && o.turning < 0) ||
-        (o.field && fieldAllows(o, a))
+        (o.field && fieldPassable(o, a))
       )
         continue;
       const angle = o.angle ?? 0;

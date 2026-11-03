@@ -113,3 +113,48 @@ test("E at a red field spends a key even beside another survivor's solo terminal
   expect(state.keys).toBe(0);
   expect(state.authorized).toEqual(["human"]);
 });
+
+test("a green door stops the walking player until E opens it, then closes behind them", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await startDesignedRun(page);
+  await page.evaluate(async () => {
+    const root = "/src/";
+    const { TestRunner } = await import(
+      /* @vite-ignore */ root + "gametest/runner.ts"
+    );
+    const s = await (
+      await fetch("/tests/fixtures/gametest/force-field-green.json")
+    ).json();
+    s.actions = [];
+    s.checks = [];
+    s.simulation = "game";
+    s.entities = s.entities.filter((e: any) => e.kind !== "zombie");
+    const roadmap = await (await fetch("/curriculum.json")).json();
+    const live = (window as any).__deadAir.game,
+      staged = new TestRunner(s, roadmap).game;
+    for (const key of Object.keys(live))
+      if (!Object.hasOwn(staged, key)) delete live[key];
+    Object.assign(live, staged);
+    live.settings.view = "top-down";
+  });
+  const read = () =>
+    page.evaluate(() => {
+      const g = (window as any).__deadAir.game;
+      return {
+        x: g.survivors[0].x as number,
+        open: (g.floors[0].furniture[0].field.leaf?.open ?? 0) as number,
+      };
+    });
+  await page.locator("#world").focus();
+  await page.keyboard.down("d");
+  await page.waitForTimeout(1200);
+  const blocked = await read();
+  expect(blocked.x).toBeLessThanOrEqual(11.8);
+  expect(blocked.open).toBe(0);
+  await page.keyboard.press("e");
+  await expect.poll(async () => (await read()).x).toBeGreaterThan(13.5);
+  await page.keyboard.up("d");
+  await expect.poll(async () => (await read()).open).toBe(0);
+});

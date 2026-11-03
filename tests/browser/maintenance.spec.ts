@@ -1,4 +1,4 @@
-import { chooseDesignedRun, startDesignedRun } from "./helpers/designed-run";
+import { startDesignedRun, startRestartedRun } from "./helpers/designed-run";
 import { openGameMenu } from "./helpers/game-menu";
 import { test, expect } from "@playwright/test";
 
@@ -69,7 +69,7 @@ test("a delayed roadmap export cannot commit its old snapshot to a restarted run
   await page.waitForFunction(() => (window as any).__exportWaiting === true);
   await page.keyboard.press("Escape");
   await page.locator("#restart-game").click();
-  await chooseDesignedRun(page);
+  await startRestartedRun(page);
   // Restart saves learning first; release the export once the new run exists.
   await expect(page.locator("#pause-menu")).not.toBeVisible();
   await page.evaluate(() => (window as any).__releaseExport());

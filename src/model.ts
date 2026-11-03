@@ -358,7 +358,14 @@ export interface Furniture extends Point {
     exit: boolean;
     visitors?: string[];
     /** Present only while the leaf is moving or held open. */
-    leaf?: { open: number; side: number; hold: number };
+    leaf?: {
+      open: number;
+      side: number;
+      hold: number;
+      /** Who pressed E, and the side they stood on, until they are through. */
+      opener?: string;
+      from?: number;
+    };
   };
   doorStyle?: DoorStyle;
   physics?: PhysicsMotion;

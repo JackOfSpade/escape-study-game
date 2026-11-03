@@ -29,6 +29,7 @@ import {
 } from "./model";
 
 export const SWARM = { cap: 600, interval: 1, batch: 4, speedRatio: 0.5 };
+/** Whether this actor's access would admit them; a closed leaf still stops them. */
 export function fieldAllows(o: Furniture, a: Pick<Actor, "id" | "access">) {
   const f = o.field;
   return (
@@ -39,6 +40,21 @@ export function fieldAllows(o: Furniture, a: Pick<Actor, "id" | "access">) {
       f.crossing.includes(a.id) ||
       (f.exit && a.access.includes(o.floor)) ||
       (f.limit === undefined ? !f.exit : f.used < f.limit))
+  );
+}
+/** A swinging leaf clears the opening about halfway through its travel. */
+function leafClear(f: NonNullable<Furniture["field"]>) {
+  return (f.leaf?.open ?? 0) >= DOOR_LEAF.passableOpen;
+}
+/** Passing takes both a personal right and an open leaf. Someone else opening
+ * the door leaves it an invisible wall for anyone without access, and someone
+ * with access still has to open it. */
+export function fieldPassable(o: Furniture, a: Pick<Actor, "id" | "access">) {
+  const f = o.field;
+  return (
+    !!f &&
+    fieldAllows(o, a) &&
+    (o.destroyed || leafClear(f) || f.crossing.includes(a.id))
   );
 }
 /** Whether an intact force field lies on the straight segment a->b. */
@@ -77,11 +93,15 @@ export function fieldRouteSignature(f: Floor, a: Actor) {
 }
 export function useField(g: Game, a: Actor, o: Furniture) {
   if (!o.field) return false;
-  if (fieldAllows(o, a)) return true;
+  if (fieldAllows(o, a)) {
+    openDoorLeaf(o, a);
+    return true;
+  }
   if ((a.keys ?? 0) < 1) {
     if (a.id === "human")
-      g.notice =
-        "Locked door: one key required, or solve a solo terminal on this floor for access. There is no other way through this wall.";
+      g.notice = o.field.leaf
+        ? "This door is open, but not for you: one key or a solved solo terminal on this floor is required to walk through."
+        : "Locked door: one key required, or solve a solo terminal on this floor for access. There is no other way through this wall.";
     return false;
   }
   a.keys = (a.keys ?? 0) - 1;
@@ -96,7 +116,8 @@ export function useField(g: Game, a: Actor, o: Furniture) {
     a.id,
   );
   if (a.id === "human")
-    g.notice = "Key consumed. This door now always opens for you.";
+    g.notice = "Key consumed. You can now open this door whenever you need it.";
+  openDoorLeaf(o, a);
   return true;
 }
 
@@ -216,7 +237,7 @@ export function redesign(
     if (!used.has(id)) delete g.encounters[id];
   if (roadmap) preparePracticeRooms(g, roadmap);
   g.notice =
-    "Doors open for you when your access is green and close themselves when zombies come near; zombies must break them. E uses a key on a locked door. The rear study hall stays open. Solve a solo terminal for stair access and a key.";
+    "Doors stay closed: press E to open one you have access to and it closes behind you; zombies must break them. Access is personal, so a door someone else opened still stops you. E uses a key on a locked door. Solve a solo terminal for stair access and a key.";
 }
 
 /** A run design may restyle a door and set its starting health. Study pacing
@@ -389,7 +410,7 @@ export function updateFields(g: Game, previous?: ReadonlyMap<string, Point>) {
             ejectFromField(g, o, a, origin);
           continue;
         }
-        if (f.limit === undefined) continue;
+        if (f.limit === undefined || !leafClear(f)) continue;
         f.crossing.push(a.id);
         if (origin === -(f.direction ?? 1) && !f.visitors?.includes(a.id)) {
           (f.visitors ??= []).push(a.id);
@@ -421,9 +442,12 @@ export function updateFields(g: Game, previous?: ReadonlyMap<string, Point>) {
 export const DOOR_LEAF = {
   openSeconds: 0.3,
   closeSeconds: 0.55,
+  /** How long it stays open after someone clears the doorway. */
   holdSeconds: 0.35,
+  /** How long a door opened with E waits for its opener to walk through. */
+  waitSeconds: 3,
   reach: 1.1,
-  zombieRange: 6,
+  passableOpen: 0.5,
 } as const;
 function wantsDoorOpen(o: Furniture, a: Actor) {
   if (inFurniture(a, o, FIELD_RADIUS + 0.2)) return true;
@@ -438,10 +462,25 @@ function wantsDoorOpen(o: Furniture, a: Actor) {
     toward * (a.physics?.[axis] ?? 0) > 0.2
   );
 }
-/** Doors open for whoever may pass, stay open, and close themselves once a
- * zombie is near, so nobody has to remember to shut one. The leaf is presentation
- * only: admission stays personal and zombies never slip past, which keeps health
- * a real time budget. */
+function startLeaf(o: Furniture, a: Actor) {
+  const f = o.field!;
+  return (f.leaf ??= {
+    open: 0,
+    side: -fieldSide(o, a) || 1,
+    hold: DOOR_LEAF.holdSeconds,
+  });
+}
+/** Pressing E: the door waits briefly for this actor to walk through. */
+function openDoorLeaf(o: Furniture, a: Actor) {
+  const leaf = startLeaf(o, a);
+  leaf.hold = Math.max(leaf.hold, DOOR_LEAF.waitSeconds);
+  leaf.opener = a.id;
+  leaf.from = fieldSide(o, a);
+}
+/** Doors rest closed. The player opens one with E and NPCs open theirs as they
+ * walk up; each closes itself once the doorway clears. The leaf never admits
+ * anyone by itself, since admission stays personal, and zombies always have to
+ * break through, which keeps health a real time budget. */
 export function updateDoorLeaves(g: Game, dt: number) {
   for (const floor of g.floors)
     for (const o of floor.furniture) {
@@ -451,41 +490,39 @@ export function updateDoorLeaves(g: Game, dt: number) {
         delete f.leaf;
         continue;
       }
-      const opener = g.survivors.find(
+      const people = g.survivors.filter(
         (a) =>
-          a.alive &&
-          !a.escaped &&
-          a.floor === floor.index &&
-          fieldAllows(o, a) &&
-          wantsDoorOpen(o, a),
+          a.alive && !a.escaped && a.floor === floor.index && fieldAllows(o, a),
       );
-      if (opener) {
-        const axis = o.h >= o.w ? "x" : "y";
-        const leaf = (f.leaf ??= {
-          open: 0,
-          side: Math.sign(o[axis] - opener[axis]) || 1,
-          hold: DOOR_LEAF.holdSeconds,
-        });
-        leaf.hold = DOOR_LEAF.holdSeconds;
+      // A person in or walking at a moving door keeps it open, but only NPCs
+      // open a closed one by walking up: the player presses E.
+      const holder = people.find(
+        (a) => (f.leaf || a.id !== "human") && wantsDoorOpen(o, a),
+      );
+      if (holder) {
+        const leaf = startLeaf(o, holder);
+        leaf.hold = Math.max(leaf.hold, DOOR_LEAF.holdSeconds);
         leaf.open = Math.min(1, leaf.open + dt / DOOR_LEAF.openSeconds);
         continue;
       }
-      if (!f.leaf) continue;
-      if (
-        !g.zombies.some(
-          (z) =>
-            z.hp > 0 &&
-            z.floor === floor.index &&
-            Math.hypot(z.x - o.x, z.y - o.y) <= DOOR_LEAF.zombieRange,
-        )
-      )
-        continue;
-      if (f.leaf.hold > 0) {
-        f.leaf.hold -= dt;
+      const leaf = f.leaf;
+      if (!leaf) continue;
+      if (leaf.opener) {
+        // Closing behind the opener: stop waiting as soon as they are through.
+        const opener = people.find((a) => a.id === leaf.opener);
+        if (!opener || fieldSide(o, opener) !== leaf.from) {
+          leaf.hold = Math.min(leaf.hold, DOOR_LEAF.holdSeconds);
+          delete leaf.opener;
+          delete leaf.from;
+        }
+      }
+      if (leaf.hold > 0) {
+        leaf.hold -= dt;
+        leaf.open = Math.min(1, leaf.open + dt / DOOR_LEAF.openSeconds);
         continue;
       }
-      f.leaf.open -= dt / DOOR_LEAF.closeSeconds;
-      if (f.leaf.open <= 0) delete f.leaf;
+      leaf.open -= dt / DOOR_LEAF.closeSeconds;
+      if (leaf.open <= 0) delete f.leaf;
     }
 }
 const views = new WeakMap<

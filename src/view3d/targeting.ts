@@ -1,10 +1,11 @@
-import { doorStyle } from "../door-style";
 import { doorFrame } from "../doors";
 import { canReachStation, human } from "../engine";
+import { fieldAllows, fieldPassable } from "../force-fields";
 import type { Box } from "../furniture-geometry";
 import { canGrip } from "../handling";
 import {
   distance,
+  type Actor,
   type Furniture,
   type Game,
   type Item,
@@ -184,6 +185,15 @@ export function lookTarget(game: Game, yaw: number): LookTarget | undefined {
   return targetFootprint(a, yaw, candidates, obstruction);
 }
 
+/** An open door needs no prompt when it admits this person. */
+export function accessDoorPrompt(o: Furniture, a: Actor) {
+  if (fieldPassable(o, a)) return "";
+  if (fieldAllows(o, a)) return "E · Open door";
+  return (a.keys ?? 0) > 0
+    ? "E · Use key to open door"
+    : "Locked · needs a key or a solved terminal";
+}
+
 export function lookTargetPrompt(game: Game, target: LookTarget) {
   if (target.kind === "item")
     return `E · Take ${objectName(target.item.kind).toLowerCase()}`;
@@ -191,7 +201,7 @@ export function lookTargetPrompt(game: Game, target: LookTarget) {
     return `E · Grip ${objectName(target.object.kind).toLowerCase()}`;
   if (target.kind === "door") {
     if (target.object.field)
-      return `E · Check access: ${doorStyle(target.object).label}`;
+      return accessDoorPrompt(target.object, human(game));
     return target.object.door?.latched
       ? "E · Release door latch"
       : "Push to swing door";

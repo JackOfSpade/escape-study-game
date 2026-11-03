@@ -356,7 +356,65 @@ test("an offline first launch can only retry or cancel until a reviewed design i
   expect(relay.calls.map((c) => c.payload.phase)).toEqual(harborPhases);
 });
 
-test("an offline restart preserves the accepted run until the replacement passes review", async ({
+test("restart replays the saved level with no model call until a new level completes", async ({
+  page,
+}) => {
+  const relay = await designer(page);
+  await open(page);
+  await page.locator("#start").click();
+  await startPrepared(page);
+  const before = await state(page);
+  const calls = relay.calls.length;
+  await pause(page);
+  relay.setCapable(false);
+  await page.locator("#restart-game").click();
+  await expect.poll(async () => (await state(page)).id).not.toBe(before.id);
+  await expect(page.locator("#run-design-dialog")).toHaveCount(0);
+  const replay = await state(page);
+  expect(relay.calls).toHaveLength(calls);
+  expect({ ...replay, id: before.id, status: before.status }).toEqual(before);
+  await flush(page);
+  await page.reload();
+  await expect(page.locator("#start")).toBeVisible();
+  await page.locator("#start").click();
+  await expect.poll(async () => (await state(page)).status).toBe("playing");
+  await pause(page);
+
+  // A cancelled generation changes nothing for later restarts.
+  await page.locator("#generate-run").click();
+  await expect(page.locator("#run-design-dialog")).toBeVisible();
+  await page.locator("#run-design-cancel").click();
+  await expect(page.locator("#run-design-dialog")).toHaveCount(0);
+  expect((await state(page)).design).toEqual(before.design);
+  await page.locator("#restart-game").click();
+  await expect.poll(async () => (await state(page)).id).not.toBe(replay.id);
+  expect((await state(page)).seed).toBe(before.seed);
+  expect((await state(page)).design).toEqual(before.design);
+  await page.locator("#start").click();
+  await pause(page);
+
+  // A completed generation replaces the level, and restarts then replay that.
+  relay.setCapable(true);
+  relay.setAnswer(() => orchard);
+  await page.locator("#generate-run").click();
+  await expect
+    .poll(async () => (await state(page)).design?.design.title)
+    .toBe(orchard.title);
+  const generated = await state(page);
+  expect(generated.tiles).not.toEqual(before.tiles);
+  const afterGeneration = relay.calls.length;
+  await page.locator("#start").click();
+  await pause(page);
+  await page.locator("#restart-game").click();
+  await expect.poll(async () => (await state(page)).id).not.toBe(generated.id);
+  const again = await state(page);
+  expect(again.seed).toBe(generated.seed);
+  expect(again.tiles).toEqual(generated.tiles);
+  expect(again.design).toEqual(generated.design);
+  expect(relay.calls).toHaveLength(afterGeneration);
+});
+
+test("an offline generation preserves the accepted run until the replacement passes review", async ({
   page,
 }) => {
   const relay = await designer(page);
@@ -366,7 +424,7 @@ test("an offline restart preserves the accepted run until the replacement passes
   await pause(page);
   const before = await state(page);
   relay.setCapable(false);
-  await page.locator("#restart-game").click();
+  await page.locator("#generate-run").click();
   await expect(page.locator("#run-design-status")).toContainText("unavailable");
   await expect(page.locator("#run-design-procedural")).toHaveCount(0);
   expect(await state(page)).toEqual(before);
@@ -374,7 +432,7 @@ test("an offline restart preserves the accepted run until the replacement passes
   await expect(page.locator("#run-design-dialog")).toHaveCount(0);
   await expect(page.locator("#pause-menu")).toBeVisible();
   expect(await state(page)).toEqual(before);
-  await page.locator("#restart-game").click();
+  await page.locator("#generate-run").click();
   await expect(page.locator("#run-design-status")).toContainText("unavailable");
   expect(await state(page)).toEqual(before);
   relay.setAnswer(() => orchard);
@@ -460,7 +518,7 @@ test("reloading while individual writing is pending retains the exact object inv
   expect(relay.calls).toHaveLength(harborPhases.length + 1);
 });
 
-test("restart sends recent fictional designs and repairs a repeated design before replacing the run", async ({
+test("generating a new level sends recent fictional designs and repairs a repeated design before replacing the run", async ({
   page,
 }) => {
   const relay = await designer(page);
@@ -470,7 +528,7 @@ test("restart sends recent fictional designs and repairs a repeated design befor
   await startPrepared(page);
   const before = await state(page);
   await pause(page);
-  await page.locator("#restart-game").click();
+  await page.locator("#generate-run").click();
   await expect
     .poll(async () => (await state(page)).design?.design.title)
     .toBe(orchard.title);

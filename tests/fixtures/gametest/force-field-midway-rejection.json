@@ -141,7 +141,8 @@
       "w": 1,
       "h": 3,
       "forceField": "green",
-      "freeLimit": 1
+      "freeLimit": 1,
+      "leafOpen": true
     }
   ],
   "id": "force-field-midway-rejection",
