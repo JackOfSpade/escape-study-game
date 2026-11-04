@@ -2848,7 +2848,6 @@ function frame(time: number) {
     lookUiVisible() || ownsKeyboard(document.activeElement),
     time,
     firstPersonControls.yaw,
-    firstPersonControls.pitch,
   );
   const renderMs = performance.now() - renderStarted;
   if (time - lastUI > 200) {

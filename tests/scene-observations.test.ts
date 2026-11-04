@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { propWorldPose, type ResolvedSceneProp } from "../src/authored-scene";
+import { type ResolvedSceneProp } from "../src/authored-scene";
 import { type Roadmap } from "../src/model";
 import { makeFurniture } from "../src/office-layout";
 import {
@@ -10,7 +10,6 @@ import {
 } from "../src/npc-chatter";
 import {
   observableSceneDetails,
-  sceneLookDescription,
 } from "../src/scene-observations";
 import { createGame } from "../src/world";
 import { createPlayableGame } from "../src/world";
@@ -79,28 +78,19 @@ function fixture() {
   };
 }
 
-test("nearby object captions use the actual gaze and follow a moved and rotated support", () => {
-  const { game, floor, desk, prop, human } = fixture();
-  const look = () => {
-    const pose = propWorldPose(floor, prop)!;
-    return sceneLookDescription(
-      game,
-      Math.atan2(pose.y - human.y, pose.x - human.x),
-      Math.atan2(
-        pose.elevation + prop.h * 0.5 - 1.6,
-        Math.hypot(pose.x - human.x, pose.y - human.y),
-      ),
-    );
-  };
-  assert.match(look(), /The seed collection/);
-  assert.match(look(), /blue envelope upstairs/);
-  assert.equal(sceneLookDescription(game, Math.PI, 0), "");
+test("nearby object readings follow a moved and rotated support", () => {
+  const { game, desk, human } = fixture();
+  const reading = () =>
+    observableSceneDetails(game, human)
+      .map((item) => `${item.title}\n${item.text}`)
+      .join("\n");
+  assert.match(reading(), /The seed collection/);
+  assert.match(reading(), /blue envelope upstairs/);
   desk.y += 1;
   desk.angle = Math.PI / 2;
   human.y += 1;
-  assert.match(look(), /The seed collection/);
+  assert.match(reading(), /The seed collection/);
   desk.destroyed = true;
-  assert.equal(sceneLookDescription(game, 0, -0.5), "");
   assert.deepEqual(observableSceneDetails(game, human), []);
 });
 

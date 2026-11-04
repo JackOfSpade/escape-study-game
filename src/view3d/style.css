@@ -53,22 +53,6 @@
 #interaction-prompt {
   top: calc(50% + 22px);
 }
-#scene-description {
-  position: absolute;
-  top: calc(50% + 58px);
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(390px, 76%);
-  padding: 10px 13px;
-  border-radius: 5px;
-  background: #0b1418ed;
-  color: #e1e9df;
-  font-size: 13px;
-  line-height: 1.45;
-  text-align: left;
-  white-space: pre-line;
-  overflow-wrap: anywhere;
-}
 #pointer-hint {
   bottom: 90px;
 }
