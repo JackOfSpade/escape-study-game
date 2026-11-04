@@ -371,7 +371,10 @@ let studySaving = false;
 let studySaveGeneration = 0;
 syncDisplayScale();
 let saveToken = 0;
-async function persist() {
+function persist() {
+  return checkpoint(false);
+}
+async function checkpoint(background: boolean) {
   persistLook();
   // A placeholder world must never overwrite a checkpoint that failed to load
   // or recover. Only a validated, explicitly imported backup releases this guard.
@@ -381,7 +384,7 @@ async function persist() {
   const at = game.time;
   lastSave = at;
   try {
-    await save(game);
+    await save(game, { background });
     if (token === saveToken) saveError = "";
     return true;
   } catch (err) {
@@ -391,6 +394,28 @@ async function persist() {
         : `Save failed: ${String(err)}. Export a run backup.`;
     return false;
   }
+}
+let autosavePending = false;
+let autosaveCount = 0;
+/** Every this many autosaves (about 30 s) is a full save: its design check and
+ * synchronous mirror bound how old the last known-good local copy can get. */
+const FULL_AUTOSAVE_EVERY = 10;
+/** Autosave time spent between frames, attributed to the next frame's report. */
+let idlePersistMs = 0;
+/** Autosave in the browser's idle time, not inside a frame's budget. The world
+ * is between simulation steps there, so the snapshot is still consistent. */
+function scheduleAutosave() {
+  if (autosavePending) return;
+  autosavePending = true;
+  const run = () => {
+    autosavePending = false;
+    const started = performance.now();
+    void checkpoint(autosaveCount++ % FULL_AUTOSAVE_EVERY !== 0);
+    idlePersistMs += performance.now() - started;
+  };
+  if (typeof requestIdleCallback === "function")
+    requestIdleCallback(run, { timeout: 1000 });
+  else setTimeout(run, 0);
 }
 async function persistOrThrow(context = "Local save failed") {
   if (!(await persist())) throw Error(saveError || context);
@@ -2789,12 +2814,7 @@ function frame(time: number) {
       )
         closeTerminal();
     }
-    if (game.time - lastSave > 3) {
-      // Times only the synchronous part (diagnostic capture and save kickoff).
-      const persistStarted = performance.now();
-      persist();
-      persistMs += performance.now() - persistStarted;
-    }
+    if (game.time - lastSave > 3) scheduleAutosave();
   }
   // Spatial listener pose follows looking as well as walking. This also stops
   // pending speech immediately when pausing or the study view disables gameplay.
@@ -2856,6 +2876,10 @@ function frame(time: number) {
     uiMs += performance.now() - uiStarted;
     lastUI = time;
   }
+  // Times only the synchronous part (diagnostic capture and save kickoff).
+  persistMs += idlePersistMs;
+  const betweenFramesMs = idlePersistMs;
+  idlePersistMs = 0;
   if (measuring) {
     benchmarkDrawCalls = Math.max(
       benchmarkDrawCalls,
@@ -2868,7 +2892,7 @@ function frame(time: number) {
     const report = framePerformance.sample(game.id, time, {
       simulationMs,
       renderMs,
-      totalMs: performance.now() - frameStarted,
+      totalMs: performance.now() - frameStarted + betweenFramesMs,
       steps,
       persistMs,
       uiMs,

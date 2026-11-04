@@ -292,8 +292,34 @@ export function poolIrradiance(intensity: number, d: number) {
   return ((intensity * FIXTURE_HEIGHT) / r / Math.max(r2, 0.01)) * cutoff ** 2;
 }
 
-/** One fixture's light on the floor grid, occluded by real walls. Values are
- * a dense window of lightmap texels starting at (x0, y0). */
+/** The ceiling plane above each floor, just over the fixtures. */
+export const CEILING_HEIGHT = 2.82;
+/** Interior shaders sample the lightmap this far off a surface. */
+export const SURFACE_OFFSET = 0.3;
+/** Wall heights with a baked light value; shaders interpolate between them. */
+export const WALL_SAMPLE_HEIGHTS = [0.2, 1.2, 2.4] as const;
+/** 0.5 m texels cannot hold the peak right above a lamp, which its housing
+ * covers anyway, so the baked ceiling curve flattens inside this radius. */
+const CEILING_PEAK_RADIUS = 0.4;
+const lightWindow = (r: number) =>
+  Math.max(0, 1 - (r / FIXTURE_RANGE) ** 4) ** 2;
+
+/** Irradiance on the ceiling at horizontal distance `d` from a fixture. The
+ * lamp hangs just under it, which makes the bright glow around every fixture. */
+export function ceilingIrradiance(intensity: number, d: number) {
+  const dy = CEILING_HEIGHT - FIXTURE_HEIGHT,
+    r = Math.hypot(Math.max(d, CEILING_PEAK_RADIUS), dy);
+  return ((intensity * dy) / r ** 3) * lightWindow(r);
+}
+
+/** Irradiance on a wall squarely facing a fixture, `d` metres away. */
+export function wallIrradiance(intensity: number, d: number, height: number) {
+  const r = Math.hypot(d, FIXTURE_HEIGHT - height);
+  return ((intensity * d) / r ** 3) * lightWindow(r);
+}
+
+/** One fixture's light on the floor grid, occluded by real walls. Each array
+ * is a dense window of lightmap texels starting at (x0, y0). */
 export interface FixturePool {
   fixture: CeilingFixture;
   warm: boolean;
@@ -302,6 +328,13 @@ export interface FixturePool {
   w: number;
   h: number;
   values: Float32Array;
+  ceiling: Float32Array;
+  /** Light vector per WALL_SAMPLE_HEIGHTS entry, as x then z arrays. Dotting
+   * it with a wall's normal gives that wall's irradiance, and summing vectors
+   * across lamps stays exact because every unoccluded lamp is in front of it.
+   * A free-standing body between two baked lamps sees them partly cancel; the
+   * room bounce and the three nearest real lights cover that approximation. */
+  walls: Float32Array[];
 }
 
 const solidTile = (floor: Floor, x: number, y: number) =>
@@ -374,6 +407,11 @@ export function fixturePools(plan: InteriorLighting): FixturePool[] {
         w = x1 - x0,
         h = y1 - y0,
         values = new Float32Array(w * h),
+        ceiling = new Float32Array(w * h),
+        walls = WALL_SAMPLE_HEIGHTS.flatMap(() => [
+          new Float32Array(w * h),
+          new Float32Array(w * h),
+        ]),
         intensity = fixtureIntensity(fixture);
       for (let y = 0; y < h; y++)
         for (let x = 0; x < w; x++) {
@@ -382,10 +420,30 @@ export function fixturePools(plan: InteriorLighting): FixturePool[] {
           if (!inside(floor, p)) continue;
           const d = Math.hypot(p.x - fixture.x, p.y - fixture.y);
           if (d >= FIXTURE_RANGE || !litFrom(floor, fixture, p)) continue;
-          values[y * w + x] = poolIrradiance(intensity, d);
+          const i = y * w + x;
+          values[i] = poolIrradiance(intensity, d);
+          ceiling[i] = ceilingIrradiance(intensity, d);
+          if (d < 1e-6) continue;
+          // The wall itself is SURFACE_OFFSET beyond the texel it samples.
+          WALL_SAMPLE_HEIGHTS.forEach((height, layer) => {
+            const e = wallIrradiance(intensity, d + SURFACE_OFFSET, height);
+            walls[layer * 2][i] = (e * (fixture.x - p.x)) / d;
+            walls[layer * 2 + 1][i] = (e * (fixture.y - p.y)) / d;
+          });
         }
-      fillSolidTexels(floor, values, w, h, x0, y0);
-      return { fixture, warm: fixture.level > 0.5, x0, y0, w, h, values };
+      for (const channel of [values, ceiling, ...walls])
+        fillSolidTexels(floor, channel, w, h, x0, y0);
+      return {
+        fixture,
+        warm: fixture.level > 0.5,
+        x0,
+        y0,
+        w,
+        h,
+        values,
+        ceiling,
+        walls,
+      };
     });
 }
 

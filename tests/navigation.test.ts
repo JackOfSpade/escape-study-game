@@ -5,7 +5,7 @@ import { DOOR_SWING, doorFrame, doorPose, ensureDoor } from "../src/doors";
 import { pushFurniture, rotate, step } from "../src/engine";
 import type { Roadmap, Zombie } from "../src/model";
 import { CONFIG, distance } from "../src/model";
-import { survivorPath, walkSegment } from "../src/navigation";
+import { routePose, survivorPath, walkSegment } from "../src/navigation";
 import { canPlace, inFurniture, solid } from "../src/spatial";
 import { actor, createGame } from "../src/world";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
@@ -531,4 +531,25 @@ test("moving a barricade into an NPC's committed doorway route invalidates it be
     1,
   );
   assert.equal(g.study.learner!.evidence.length, 0);
+});
+
+test("a swinging door keeps the route graph until its swing changes routing", () => {
+  const leaf = (angle: number, latched = false) =>
+    ({
+      id: "door",
+      x: 10 + angle,
+      y: 5 - angle,
+      angle,
+      door: { latched },
+    }) as unknown as Parameters<typeof routePose>[0];
+  // A leaf pushed through its near-closed arc is ignored by routing.
+  assert.deepEqual(routePose(leaf(0.02)), routePose(leaf(0.45)));
+  assert.deepEqual(routePose(leaf(-0.3)), routePose(leaf(0)));
+  // A swung leaf is routed around at its exact pose.
+  assert.notDeepEqual(routePose(leaf(0.45)), routePose(leaf(0.8)));
+  assert.notDeepEqual(routePose(leaf(0.801)), routePose(leaf(0.805)));
+  // Ordinary furniture still rebuilds on any move.
+  const chair = (x: number) =>
+    ({ id: "chair", x, y: 5 }) as unknown as Parameters<typeof routePose>[0];
+  assert.notDeepEqual(routePose(chair(3)), routePose(chair(3.001)));
 });

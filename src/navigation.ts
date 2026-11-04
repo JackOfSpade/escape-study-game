@@ -33,7 +33,25 @@ interface Snapshot {
 }
 const POSE = 6;
 const poseFlags = (o: Floor["furniture"][number]) =>
-  (o.destroyed ? 1 : 0) | (o.open ? 2 : 0) | (o.turning < 0 ? 4 : 0);
+  (o.destroyed ? 1 : 0) |
+  (o.open ? 2 : 0) |
+  (o.turning < 0 ? 4 : 0) |
+  (o.door?.latched ? 8 : 0);
+/** Below this swing an unlatched leaf is pushed aside, not routed around. */
+const DOOR_ROUTE_ANGLE = 0.5;
+/** What routing actually depends on. A hinged leaf's position follows from its
+ * angle and its crossing from its fixed frame, so a door moving through its
+ * near-closed arc keeps the same graph rather than rebuilding it every step.
+ * A swung leaf stays exact: tight gaps beside it need its true corners. */
+export function routePose(o: Floor["furniture"][number]) {
+  if (!o.door) return { x: o.x, y: o.y, angle: o.angle ?? 0 };
+  const angle = o.angle ?? 0;
+  return {
+    x: 0,
+    y: 0,
+    angle: o.door.latched || Math.abs(angle) < DOOR_ROUTE_ANGLE ? 0 : angle,
+  };
+}
 function tilesMatch(tiles: Float64Array, f: Floor) {
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++)
@@ -44,15 +62,16 @@ function furnitureMatches(s: Snapshot, f: Floor) {
   if (s.ids.length !== f.furniture.length) return false;
   for (let i = 0; i < f.furniture.length; i++) {
     const o = f.furniture[i],
-      j = i * POSE;
+      j = i * POSE,
+      pose = routePose(o);
     if (
       s.ids[i] !== o.id ||
       s.kinds[i] !== o.kind ||
-      s.poses[j] !== o.x ||
-      s.poses[j + 1] !== o.y ||
+      s.poses[j] !== pose.x ||
+      s.poses[j + 1] !== pose.y ||
       s.poses[j + 2] !== o.w ||
       s.poses[j + 3] !== o.h ||
-      s.poses[j + 4] !== (o.angle ?? 0) ||
+      s.poses[j + 4] !== pose.angle ||
       s.poses[j + 5] !== poseFlags(o)
     )
       return false;
@@ -68,12 +87,13 @@ function snapshotTiles(f: Floor) {
 function snapshotFurniture(f: Floor, tiles: Float64Array): Snapshot {
   const poses = new Float64Array(f.furniture.length * POSE);
   f.furniture.forEach((o, i) => {
-    const j = i * POSE;
-    poses[j] = o.x;
-    poses[j + 1] = o.y;
+    const j = i * POSE,
+      pose = routePose(o);
+    poses[j] = pose.x;
+    poses[j + 1] = pose.y;
     poses[j + 2] = o.w;
     poses[j + 3] = o.h;
-    poses[j + 4] = o.angle ?? 0;
+    poses[j + 4] = pose.angle;
     poses[j + 5] = poseFlags(o);
   });
   return {

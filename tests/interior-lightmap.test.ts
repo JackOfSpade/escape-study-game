@@ -4,9 +4,13 @@ import test from "node:test";
 import { PerspectiveCamera } from "three";
 import {
   buildInteriorLighting,
+  CEILING_HEIGHT,
+  FIXTURE_HEIGHT,
+  FIXTURE_RANGE,
   fixtureIntensity,
   fixturePools,
   poolIrradiance,
+  WALL_SAMPLE_HEIGHTS,
 } from "../src/interior-lighting";
 import { type Roadmap } from "../src/model";
 import { InteriorAtmosphere } from "../src/view3d/interior-atmosphere";
@@ -85,4 +89,88 @@ test("practical lights take over exactly the share they remove from the lightmap
   for (let i = 0; i < 40; i++) atmosphere.update(game, camera, 0.1);
   assert.ok(lightmap.sample(1, fixture.x, fixture.y)!.pool >= full * 0.9);
   atmosphere.dispose();
+});
+
+/** Irradiance from a real three.js PointLight (decay 2, finite range). */
+function realLight(intensity: number, offset: number, along: number) {
+  const r = Math.hypot(offset, along),
+    window = Math.max(0, 1 - (r / FIXTURE_RANGE) ** 4) ** 2;
+  return ((intensity * along) / r ** 3) * window;
+}
+
+function singleLamp() {
+  const game = createPlayableGame(42, roadmap),
+    floor = game.floors[1];
+  floor.tiles = floor.tiles.map((row, y) =>
+    row.map((_, x) =>
+      x === 0 || y === 0 || x === row.length - 1 || y === floor.tiles.length - 1
+        ? 1
+        : 0,
+    ),
+  );
+  floor.furniture = [];
+  delete floor.boundary;
+  const plan = buildInteriorLighting(floor, game.seed);
+  plan.zones = [];
+  plan.stories = [];
+  plan.fixtures = [
+    { id: "lamp", x: 16.5, y: 15.5, level: 0.82, color: "#f2d7a3" },
+  ];
+  const lightmap = new InteriorLightmap();
+  lightmap.build(1, plan);
+  return { lightmap, intensity: fixtureIntensity(plan.fixtures[0]) };
+}
+
+test("a distant lamp keeps the same ceiling glow a real light gives up close", () => {
+  const { lightmap, intensity } = singleLamp(),
+    dy = CEILING_HEIGHT - FIXTURE_HEIGHT;
+  // Distances land on texel centres (0.5 m texels, lamp mid-tile).
+  for (const d of [0.75, 1.25, 2.25, 3.25, 5.25]) {
+    const baked = lightmap.surface(1, 16.5 + d, 15.5)!.ceiling,
+      real = realLight(intensity, d, dy);
+    assert.ok(
+      Math.abs(baked - real) < real * 0.4,
+      `ceiling at ${d} m: baked ${baked}, real ${real}`,
+    );
+  }
+  const close = realLight(intensity, 1, dy),
+    far = lightmap.surface(1, 16.5 + 4, 15.5)!.ceiling;
+  assert.ok(
+    lightmap.surface(1, 16.5 + 1, 15.5)!.ceiling > far * 4,
+    `the glow is a pool around the lamp, not a flat wash (${close}, ${far})`,
+  );
+});
+
+test("a wall's baked light matches a real lamp at each height and direction", () => {
+  const { lightmap, intensity } = singleLamp(),
+    offset = 0.3;
+  // A wall facing the lamp, read 0.3 m off its surface as the shader does.
+  for (const wallAt of [1.5, 3]) {
+    const sampleAt = wallAt - offset,
+      texel = lightmap.surface(1, 16.5 + sampleAt, 15.5)!;
+    WALL_SAMPLE_HEIGHTS.forEach((height, layer) => {
+      // The wall's outward normal points back at the lamp, along -x.
+      const baked = -texel.walls[layer].x,
+        real = realLight(intensity, FIXTURE_HEIGHT - height, wallAt);
+      assert.ok(
+        Math.abs(baked - real) < real * 0.25,
+        `wall ${wallAt} m away at ${height} m: baked ${baked}, real ${real}`,
+      );
+      assert.ok(Math.abs(texel.walls[layer].y) < real * 0.25);
+    });
+  }
+});
+
+test("a practical takes over its lamp's share of the ceiling and walls too", () => {
+  const { lightmap } = singleLamp(),
+    before = lightmap.surface(1, 18.5, 15.5)!;
+  assert.ok(before.ceiling > 0 && before.walls[2].x < 0);
+  lightmap.setPracticals(1, new Map([["lamp", 1]]));
+  const held = lightmap.surface(1, 18.5, 15.5)!;
+  assert.ok(held.ceiling < 1e-5);
+  assert.ok(Math.abs(held.walls[2].x) < 1e-5);
+  lightmap.setPracticals(1, new Map());
+  const after = lightmap.surface(1, 18.5, 15.5)!;
+  assert.ok(Math.abs(after.ceiling - before.ceiling) < 1e-5);
+  assert.ok(Math.abs(after.walls[2].x - before.walls[2].x) < 1e-5);
 });

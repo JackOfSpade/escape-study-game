@@ -27,6 +27,22 @@ import { playerCanSee, sightRadius, visibilityPolygon } from "./visibility";
 import { stairContactCues } from "./zombie-stairs";
 import { npcSpeechBubble, speechLines } from "./speech-bubbles";
 
+/** How long an object visibly reacts to a zombie strike in the 2D view. */
+const STRIKE_SHAKE_SECONDS = 0.35;
+/** Sideways offset of the 2D impact shake. Only a recent strike shakes an
+ * object: lasting damage, including authored wear, shows as cracks and holds
+ * still. */
+export function strikeShake(
+  o: { struckAt?: number },
+  time: number,
+  reducedFlash = false,
+) {
+  if (reducedFlash || o.struckAt === undefined) return 0;
+  const since = time - o.struckAt;
+  return since >= 0 && since < STRIKE_SHAKE_SECONDS
+    ? Math.sin(time * 39) * 0.025
+    : 0;
+}
 const tileMemory = new WeakMap<
   Game["survivors"][number],
   {
@@ -481,12 +497,7 @@ export function render(
     ctx.save();
     ctx.translate(o.x, o.y);
     ctx.rotate(o.angle ?? 0);
-    if (
-      !g.settings.reducedFlash &&
-      o.hp < o.maxHp &&
-      Math.sin(g.time * 16 + o.x) > 0.5
-    )
-      ctx.translate(Math.sin(g.time * 39) * 0.025, 0);
+    ctx.translate(strikeShake(o, g.time, g.settings.reducedFlash), 0);
     drawFurniture(ctx, o, theme);
     if (damage > 0.2) {
       ctx.strokeStyle = p.sky;

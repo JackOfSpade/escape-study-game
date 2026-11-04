@@ -2175,12 +2175,11 @@ function strikeFurniture(
     g.surge.state === "active"
       ? BARRICADE_ATTACK.surgeDamage
       : BARRICADE_ATTACK.damage;
+  ob.struckAt = g.time;
   const hit = event(
     g,
     "barricade-hit",
-    ob.field
-      ? "A zombie struck a door."
-      : "A zombie struck a barricade.",
+    ob.field ? "A zombie struck a door." : "A zombie struck a barricade.",
     floor,
     z.id,
   );
