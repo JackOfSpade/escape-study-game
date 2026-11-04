@@ -252,8 +252,9 @@ test("prepared runs wait for an explicit Start before gameplay and across reload
   relay.setHeld(false);
   relay.finish(relay.calls[0]);
   await prepared(page);
-  await expect(page.locator("#start-card")).toContainText(
-    "Your escape is ready",
+  await expect(page.locator("#start")).toContainText("Start game");
+  await expect(page.locator("#start-card")).not.toContainText(
+    /your escape is ready/i,
   );
   const ready = await expectFrozen(page);
   expect(ready.time).toBe(0);
