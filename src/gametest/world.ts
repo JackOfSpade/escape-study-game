@@ -121,6 +121,7 @@ export function spawn(g: Game, s: Spawn, replace = false) {
         : s.freeLimit
           ? { limit: s.freeLimit, direction: s.freeDirection ?? 1 }
           : {}),
+      ...(s.leafOpen ? { leaf: { open: 1, side: 1, hold: 0 } } : {}),
     };
   if (o.kind === "door" && !o.field) {
     o.angle = 0;

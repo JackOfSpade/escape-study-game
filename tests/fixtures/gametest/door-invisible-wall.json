@@ -3,7 +3,7 @@
   "seed": 42,
   "template": "arena",
   "simulation": "physics",
-  "maxTicks": 500,
+  "maxTicks": 200,
   "startTime": 0,
   "naturalSpawns": false,
   "rules": "force-fields",
@@ -12,47 +12,33 @@
     {
       "tick": 1,
       "type": "move",
+      "id": "opener",
+      "x": 1,
+      "y": 0
+    },
+    {
+      "tick": 1,
+      "type": "move",
       "id": "human",
       "x": 1,
       "y": 0
     },
     {
-      "tick": 130,
-      "type": "move",
-      "id": "attacker",
-      "x": 1,
-      "y": 0
+      "tick": 14,
+      "type": "door",
+      "id": "opener",
+      "target": "door"
+    },
+    {
+      "tick": 60,
+      "type": "checkpoint"
     }
   ],
   "checks": [
     {
-      "name": "Door swings open as the survivor reaches it",
+      "name": "The opener's key swings the door open",
       "mode": "at",
-      "tick": 25,
-      "query": {
-        "type": "property",
-        "id": "door",
-        "field": "doorOpen"
-      },
-      "op": "gte",
-      "expected": 0.5
-    },
-    {
-      "name": "Survivor walks through",
-      "mode": "at",
-      "tick": 65,
-      "query": {
-        "type": "property",
-        "id": "human",
-        "field": "x"
-      },
-      "op": "gte",
-      "expected": 15
-    },
-    {
-      "name": "Door stays open with the zombie far away",
-      "mode": "at",
-      "tick": 125,
+      "tick": 30,
       "query": {
         "type": "property",
         "id": "door",
@@ -62,9 +48,32 @@
       "expected": 1
     },
     {
-      "name": "Door has closed itself once the zombie is near",
+      "name": "The opener walks through",
       "mode": "at",
-      "tick": 500,
+      "tick": 120,
+      "query": {
+        "type": "property",
+        "id": "opener",
+        "field": "x"
+      },
+      "op": "gte",
+      "expected": 15
+    },
+    {
+      "name": "An invisible wall stops the player with no access the whole time",
+      "mode": "always",
+      "query": {
+        "type": "property",
+        "id": "human",
+        "field": "x"
+      },
+      "op": "lte",
+      "expected": 11.76
+    },
+    {
+      "name": "The door closes behind the opener",
+      "mode": "at",
+      "tick": 190,
       "query": {
         "type": "property",
         "id": "door",
@@ -72,18 +81,6 @@
       },
       "op": "eq",
       "expected": 0
-    },
-    {
-      "name": "The zombie is held at the door",
-      "mode": "at",
-      "tick": 500,
-      "query": {
-        "type": "property",
-        "id": "attacker",
-        "field": "x"
-      },
-      "op": "lte",
-      "expected": 11.8
     }
   ],
   "maps": [
@@ -132,13 +129,15 @@
       "id": "human",
       "kind": "player",
       "x": 10,
-      "y": 11.8
+      "y": 11.8,
+      "keys": 0
     },
     {
-      "id": "attacker",
-      "kind": "zombie",
-      "x": 2,
-      "y": 12.5
+      "id": "opener",
+      "kind": "npc",
+      "x": 10,
+      "y": 13.2,
+      "keys": 1
     },
     {
       "id": "door",
@@ -147,9 +146,9 @@
       "y": 12.5,
       "w": 1,
       "h": 3,
-      "forceField": "green"
+      "forceField": "red"
     }
   ],
-  "id": "door-stays-open-until-zombie",
-  "name": "An access door stays open behind a survivor and closes itself when a zombie comes near"
+  "id": "door-invisible-wall",
+  "name": "Another survivor opening a locked door does not let a player without access through"
 }

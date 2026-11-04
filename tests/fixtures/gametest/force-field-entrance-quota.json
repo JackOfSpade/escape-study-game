@@ -17,6 +17,12 @@
       "y": 0
     },
     {
+      "tick": 12,
+      "type": "door",
+      "id": "human",
+      "target": "field"
+    },
+    {
       "tick": 66,
       "type": "move",
       "id": "human",

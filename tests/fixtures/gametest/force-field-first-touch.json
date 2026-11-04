@@ -11,6 +11,12 @@
   "actions": [
     {
       "tick": 1,
+      "type": "door",
+      "id": "human",
+      "target": "field"
+    },
+    {
+      "tick": 1,
       "type": "move",
       "id": "human",
       "x": 1,

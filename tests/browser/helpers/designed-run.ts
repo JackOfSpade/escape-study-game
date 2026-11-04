@@ -124,6 +124,20 @@ async function finishSyntheticDesign(page: Page, state: SyntheticDesigner) {
   }
 }
 
+/** A restart replays the saved level: no design dialog, only Start. */
+export async function startRestartedRun(page: Page) {
+  await page.waitForFunction(() => {
+    const game = (window as any).__deadAir.game;
+    return game.status === "ready" && !game.preparingRun && !game.paused;
+  });
+  await expect(page.locator("#run-design-dialog")).toHaveCount(0);
+  await page.locator("#start").click();
+  await page.waitForFunction(() => {
+    const game = (window as any).__deadAir.game;
+    return game.status === "playing" && !game.paused;
+  });
+}
+
 /** Complete every new run through the real quality pipeline using local replies. */
 export async function chooseDesignedRun(page: Page) {
   const designer = await syntheticDesigner(page);

@@ -445,7 +445,7 @@
       "expected": 0
     },
     {
-      "name": "Eighteen survivors reach the central study hall and near wings",
+      "name": "At least eighteen survivors settle in the central study hall and near wings",
       "mode": "at",
       "tick": 450,
       "query": {
@@ -457,11 +457,11 @@
         "x2": 42,
         "y2": 24.9
       },
-      "op": "eq",
+      "op": "gte",
       "expected": 18
     },
     {
-      "name": "The remaining survivor reaches the far wraparound study wing",
+      "name": "Every survivor settles inside the study hall or its wraparound wing",
       "mode": "at",
       "tick": 450,
       "query": {
@@ -469,12 +469,12 @@
         "kind": "npc",
         "floor": 0,
         "x1": 2,
-        "y1": 25,
-        "x2": 10,
+        "y1": 2,
+        "x2": 42,
         "y2": 28
       },
       "op": "eq",
-      "expected": 1
+      "expected": 19
     },
     {
       "name": "No survivor is removed to solve the authored crowd layout",

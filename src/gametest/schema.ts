@@ -30,6 +30,8 @@ export interface Spawn extends Point {
   credential?: boolean;
   keys?: number;
   forceField?: "green" | "red" | "exit";
+  /** Start an access door with its leaf already open, as if someone just used it. */
+  leafOpen?: boolean;
   freeLimit?: number;
   freeDirection?: -1 | 1;
 }
@@ -63,7 +65,7 @@ export interface Check {
           | "alive"
           | "latched"
           | "absAngle"
-    | "doorOpen";
+          | "doorOpen";
       }
     | { type: "count"; kind: "npc" | "zombie" }
     | {
@@ -170,6 +172,7 @@ function spawn(v: unknown, city = false): asserts v is Spawn {
     "credential",
     "keys",
     "forceField",
+    "leafOpen",
     "freeLimit",
     "freeDirection",
   ]);
@@ -219,6 +222,11 @@ function spawn(v: unknown, city = false): asserts v is Spawn {
       ((v.kind === "door" || v.kind === "gate") &&
         ["green", "red", "exit"].includes(String(v.forceField))),
     "Invalid force field.",
+  );
+  requireThat(
+    v.leafOpen === undefined ||
+      (v.leafOpen === true && v.forceField !== undefined),
+    "Only an access door can start with its leaf open.",
   );
   requireThat(
     v.freeDirection === undefined ||

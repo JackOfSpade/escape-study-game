@@ -1,4 +1,3 @@
-import { doorStyle } from "../door-style";
 import { doorFrame } from "../doors";
 import {
   canBoard,
@@ -10,7 +9,7 @@ import {
 import { surfacePoint } from "../furniture-geometry";
 import { distance, type Game } from "../model";
 import { objectName } from "../render";
-import { lookTarget, lookTargetPrompt } from "./targeting";
+import { accessDoorPrompt, lookTarget, lookTargetPrompt } from "./targeting";
 import { sceneLookDescription } from "../scene-observations";
 
 /** Use the same reach queries and priority as E; the prompt never grants reach. */
@@ -44,7 +43,7 @@ export function interactionPrompt(game: Game, yaw?: number) {
     if (!usable) return "Terminal in use";
     return "E · Open terminal";
   }
-  if (door?.field) return `E · Check access: ${doorStyle(door).label}`;
+  if (door?.field) return accessDoorPrompt(door, a);
   if (door?.door && !door.door.latched)
     return "Push to swing door · E near handle to grip";
   return door ? "E · Release door latch" : "";

@@ -632,6 +632,8 @@ $("#pause-toggle").onclick = () =>
   setPaused(!$<HTMLDialogElement>("#pause-menu").open);
 $("#resume-game").onclick = () => setPaused(false);
 $("#restart-game").onclick = () => void fresh($("#pause-save-status"));
+$("#generate-run").onclick = () =>
+  void fresh($("#pause-save-status"), { generate: true });
 $("#save-quit").onclick = () => void saveAndQuit();
 $("#pause-menu").addEventListener("cancel", (event) => {
   event.preventDefault();
@@ -838,11 +840,27 @@ function preserveRunLearning(g: Game, archive = false) {
 const RESTART_ASSESSMENT_WAIT_MS = 12_000;
 let restarting = false,
   unsavedRestartConfirmed = false;
+/** The level a restart replays: the current design and seed, with no model call.
+ * Saves from before this rule, or a design this build rejects, get a new one. */
+function currentRunChoice(g: Game): RunChoice | undefined {
+  if (!g.design || g.preparingRun) return undefined;
+  const choice = { seed: g.seed, saved: structuredClone(g.design) };
+  try {
+    createGame(choice.seed, roadmap, structuredClone(g.study), choice.saved);
+    return choice;
+  } catch {
+    return undefined;
+  }
+}
 /** A restart first archives this run's learning and writes it durably; a new
  * run starts only once that save succeeded, or on a second press after a
- * failed save. */
+ * failed save. It replays the current level unless asked to generate a new one,
+ * and only a completed generation changes what later restarts replay. */
 let designingNextRun = false;
-async function fresh(statusLine?: HTMLElement) {
+async function fresh(
+  statusLine?: HTMLElement,
+  { generate = false }: { generate?: boolean } = {},
+) {
   if (saveRecoveryError) {
     if (statusLine) statusLine.textContent = saveRecoveryError;
     return false;
@@ -850,12 +868,13 @@ async function fresh(statusLine?: HTMLElement) {
   if (restarting || designingNextRun) return false;
   designingNextRun = true;
   const beforeDesign = game;
-  let choice: RunChoice | undefined;
+  let choice: RunChoice | undefined, reused: RunChoice | undefined;
   try {
     firstPersonControls.release();
     keys.clear();
     jumpRequested = false;
-    choice = await chooseRunDesign(game, roadmap);
+    reused = generate ? undefined : currentRunChoice(game);
+    choice = reused ?? (await chooseRunDesign(game, roadmap));
   } finally {
     designingNextRun = false;
   }
@@ -920,7 +939,7 @@ async function fresh(statusLine?: HTMLElement) {
   jumpRequested = false;
   closeTerminal();
   readyRun();
-  if (await persist()) finishRunDesign(previous.id, choice);
+  if ((await persist()) && !reused) finishRunDesign(previous.id, choice);
   return true;
 }
 function startCard() {
@@ -1251,7 +1270,7 @@ async function interact() {
       const allowed = toggleDoor(game, a, door.id);
       if (allowed && (a.keys ?? 0) === before)
         game.notice =
-          "This door opens for you: walk through. Zombies must break it.";
+          "Door open: walk through and it closes behind you. Zombies must break it.";
       persist();
       return;
     }
@@ -2589,14 +2608,14 @@ function ui() {
       ? "Review your saved work or begin another run."
       : game.time < spawnGrace(game)
         ? game.rules === "force-fields"
-          ? `Swarm begins in ${Math.ceil(spawnGrace(game) - game.time)}s. Green-lit doors open for you. E uses a key on a red-lit door. The rear study hall stays open.`
+          ? `Swarm begins in ${Math.ceil(spawnGrace(game) - game.time)}s. Press E to open a green-lit door; it closes behind you. E uses a key on a red-lit door.`
           : `Zombies spawn in ${Math.ceil(spawnGrace(game) - game.time)}s. E releases a door latch; move to push it open.`
         : a.floor === CONFIG.floors
           ? "Reach the helipad and press E while a helicopter is boarding. Four seats per trip."
           : a.access.includes(a.floor)
             ? "Your credential is personal. Walk into the staircase at the north edge of the floor. Space jumps; watch for broken guards."
             : game.rules === "force-fields"
-              ? "Solve a solo terminal for personal stair access and one key. Other entrance passes run out; the rear study hall stays open. E uses a key on a red-lit door. Green fields still block zombies. Space jumps."
+              ? "Solve a solo terminal for personal stair access and one key. Other entrance passes run out; the rear study hall stays available. Press E to open a door; a door someone else opened still stops you without access. E uses a key on a red-lit door. Space jumps."
               : "Find a glowing terminal. Solo work or meaningful shared-room defense can earn your credential. Walk into light furniture to push it; E grips heavier pieces to drag and pivot. Space jumps; facing a barricade vaults it.";
   $("#pickup").textContent =
     game.status === "escaped"

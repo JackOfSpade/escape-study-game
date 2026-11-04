@@ -10,9 +10,10 @@ import {
 } from "../src/engine";
 import { TestRunner } from "../src/gametest/runner";
 import { emptyScenario } from "../src/gametest/schema";
-import type { Roadmap } from "../src/model";
+import type { Actor, Furniture, Roadmap } from "../src/model";
 import { interactionPrompt } from "../src/view3d/hud";
 import {
+  accessDoorPrompt,
   lookTarget,
   lootSlot,
   rayFootprintDistance,
@@ -21,6 +22,21 @@ import {
 import { createGame } from "../src/world";
 
 const origin = { x: 0, y: 0 };
+test("an access door's prompt says what E does, never asks to check it", () => {
+  const door = {
+    id: "d",
+    field: { authorized: [], crossing: [], sides: {}, used: 0, exit: true },
+  } as unknown as Furniture;
+  const a = { id: "human", access: [], keys: 0 } as unknown as Actor;
+  assert.match(accessDoorPrompt(door, a), /^Locked/);
+  a.keys = 1;
+  assert.equal(accessDoorPrompt(door, a), "E · Use key to open door");
+  door.field!.authorized.push("human");
+  assert.equal(accessDoorPrompt(door, a), "E · Open door");
+  door.field!.leaf = { open: 1, side: 1, hold: 1 };
+  assert.equal(accessDoorPrompt(door, a), "");
+});
+
 test("targeting ray intersects oriented footprints in metres, including parallel, inside and grazing rays", () => {
   const box = { x: 2, y: 0, w: 1, h: 1 };
   assert.equal(rayFootprintDistance(origin, 10, 0, box), 1.5);

@@ -1,4 +1,4 @@
-import { chooseDesignedRun, startDesignedRun } from "./helpers/designed-run";
+import { startDesignedRun, startRestartedRun } from "./helpers/designed-run";
 import { expect, test } from "@playwright/test";
 import {
   flushNativeSave,
@@ -128,7 +128,7 @@ test("after combat death the live building can be watched, paused and reloaded w
   // A new run leaves spectator mode.
   await page.getByRole("button", { name: "Run summary" }).click();
   await page.getByRole("button", { name: "Begin another run" }).click();
-  await chooseDesignedRun(page);
+  await startRestartedRun(page);
   await expect(page.locator("body")).not.toHaveClass(/spectating/);
   await expect(page.locator("#spectator")).toBeHidden();
   await expect(page.locator("#start-card")).toBeHidden();

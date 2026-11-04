@@ -85,6 +85,7 @@ test("merged forward opening consumes free passes on first touch, closes permane
   assert.ok(o.field!.limit! >= 3);
   o.field!.limit = 1;
   const f = o.field!;
+  f.leaf = { open: 1, side: 1, hold: 30 };
   // Vertical openings cross along x, horizontal ones along y; the free pass is
   // granted to arrivals from the side opposite the field's direction.
   const axis = o.h >= o.w ? "x" : "y",
@@ -414,7 +415,12 @@ test("a quota exhausted during a cached approach reroutes the remaining zero-key
   const r = fixture("force-field-explore-alternate"),
     g = r.game,
     o = g.floors[0].furniture.find((o) => o.id === "locked")!;
-  Object.assign(o.field!, { limit: 1, used: 0, direction: 1 });
+  Object.assign(o.field!, {
+    limit: 1,
+    used: 0,
+    direction: 1,
+    leaf: { open: 1, side: 1, hold: 30 },
+  });
   Object.assign(g.survivors[0], { floor: 0, x: 26.5, y: 24.5 });
   for (const a of g.survivors.slice(1)) {
     a.target = { x: 27.8, y: 24.5 };

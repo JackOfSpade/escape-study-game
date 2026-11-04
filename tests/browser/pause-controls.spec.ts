@@ -1,4 +1,4 @@
-import { chooseDesignedRun } from "./helpers/designed-run";
+import { chooseDesignedRun, startRestartedRun } from "./helpers/designed-run";
 import { expect, test, type Page } from "./helpers/offline-test";
 import { enterLegacyBuilding } from "./helpers/legacy-world";
 import { environmentDesignFixture } from "../helpers/environment-design";
@@ -47,6 +47,7 @@ test("player controls live in the pause dialog and developer tools stay hidden",
     "resume-game",
     "settings-toggle",
     "restart-game",
+    "generate-run",
     "save-quit",
   ])
     await expect(menu.locator(`#${id}`)).toBeVisible();
@@ -156,6 +157,7 @@ test("pause restart retains original progress and archives unfinished human work
   });
   await page.keyboard.press("Escape");
   await page.locator("#restart-game").click();
+  // This legacy world has no saved design, so its first restart generates one.
   await chooseDesignedRun(page);
   await expect(page.locator("#pause-menu")).not.toBeVisible();
   const after = await page.evaluate((id) => {
@@ -273,7 +275,9 @@ test("diagnostics retain only newest three runs, including pause/restart and no 
   for (let i = 0; i < 3; i++) {
     await page.keyboard.press("Escape");
     await page.locator("#restart-game").click();
-    await chooseDesignedRun(page);
+    // The legacy world generates a design once; later restarts replay it.
+    if (i === 0) await chooseDesignedRun(page);
+    else await startRestartedRun(page);
     await expect(page.locator("#pause-menu")).not.toBeVisible();
   }
   await page.keyboard.press("Escape");

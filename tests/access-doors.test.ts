@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { doorLeaves, doorStyle, presetDoorStyle } from "../src/door-style";
-import { DOOR_LEAF, updateDoorLeaves } from "../src/force-fields";
+import {
+  DOOR_LEAF,
+  fieldPassable,
+  updateDoorLeaves,
+  useField,
+} from "../src/force-fields";
 import type { Furniture, Game, Roadmap } from "../src/model";
 import {
   parseRunDesign,
@@ -49,44 +54,102 @@ const world = (o: Furniture, survivors: unknown[], zombies: unknown[] = []) =>
     zombies,
   }) as unknown as Game;
 
-test("a door swings away from its opener, stays open, and closes only near a zombie", () => {
+const openness = (o: Furniture) => o.field!.leaf?.open ?? 0;
+const npc = (x: number, velocity = 0) => ({
+  ...person(x, velocity),
+  id: "npc-0",
+});
+
+test("an NPC opens a door by walking up, and it closes itself behind them", () => {
   const o = door(),
-    a = person(9, 2),
-    zombie = { hp: 100, floor: 0, x: 30, y: 10 },
-    g = world(o, [a], [zombie]);
+    a = npc(9, 2),
+    g = world(o, [a]);
   updateDoorLeaves(g, DOOR_LEAF.openSeconds);
   assert.equal(o.field!.leaf?.open, 1);
   assert.equal(o.field!.leaf?.side, 1, "swings away from the opener");
   a.x = 14;
-  for (let i = 0; i < 120; i++) updateDoorLeaves(g, 1 / 30);
-  assert.equal(o.field!.leaf?.open, 1, "stays open with no zombie near");
-  zombie.floor = 1;
-  zombie.x = o.x;
-  for (let i = 0; i < 60; i++) updateDoorLeaves(g, 1 / 30);
-  assert.equal(o.field!.leaf?.open, 1, "a zombie on another floor is not near");
-  zombie.floor = 0;
-  zombie.hp = 0;
-  for (let i = 0; i < 60; i++) updateDoorLeaves(g, 1 / 30);
-  assert.equal(o.field!.leaf?.open, 1, "a dead zombie is not near");
-  zombie.hp = 100;
-  zombie.x = o.x + DOOR_LEAF.zombieRange;
+  a.physics.x = 0;
   for (let i = 0; i < 60; i++) updateDoorLeaves(g, 1 / 30);
   assert.equal(o.field!.leaf, undefined, "closes and leaves no state");
 });
 
-test("a person in the doorway keeps it open even with a zombie near", () => {
+test("walking into a door never opens it for the player, E does", () => {
   const o = door(),
-    g = world(o, [person(10)], [{ hp: 100, floor: 0, x: 11, y: 10 }]);
+    a = person(9.2, 2),
+    g = world(o, [a]);
+  for (let i = 0; i < 30; i++) updateDoorLeaves(g, 1 / 30);
+  assert.equal(openness(o), 0, "closed until the player asks");
+  assert.equal(fieldPassable(o, a as never), false, "and it stops them");
+  assert.equal(useField(g, a as never, o), true);
+  for (let i = 0; i < 10; i++) updateDoorLeaves(g, 1 / 30);
+  assert.equal(openness(o), 1);
+  assert.equal(fieldPassable(o, a as never), true);
+});
+
+test("an opened door waits for its opener, then closes behind them once through", () => {
+  const o = door(),
+    a = person(8),
+    g = world(o, [a]);
+  useField(g, a as never, o);
   for (let i = 0; i < 60; i++) updateDoorLeaves(g, 1 / 30);
+  assert.equal(o.field!.leaf?.open, 1, "still waiting two seconds later");
+  a.x = 13;
+  for (
+    let i = 0;
+    i < (DOOR_LEAF.holdSeconds + DOOR_LEAF.closeSeconds) * 30 + 2;
+    i++
+  )
+    updateDoorLeaves(g, 1 / 30);
+  assert.equal(o.field!.leaf, undefined, "shuts soon after they are through");
+});
+
+test("an opened door gives up when its opener never walks through", () => {
+  const o = door(),
+    a = person(8),
+    g = world(o, [a]);
+  useField(g, a as never, o);
+  for (
+    let i = 0;
+    i < (DOOR_LEAF.waitSeconds + DOOR_LEAF.closeSeconds) * 30 + 2;
+    i++
+  )
+    updateDoorLeaves(g, 1 / 30);
+  assert.equal(o.field!.leaf, undefined);
+});
+
+test("a person in the doorway keeps it open, even with a zombie beside it", () => {
+  const o = door(),
+    a = person(9),
+    g = world(o, [a], [{ hp: 100, floor: 0, x: 11, y: 10 }]);
+  useField(g, a as never, o);
+  a.x = 10;
+  for (let i = 0; i < 300; i++) updateDoorLeaves(g, 1 / 30);
   assert.equal(o.field!.leaf?.open, 1);
 });
 
-test("standing still beside a door does not hold it open, standing in it does", () => {
+test("a door someone else opened is still an invisible wall without access", () => {
+  const o = door();
+  o.field!.limit = 0;
+  o.field!.exit = true;
+  o.field!.authorized = ["npc-0"];
+  const a = person(9),
+    b = npc(9.5),
+    g = world(o, [a, b]);
+  assert.equal(useField(g, b as never, o), true);
+  for (let i = 0; i < 15; i++) updateDoorLeaves(g, 1 / 30);
+  assert.equal(o.field!.leaf?.open, 1, "visibly open");
+  assert.equal(fieldPassable(o, b as never), true, "for the one who solved it");
+  assert.equal(fieldPassable(o, a as never), false, "not for the player");
+  assert.equal(useField(g, a as never, o), false, "E grants nothing either");
+  assert.match(String(g.notice), /open, but not for you/);
+});
+
+test("standing still beside a door does not open it, standing in it does", () => {
   const beside = door();
-  updateDoorLeaves(world(beside, [person(9)]), 0.1);
+  updateDoorLeaves(world(beside, [npc(9)]), 0.1);
   assert.equal(beside.field!.leaf, undefined);
   const inside = door();
-  updateDoorLeaves(world(inside, [person(10)]), 0.1);
+  updateDoorLeaves(world(inside, [npc(10)]), 0.1);
   assert.ok(inside.field!.leaf);
 });
 

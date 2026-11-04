@@ -325,7 +325,7 @@ canvas.addEventListener("keydown", (ev) => {
         Action,
         "tick"
       >);
-    else if (door?.door?.latched)
+    else if (door?.field || door?.door?.latched)
       queue({ type: "door", id: "human", target: door.id } as Omit<
         Action,
         "tick"

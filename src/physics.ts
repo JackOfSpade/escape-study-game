@@ -1,5 +1,5 @@
 import { trafficVelocity } from "./local-traffic";
-import { fieldAllows, updateDoorLeaves, updateFields } from "./force-fields";
+import { fieldPassable, updateDoorLeaves, updateFields } from "./force-fields";
 import {
   Box,
   Circle,
@@ -199,7 +199,8 @@ class PhysicsLayer {
   }
   private preSolvePair(contact: Contact, person: Entity, object: Entity) {
     if (!actor(person) || !furniture(object)) return;
-    if (object.field && fieldAllows(object, person)) contact.setEnabled(false);
+    if (object.field && fieldPassable(object, person))
+      contact.setEnabled(false);
     const vault = person.vault ?? this.records.get(person)?.start.vault;
     if (vault?.obstacle === object.id || vault?.obstacles?.includes(object.id))
       contact.setEnabled(false);
