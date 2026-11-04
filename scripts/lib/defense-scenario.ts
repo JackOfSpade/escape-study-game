@@ -17,10 +17,11 @@ import {
   type Input,
 } from "../../src/engine";
 import { canGrip } from "../../src/handling";
-import type { Furniture, Game, Point, Roadmap } from "../../src/model";
+import type { Furniture, Game, Point, Roadmap, Station } from "../../src/model";
 import { distance } from "../../src/model";
 import { survivorPath, walkSegment } from "../../src/navigation";
-import { canPlace, solid } from "../../src/spatial";
+import { canPlace, inStation, solid, stationSpot } from "../../src/spatial";
+import { solidDesks } from "../../src/station-clearance";
 import { createGame } from "../../src/world";
 export const DEFENSE_STEP_SECONDS = 1 / 30;
 const preparationSteps = new WeakMap<
@@ -37,9 +38,14 @@ function prepareStep(g: Game, seconds: number, input?: Input) {
   return dt;
 }
 const idle = { x: 0, y: 0, grab: false };
-export function walkTo(g: Game, target: Point) {
+export function walkTo(g: Game, destination: Point) {
   const a = human(g),
     f = g.floors[a.floor],
+    // A terminal is used from its keyboard; its centre is inside the desk.
+    target =
+      "encounter" in destination
+        ? stationSpot(f, destination as Station)
+        : destination,
     limit = g.time + 90;
   let route = survivorPath(f, a, target),
     pulling: Furniture | undefined;
@@ -125,7 +131,9 @@ export function walkTo(g: Game, target: Point) {
   if (a.grip) toggleGrip(g, a);
   if (g.status !== "playing")
     throw Error(`Human lost during preparation at ${g.time.toFixed(1)}s`);
-  if (distance(a, target) > 0.06) throw Error("Walking budget exceeded");
+  if (distance(a, target) > 0.06) throw Error(
+      `Walking budget exceeded at ${a.x},${a.y} for ${target.x},${target.y}`,
+    );
 }
 /** Benchmarks must push the actual hinge shut, just like a player. */
 export function closeDoorByContact(g: Game, door: Furniture) {
@@ -157,20 +165,25 @@ export function pushAxis(
   const offset = (axis === "x" ? o.w : o.h) / 2 + 0.55;
   const sides = [-sign, sign];
   let positioned = false;
-  for (const side of sides) {
-    const p = { x: o.x, y: o.y };
-    p[axis] += side * offset;
-    if (solid(f, p)) continue;
-    // G really selects this object from this physical handling position.
-    const closest = f.furniture
-      .filter((x) => canGrip(f, { ...a, ...p }, x))
-      .sort((b, c) => distance(p, b) - distance(p, c))[0];
-    if (closest?.id !== o.id) continue;
-    if (!survivorPath(f, a, p).length && distance(a, p) > 0.045) continue;
-    walkTo(g, p);
-    positioned = true;
-    break;
-  }
+  const across = axis === "x" ? "y" : "x";
+  // Straight behind the object first; a terminal desk there means a step aside.
+  for (const side of sides)
+    for (const shift of [0, -0.6, 0.6, -1.1, 1.1]) {
+      if (positioned) break;
+      const p = { x: o.x, y: o.y };
+      p[axis] += side * offset;
+      p[across] += shift;
+      if (solid(f, p) || solidDesks(f).some((s) => inStation(s, p, 0.27)))
+        continue;
+      // G really selects this object from this physical handling position.
+      const closest = f.furniture
+        .filter((x) => canGrip(f, { ...a, ...p }, x))
+        .sort((b, c) => distance(p, b) - distance(p, c))[0];
+      if (closest?.id !== o.id) continue;
+      if (!survivorPath(f, a, p).length && distance(a, p) > 0.045) continue;
+      walkTo(g, p);
+      positioned = true;
+    }
   if (!positioned) throw Error(`No handling position for ${o.id} ${axis}`);
   if (nearestFurniture(g, a, true)?.id !== o.id)
     throw Error("Wrong physical grab target");

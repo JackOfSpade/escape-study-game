@@ -1,3 +1,4 @@
+import { moveBlockingDesks } from "./station-clearance";
 import { presetDoorStyle } from "./door-style";
 import { pursuitLayout, pursuitLayoutErrors } from "./pursuit-layout";
 import { forwardFieldQuota } from "./office-plan";
@@ -204,6 +205,8 @@ export function redesign(
   for (const floor of g.floors)
     if (floor.generation?.version === 2) {
       pursuitLayout(g, floor);
+      if (!floor.design)
+        moveBlockingDesks(floor, () => !pursuitLayoutErrors(g, floor).length);
       // Fresh runs are furnished as an office: a few movable physical pieces
       // per room, kept clear of every field opening and terminal.
       furnishOffice(
@@ -215,6 +218,10 @@ export function redesign(
         floor.furniture.filter((o) => /-room\d-door$/.test(o.id)),
       );
       applyDoorDesign(g, floor, options.blueprint);
+      // Saved designs bind writing to the furnished building, so their
+      // terminals move only around what is already placed.
+      if (floor.design)
+        moveBlockingDesks(floor, () => !pursuitLayoutErrors(g, floor).length);
       if (g.design || options.blueprint) {
         const errors = [
           ...pursuitLayoutErrors(g, floor),

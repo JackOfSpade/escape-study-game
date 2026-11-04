@@ -393,6 +393,8 @@ export interface Furniture extends Point {
 export interface Station extends Point {
   id: string;
   encounter: string;
+  /** Which way along y the screen faces; settled on first use by `stationFacing`. */
+  facing?: 1 | -1;
 }
 /** Office function of a furnished room; it decides which objects it may hold. */
 export type OfficeRoomType =

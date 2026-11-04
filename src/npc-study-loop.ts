@@ -10,7 +10,7 @@ import {
 import { npcReasoningAvailable, npcThinkingRate } from "./npc-cognition";
 import { npcThinkingScale } from "./study-pacing";
 import { walkSegment } from "./navigation";
-import { solid } from "./spatial";
+import { solid, stationSpot } from "./spatial";
 import { sectorBounds } from "./floor-plan";
 
 export interface StudyLoop {
@@ -280,7 +280,8 @@ export function studyLoopDecision(
     (stage) => s.y > stage.front + 1 && s.y < stage.rear,
   );
   const block = f.generation?.sectors ? sectorBounds(f, s) : undefined;
-  const candidates: Point[][] = [[s]];
+  const spot = stationSpot(f, s);
+  const candidates: Point[][] = [[spot]];
   for (let i = 0; i < STUDY_LOOP.candidates; i++) {
     const angle = ((i % 8) * Math.PI) / 4,
       radius = i < 8 ? 5 : 8;
@@ -295,7 +296,7 @@ export function studyLoopDecision(
             ? Math.max(block.y1 + 0.4, Math.min(block.y2 + 0.6, y))
             : y,
       },
-      s,
+      spot,
     ]);
   }
   let returning: { route: Point[]; score: number; window: number } | undefined;
@@ -305,7 +306,7 @@ export function studyLoopDecision(
     const first = route[0],
       origin = { ...a, x: first.x, y: first.y };
     if (solid(f, origin) || !walkSegment(f, a, first)) continue;
-    if (route.length === 1 || walkSegment(f, origin, s)) {
+    if (route.length === 1 || walkSegment(f, origin, spot)) {
       const estimate = forecast(g, a, route, threats);
       if (
         estimate.clearance > STUDY_LOOP.contact &&

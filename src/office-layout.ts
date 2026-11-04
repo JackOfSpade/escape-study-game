@@ -1,3 +1,4 @@
+import { clearFillerAroundDesks } from "./station-clearance";
 import {
   CONFIG,
   FURNITURE,
@@ -624,6 +625,7 @@ export function furnishOffice(
     for (const variants of groups)
       for (const group of variants) if (tryPlace(group)) break;
   }
+  if (f.generation?.version === 5) clearFillerAroundDesks(f);
 }
 
 /** Check the finished physical furnishing, not just the floor-plan raster. */
