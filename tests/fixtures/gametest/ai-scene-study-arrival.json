@@ -1674,7 +1674,7 @@
     }
   },
   "simulation": "game",
-  "maxTicks": 450,
+  "maxTicks": 900,
   "startTime": 0,
   "naturalSpawns": false,
   "entities": [],
@@ -1699,7 +1699,7 @@
     {
       "name": "At least eighteen survivors settle in the central study hall and near wings",
       "mode": "at",
-      "tick": 450,
+      "tick": 900,
       "query": {
         "type": "region",
         "kind": "npc",
@@ -1707,7 +1707,7 @@
         "x1": 2,
         "y1": 2,
         "x2": 42,
-        "y2": 24.9
+        "y2": 25.6
       },
       "op": "gte",
       "expected": 18
@@ -1715,7 +1715,7 @@
     {
       "name": "Every survivor settles inside the study hall or its wraparound wing",
       "mode": "at",
-      "tick": 450,
+      "tick": 900,
       "query": {
         "type": "region",
         "kind": "npc",

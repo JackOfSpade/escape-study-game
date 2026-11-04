@@ -1,3 +1,4 @@
+import { inStation } from "../src/spatial";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
@@ -327,7 +328,9 @@ test("authored scene GameTest keeps all NPCs physically at study terminals throu
       (s) => s.id === npc.station,
     );
     assert.ok(
-      terminal && Math.hypot(npc.x - terminal.x, npc.y - terminal.y) < 0.1,
+      terminal &&
+        Math.hypot(npc.x - terminal.x, npc.y - terminal.y) < 1.3 &&
+        !inStation(terminal, npc, 0.1),
     );
     assert.ok(npc.thought > 0);
   }

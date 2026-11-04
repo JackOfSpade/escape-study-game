@@ -13,7 +13,7 @@ export interface SceneObservation extends Point {
   id: string;
   title: string;
   text: string;
-  /** Metres above this floor; used for the actual look direction. */
+  /** Metres above this floor; used for the line-of-sight check. */
   elevation: number;
 }
 const environmentReadings = new WeakMap<
@@ -178,36 +178,4 @@ export function observableSceneDetails(
     )
     .filter((item) => readable(floor, actor, eye, item))
     .slice(0, limit);
-}
-
-/** Read the object under the player's gaze without replacing E's interaction. */
-export function sceneLookDescription(game: Game, yaw: number, pitch: number) {
-  const actor = game.survivors[0],
-    eye =
-      (actor.elevated?.feet ?? actor.floor * FLOOR_HEIGHT) -
-      actor.floor * FLOOR_HEIGHT +
-      1.6,
-    horizontal = Math.cos(pitch),
-    direction = {
-      x: Math.cos(yaw) * horizontal,
-      y: Math.sin(yaw) * horizontal,
-      z: Math.sin(pitch),
-    };
-  let selected: SceneObservation | undefined,
-    best = Math.cos(0.12);
-  for (const item of observableSceneDetails(game, actor, 64)) {
-    const x = item.x - actor.x,
-      y = item.y - actor.y,
-      z = item.elevation - eye,
-      length = Math.hypot(x, y, z),
-      alignment =
-        (x * direction.x + y * direction.y + z * direction.z) / length;
-    if (alignment > best) {
-      best = alignment;
-      selected = item;
-    }
-  }
-  return selected
-    ? [selected.title, selected.text].filter(Boolean).join("\n")
-    : "";
 }

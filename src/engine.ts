@@ -95,6 +95,7 @@ import {
   beginFurnitureIndex,
   endFurnitureIndex,
   furnitureNear,
+  stationSpot,
 } from "./spatial";
 import {
   advanceStairs,
@@ -849,6 +850,11 @@ function pullDoorOnRoute(g: Game, a: Actor, target: Point, dt: number) {
   }
   physicsMove(g, a, state.inside * a.speed * dt, 0);
   return true;
+}
+/** A body at a terminal looks at its screen, not along its last step. */
+function faceStation(a: Actor, station: Point) {
+  const d = distance(a, station) || 1;
+  a.heading = { x: (station.x - a.x) / d, y: (station.y - a.y) / d };
 }
 function follow(
   g: Game,
@@ -1927,7 +1933,9 @@ function npc(g: Game, a: Actor, dt: number) {
         }
       }
       delete a.closingDoor;
-      follow(g, a, st, dt);
+      const spot = stationSpot(f, st);
+      follow(g, a, spot, dt);
+      if (distance(a, spot) < 0.3) faceStation(a, st);
       if (distance(a, st) < 1.3 && !a.vault && claimStation(g, a, st.id)) {
         attention = 1;
         if (e.mode === "solo") e.owner ??= a.id;

@@ -252,8 +252,9 @@ test("prepared runs wait for an explicit Start before gameplay and across reload
   relay.setHeld(false);
   relay.finish(relay.calls[0]);
   await prepared(page);
-  await expect(page.locator("#start-card")).toContainText(
-    "Your escape is ready",
+  await expect(page.locator("#start")).toContainText("Start game");
+  await expect(page.locator("#start-card")).not.toContainText(
+    /your escape is ready/i,
   );
   const ready = await expectFrozen(page);
   expect(ready.time).toBe(0);
@@ -760,79 +761,4 @@ test("settled design failures keep the captured draft until Cancel or Escape wit
   expect(after.design.design.title).toBe(harbor.title);
   expect(after.design.generationId).toBe(retry.payload.generationId);
   expect(relay.calls.at(-1).payload.phase).toBe("content-review");
-});
-
-test("looking at an authored object reveals its readable caption without replacing furniture controls", async ({
-  page,
-}) => {
-  // The full first-person scene compiles on software WebGL in hosted CI.
-  test.setTimeout(120_000);
-  await designer(page);
-  await open(page);
-  await page.locator("#start").click();
-  await startPrepared(page);
-  await page.evaluate(() => {
-    const g = (window as any).__deadAir.game;
-    g.settings.view = "first-person";
-    g.survivors = [g.survivors[0]];
-    g.zombies = [];
-    g.nextSpawn = Number.MAX_SAFE_INTEGER;
-  });
-  await expect(page.locator("#view3d")).toBeVisible();
-  const target = await page.evaluate(async () => {
-    const { surfaceWorldPose } = await import(
-        "/src/environment-surfaces.ts" as string
-      ),
-      { expandContentText } = await import(
-        "/src/environment-contract.mjs" as string
-      ),
-      { sceneLookDescription } = await import(
-        "/src/scene-observations.ts" as string
-      ),
-      { solid } = await import("/src/spatial.ts" as string),
-      app = (window as any).__deadAir,
-      g = app.game,
-      f = g.floors[0],
-      a = g.survivors[0];
-    for (const slot of f.environment.surfaces.filter(
-      (s: any) => s.role === "prop-face",
-    )) {
-      const pose = surfaceWorldPose(f, slot);
-      if (!pose?.parent) continue;
-      const entry = f.environment.entries.find(
-          (e: any) => e.surfaceId === slot.id,
-        ),
-        title = expandContentText(entry.title, f.environment.fragments),
-        text =
-          expandContentText(entry.body, f.environment.fragments) ||
-          entry.description;
-      if (!title || !text) continue;
-      for (let i = 0; i < 16; i++) {
-        const angle = (i * Math.PI) / 8,
-          point = {
-            x: pose.parent.x + Math.cos(angle) * 1.15,
-            y: pose.parent.y + Math.sin(angle) * 1.15,
-          };
-        if (solid(f, point, 0.3)) continue;
-        Object.assign(a, point, { floor: 0 });
-        const yaw = Math.atan2(pose.y - a.y, pose.x - a.x),
-          pitch = Math.atan2(
-            pose.z - 1.6,
-            Math.hypot(pose.x - a.x, pose.y - a.y),
-          );
-        if (!sceneLookDescription(g, yaw, pitch).includes(text)) continue;
-        app.setLook(yaw, pitch);
-        return { parent: pose.parent.id, title, text };
-      }
-    }
-    throw Error("No reachable authored object to read");
-  });
-  await expect(page.locator("#scene-description")).toContainText(target.title);
-  await expect(page.locator("#scene-description")).toContainText(target.text);
-  await expect(page.locator("#interaction-prompt")).toContainText("Grip");
-  await page.evaluate((id) => {
-    const g = (window as any).__deadAir.game;
-    g.floors[0].furniture.find((o: any) => o.id === id).destroyed = true;
-  }, target.parent);
-  await expect(page.locator("#scene-description")).toBeHidden();
 });

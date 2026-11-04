@@ -27,6 +27,7 @@ import { human } from "../engine";
 import { doorLeaves, doorSeeThrough, doorStyle } from "../door-style";
 import { fieldAllows } from "../force-fields";
 import { floorSectors } from "../floor-plan";
+import { stationFacing } from "../spatial";
 import {
   CONFIG,
   H,
@@ -1008,7 +1009,7 @@ export class FirstPersonView {
       for (const station of floor.stations) {
         this.markPresent(station);
         if (Math.hypot(station.x - a.x, station.y - a.y) <= fogDistance + 0.6)
-          this.station(station, game, palette);
+          this.station(station, game, palette, stationFacing(floor, station));
         const encounter = game.encounters[station.encounter];
         if (encounter?.state === "consumed" && encounter.reward === "loot")
           for (let i = 0; i < encounter.loot.length; i++) {
@@ -1654,7 +1655,12 @@ export class FirstPersonView {
     }
   }
 
-  private station(station: Station, game: Game, palette: Palette) {
+  private station(
+    station: Station,
+    game: Game,
+    palette: Palette,
+    facing: 1 | -1 = 1,
+  ) {
     const visual = this.visual(station, "station");
     if (!visual.parts.length) {
       this.part(visual.parts, 0, 0.76, 0, 0.98, 0.1, 0.65);
@@ -1679,9 +1685,9 @@ export class FirstPersonView {
     for (const p of visual.parts)
       this.pools[p.batch].set(
         p.slot,
-        station.x + p.x,
+        station.x + facing * p.x,
         p.y,
-        station.y + p.z,
+        station.y + facing * p.z,
         p.w,
         p.h,
         p.d,

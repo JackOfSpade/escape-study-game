@@ -1,3 +1,4 @@
+import { stationSpot } from "../src/spatial";
 import { withCompletionProvider } from "./helpers/completion-provider";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -624,7 +625,7 @@ test("integrated escape at 30 Hz: legal human movement, four puzzle snapshots, i
     const st = g.floors[floor].stations.find(
       (s) => s.encounter === `f${floor}-room0`,
     )!;
-    walkTo(st);
+    walkTo(stationSpot(g.floors[a.floor], st));
     const e = g.encounters[st.encounter];
     assert.notEqual(e.state, "consumed");
     await ensureProblem(g, e, roadmap);

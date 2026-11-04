@@ -7,9 +7,11 @@ import {
   type Furniture,
   H,
   type Point,
+  type Station,
   W,
 } from "./model";
 import { MinHeap } from "./heap";
+import { solidDesks } from "./station-clearance";
 export function inFurniture(p: Point, f: Furniture, pad = 0) {
   if (
     f.destroyed ||
@@ -99,6 +101,25 @@ export function furnitureNear(
   if (x < 0 || y < 0 || x >= W || y >= H) return undefined;
   return index.cells[y * W + x];
 }
+/** Footprint of a terminal's desk, matching its first-person model. */
+export const STATION_BODY = { w: 0.98, h: 0.65 };
+/** A terminal as a fixed obstacle, for the geometry helpers. */
+export function stationBody(s: Point) {
+  return { x: s.x, y: s.y, ...STATION_BODY, angle: 0 };
+}
+/** Whether `p` is within `pad` of a terminal's desk. */
+export function inStation(s: Point, p: Point, pad = 0) {
+  return (
+    Math.hypot(
+      Math.max(0, Math.abs(p.x - s.x) - STATION_BODY.w / 2),
+      Math.max(0, Math.abs(p.y - s.y) - STATION_BODY.h / 2),
+    ) < pad
+  );
+}
+/** Cheap comparison key: terminals only move while a floor is being laid out. */
+export function stationSignature(f: Floor) {
+  return f.stations.map((s) => `${s.x},${s.y}`).join(";");
+}
 export function wall(f: Floor, x: number, y: number) {
   const city = cityWall(f, x, y);
   if (city !== undefined) return city;
@@ -148,6 +169,38 @@ export function solid(
       ) &&
       inFurniture(p, o, pad),
   );
+}
+/** How far from a terminal's centre a body stands to work at its keyboard. */
+const STATION_REACH = STATION_BODY.h / 2 + 0.325;
+/**
+ * The way a terminal's screen faces: toward open floor rather than a wall, or
+ * a pushed chair would flip it. Once settled the desk keeps it for the run.
+ */
+export function stationFacing(f: Floor, s: Station) {
+  if (s.facing) return s.facing;
+  const clear = ([1, -1] as const).filter((sign) => {
+    const y = s.y + sign * STATION_REACH;
+    return ![-0.26, 0, 0.26].some((dx) =>
+      [-0.26, 0, 0.26].some((dy) => wall(f, s.x + dx, y + dy)),
+    );
+  });
+  const open = clear.find(
+    (sign) => !solid(f, { x: s.x, y: s.y + sign * STATION_REACH }, 0.26),
+  );
+  return (s.facing = open ?? clear[0] ?? 1);
+}
+/** Where a body stands to use a terminal: at the keyboard, facing the screen.
+ * Falls back to the other sides only if something has been left in the way. */
+export function stationSpot(f: Floor, s: Station): Point {
+  const sign = stationFacing(f, s),
+    side = STATION_BODY.w / 2 + 0.325,
+    spots = [
+      { x: s.x, y: s.y + sign * STATION_REACH },
+      { x: s.x - side, y: s.y },
+      { x: s.x + side, y: s.y },
+      { x: s.x, y: s.y - sign * STATION_REACH },
+    ];
+  return spots.find((p) => !solid(f, p, 0.26)) ?? spots[0];
 }
 export function move(
   f: Floor,
@@ -211,6 +264,9 @@ interface PathCache {
   routes: Map<string, Point[]>;
   /** Cells whose centre lies within a body radius of intact furniture. */
   furniture?: Uint8Array;
+  stations: string;
+  /** Cells whose centre lies within a body radius of a terminal's desk. */
+  desks?: Uint8Array;
 }
 const routeCache = new WeakMap<Floor, PathCache>();
 const POSE = 6;
@@ -238,11 +294,13 @@ function snapshot(f: Floor) {
     tiles,
     poses,
     ids: f.furniture.map((o) => `${o.id}/${o.kind}`),
+    stations: stationSignature(f),
   };
 }
 function unchanged(cache: PathCache, f: Floor) {
   if (cache.city !== f.city) return false;
   if (cache.ids.length !== f.furniture.length) return false;
+  if (cache.stations !== stationSignature(f)) return false;
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++)
       if (cache.tiles[y * W + x] !== (f.tiles[y]?.[x] ?? 1)) return false;
@@ -281,7 +339,8 @@ export function path(f: Floor, a: Point, b: Point, breakable = false): Point[] {
   let route = cache.routes.get(key);
   if (!route) {
     cache.furniture ??= furnitureCells(f);
-    route = computePath(f, a, b, breakable, cache.furniture);
+    cache.desks ??= deskCells(f);
+    route = computePath(f, a, b, breakable, cache.furniture, cache.desks);
     if (cache.routes.size >= 512)
       cache.routes.delete(cache.routes.keys().next().value!);
     cache.routes.set(key, route);
@@ -311,6 +370,15 @@ function furnitureCells(f: Floor) {
   }
   return cells;
 }
+function deskCells(f: Floor) {
+  const cells = new Uint8Array(W * H),
+    desks = solidDesks(f);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++)
+      if (desks.some((s) => inStation(s, { x: x + 0.5, y: y + 0.5 }, 0.22)))
+        cells[y * W + x] = 1;
+  return cells;
+}
 // Dijkstra with positive furniture traversal costs: zombies prefer open alternatives, then break a physical route.
 function computePath(
   f: Floor,
@@ -318,6 +386,7 @@ function computePath(
   b: Point,
   breakable: boolean,
   furniture: Uint8Array,
+  desks: Uint8Array,
 ): Point[] {
   const start = Math.floor(a.y) * W + Math.floor(a.x),
     end = Math.floor(b.y) * W + Math.floor(b.x);
@@ -346,6 +415,8 @@ function computePath(
       if (wall(f, xx + 0.5, yy + 0.5)) continue;
       const id = yy * W + xx;
       if (closed[id]) continue;
+      // A desk cannot be broken, but its own cell may be the destination.
+      if (desks[id] && id !== end) continue;
       const ob = furniture[id] === 1;
       if (ob && !breakable) continue;
       const nd = cost + 1 + (ob ? 18 : 0);

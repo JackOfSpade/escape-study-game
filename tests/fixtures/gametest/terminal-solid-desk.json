@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "id": "terminal-solid-desk",
+  "name": "A player walking straight at a terminal stops against its desk instead of phasing through",
+  "seed": 42,
+  "template": "building",
+  "layout": "randomized",
+  "rules": "force-fields",
+  "simulation": "physics",
+  "maxTicks": 150,
+  "startTime": 0,
+  "naturalSpawns": false,
+  "entities": [
+    { "id": "human", "kind": "player", "x": 7.5, "y": 10 }
+  ],
+  "deleted": [],
+  "maps": [],
+  "actions": [
+    { "tick": 1, "type": "move", "id": "human", "x": 0, "y": -1 }
+  ],
+  "checks": [
+    {
+      "name": "The player reaches the desk",
+      "mode": "at",
+      "tick": 120,
+      "query": { "type": "property", "id": "human", "field": "y" },
+      "op": "lte",
+      "expected": 9.2
+    },
+    {
+      "name": "The player never enters the desk at (7.5, 8.5)",
+      "mode": "always",
+      "query": { "type": "property", "id": "human", "field": "y" },
+      "op": "gte",
+      "expected": 9
+    }
+  ]
+}

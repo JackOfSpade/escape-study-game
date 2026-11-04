@@ -1,3 +1,4 @@
+import { inStation } from "../src/spatial";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
@@ -237,7 +238,8 @@ test("GameTest design data is validated, checkpointed and stripped from arena la
       (s) => s.id === actor.station,
     );
     assert.ok(station, `${actor.name} has reached a study terminal`);
-    assert.ok(Math.hypot(actor.x - station.x, actor.y - station.y) < 0.1);
+    assert.ok(Math.hypot(actor.x - station.x, actor.y - station.y) < 1.3);
+    assert.ok(!inStation(station, actor, 0.1), "stands outside the desk");
     assert.ok(
       actor.thought > 0,
       `${actor.name} is performing actual study work`,

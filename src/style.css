@@ -1267,9 +1267,6 @@ body.reduced * {
     animation: none;
   }
 }
-#run-ready-status {
-  color: var(--accent);
-}
 #run-design-steps {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

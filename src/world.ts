@@ -1,3 +1,4 @@
+import { withOriginalDesks } from "./station-clearance";
 import { redesign } from "./force-fields";
 import { forwardLayout } from "./forward-layout";
 import { ensureDoor } from "./doors";
@@ -130,16 +131,21 @@ export function createPlayableGame(
   design?: SavedRunDesign,
 ): Game {
   const saved = design ? parseSavedRunDesign(design) : undefined;
-  const g = buildPlayableGame(seed, r, study, saved?.design, saved);
+  let g = buildPlayableGame(seed, r, study, saved?.design, saved);
   if (saved?.design.version === 3) {
-    const actual = buildEnvironmentSurfaces(g);
-    if (
-      environmentSurfaceFingerprint(actual) !==
-      saved.design.environment.surfaceFingerprint
-    )
-      throw Error(
-        "Saved environment inventory does not match this generated building",
+    const expected = saved.design.environment.surfaceFingerprint,
+      matches = (game: Game) =>
+        environmentSurfaceFingerprint(buildEnvironmentSurfaces(game)) ===
+        expected;
+    if (!matches(g)) {
+      g = withOriginalDesks(() =>
+        buildPlayableGame(seed, r, study, saved.design, saved),
       );
+      if (!matches(g))
+        throw Error(
+          "Saved environment inventory does not match this generated building",
+        );
+    }
     bindDesignedEnvironment(g);
   }
   return g;

@@ -25,7 +25,8 @@ import {
   type Point,
   type Zombie,
 } from "./model";
-import { move, solid } from "./spatial";
+import { move, solid, STATION_BODY, stationSignature } from "./spatial";
+import { solidDesks } from "./station-clearance";
 import { cityCollisionBoxes, cityWall } from "./city-layout";
 
 export const BODY_RADIUS = 0.26;
@@ -86,6 +87,9 @@ interface FloorPhysics {
   world: World;
   ground: Body;
   walls: Body;
+  /** Fixed terminal desks. Their positions are `stationKey`. */
+  desks: Body;
+  stationKey?: string;
   /** Copy of the tile grid the wall fixtures were built from. */
   tiles: number[][];
   city?: Game["floors"][number]["city"];
@@ -233,13 +237,23 @@ class PhysicsLayer {
       world.setWarmStarting(false);
       world.setContinuousPhysics(true);
       const ground = world.createBody();
-      p = { world, ground, walls: world.createBody(), tiles: [] };
+      p = {
+        world,
+        ground,
+        walls: world.createBody(),
+        desks: world.createBody(),
+        tiles: [],
+      };
       this.floors[index] = p;
       world.on("pre-solve", (contact) => {
-        const a = contact.getFixtureA().getBody().getUserData() as
-            Entity | undefined,
-          b = contact.getFixtureB().getBody().getUserData() as
-            Entity | undefined;
+        const bodyA = contact.getFixtureA().getBody(),
+          bodyB = contact.getFixtureB().getBody(),
+          a = bodyA.getUserData() as Entity | undefined,
+          b = bodyB.getUserData() as Entity | undefined;
+        // Desks stop the player. Everyone else routes around them, but a crowd
+        // shoved against one must slip past rather than jam a study row.
+        const other = bodyA === p!.desks ? b : bodyB === p!.desks ? a : undefined;
+        if (other && other !== this.g.survivors[0]) contact.setEnabled(false);
         if (!a || !b) return;
         this.preSolvePair(contact, a, b);
         this.preSolvePair(contact, b, a);
@@ -296,6 +310,17 @@ class PhysicsLayer {
       for (const box of boundaryBoxes)
         p.walls.createFixture(
           new Box(box.w / 2 - 0.01, box.h / 2 - 0.01, Vec2(box.x, box.y)),
+          { friction: 0.1 },
+        );
+    }
+    const stationKey = stationSignature(f);
+    if (p.stationKey !== stationKey) {
+      p.world.destroyBody(p.desks);
+      p.desks = p.world.createBody();
+      p.stationKey = stationKey;
+      for (const s of solidDesks(f))
+        p.desks.createFixture(
+          new Box(STATION_BODY.w / 2, STATION_BODY.h / 2, Vec2(s.x, s.y)),
           { friction: 0.1 },
         );
     }

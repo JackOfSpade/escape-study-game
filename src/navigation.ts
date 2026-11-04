@@ -2,9 +2,17 @@ import { survivorFloor } from "./force-fields";
 import { doorFrame } from "./doors";
 import { boxBounds, worldPoint } from "./furniture-geometry";
 import { H, W, distance, type Floor, type Point } from "./model";
-import { inFurniture, solid, wall } from "./spatial";
+import {
+  inFurniture,
+  inStation,
+  solid,
+  stationBody,
+  stationSignature,
+  wall,
+} from "./spatial";
 import { rayBodyDistance } from "./visibility";
 import { MinHeap } from "./heap";
+import { solidDesks } from "./station-clearance";
 import { cityWall } from "./city-layout";
 export interface NavStep extends Point {
   action?: "door" | "vault";
@@ -78,6 +86,7 @@ function snapshotFurniture(f: Floor, tiles: Float64Array): Snapshot {
 interface Graph {
   city?: Floor["city"];
   signature: Snapshot;
+  stations: string;
   points: Point[];
   edges: Edge[][];
 }
@@ -152,6 +161,14 @@ function segment(
       continue;
     if (rayBodyDistance(a, dx, dy, o, pad - 1e-8) < d - 1e-7) return false;
   }
+  // Terminals are approached and left, so a desk at the destination does not
+  // block; a body already touching one may leave but not walk through it.
+  for (const s of solidDesks(f)) {
+    if (inStation(s, b, pad) || inStation(s, a, 1e-6)) continue;
+    const clearance = inStation(s, a, pad) ? 0 : pad - 1e-8;
+    if (rayBodyDistance(a, dx, dy, stationBody(s), clearance) < d - 1e-7)
+      return false;
+  }
   return true;
 }
 
@@ -215,6 +232,7 @@ function graph(f: Floor): Graph {
   if (
     saved &&
     saved.city === f.city &&
+    saved.stations === stationSignature(f) &&
     tilesMatch(saved.signature.tiles, f) &&
     furnitureMatches(saved.signature, f)
   )
@@ -252,7 +270,11 @@ function graph(f: Floor): Graph {
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
       const p = { x: x + 0.5, y: y + 0.5 };
-      if (!solid(f, p, 0.22, undefined, true)) grid.set(y * W + x, add(p));
+      if (
+        !solid(f, p, 0.22, undefined, true) &&
+        !solidDesks(f).some((s) => inStation(s, p, 0.22))
+      )
+        grid.set(y * W + x, add(p));
     }
   for (const [key, index] of grid)
     for (const neighbor of [key + 1, key + W]) {
@@ -378,7 +400,13 @@ function graph(f: Floor): Graph {
       }
     }
   }
-  const result = { signature, city: f.city, points, edges };
+  const result = {
+    signature,
+    city: f.city,
+    stations: stationSignature(f),
+    points,
+    edges,
+  };
   cache.set(f, result);
   return result;
 }
@@ -467,11 +495,12 @@ export function survivorPath(f: Floor, start: Point, end: Point): NavStep[] {
   const result: NavStep[] = [];
   for (let i = to; i !== from; i = previous[i]) {
     if (i < 0) return [];
-    result.push({
-      ...points[i],
-      action: via[i]?.action,
-      obstacle: via[i]?.obstacle,
-    });
+    const edge = via[i];
+    result.push(
+      edge?.action
+        ? { ...points[i], action: edge.action, obstacle: edge.obstacle }
+        : { ...points[i] },
+    );
   }
   return result.reverse();
 }
