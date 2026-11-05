@@ -89,6 +89,14 @@ test("headings, bullet and numbered lists, paragraphs and line breaks", () => {
   );
 });
 
+test("paragraph lines keep indentation relative to the shallowest line", () => {
+  assert.equal(
+    markdownToHtml("for v in vs:\n    if v > 4:\n\tcount += 1"),
+    "<p>for v in vs:<br>&nbsp;&nbsp;&nbsp;&nbsp;if v &gt; 4:<br>&nbsp;&nbsp;&nbsp;&nbsp;count += 1</p>",
+  );
+  assert.equal(markdownToHtml("  a\n    b"), "<p>a<br>&nbsp;&nbsp;b</p>");
+});
+
 test("links, images and raw urls stay plain text", () => {
   const html = markdownToHtml(
     "[click](https://evil.example) ![x](https://evil.example/i.png) https://evil.example <https://evil.example>",

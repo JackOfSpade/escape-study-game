@@ -62,7 +62,7 @@ export function devProblem(
   }
   return {
     title: "Signal contract / trace",
-    prompt: `Read this small Python trace:\n\nvalues = ${JSON.stringify(values)}\ncount = 0\nfor value in values:\n    if value > ${threshold}:\n        count += 1\n\nPredict the final value of count. Explain what count means partway through, after the loop has seen only the first few values, and name one edge case worth checking. No code is needed.${gapLine(g, contract)}`,
+    prompt: `Read this small Python trace:\n\n\`\`\`python\nvalues = ${JSON.stringify(values)}\ncount = 0\nfor value in values:\n    if value > ${threshold}:\n        count += 1\n\`\`\`\n\nPredict the final value of count. Explain what count means partway through, after the loop has seen only the first few values, and name one edge case worth checking. No code is needed.${gapLine(g, contract)}`,
     rubric: [
       "Predict the correct final count",
       "Explain what count means partway through the loop",
@@ -76,4 +76,33 @@ export function devProblem(
         : undefined,
     contract,
   };
+}
+
+const withoutCodeMarkup = (prompt: string) =>
+  prompt
+    .split("\n")
+    .filter((line) => !line.startsWith("```"))
+    .join("\n")
+    .replace(/`/g, "");
+const UNFENCED_TRACE =
+  /^(Read this small Python trace:\n\n)(values = [^\n]*\ncount = 0\nfor value in values:\n {4}if value > \d+:\n {8}count \+= 1)(?=\n\n)/;
+
+/**
+ * Saves keep the question text they were issued with, so development questions
+ * issued before their code was fenced are upgraded on load. Only markup changes:
+ * a prompt whose wording differs from the current bank is left untouched.
+ */
+export function upgradeSavedPracticePrompt(problem: Problem | undefined) {
+  if (problem?.provenance !== "development") return;
+  problem.prompt = problem.prompt.replace(
+    UNFENCED_TRACE,
+    "$1```python\n$2\n```",
+  );
+  if (problem.contract?.track !== "PE") return;
+  try {
+    const current = productPractice(problem.contract).prompt;
+    if (withoutCodeMarkup(current) === problem.prompt) problem.prompt = current;
+  } catch {
+    // An objective no longer in the bank keeps the text it was issued with.
+  }
 }

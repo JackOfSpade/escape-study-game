@@ -574,7 +574,7 @@ body.spectating canvas.dragging {
 }
 .provenance {
   background: var(--editor);
-  color: var(--danger);
+  color: var(--muted);
   font-size: 9px;
   letter-spacing: 0.5px;
   padding: 8px 15px;

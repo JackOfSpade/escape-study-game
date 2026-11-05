@@ -56,6 +56,22 @@ const startsBlock = (line: string) =>
   BULLET.test(line) ||
   NUMBERED.test(line);
 
+const indentWidth = (line: string) =>
+  /^[ \t]*/.exec(line)![0].replace(/\t/g, "    ").length;
+
+/**
+ * Unfenced code still reaches paragraphs (saved and static prompts), where
+ * indentation can carry meaning. Each line keeps its indent relative to the
+ * paragraph's shallowest line, so an incidental uniform indent still vanishes.
+ */
+function paragraphLines(lines: string[]) {
+  const base = Math.min(...lines.map(indentWidth));
+  return lines.map(
+    (line) =>
+      "&nbsp;".repeat(indentWidth(line) - base) + inline(line.trim()),
+  );
+}
+
 export function markdownToHtml(text: string): string {
   const lines = text.replace(/\r\n?/g, "\n").split("\n");
   const out: string[] = [];
@@ -97,8 +113,8 @@ export function markdownToHtml(text: string): string {
     }
     const paragraph: string[] = [];
     while (i < lines.length && lines[i].trim() && !startsBlock(lines[i]))
-      paragraph.push(inline(lines[i++].trim()));
-    out.push(`<p>${paragraph.join("<br>")}</p>`);
+      paragraph.push(lines[i++]);
+    out.push(`<p>${paragraphLines(paragraph).join("<br>")}</p>`);
   }
   return out.join("");
 }
