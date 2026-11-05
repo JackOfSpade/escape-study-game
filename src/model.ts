@@ -371,6 +371,8 @@ export interface Furniture extends Point {
   physics?: PhysicsMotion;
   door?: DoorState;
   lastMoveTick?: number;
+  /** Game time of the last zombie strike; drives the brief 2D impact shake. */
+  struckAt?: number;
   initial?: { x: number; y: number; w: number; h: number; angle?: number };
   angle?: number;
   id: string;

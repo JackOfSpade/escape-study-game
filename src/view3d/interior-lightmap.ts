@@ -14,6 +14,7 @@ import {
   LIGHTMAP_RES,
   type FixturePool,
   type InteriorLighting,
+  WALL_SAMPLE_HEIGHTS,
 } from "../interior-lighting";
 import { CONFIG, H, W } from "../model";
 import { FLOOR_HEIGHT } from "../stair-route";
@@ -21,26 +22,39 @@ import { FLOOR_HEIGHT } from "../stair-route";
 const BANDS = CONFIG.floors + 1,
   TW = W * LIGHTMAP_RES,
   TH = H * LIGHTMAP_RES;
+/** Irradiance per unit of zone power on surfaces lamps do not reach directly. */
+const ROOM_BOUNCE = 0.6;
 
 interface Band {
   ambient: Float32Array;
   covered: Uint8Array;
   warm: Float32Array;
   cool: Float32Array;
+  ceilingWarm: Float32Array;
+  ceilingCool: Float32Array;
+  /** Light vectors for each baked wall height, as x then z arrays. */
+  walls: Float32Array[];
   pools: Map<string, FixturePool>;
   /** Share of each fixture currently drawn by a real practical light. */
   removed: Map<string, number>;
 }
 
 /** Every powered ceiling fixture lights its own room at any distance. Light
- * is baked per floor into a small texture (occluded by real walls) and added
- * to the indirect irradiance of interior materials. The three nearest
- * practical point lights take over their fixture's share up close, so a lamp
- * never brightens or dims as the player approaches it. */
+ * is baked per floor into small textures (occluded by real walls) and added
+ * to the indirect irradiance of interior materials: the floor pool, the glow
+ * on the ceiling around the lamp, and the wash down its walls. The three
+ * nearest practical point lights take over their fixture's share of all three
+ * up close, so a lamp never brightens or dims as the player approaches it. */
 export class InteriorLightmap {
   readonly texture: DataTexture;
+  readonly sidesTexture: DataTexture;
+  readonly overTexture: DataTexture;
   readonly uniforms = {
     interiorLightmap: { value: null as DataTexture | null },
+    /** rg: wall light vector at 1.2 m. ba: at 2.4 m. */
+    interiorLmSides: { value: null as DataTexture | null },
+    /** rg: warm and cool ceiling irradiance. ba: wall light vector at 0.2 m. */
+    interiorLmOver: { value: null as DataTexture | null },
     /** Hemisphere intensity per unit of zone power (0 outdoors). */
     interiorLmAmbient: { value: 0 },
     /** Zone power the global hemisphere fill already represents. */
@@ -52,22 +66,37 @@ export class InteriorLightmap {
     interiorLmCool: { value: new Color("#9dbfc7") },
   };
   private data = new Uint16Array(TW * TH * BANDS * 4);
+  private sidesData = new Uint16Array(TW * TH * BANDS * 4);
+  private overData = new Uint16Array(TW * TH * BANDS * 4);
   private bands = new Map<number, Band>();
 
   constructor() {
-    this.texture = new DataTexture(
-      this.data,
-      TW,
-      TH * BANDS,
-      RGBAFormat,
-      HalfFloatType,
-    );
-    this.texture.magFilter = this.texture.minFilter = LinearFilter;
-    this.texture.wrapS = this.texture.wrapT = ClampToEdgeWrapping;
-    this.texture.generateMipmaps = false;
-    this.texture.name = "interior-lightmap";
-    this.texture.needsUpdate = true;
+    const texture = (data: Uint16Array, name: string) => {
+      const map = new DataTexture(
+        data,
+        TW,
+        TH * BANDS,
+        RGBAFormat,
+        HalfFloatType,
+      );
+      map.magFilter = map.minFilter = LinearFilter;
+      map.wrapS = map.wrapT = ClampToEdgeWrapping;
+      map.generateMipmaps = false;
+      map.name = name;
+      map.needsUpdate = true;
+      return map;
+    };
+    this.texture = texture(this.data, "interior-lightmap");
+    this.sidesTexture = texture(this.sidesData, "interior-lightmap-sides");
+    this.overTexture = texture(this.overData, "interior-lightmap-over");
     this.uniforms.interiorLightmap.value = this.texture;
+    this.uniforms.interiorLmSides.value = this.sidesTexture;
+    this.uniforms.interiorLmOver.value = this.overTexture;
+  }
+
+  private markUploaded() {
+    for (const map of [this.texture, this.sidesTexture, this.overTexture])
+      map.needsUpdate = true;
   }
 
   build(index: number, plan: InteriorLighting) {
@@ -78,6 +107,12 @@ export class InteriorLightmap {
         covered,
         warm: new Float32Array(TW * TH),
         cool: new Float32Array(TW * TH),
+        ceilingWarm: new Float32Array(TW * TH),
+        ceilingCool: new Float32Array(TW * TH),
+        walls: Array.from(
+          { length: WALL_SAMPLE_HEIGHTS.length * 2 },
+          () => new Float32Array(TW * TH),
+        ),
         pools: new Map(),
         removed: new Map(),
       };
@@ -92,14 +127,15 @@ export class InteriorLightmap {
   clear(index: number) {
     this.bands.delete(index);
     const start = index * TW * TH * 4;
-    this.data.fill(0, start, start + TW * TH * 4);
-    this.texture.needsUpdate = true;
+    for (const data of [this.data, this.sidesData, this.overData])
+      data.fill(0, start, start + TW * TH * 4);
+    this.markUploaded();
   }
 
   reset() {
     this.bands.clear();
-    this.data.fill(0);
-    this.texture.needsUpdate = true;
+    for (const data of [this.data, this.sidesData, this.overData]) data.fill(0);
+    this.markUploaded();
   }
 
   /** `weights` is the share of each fixture now drawn by a practical light;
@@ -113,7 +149,9 @@ export class InteriorLightmap {
         after = weights.get(id) ?? 0,
         pool = band.pools.get(id);
       if (!pool || after === before) continue;
-      if (after > 0 && Math.abs(after - before) < 1 / 64) continue;
+      // A lamp fading in or out is at least 5 m away, so coarse steps are not
+      // visible, and each one re-uploads every lightmap texture.
+      if (after > 0 && Math.abs(after - before) < 1 / 16) continue;
       this.accumulate(band, pool, before - after);
       if (after > 0) band.removed.set(id, after);
       else band.removed.delete(id);
@@ -134,14 +172,34 @@ export class InteriorLightmap {
     };
   }
 
+  /** Baked ceiling irradiance and wall light vectors, for tests. */
+  surface(index: number, x: number, y: number) {
+    const band = this.bands.get(index);
+    if (!band) return undefined;
+    const i = Math.floor(y * LIGHTMAP_RES) * TW + Math.floor(x * LIGHTMAP_RES);
+    return {
+      ceiling: band.ceilingWarm[i] + band.ceilingCool[i],
+      walls: WALL_SAMPLE_HEIGHTS.map((_, layer) => ({
+        x: band.walls[layer * 2][i],
+        y: band.walls[layer * 2 + 1][i],
+      })),
+    };
+  }
+
   private accumulate(band: Band, pool: FixturePool, scale: number) {
-    const target = pool.warm ? band.warm : band.cool;
+    const target = pool.warm ? band.warm : band.cool,
+      ceiling = pool.warm ? band.ceilingWarm : band.ceilingCool;
     for (let y = 0; y < pool.h; y++)
       for (let x = 0; x < pool.w; x++) {
-        const v = pool.values[y * pool.w + x];
-        if (v) {
-          const i = (pool.y0 + y) * TW + pool.x0 + x;
-          target[i] = Math.max(0, target[i] + v * scale);
+        const source = y * pool.w + x;
+        const i = (pool.y0 + y) * TW + pool.x0 + x;
+        const v = pool.values[source];
+        if (v) target[i] = Math.max(0, target[i] + v * scale);
+        const c = pool.ceiling[source];
+        if (c) ceiling[i] = Math.max(0, ceiling[i] + c * scale);
+        for (let channel = 0; channel < band.walls.length; channel++) {
+          const w = pool.walls[channel][source];
+          if (w) band.walls[channel][i] += w * scale;
         }
       }
   }
@@ -156,8 +214,16 @@ export class InteriorLightmap {
       this.data[o + 1] = half(band.warm[i]);
       this.data[o + 2] = half(band.cool[i]);
       this.data[o + 3] = half(band.covered[i]);
+      this.sidesData[o] = half(band.walls[2][i]);
+      this.sidesData[o + 1] = half(band.walls[3][i]);
+      this.sidesData[o + 2] = half(band.walls[4][i]);
+      this.sidesData[o + 3] = half(band.walls[5][i]);
+      this.overData[o] = half(band.ceilingWarm[i]);
+      this.overData[o + 1] = half(band.ceilingCool[i]);
+      this.overData[o + 2] = half(band.walls[0][i]);
+      this.overData[o + 3] = half(band.walls[1][i]);
     }
-    this.texture.needsUpdate = true;
+    this.markUploaded();
   }
 
   /** Adds the baked irradiance to a lit material's indirect diffuse term. */
@@ -190,6 +256,8 @@ vLmNormal = mat3( modelMatrix ) * lmNormal;`,
 varying vec3 vLmWorld;
 varying vec3 vLmNormal;
 uniform sampler2D interiorLightmap;
+uniform sampler2D interiorLmSides;
+uniform sampler2D interiorLmOver;
 uniform float interiorLmAmbient;
 uniform float interiorLmPlayer;
 uniform float interiorLmPool;
@@ -205,11 +273,24 @@ vec3 interiorLightmapIrradiance() {
   float z = clamp( p.z * ${LIGHTMAP_RES.toFixed(1)}, 0.5, ${(TH - 0.5).toFixed(1)} );
   vec2 uv = vec2( p.x / ${W.toFixed(1)}, ( band * ${TH.toFixed(1)} + z ) / ${(TH * BANDS).toFixed(1)} );
   vec4 lm = texture2D( interiorLightmap, uv );
+  vec4 sides = texture2D( interiorLmSides, uv );
+  vec4 over = texture2D( interiorLmOver, uv );
   vec3 hemi = mix( interiorLmGround, interiorLmSky, 0.5 * n.y + 0.5 );
-  // Floors take full pool light, walls about half, ceilings little.
-  float facing = n.y >= 0.0 ? mix( 0.55, 1.0, n.y ) : mix( 0.55, 0.2, -n.y );
+  vec3 pool = lm.g * interiorLmWarm + lm.b * interiorLmCool;
+  vec3 ceilingGlow = over.r * interiorLmWarm + over.g * interiorLmCool;
+  // Walls share the ceiling's lamps, so they share its warm and cool balance.
+  vec3 tint = ceilingGlow / max( over.r + over.g, 1e-4 );
+  float height = vLmWorld.y - band * ${FLOOR_HEIGHT.toFixed(2)};
+  vec2 light = height < ${WALL_SAMPLE_HEIGHTS[1].toFixed(1)}
+    ? mix( over.ba, sides.rg, clamp( ( height - ${WALL_SAMPLE_HEIGHTS[0].toFixed(1)} ) / ${(WALL_SAMPLE_HEIGHTS[1] - WALL_SAMPLE_HEIGHTS[0]).toFixed(1)}, 0.0, 1.0 ) )
+    : mix( sides.rg, sides.ba, clamp( ( height - ${WALL_SAMPLE_HEIGHTS[1].toFixed(1)} ) / ${(WALL_SAMPLE_HEIGHTS[2] - WALL_SAMPLE_HEIGHTS[1]).toFixed(1)}, 0.0, 1.0 ) );
+  // Light bounced around a powered room. It follows the zone's power, never a
+  // lamp's share, so it stays constant while a practical takes over.
+  vec3 bounce = ${ROOM_BOUNCE.toFixed(2)} * lm.r * ( 1.0 - max( n.y, 0.0 ) ) * interiorLmWarm;
+  vec3 lamps = max( n.y, 0.0 ) * pool + max( -n.y, 0.0 ) * ceilingGlow
+    + max( dot( n.xz, light ), 0.0 ) * tint + bounce;
   return lm.a * ( interiorLmAmbient * ( lm.r - interiorLmPlayer ) * hemi
-    + interiorLmPool * facing * ( lm.g * interiorLmWarm + lm.b * interiorLmCool ) );
+    + interiorLmPool * lamps );
 }`,
         )
         .replace(
@@ -226,5 +307,7 @@ irradiance += interiorLightmapIrradiance();
   dispose() {
     this.bands.clear();
     this.texture.dispose();
+    this.sidesTexture.dispose();
+    this.overTexture.dispose();
   }
 }

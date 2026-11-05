@@ -827,8 +827,9 @@ export class InteriorAtmosphere {
 
   /** The nearest visible lamps get real point lights for close shading. Each
    * fades in over the last 1.5 m of practical range, and the baked lightmap
-   * gives up exactly the share the point light takes, so the total light a
-   * lamp casts never depends on where the player stands. */
+   * gives up exactly the share the point light takes, on the floor, ceiling
+   * and walls alike, so the total light a lamp casts never depends on where
+   * the player stands. */
   private updatePracticals(
     game: Game,
     floor: Floor,

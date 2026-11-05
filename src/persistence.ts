@@ -23,8 +23,11 @@ interface Envelope {
   payload: string;
   checksum: number;
 }
-export function encode(g: Game) {
-  assertDesignedEnvironment(g);
+/** `revalidate: false` skips the immutable design's full re-check, the costliest
+ * step of a save. Only background autosaves do that: every explicit and periodic
+ * full save keeps the check, and load rejects a checkpoint that fails it. */
+export function encode(g: Game, { revalidate = true } = {}) {
+  if (revalidate) assertDesignedEnvironment(g);
   checkpointPhysics(g);
   const payload = JSON.stringify(g);
   return JSON.stringify({
@@ -144,20 +147,24 @@ function unpack(raw: string) {
     throw Error("Invalid saved checkpoint");
   return { serial: stored.serial, game: decode(stored.data) };
 }
-export function save(g: Game) {
+/** A background checkpoint skips the synchronous localStorage mirror: copying a
+ * megabyte there on every autosave hitches the game. IndexedDB still receives
+ * it, and the queue above falls back to localStorage if that write fails. */
+export function save(g: Game, options: { background?: boolean } = {}) {
   const payload = JSON.stringify({
     format: 2,
     serial: (serial = Math.max(serial + 1, Date.now() * 1000)),
-    data: encode(g),
+    data: encode(g, { revalidate: !options.background }),
   } satisfies StoredSave);
   let checkpoint = false;
   // Capture the whole snapshot before yielding to IndexedDB, including large
   // drafts/archives when they still fit the browser's actual storage quota.
   // A fixed size cutoff silently left those edits without crash recovery.
-  try {
-    localStorage.setItem(KEY, payload);
-    checkpoint = true;
-  } catch {}
+  if (!options.background)
+    try {
+      localStorage.setItem(KEY, payload);
+      checkpoint = true;
+    } catch {}
   return checkpoints.enqueue({ payload, checkpoint, serial });
 }
 async function storedCopies() {
