@@ -159,7 +159,7 @@ function buildPlayableGame(
   saved?: SavedRunDesign,
 ): Game {
   const g = buildGame(seed, r, study, { layout: "forward" }, blueprint, saved);
-  redesign(g, r, {
+  redesign(g, {
     randomized: true,
     ...(blueprint?.version === 3 ? { blueprint } : {}),
   });

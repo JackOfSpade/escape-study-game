@@ -15,6 +15,7 @@ import { applyLearningAssessment, encounterKey } from "../src/learner";
 import type { Assessment, Encounter, Roadmap } from "../src/model";
 import { decode, encode, recover } from "../src/persistence";
 import { createPlayableGame } from "../src/world";
+import { devProblem, preparePracticeRooms } from "./helpers/practice-questions";
 import {
   enterStudyWorkspace,
   exitStudyWorkspace,
@@ -73,6 +74,7 @@ test("study workspace freezes the real GameTest world and restores the prior pau
 
 test("standalone questions use the formal scheduler without touching stations, world RNG or pacing", async () => {
   const g = createPlayableGame(122, r);
+  preparePracticeRooms(g, r);
   const before = structuredClone({
     floors: g.floors,
     rng: g.rng,
@@ -84,7 +86,13 @@ test("standalone questions use the formal scheduler without touching stations, w
   const e = nextWorkspaceQuestion(g, r);
   assert.equal(nextWorkspaceQuestion(g, r), e);
   assert.equal(e.studyOnly, true);
+  // No local stand-in: an unconnected world gets no question, only an error.
   await ensureProblem(g, e, r);
+  assert.equal(e.problem, undefined);
+  assert.ok(e.error);
+  e.problem = devProblem({ ...g, rng: g.seed ^ g.study.version }, r, contract);
+  e.workspace = e.problem.starter;
+  delete e.error;
   assert.deepEqual(e.problem?.contract, contract);
   assert.deepEqual(
     {
@@ -111,6 +119,7 @@ test("standalone questions use the formal scheduler without touching stations, w
 
 test("workspace reuses an issued game question and ignores NPC-only preparation", () => {
   const g = createPlayableGame(123, r);
+  preparePracticeRooms(g, r);
   const npc = Object.values(g.encounters)[0];
   npc.owner = "someone-else";
   npc.pendingGeneration = { requestId: "npc-only", payload: {} };
@@ -139,6 +148,7 @@ test("workspace reuses an issued game question and ignores NPC-only preparation"
 
 test("workspace keeps the selected human question when other displayed tasks precede it", () => {
   const g = createPlayableGame(127, r);
+  preparePracticeRooms(g, r);
   enterStudyWorkspace(g);
   const [earlier, selected] = Object.values(g.encounters);
   earlier.problemPresentedSequence = 1;
@@ -151,6 +161,7 @@ test("workspace keeps the selected human question when other displayed tasks pre
 
 test("consumed generation and displayed NPC-owned work cannot block a new study question", () => {
   const g = createPlayableGame(128, r);
+  preparePracticeRooms(g, r);
   enterStudyWorkspace(g);
   const consumed = nextWorkspaceQuestion(g, r);
   consumed.state = "consumed";
@@ -379,6 +390,7 @@ test("a completed unresolved visit becomes a linked continuation without blockin
 
 test("skill map stays stable across an unissued question and escapes learner-facing content", () => {
   const g = createPlayableGame(125, r);
+  preparePracticeRooms(g, r);
   const before = workspaceProgressHtml(g, r);
   enterStudyWorkspace(g);
   nextWorkspaceQuestion(g, r);

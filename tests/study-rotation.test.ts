@@ -15,7 +15,7 @@ import {
   type Track,
 } from "../src/model";
 import { decode, encode, recover } from "../src/persistence";
-import { devProblem } from "../src/practice-problem";
+import { devProblem, preparePracticeRooms } from "./helpers/practice-questions";
 import { retainRunLearning } from "../src/run-learning";
 import {
   enterStudyWorkspace,
@@ -51,6 +51,7 @@ function world(profile: "development" | "live" = "development") {
   );
   assert.equal(runner.run().status, "passed");
   runner.game.study = initialStudy(roadmap, profile);
+  preparePracticeRooms(runner.game, roadmap);
   return runner.game;
 }
 function practice(g: ReturnType<typeof world>, id: string) {
@@ -80,6 +81,16 @@ function practice(g: ReturnType<typeof world>, id: string) {
   g.encounters[id] = e;
   beginVisit(roadmap, g.study, e);
   return e;
+}
+/** What a development terminal used to receive on opening: the next scheduled question. */
+function issueDevelopmentQuestion(g: ReturnType<typeof world>, e: Encounter) {
+  const contract = e.studyOnly
+    ? eligible(roadmap, g.study)
+    : spawnContract(roadmap, g.study);
+  e.problem = devProblem(g, roadmap, contract);
+  e.workspace = e.problem.starter;
+  e.state = "in-progress";
+  if (!e.studyOnly) recordSpawn(g.study, contract, e.id, g.time);
 }
 function finishHuman(g: ReturnType<typeof world>, e: Encounter) {
   const wasConsumed = e.state === "consumed";
@@ -172,38 +183,12 @@ test("a completed practice question advances the shared scheduler used by standa
   finishHuman(g, e);
   enterStudyWorkspace(g);
   const next = nextWorkspaceQuestion(g, roadmap);
-  await ensureProblem(g, next, roadmap);
+  issueDevelopmentQuestion(g, next);
   assert.equal(next.problem!.contract.track, "PE");
   beginVisit(roadmap, g.study, next);
   finishHuman(g, next);
   assert.equal(g.study.visits.length, 1);
   assert.equal(eligible(roadmap, g.study).track, "PE");
-});
-
-test("untouched solo terminals refresh a preloaded old track while issued questions stay frozen", async () => {
-  const g = world();
-  const untouched = Object.values(g.encounters).find((e) => e.mode === "solo")!;
-  untouched.owner = "human";
-  const frozen = structuredClone(untouched);
-  frozen.id = "issued-question";
-  frozen.problemPresentedSequence = 7;
-  g.encounters[frozen.id] = frozen;
-  const original = structuredClone(frozen.problem);
-  const e = practice(g, "practice");
-  finishHuman(g, e);
-  const before = structuredClone({
-    rng: g.rng,
-    floors: g.floors,
-    learner: g.study.learner,
-  });
-  await ensureProblem(g, untouched, roadmap);
-  assert.equal(untouched.problem!.contract.track, "PE");
-  assert.deepEqual(
-    { rng: g.rng, floors: g.floors, learner: g.study.learner },
-    before,
-  );
-  await ensureProblem(g, frozen, roadmap);
-  assert.deepEqual(frozen.problem, original);
 });
 
 test("preloaded NPC work and shared room questions are preserved after the track changes", async () => {

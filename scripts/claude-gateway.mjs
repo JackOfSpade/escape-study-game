@@ -300,6 +300,9 @@ const conversationKey = (operation, payload) =>
     : undefined;
 const AMBIENT = new Set(["npc-chatter", "npc-chatter-review"]);
 
+const CONNECTION_CACHE_MS = 2000;
+// Well under the browser's 5 s status timeout, so a slow check never reads as a dead relay.
+const CONNECTION_TIMEOUT_MS = 3000;
 export function createClaudeGateway({
   env = process.env,
   spawn = spawnChild,
@@ -528,5 +531,59 @@ export function createClaudeGateway({
     }
     return entry.promise;
   }
-  return { run, enabled: () => true };
+  /** Whether a player request could reach Claude now. A check that cannot
+   * conclude does not lock the terminals: the request itself reports the failure. */
+  let checked, checking;
+  const checkConnection = () =>
+    new Promise((resolve) => {
+      let binary;
+      try {
+        binary = resolveClaudeBinary(env);
+      } catch {
+        resolve("cli-missing");
+        return;
+      }
+      let output = "",
+        done = false;
+      const finish = (state) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        resolve(state);
+      };
+      const child = spawn(binary, ["auth", "status", "--json"], {
+        cwd,
+        env: claudeChildEnv(env, binary),
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+      const timer = setTimeout(() => {
+        child.kill("SIGKILL");
+        finish("connected");
+      }, CONNECTION_TIMEOUT_MS);
+      child.on("error", (error) =>
+        finish(error?.code === "ENOENT" ? "cli-missing" : "connected"),
+      );
+      child.stdout.on("data", (chunk) => {
+        output += chunk;
+      });
+      child.on("close", () => {
+        try {
+          finish(JSON.parse(output).loggedIn === false ? "signed-out" : "connected");
+        } catch {
+          finish("connected");
+        }
+      });
+    });
+  const connection = () => {
+    if (checked && now() < checked.until) return Promise.resolve(checked.state);
+    checking ??= checkConnection()
+      .catch(() => "connected")
+      .then((state) => {
+      checked = { state, until: now() + CONNECTION_CACHE_MS };
+      checking = undefined;
+      return state;
+    });
+    return checking;
+  };
+  return { run, enabled: () => true, connection };
 }

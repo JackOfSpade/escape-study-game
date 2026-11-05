@@ -1,6 +1,5 @@
 import { fnv1a } from "./hash";
 import { QUESTION_DESIGN_GUIDANCE } from "../scripts/lib/study-question-policy.mjs";
-import { devProblem } from "./practice-problem";
 import { adoptQuestionPacing, validSolveEstimate } from "./field-pacing";
 import { roomEncounters, assignRoomProblem } from "./room-questions";
 import { completionVerdict } from "./completion-verdict";
@@ -242,11 +241,13 @@ const generationCurrent = (g: Game, e: Encounter, id: string) =>
   !e.problem;
 const roomGenerations = new WeakMap<Game, Map<string, Promise<void>>>();
 export async function ensureProblem(g: Game, e: Encounter, r: Roadmap) {
-  refreshUnissuedPractice(g, e, r);
   if (!e.questionRoom) return ensureIndividualProblem(g, e, r);
   if (e.state === "consumed" || g.encounters[e.id] !== e) return;
   const peers = roomEncounters(g, e);
-  const existing = peers.find((peer) => peer.problem);
+  // Only a question Claude wrote is shared; an old practice one never spreads.
+  const existing = peers.find(
+    (peer) => peer.problem && peer.problem.provenance !== "development",
+  );
   if (existing?.problem) {
     assignRoomProblem(g, existing, existing.problem);
     return;
@@ -275,55 +276,6 @@ export async function ensureProblem(g: Game, e: Encounter, r: Roadmap) {
   }
 }
 
-/** Development rooms preload one track for the whole world. Refresh only an
- * untouched private prompt at opening time; issued tasks and NPC work stay frozen.
- * Use a separate deterministic stream so opening a terminal cannot change physics RNG.
- */
-function refreshUnissuedPractice(g: Game, e: Encounter, r: Roadmap) {
-  const p = e.problem;
-  if (
-    g.encounters[e.id] !== e ||
-    g.study.profile !== "development" ||
-    p?.provenance !== "development" ||
-    e.mode !== "solo" ||
-    e.state === "consumed" ||
-    (e.owner && e.owner !== "human") ||
-    e.problemPresentedSequence !== undefined ||
-    e.directStudy ||
-    e.pendingGeneration ||
-    e.generation ||
-    e.revision !== 0 ||
-    e.workspace !== p.starter ||
-    e.history.length ||
-    e.tutor.length ||
-    e.group.length ||
-    e.submissions.length ||
-    e.npcProgress > 0 ||
-    e.npcWork?.length ||
-    e.executions?.length
-  )
-    return;
-  let formal: Contract;
-  try {
-    formal = eligible(r, g.study);
-  } catch {
-    // Preserve existing tasks when the curriculum has no eligible replacement.
-    return;
-  }
-  if (
-    p.contract.track === formal.track &&
-    (p.contract.practice ||
-      JSON.stringify(p.contract.objectiveIds) ===
-        JSON.stringify(formal.objectiveIds))
-  )
-    return;
-  const contract = e.studyOnly ? formal : spawnContract(r, g.study, formal);
-  const rng = fnv1a(e.id, g.seed);
-  e.problem = devProblem({ ...g, rng }, r, contract);
-  e.workspace = e.problem.starter;
-  delete e.error;
-  recordSpawn(g.study, contract, e.id, g.time);
-}
 const QUESTION_GENERATION_POLICY =
   "Diagnose before teaching. Write a standalone question: the prompt alone must supply the essential scenario, interface, implementation, data, timing and business-rule facts needed to answer without using the chat. For classification, list the concrete items to classify and their relevant behavior, lifetime and source without supplying their classifications. For tracing, debugging or critique, supply the relevant code, event sequence or evidence. Distinguish fixed facts from intentional design choices; if the learner may choose an example or an approach, say so explicitly rather than expecting them to infer an unspecified implementation. Ask a bounded task that matches the supplied scenario; never paste a capability statement into an unrelated generic story. Every requirement in the rubric must be visible in the question; do not grade unstated assumptions or add unrelated decisions, personal history or edge cases. Before returning the question, check that it can be answered from the prompt alone and repair missing context without revealing the solution. For D1, keep the learner workspace starter empty; put essential scenario or code-reading material in the prompt without supplying the key explanation, endpoint update, worked result or a leading solution hint. Do not interpret an objective's implementation verb as a D1 implementation requirement. Preserve legitimate prior context and assistance attribution without presenting supplied steps as fresh independent understanding. Use probeRecords: build the question around open gaps inside the eligible scope with the facet they blocked as the apex; only a gap marked reuseInScopeDefinitions may add its exact facet id to scopeDefinitions, and existing stable scope definitions are copied exactly; do not spend the question on established facets unless the scope requires them; re-ask what a closed gap blocked. The prompt is read by the learner: never mention the scheduled scope, objective IDs, tiers, depth, scheduling or that this is a formal visit; ask the question in plain language. Keep it minimal: write the smallest self-contained diagnostic that exercises the objective, with one main problem and at most one or two directly connected follow-ups. Include only the essential facts, not pasted project context or a full-project audit. For code review, include the actual code under review, including any required helper and its authorization semantics; a prose proposal supports design review only. Prefer short snippets, traces or evidence, and never turn an objective's scope verbs into a D1 implementation task. The visible task and rubric must match, without leaking the solution. An honestly integrative objective may stay integrative on a small feature. A narrow example never establishes unrelated facets or mastery. " +
   QUESTION_DESIGN_GUIDANCE;
@@ -488,9 +440,9 @@ function takePrepared(g: Game, r: Roadmap) {
 }
 async function ensureIndividualProblem(g: Game, e: Encounter, r: Roadmap) {
   if (e.problem || e.state === "consumed") return;
-  if (g.study.profile === "live" && status().mode === "development") {
-    e.error =
-      "Live study connection unavailable; work is preserved. Reconnect to continue this live profile.";
+  // Every question comes from Claude; there is no local stand-in.
+  if (!live(g)) {
+    e.error = "Claude is not connected. Your work is saved.";
     return;
   }
   if (e.generation) return;
@@ -527,7 +479,7 @@ async function ensureIndividualProblem(g: Game, e: Encounter, r: Roadmap) {
       (e.pendingGeneration?.payload?.contract as Contract | undefined) ??
       (e.studyOnly ? eligible(r, study) : spawnContract(r, study));
     if (prepared) p = prepared.problem;
-    else if (native) {
+    else {
       const payload =
         e.pendingGeneration?.payload ??
         generationPayload(g, r, contract, generation, e.id);
@@ -539,12 +491,7 @@ async function ensureIndividualProblem(g: Game, e: Encounter, r: Roadmap) {
       };
       p = await request<Problem>("generate", payload);
       p.provenance = provider;
-    } else
-      p = devProblem(
-        e.studyOnly ? { ...g, rng: g.seed ^ study.version } : g,
-        r,
-        contract,
-      );
+    }
     if (
       g.study !== study ||
       study.profile !== profile ||

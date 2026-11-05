@@ -24,6 +24,9 @@ export default defineConfig({
   },
   webServer: {
     command: "npm run client -- --port 5279 --strictPort",
+    // Never reach the player's real study relay: a live run would ask real
+    // Claude to prepare questions. Specs that need Claude mock /api themselves.
+    env: { STUDY_BRIDGE_URL: "http://127.0.0.1:9" },
     url: "http://127.0.0.1:5279",
     reuseExistingServer: false,
   },

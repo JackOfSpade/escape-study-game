@@ -5,13 +5,12 @@ import {
   checkBridge,
   closeChat,
   edit,
-  ensureProblem,
   openChat,
   presentMessages,
   responders,
   send,
 } from "../src/ai";
-import { evidencePacket } from "../src/curriculum";
+import { eligible, evidencePacket } from "../src/curriculum";
 import {
   groupSnapshot,
   validateGroupReply,
@@ -21,6 +20,8 @@ import type { Artifact, Roadmap } from "../src/model";
 import { npcProfile, recordNpcWork, taskSkill } from "../src/npc-cognition";
 import { decode, encode } from "../src/persistence";
 import { createGame } from "../src/world";
+import { devProblem } from "./helpers/practice-questions";
+import { fnv1a } from "../src/hash";
 
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 async function fixture(seed = 7) {
@@ -28,7 +29,14 @@ async function fixture(seed = 7) {
     e = g.encounters["f0-room0"];
   g.zombies = [];
   g.nextSpawn = Number.MAX_SAFE_INTEGER;
-  await ensureProblem(g, e, r);
+  // The game has no local questions: hand the terminal the synthetic fixture.
+  e.problem = devProblem(
+    { ...g, rng: fnv1a(e.id, g.seed) },
+    r,
+    eligible(r, g.study),
+  );
+  e.workspace = e.problem.starter;
+  e.state = "in-progress";
   for (const a of g.survivors.slice(1)) {
     a.intent = e.id;
     a.thought = 30;

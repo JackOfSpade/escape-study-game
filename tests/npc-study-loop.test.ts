@@ -96,10 +96,14 @@ test("unseen zombie positions cannot influence a loop plan", () => {
   };
   assert.equal(make(35), make(38));
 });
-test("missing room questions, foreign ownership and stair credentials exclude loop study", () => {
-  for (const reason of ["question", "owner", "access"] as const) {
+test("a room nobody has opened still allows loop study, but foreign ownership and stair credentials exclude it", () => {
+  {
     const { g, a, e } = loopFixture();
-    if (reason === "question") delete e.problem;
+    delete e.problem;
+    assert.deepEqual(studyLoopDecision(g, a, g.zombies), { mode: "work" });
+  }
+  for (const reason of ["owner", "access"] as const) {
+    const { g, a, e } = loopFixture();
     if (reason === "owner") e.owner = "someone-else";
     if (reason === "access") a.access.push(0);
     assert.equal(studyLoopDecision(g, a, g.zombies), undefined);

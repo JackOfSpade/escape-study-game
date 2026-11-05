@@ -1,3 +1,4 @@
+import { preparePracticeRooms } from "./helpers/practice-questions";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
@@ -18,6 +19,7 @@ const roadmap: Roadmap = JSON.parse(
 );
 test("all stations in each room share the exact question, with independent solo answers and completion", async () => {
   const g = createPlayableGame(42, roadmap);
+  preparePracticeRooms(g, roadmap);
   const rooms = new Map<string, (typeof g.floors)[0]["stations"]>();
   for (const f of g.floors)
     for (const s of f.stations) {
@@ -62,6 +64,7 @@ test("normal GameTest AI shares room difficulty while retaining individual work 
   ];
   const runner = new TestRunner(s, roadmap),
     g = runner.game;
+  preparePracticeRooms(g, roadmap);
   g.survivors = g.survivors.slice(0, 3);
   Object.assign(g.survivors[0], { x: 39, y: 26 });
   const stations = g.floors[0].stations
@@ -105,8 +108,9 @@ test("normal GameTest AI shares room difficulty while retaining individual work 
   harder.problem!.contract.depth = 3;
   assert.ok(npcThinkingRate(a, harder) < npcThinkingRate(a, question));
   delete harder.problem;
-  assert.equal(npcThinkingRate(a, harder), 0);
-  assert.equal(npcReasoningAvailable(harder, a), false);
+  // NPCs keep working in a room nobody has opened yet.
+  assert.ok(npcThinkingRate(a, harder) > 0);
+  assert.equal(npcReasoningAvailable(harder, a), true);
 });
 
 test("concurrent live room requests generate once, and retry after reload keeps the original packet", async () => {

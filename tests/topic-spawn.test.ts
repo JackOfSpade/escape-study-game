@@ -1,3 +1,4 @@
+import { preparePracticeRooms } from "./helpers/practice-questions";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
@@ -151,6 +152,7 @@ test("the formal topic spawns first, then cooled topics rotate in, gaps first, a
 
 test("a fresh run spawns varied room topics on the formal track, keeps the formal visit, and practice rooms never bind a visit", async () => {
   const g = createPlayableGame(42, r);
+  preparePracticeRooms(g, r);
   const rooms = new Map<string, string[]>();
   for (const e of Object.values(g.encounters))
     if (e.questionRoom && e.problem)
@@ -214,6 +216,7 @@ test("a fresh run spawns varied room topics on the formal track, keeps the forma
   );
   delete restored.study.pending;
   const next = createPlayableGame(43, r, restored.study);
+  preparePracticeRooms(next, r);
   assert.ok(spawnState(next.study).recent.length > rooms.size);
 });
 

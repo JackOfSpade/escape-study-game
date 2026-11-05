@@ -164,7 +164,7 @@ test("footprint and floor generation replay deterministically without consuming 
 test("historical forward factories retain their existing floor geometry", () => {
   const g = createGame(42, roadmap, undefined, { layout: "forward" });
   assert.equal(g.floors[0].generation?.version, 2);
-  redesign(g, roadmap);
+  redesign(g);
   for (const f of g.floors) {
     assert.equal(f.boundary, undefined);
     if (f.index < CONFIG.floors) assert.equal(f.generation?.version, 3);

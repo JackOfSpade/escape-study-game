@@ -7,7 +7,6 @@ import { test } from "node:test";
 import {
   closeChat,
   edit,
-  ensureProblem,
   openChat,
   responders,
   submit,
@@ -46,10 +45,21 @@ import { survivorPath, type NavStep } from "../src/navigation";
 import { decode, encode, recover } from "../src/persistence";
 import { path, soundGain } from "../src/spatial";
 import { createGame } from "../src/world";
+import { recordSpawn, spawnContract } from "../src/topic-spawn";
+import { devProblem } from "./helpers/practice-questions";
+import type { Encounter, Game } from "../src/model";
 const roadmap = JSON.parse(
   readFileSync("public/curriculum.json", "utf8"),
 ) as Roadmap;
 const fixture = (seed = 42) => createGame(seed, roadmap);
+/** The game has no local questions; give the terminal the synthetic fixture the way a delivered question would arrive. */
+function openDev(g: Game, e: Encounter) {
+  const contract = spawnContract(roadmap, g.study);
+  e.problem = devProblem(g, roadmap, contract);
+  e.workspace = e.problem.starter;
+  e.state = "in-progress";
+  recordSpawn(g.study, contract, e.questionRoom ?? e.id, g.time);
+}
 const empty = (index = 0): Floor => ({
   index,
   tiles: Array.from({ length: 34 }, (_, y) =>
@@ -273,7 +283,7 @@ test("B11/B12/B13/B14 sound follows open paths and layered separation", () => {
 test("C01/C03/C04/C14 exact drafts, messages, consumed state and RNG survive encode/decode", async () => {
   const g = fixture(),
     e = g.encounters["f0-room0"];
-  await ensureProblem(g, e, roadmap);
+  openDev(g, e);
   edit(g, e, "my own draft", 0);
   e.group.push({
     id: "m",
@@ -299,7 +309,7 @@ test("C01/C03/C04/C14 exact drafts, messages, consumed state and RNG survive enc
 test("C05/C06/C07/C08 async snapshot completion is once-only and accepted revision freezes", async () => {
   const g = fixture(),
     e = g.encounters["f0-room0"];
-  await ensureProblem(g, e, roadmap);
+  openDev(g, e);
   edit(
     g,
     e,
@@ -434,7 +444,7 @@ test("F03/F04/F05/F06/F07 scheduled reviews then exact breadth order; ratio adva
   assert.equal(eligible(roadmap, g.study).objectiveIds[0], "PY:T05.2");
   for (let i = 0; i < 6; i++) {
     const e = g.encounters[`f${Math.floor(i / 4)}-room${i % 4}`];
-    await ensureProblem(g, e, roadmap);
+    openDev(g, e);
     const c = e.problem!.contract;
     assert.equal(c.track, ["PY", "PE", "PE"][i % 3]);
     assert.equal(c.depth, 1);
@@ -448,7 +458,7 @@ test("F03/F04/F05/F06/F07 scheduled reviews then exact breadth order; ratio adva
 test("F09/F11/F13/F23 assessment rejects NPC evidence and out of scope; no automatic passes", async () => {
   const g = fixture(),
     e = g.encounters["f0-room0"];
-  await ensureProblem(g, e, roadmap);
+  openDev(g, e);
   e.history.push({
     seq: 1,
     author: "npc-0",
@@ -628,7 +638,7 @@ test("integrated escape at 30 Hz: legal human movement, four puzzle snapshots, i
     walkTo(stationSpot(g.floors[a.floor], st));
     const e = g.encounters[st.encounter];
     assert.notEqual(e.state, "consumed");
-    await ensureProblem(g, e, roadmap);
+    openDev(g, e);
     edit(
       g,
       e,

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { checkBridge, ensureProblem } from "../src/ai";
 import { eligible, initialStudy } from "../src/curriculum";
-import { devProblem } from "../src/practice-problem";
+import { devProblem, preparePracticeRooms } from "./helpers/practice-questions";
 import {
   concessionFeedback,
   encounterEstablished,
@@ -61,6 +61,7 @@ const scopedProblem = {
 
 test("generic facet ids cannot resolve unrelated gaps, and withdrawn judgments reopen their own resolutions", () => {
   const g = createPlayableGame(2026, r);
+  preparePracticeRooms(g, r);
   const [source, unrelated, resolver] = Object.values(g.encounters).filter(
     (e) => e.mode === "solo",
   );
@@ -148,6 +149,7 @@ test("generic facet ids cannot resolve unrelated gaps, and withdrawn judgments r
 
 test("gap matching uses the complete normalized description and keeps an independent resolver after withdrawal", () => {
   const g = createPlayableGame(2027, r);
+  preparePracticeRooms(g, r);
   const [source, different, first, second] = Object.values(g.encounters).filter(
     (e) => e.mode === "solo",
   );
@@ -281,6 +283,7 @@ test("gap matching uses the complete normalized description and keeps an indepen
 
 test("facet descriptions preserve symbolic predicates when matching a gap", () => {
   const g = createPlayableGame(2028, r);
+  preparePracticeRooms(g, r);
   const [source, different] = Object.values(g.encounters).filter(
     (e) => e.mode === "solo",
   );
@@ -340,6 +343,7 @@ test("facet descriptions preserve symbolic predicates when matching a gap", () =
 
 test("reload repairs stale gap resolutions while preserving supported resolvers and raw observations", () => {
   const g = createPlayableGame(2029, r);
+  preparePracticeRooms(g, r);
   const gap = (
     id: string,
     facetId: string,
@@ -601,6 +605,7 @@ test("reply parsing keeps the key decision authoritative, drops unknown facet id
 
 test("cumulative state re-judges per facet and conceding records only unestablished facets as gaps, once, carried into the next run", async () => {
   const g = createPlayableGame(4242, r);
+  preparePracticeRooms(g, r);
   const e = g.encounters[g.floors[0].stations[0].encounter];
   await ensureProblem(g, e, r);
   e.problem!.scopeDefinitions = scopedProblem.scopeDefinitions as never;
@@ -838,6 +843,7 @@ test("cumulative state re-judges per facet and conceding records only unestablis
 
 test("conceding without naming facets leaves unasked facets unknown", async () => {
   const g = createPlayableGame(77, r);
+  preparePracticeRooms(g, r);
   const e = g.encounters[g.floors[0].stations[0].encounter];
   await ensureProblem(g, e, r);
   const facets = probeFacets(e.problem!);
@@ -883,6 +889,7 @@ test("conceding without naming facets leaves unasked facets unknown", async () =
   );
   // A plain solved completion records nothing.
   const g2 = createPlayableGame(78, r);
+  preparePracticeRooms(g2, r);
   const e2 = g2.encounters[g2.floors[0].stations[0].encounter];
   await ensureProblem(g2, e2, r);
   assert.deepEqual(
@@ -908,6 +915,7 @@ test("conceding without naming facets leaves unasked facets unknown", async () =
 
 test("a recorded gap closes when the facet is later established at another terminal, by stable id or identical facet text, and the context says the blocked apex can be re-asked", async () => {
   const g = createPlayableGame(2024, r);
+  preparePracticeRooms(g, r);
   const solo = Object.values(g.encounters).filter((x) => x.mode === "solo");
   const [e1, e2, e3] = solo;
   const facets = (ids: [string, string][]) => [
@@ -1049,6 +1057,7 @@ test("a recorded gap closes when the facet is later established at another termi
   assert.match(context, /Gaps since closed/);
   // A different track never closes it; resolution survives save/reload.
   const other = createPlayableGame(3, r);
+  preparePracticeRooms(other, r);
   const oe = Object.values(other.encounters).find((x) => x.mode === "solo")!;
   await ensureProblem(other, oe, r);
   oe.problem!.scopeDefinitions = facets([["x", "Some facet"]]) as never;
@@ -1248,6 +1257,7 @@ test("the tutor can declare prerequisite parts the question never listed, bounde
 
 test("declared parts join the encounter's universe and are carried in records and context with their parent", async () => {
   const g = createPlayableGame(515, r);
+  preparePracticeRooms(g, r);
   const e = g.encounters[g.floors[0].stations[0].encounter];
   await ensureProblem(g, e, r);
   e.problem!.scopeDefinitions = [
@@ -1389,6 +1399,7 @@ test("declared parts join the encounter's universe and are carried in records an
 
 test("probeRecordsForTrack is bounded, track-scoped, keeps parents and splits open from closed gaps", () => {
   const g = createPlayableGame(9, r);
+  preparePracticeRooms(g, r);
   const parent = { id: "apex", description: "Apex facet" };
   g.study.knowledgeEstablished = Array.from({ length: 45 }, (_, i) => ({
     id: `known-${i}`,
@@ -1564,6 +1575,7 @@ test("live question generation sends the track's probe records and a policy that
 
 test("development practice lists open gaps on its own objective, never closed, other-objective or other-track ones", () => {
   const g = createPlayableGame(12, r);
+  preparePracticeRooms(g, r);
   const { track, objectiveIds } = eligible(r, g.study);
   const gap = (
     id: string,
@@ -1720,6 +1732,7 @@ test("a declared part is matched in the model's own spelling on later turns, for
 
 test("the next turn's probe contract carries declared parts with their stored ids", async () => {
   const g = createPlayableGame(616, r);
+  preparePracticeRooms(g, r);
   const e = g.encounters[g.floors[0].stations[0].encounter];
   await ensureProblem(g, e, r);
   const own = probeFacets(e.problem!);

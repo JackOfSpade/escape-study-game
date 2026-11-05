@@ -1,17 +1,30 @@
 import { isRecord } from "./records";
 /** Provider transport only; gameplay and learning remain in their owning modules. */
+export type DisconnectReason =
+  | "relay-unreachable"
+  | "gateway-off"
+  | "cli-missing"
+  | "signed-out";
+const REASONS: readonly unknown[] = [
+  "relay-unreachable",
+  "gateway-off",
+  "cli-missing",
+  "signed-out",
+];
 export interface BridgeStatus {
+  /** "development" means Claude is not connected, so terminals are locked. */
   mode: "development" | "claude-cli";
   label: string;
+  reason?: DisconnectReason;
   capabilities: string[];
   detail: string;
 }
 let bridgeStatus: BridgeStatus = {
   mode: "development",
-  label: "Development fallback",
+  label: "Claude not connected",
+  reason: "relay-unreachable",
   capabilities: [],
-  detail:
-    "Claude CLI study connection is not available. No real mastery awarded.",
+  detail: "Claude CLI study connection is not available.",
 };
 export const status = () => bridgeStatus;
 let checkVersion = 0;
@@ -34,6 +47,9 @@ export async function checkBridge() {
       bridgeStatus = {
         mode: info.mode,
         label: info.label,
+        ...(REASONS.includes(info.reason)
+          ? { reason: info.reason as DisconnectReason }
+          : {}),
         capabilities: info.capabilities,
         detail: info.detail,
       };
@@ -41,10 +57,10 @@ export async function checkBridge() {
     if (version === checkVersion)
       bridgeStatus = {
         mode: "development",
-        label: "Development fallback",
+        label: "Claude not connected",
+        reason: "relay-unreachable",
         capabilities: [],
-        detail:
-          "Bridge server unavailable. Local mechanics remain playable. No real mastery awarded.",
+        detail: "The study relay is not reachable.",
       };
   }
   return bridgeStatus;

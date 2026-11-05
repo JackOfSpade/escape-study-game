@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
+import { devProblem } from "./helpers/practice-questions";
 import {
   checkBridge,
   closeChat,
   edit,
-  ensureProblem,
   openChat,
   presentWorkLog,
 } from "../src/ai";
@@ -23,7 +23,8 @@ async function fixture() {
   const g = createGame(7, r),
     e = g.encounters["f0-room0"],
     a = g.survivors[1];
-  await ensureProblem(g, e, r);
+  e.problem = devProblem(g, r);
+  e.workspace = e.problem.starter;
   g.zombies = [];
   g.nextSpawn = Number.MAX_SAFE_INTEGER;
   a.milestone = 1;

@@ -1,13 +1,19 @@
-import { eligible } from "./curriculum";
-import { openGaps } from "./knowledge-probe";
-import { productPractice } from "./product-practice";
+import { eligible } from "../../src/curriculum";
+import { fnv1a } from "../../src/hash";
+import { openGaps } from "../../src/knowledge-probe";
 import {
   type Contract,
   type Game,
   type Roadmap,
   type Problem,
   rand,
-} from "./model";
+} from "../../src/model";
+import { assignRoomProblem } from "../../src/room-questions";
+import { recordSpawn, spawnContract } from "../../src/topic-spawn";
+/**
+ * Test fixture only: synthetic questions for worlds that never reach Claude.
+ * The game itself has no local questions; every real question comes from Claude.
+ */
 /** Gaps the learner declared on this question's own objective, so the extra line is never off-topic. */
 function gapLine(g: Game, contract: Contract) {
   const gaps = openGaps(g)
@@ -50,11 +56,10 @@ export function devProblem(
     };
   }
   if (contract.track === "PE") {
-    // The static PE bank cannot adapt to arbitrary declared gaps, so it never
-    // appends them as extra chores; the RNG draws above stay unchanged.
-    const question = productPractice(contract);
     return {
-      ...question,
+      title: "Product review",
+      prompt: `Review this small product change and name one risk worth checking.${gapLine(g, contract)}`,
+      rubric: ["Name one relevant risk", "Explain how to check it"],
       starter: "",
       provenance: "development",
       contract,
@@ -77,32 +82,14 @@ export function devProblem(
     contract,
   };
 }
-
-const withoutCodeMarkup = (prompt: string) =>
-  prompt
-    .split("\n")
-    .filter((line) => !line.startsWith("```"))
-    .join("\n")
-    .replace(/`/g, "");
-const UNFENCED_TRACE =
-  /^(Read this small Python trace:\n\n)(values = [^\n]*\ncount = 0\nfor value in values:\n {4}if value > \d+:\n {8}count \+= 1)(?=\n\n)/;
-
-/**
- * Saves keep the question text they were issued with, so development questions
- * issued before their code was fenced are upgraded on load. Only markup changes:
- * a prompt whose wording differs from the current bank is left untouched.
- */
-export function upgradeSavedPracticePrompt(problem: Problem | undefined) {
-  if (problem?.provenance !== "development") return;
-  problem.prompt = problem.prompt.replace(
-    UNFENCED_TRACE,
-    "$1```python\n$2\n```",
-  );
-  if (problem.contract?.track !== "PE") return;
-  try {
-    const current = productPractice(problem.contract).prompt;
-    if (withoutCodeMarkup(current) === problem.prompt) problem.prompt = current;
-  } catch {
-    // An objective no longer in the bank keeps the text it was issued with.
+/** What the game used to do at world creation: give every room a synthetic question. */
+export function preparePracticeRooms(g: Game, roadmap: Roadmap) {
+  if (g.study.profile !== "development") return;
+  for (const e of Object.values(g.encounters)) {
+    if (!e.questionRoom || e.problem || e.state === "consumed") continue;
+    const rng = fnv1a(e.questionRoom, g.seed);
+    const contract = spawnContract(roadmap, g.study);
+    assignRoomProblem(g, e, devProblem({ ...g, rng }, roadmap, contract));
+    recordSpawn(g.study, contract, e.questionRoom, g.time);
   }
 }

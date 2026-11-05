@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { checkBridge, ensureProblem, retryTutorRequest, send } from "../src/ai";
+import { preparePracticeRooms } from "./helpers/practice-questions";
+import { checkBridge, retryTutorRequest, send } from "../src/ai";
 import { probeFacets, probeState } from "../src/knowledge-probe";
 import type { Roadmap } from "../src/model";
 import { createPlayableGame } from "../src/world";
@@ -35,8 +36,8 @@ async function fixture(
   try {
     await checkBridge();
     const g = createPlayableGame(717, r);
+    preparePracticeRooms(g, r);
     const e = g.encounters[g.floors[0].stations[0].encounter];
-    await ensureProblem(g, e, r);
     e.mode = "solo";
     e.owner = "human";
     connected = true;
@@ -272,7 +273,6 @@ test("a declared gap lets Terminal AI concede the key, records the gap with the 
     const other = Object.values(g.encounters).find(
       (x: any) => x.id !== e.id && x.mode === "solo" && x.state !== "consumed",
     ) as any;
-    await ensureProblem(g, other, r);
     other.owner = "human";
     reply(async () => Response.json({ text: "Go on", complete: false }));
     const before = calls.length;

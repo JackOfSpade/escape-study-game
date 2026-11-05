@@ -163,6 +163,7 @@ import { readFileSync } from "node:fs";
 import { checkBridge, ensureProblem, presentProblem, send } from "../src/ai";
 import { topicAssessmentTopics } from "../scripts/lib/topic-assessment.mjs";
 import { createPlayableGame } from "../src/world";
+import { preparePracticeRooms } from "./helpers/practice-questions";
 
 const liveRoadmap: Roadmap = JSON.parse(
   readFileSync("public/curriculum.json", "utf8"),
@@ -196,6 +197,7 @@ async function terminalFixture(
   try {
     await checkBridge();
     const g = createPlayableGame(717, liveRoadmap);
+    preparePracticeRooms(g, liveRoadmap);
     const e = g.encounters[g.floors[0].stations[0].encounter];
     await ensureProblem(g, e, liveRoadmap);
     e.mode = "solo";
