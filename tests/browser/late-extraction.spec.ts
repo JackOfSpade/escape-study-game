@@ -19,6 +19,7 @@ test("earned shields and real keyboard controls extract from a crowded rooftop a
     created: captured.spawned,
     evidence: JSON.stringify(captured.study.learner.evidence),
     visits: captured.study.visits.length,
+    attempts: JSON.stringify(captured.study.learner.attempts),
     trip: captured.helicopter.trip,
   };
   await page.goto("/");
@@ -146,6 +147,8 @@ test("earned shields and real keyboard controls extract from a crowded rooftop a
       created: g.spawned,
       evidence: JSON.stringify(g.study.learner.evidence),
       visits: g.study.visits.length,
+      profile: g.study.profile,
+      attempts: JSON.stringify(g.study.learner.attempts),
       used: g.events.filter(
         (e: any) =>
           e.type === "item" && e.actor === "human" && e.text.includes("bubble"),
@@ -161,7 +164,12 @@ test("earned shields and real keyboard controls extract from a crowded rooftop a
   expect(after.bubbles).toBe(3 - after.used);
   expect(after.created).toBeGreaterThanOrEqual(baseline.created);
   expect(after.evidence).toBe(baseline.evidence);
-  expect(after.visits).toBe(baseline.visits);
+  // The captured run is a development run; loading moves it to the live
+  // profile, which resets the development curriculum visits but keeps the
+  // learner ledger (evidence above), so the visits are not preserved.
+  expect(after.profile).toBe("live");
+  expect(after.visits).toBe(0);
+  expect(after.attempts).toBe(baseline.attempts);
   await writeFile(
     "test-results/late-extraction-ui-state.json",
     JSON.stringify({ baseline, after }, null, 2),

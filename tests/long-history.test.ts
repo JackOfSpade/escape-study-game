@@ -5,7 +5,7 @@ import { evidencePacket } from "../src/curriculum";
 import { beginLearningAttempt, eligibleLearning } from "../src/learner";
 import type { Roadmap } from "../src/model";
 import { npcWorkContext } from "../src/npc-cognition";
-import { devProblem } from "../src/practice-problem";
+import { devProblem } from "./helpers/practice-questions";
 import { captureActiveAttempts } from "../src/roadmap-active-work";
 import { createGame } from "../src/world";
 
@@ -16,8 +16,9 @@ test("retained long study histories stay usable for NPC context, evidence and ro
     l = g.study.learner!,
     at = "2026-10-20T12:00:00Z";
   g.study.profile = "live";
-  e.problem = devProblem(g, r, eligibleLearning(r, l, at));
-  e.problem.provenance = "study-mode";
+  const problem = devProblem(g, r, eligibleLearning(r, l, at));
+  problem.provenance = "study-mode";
+  e.problem = problem;
   e.humanEngaged = true;
   beginLearningAttempt(r, l, e, at);
   const count = 150_001;

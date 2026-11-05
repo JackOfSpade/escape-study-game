@@ -141,6 +141,14 @@
         <button id="leave" class="quiet">Leave terminal</button>
       </div>
       <div id="terminal-provenance" class="provenance"></div>
+      <section id="terminal-connect" aria-live="polite" hidden>
+        <p id="terminal-connect-problem"></p>
+        <ol id="terminal-connect-steps"></ol>
+        <p class="muted">
+          This terminal opens by itself as soon as Claude is connected.
+        </p>
+        <button id="terminal-connect-retry" class="quiet">Check again</button>
+      </section>
       <div id="terminal-body">
         <div class="terminal-layout">
           <section class="answer-panel" aria-label="Room question">
@@ -223,15 +231,6 @@
               <div id="work-log-body"></div>
             </details>
             <div id="tutor-request-status" hidden></div>
-            <p
-              id="completion-connection"
-              class="muted"
-              role="status"
-              hidden
-            ></p>
-            <button id="retry-connection" class="quiet" hidden>
-              Retry connection
-            </button>
             <form id="chat-form">
               <textarea
                 rows="3"
@@ -403,9 +402,7 @@
           Study questions, tutoring and NPC voices run through Claude CLI on
           this computer. It must be installed and signed in.
         </p>
-        <button id="reconnect" class="quiet">Recheck study connection</button
-        ><button id="live-profile" class="quiet">Start a live study run</button>
-        <p id="live-profile-status" role="status"></p>
+        <button id="reconnect" class="quiet">Recheck study connection</button>
       </details>
       <div class="agent-only">
         <button id="export" class="quiet">Export full run & evidence</button

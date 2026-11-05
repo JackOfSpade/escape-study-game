@@ -8,9 +8,10 @@ test("importing a lower-sequence run still assesses its retained human completio
   await page.goto("/");
   await startDesignedRun(page);
   const saved = await page.evaluate(async () => {
-    const root = "/src/",
+    const fixtures = "/tests/helpers/practice-questions.ts",
+      root = "/src/",
       { createGame } = await import(root + "world.ts"),
-      { devProblem } = await import(root + "practice-problem.ts"),
+      { devProblem } = await import(/* @vite-ignore */ fixtures),
       { encode } = await import(root + "persistence.ts"),
       { game: current, roadmap } = (window as any).__deadAir;
     current.seq = 100_000;
@@ -94,9 +95,10 @@ test("retrying an assessment durably captures its pending request before a reply
     await page.goto("/");
     await startDesignedRun(page);
     await page.evaluate(async () => {
-      const root = "/src/",
+      const fixtures = "/tests/helpers/practice-questions.ts",
+        root = "/src/",
         { assess } = await import(root + "ai.ts"),
-        { devProblem } = await import(root + "practice-problem.ts"),
+        { devProblem } = await import(/* @vite-ignore */ fixtures),
         { save } = await import(root + "persistence.ts"),
         { game: g, roadmap: r } = (window as any).__deadAir,
         e = Object.values(g.encounters)[0] as any;

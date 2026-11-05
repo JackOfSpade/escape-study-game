@@ -13,6 +13,10 @@ import { completionVerdict } from "../src/completion-verdict";
 import { submissionView, terminalChannel } from "../src/terminal-view";
 import type { Roadmap } from "../src/model";
 import { createGame } from "../src/world";
+import { devProblem } from "./helpers/practice-questions";
+import { recordSpawn, spawnContract } from "../src/topic-spawn";
+import type { Encounter, Game } from "../src/model";
+
 const roadmap: Roadmap = JSON.parse(
   readFileSync("public/curriculum.json", "utf8"),
 );
@@ -50,9 +54,18 @@ async function transport(
     globalThis.fetch = original;
   }
 }
+/** Old development path: the encounter's private synthetic question, assigned explicitly. */
+function issueDev(g: Game, e: Encounter, roadmap: Roadmap) {
+  const contract = spawnContract(roadmap, g.study);
+  e.problem = devProblem(g, roadmap, contract);
+  e.workspace = e.problem.starter;
+  e.state = "in-progress";
+  recordSpawn(g.study, contract, e.id, g.time);
+}
 async function fixture() {
-  const g = createGame(701, roadmap),
-    e = g.encounters["f0-room0"];
+  const g = createGame(701, roadmap);
+  const e = g.encounters["f0-room0"];
+  issueDev(g, e, roadmap);
   await ensureProblem(g, e, roadmap);
   assert.equal(e.problem!.provenance, "development");
   return { g, e };

@@ -26,6 +26,10 @@ import { type Assessment, type Encounter, type Roadmap } from "../src/model";
 import { decode, encode } from "../src/persistence";
 import { replayRetention } from "../src/retention-history";
 import { createGame } from "../src/world";
+import { devProblem } from "./helpers/practice-questions";
+import { recordSpawn, spawnContract } from "../src/topic-spawn";
+import type { Game } from "../src/model";
+
 const r = JSON.parse(readFileSync("public/curriculum.json", "utf8")) as Roadmap;
 const when = "2026-10-15T16:00:00.000Z";
 function fixture() {
@@ -144,6 +148,14 @@ test("full extension definitions are imported, including the real-history X09 bo
   );
   assert.ok(r.tracks.PE.topics.X09.includes("Project"));
 });
+/** Old development path: the encounter's private synthetic question, assigned explicitly. */
+function issueDev(g: Game, e: Encounter, roadmap: Roadmap) {
+  const contract = spawnContract(roadmap, g.study);
+  e.problem = devProblem(g, roadmap, contract);
+  e.workspace = e.problem.starter;
+  e.state = "in-progress";
+  recordSpawn(g.study, contract, e.id, g.time);
+}
 test("new actual study allocates S0008 once; development practice allocates no real attempt", async () => {
   const { l, e } = fixture();
   assert.equal(l.currentSession, "S0008");
@@ -154,8 +166,9 @@ test("new actual study allocates S0008 once; development practice allocates no r
   );
   beginLearningAttempt(r, l, e, when);
   assert.equal(l.attempts.length, 1);
-  const g = createGame(4, r),
-    dev = g.encounters["f0-room0"];
+  const g = createGame(4, r);
+  const dev = g.encounters["f0-room0"];
+  issueDev(g, dev, r);
   await ensureProblem(g, dev, r);
   beginVisit(r, g.study, dev);
   finishVisit(r, g.study, dev);
@@ -398,13 +411,15 @@ test("strict per-track gates and cross-track lead limit survive reopening", () =
   assert.ok(l.tracks.PY.suspended.some((s) => s.tier === 3));
 });
 test("run-local terminal names never collide in persistent study visits or archived attempts", async () => {
-  const a = createGame(15, r),
-    e = a.encounters["f0-room0"];
+  const a = createGame(15, r);
+  const e = a.encounters["f0-room0"];
+  issueDev(a, e, r);
   await ensureProblem(a, e, r);
   beginVisit(r, a.study, e);
   finishVisit(r, a.study, e);
-  const b = createGame(15, r, a.study),
-    other = b.encounters["f0-room0"];
+  const b = createGame(15, r, a.study);
+  const other = b.encounters["f0-room0"];
+  issueDev(b, other, r);
   assert.notEqual(encounterKey(e), encounterKey(other));
   await ensureProblem(b, other, r);
   beginVisit(r, b.study, other);
@@ -437,8 +452,9 @@ test("unfinished learning links a new encounter to scope history without transfe
   assert.deepEqual(next.problem!.contract.missingFacets, ["boundary"]);
 });
 test("development assessments cannot apply academic evidence; live disconnection never substitutes a development pass", async () => {
-  const g = createGame(2, r),
-    e = g.encounters["f0-room0"];
+  const g = createGame(2, r);
+  const e = g.encounters["f0-room0"];
+  issueDev(g, e, r);
   await ensureProblem(g, e, r);
   edit(
     g,

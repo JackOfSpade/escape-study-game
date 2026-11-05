@@ -1,3 +1,4 @@
+import { preparePracticeRooms } from "./helpers/practice-questions";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
@@ -31,6 +32,7 @@ function archived(
 
 test("a scheduled question the human started in earlier runs but never finished is reported with its carried facets", () => {
   const g = createPlayableGame(44, r);
+  preparePracticeRooms(g, r);
   const formal = Object.values(g.encounters).find(
     (e) => e.problem && !e.problem.contract.practice,
   )!;

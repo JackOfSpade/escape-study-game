@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { ensureProblem } from "../src/ai";
+import { eligible } from "../src/curriculum";
 import { claimStation, step, vault } from "../src/engine";
 import type { Roadmap } from "../src/model";
 import { decode, encode, recover } from "../src/persistence";
 import { createGame } from "../src/world";
+import { devProblem } from "./helpers/practice-questions";
 const roadmap: Roadmap = JSON.parse(
   readFileSync("public/curriculum.json", "utf8"),
 );
@@ -49,7 +50,10 @@ test("D07 a late human can vault another survivor’s damaged cover and use a fr
   assert.equal(h.vault, undefined);
   assert.ok(h.x > 13.5);
   assert.ok(claimStation(g, h, f.stations[0].id));
-  await ensureProblem(g, e, roadmap);
+  // The game has no local questions: the terminal gets the synthetic fixture.
+  e.problem = devProblem(g, roadmap, eligible(roadmap, g.study));
+  e.workspace = e.problem.starter;
+  e.state = "in-progress";
   assert.ok(e.problem);
   assert.equal(e.state, "in-progress");
   assert.equal(h.hp, hp);

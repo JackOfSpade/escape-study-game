@@ -27,7 +27,10 @@ export function createStudyBridgeServer({ speech, claude, control } = {}) {
         return;
       }
       if (req.url === "/api/status" && req.method === "GET") {
-        if (claude?.enabled()) {
+        const connection = !claude?.enabled()
+          ? "gateway-off"
+          : ((await claude.connection?.()) ?? "connected");
+        if (connection === "connected") {
           res.end(
             JSON.stringify({
               mode: "claude-cli",
@@ -42,10 +45,15 @@ export function createStudyBridgeServer({ speech, claude, control } = {}) {
         res.end(
           JSON.stringify({
             mode: "development",
-            label: "Development fallback",
+            label: "Claude not connected",
+            reason: connection,
             capabilities: [],
             detail:
-              "No AI gateway is running. Start the Claude CLI gateway; until then no real academic credit.",
+              connection === "cli-missing"
+                ? "Claude CLI was not found on this computer."
+                : connection === "signed-out"
+                  ? "Claude CLI is not signed in."
+                  : "The study relay has no Claude gateway running.",
           }),
         );
         return;

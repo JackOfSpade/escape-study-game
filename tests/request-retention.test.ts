@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { checkBridge, ensureProblem, retryTutorRequest, send } from "../src/ai";
+import { preparePracticeRooms } from "./helpers/practice-questions";
+import { checkBridge, retryTutorRequest, send } from "../src/ai";
 import type { Roadmap, TutorRequest } from "../src/model";
 import { decode, encode, recover } from "../src/persistence";
 import { retainRunLearning } from "../src/run-learning";
@@ -35,8 +36,8 @@ async function fixture(
   try {
     await checkBridge();
     const g = createPlayableGame(717, r);
+    preparePracticeRooms(g, r);
     const e = g.encounters[g.floors[0].stations[0].encounter];
-    await ensureProblem(g, e, r);
     e.mode = "solo";
     e.owner = "human";
     connected = true;

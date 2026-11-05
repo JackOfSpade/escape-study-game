@@ -152,14 +152,14 @@ test("tier skill map shows connected topic nodes vertically and marks the curren
   await expect.poll(() => scroll.evaluate((el) => el.scrollTop)).toBe(120);
 
   // Force an actual progress-content update in this synthetic context. This is
-  // imported practice credit, not an assessment or a real learner save.
+  // verified credit in the live learner ledger, not an assessment or a real
+  // learner save.
   await page.evaluate(() => {
-    const objective = (
-      window as any
-    ).__deadAir.roadmap.tracks.PY.objectives.find(
-      (o: any) => o.cells[0] !== "P",
+    const d = (window as any).__deadAir;
+    const objective = d.roadmap.tracks.PY.objectives.find(
+      (o: any) => d.game.study.learner.cells[o.id].states[0] !== "P",
     );
-    objective.cells[0] = "P";
+    d.game.study.learner.cells[objective.id].states[0] = "P";
   });
   await expect(root).toContainText("8 of 131");
   await expect.poll(() => scroll.evaluate((el) => el.scrollTop)).toBe(120);

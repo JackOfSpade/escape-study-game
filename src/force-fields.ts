@@ -16,7 +16,6 @@ import {
 } from "./office-layout";
 import { rayBodyDistance } from "./visibility";
 import { inFurniture, line, solid } from "./spatial";
-import { preparePracticeRooms } from "./room-questions";
 import {
   CONFIG,
   devPass,
@@ -25,7 +24,6 @@ import {
   type Furniture,
   type Game,
   type Point,
-  type Roadmap,
   event,
 } from "./model";
 
@@ -125,7 +123,6 @@ export function useField(g: Game, a: Actor, o: Furniture) {
 /** Fresh-run redesign; historical saves and lab fixtures retain their original rules. */
 export function redesign(
   g: Game,
-  roadmap?: Roadmap,
   options: {
     randomized?: boolean;
     blueprint?: import("./run-design-contract.mjs").RunStructureV3;
@@ -242,7 +239,6 @@ export function redesign(
   );
   for (const id of Object.keys(g.encounters))
     if (!used.has(id)) delete g.encounters[id];
-  if (roadmap) preparePracticeRooms(g, roadmap);
   g.notice =
     "Doors stay closed: press E to open one you have access to and it closes behind you; zombies must break them. Access is personal, so a door someone else opened still stops you. E uses a key on a locked door. Solve a solo terminal for stair access and a key.";
 }

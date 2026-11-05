@@ -5,11 +5,21 @@ import { expect, type Page } from "@playwright/test";
  * Claude CLI, model, credential or real learner save in these fixtures. The
  * fake gateway answers `generate` and `tutor` synchronously, as the real one
  * does, so a held reply is the only way a request stays in flight. */
-export async function mockClaudeStudy(page: Page, available = true) {
+export async function mockClaudeStudy(
+  page: Page,
+  available = true,
+  reason:
+    | "relay-unreachable"
+    | "gateway-off"
+    | "cli-missing"
+    | "signed-out" = "gateway-off",
+) {
   const calls: any[] = [];
   const held: (() => void)[] = [];
   let up = available,
+    why = reason,
     holding = false;
+  const forced: any[] = [];
   let respond: (body: any) => object | Promise<object> = () => ({
     text: "What would the planner do then?",
     complete: false,
@@ -40,7 +50,8 @@ export async function mockClaudeStudy(page: Page, available = true) {
             }
           : {
               mode: "development",
-              label: "Development fallback",
+              label: "Claude not connected",
+              reason: why,
               detail: "Synthetic browser fixture; gateway is down",
               capabilities: [],
             },
@@ -51,7 +62,7 @@ export async function mockClaudeStudy(page: Page, available = true) {
     const body = request.postDataJSON();
     calls.push(body);
     if (body.operation === "generate") {
-      const c = body.payload.contract;
+      const c = forced.shift() ?? body.payload.contract;
       return json({
         title: "Synthetic question",
         prompt: "Why does the leading index column matter?",
@@ -80,6 +91,14 @@ export async function mockClaudeStudy(page: Page, available = true) {
     tutorCalls: () => calls.filter((call) => call.operation === "tutor"),
     setAvailable(value: boolean) {
       up = value;
+    },
+    /** Why Claude is unavailable while the status says so. */
+    setReason(value: typeof reason) {
+      why = value;
+    },
+    /** Answer the next generate call with this contract instead of the requested one. */
+    forceNextContract(contract: unknown) {
+      forced.push(contract);
     },
     /** Keep tutor requests in flight until `release`. */
     hold() {
@@ -163,6 +182,13 @@ export async function openNativeQuestion(
       // A live run starts with no pre-made practice questions.
       g.study.profile = "live";
       for (const each of Object.values<any>(g.encounters)) delete each.problem;
+    } else {
+      // The game has no local questions; the development world is a test fixture.
+      const fixtures = "/tests/helpers/practice-questions.ts";
+      const { preparePracticeRooms } = await import(
+        /* @vite-ignore */ fixtures
+      );
+      preparePracticeRooms(g, d.roadmap);
     }
     const st = g.floors[0].stations[0],
       e = g.encounters[st.encounter];

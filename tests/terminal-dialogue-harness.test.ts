@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { checkBridge, ensureProblem, retryTutorRequest, send } from "../src/ai";
+import { preparePracticeRooms } from "./helpers/practice-questions";
+import { checkBridge, retryTutorRequest, send } from "../src/ai";
 import { TestRunner } from "../src/gametest/runner";
 import { emptyScenario } from "../src/gametest/schema";
 import type { Roadmap } from "../src/model";
@@ -51,7 +52,8 @@ test("real bridge and gateway: chat follow-up, malformed correction, interrupted
       g.id,
       "GameTest encounter sessions must use the scenario run ID",
     );
-    await ensureProblem(g, e, roadmap);
+    preparePracticeRooms(g, roadmap);
+    e = g.encounters[g.floors[0].stations[0].encounter];
     e.owner = "human";
     const ledger = JSON.stringify(g.study.learner);
     globalThis.fetch = (url, options) =>

@@ -71,7 +71,6 @@ export function taskSkill(a: Actor, e: Encounter) {
 }
 /** Question scope determines effort; survivor expertise determines personal speed. */
 export function npcThinkingRate(a: Actor, e: Encounter) {
-  if (e.questionRoom && !e.problem) return 0;
   const base = 0.65 + taskSkill(a, e) * 0.7;
   const effort = e.questionRoom && e.problem ? questionEffort(e) : 1;
   return (base * workRhythm(a, e)) / effort;
@@ -209,7 +208,6 @@ function workFocus(e: Encounter, a: Actor, stage: NpcWork["stage"]) {
     .sort((x, y) => strengths[y] - strengths[x])[0];
 }
 export function npcReasoningAvailable(e: Encounter, a: Actor) {
-  if (e.questionRoom && !e.problem) return false;
   const contextKey = npcWorkContext(e);
   if (contextKey === undefined) return true; // Cheap unobserved world simulation.
   return reasoningStages.some((stage) =>

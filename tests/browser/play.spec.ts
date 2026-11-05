@@ -5,7 +5,7 @@ import { selectTopDown } from "./helpers/view-mode";
 import { expect, test, type Page } from "@playwright/test";
 import { readFile, writeFile } from "node:fs/promises";
 import { tier4RoadmapFixture } from "../fixtures/tier4-roadmap";
-import { enterLegacyBuilding, useLegacyWorld } from "./helpers/legacy-world";
+import { enterLegacyBuilding } from "./helpers/legacy-world";
 import { isolateRunnerBridge } from "./helpers/runner-bridge";
 import {
   enterNativeGame,
@@ -141,8 +141,19 @@ test("physical station access respects occlusion while an issued Claude question
   await seedLegacyDraft(page, "draft kept behind a new obstruction");
   await page.locator("#world").focus();
   await page.keyboard.press("e");
-  expect(relay.calls).toHaveLength(0);
+  // The live run may prepare its next question in the background (payload
+  // encounterId "prepared"); nothing is asked for the occluded station.
+  const stationEncounter = await page.evaluate(
+    () => (window as any).__deadAir.game.floors[0].stations[0].encounter,
+  );
+  expect(
+    relay.calls.filter((call) => call.payload?.encounterId !== "prepared"),
+  ).toHaveLength(0);
+  expect(
+    relay.calls.filter((call) => call.payload?.encounterId === stationEncounter),
+  ).toHaveLength(0);
   await expect(page.locator("#terminal")).toBeHidden();
+  await expect(page.locator("#terminal-connect")).toBeHidden();
   await page.evaluate(() => {
     (window as any).__deadAir.game.floors[0].tiles[15][20] = 0;
   });
@@ -448,7 +459,13 @@ test("partial development work survives combat death while a fresh run archives 
   expect(archive.workspace).toBe(draft);
   expect(JSON.stringify(archive.problem)).toBe(issued);
   expect(state.evidence).toEqual([]);
-  expect(state.attempts).toEqual([]);
+  // The interrupted visit stays in the ledger as an attempt without evidence;
+  // the new run starts none of its own.
+  expect(state.attempts).toHaveLength(1);
+  expect(state.attempts[0]).toMatchObject({
+    encounter: `${oldRun}/${id}`,
+    status: "interrupted",
+  });
   // A late reply from the old run must not reopen it, add a gap or a key to
   // the new run, or transfer the old question's lock.
   relay.release();
@@ -611,19 +628,10 @@ for (const fixtureKind of ["checkpoint", "transfer", "historical"] as const) {
       await route.fulfill({ json: { text: "Fixture guidance" } });
     });
     await enterLegacyBuilding(page);
-    await openGameMenu(page);
-    await page.getByRole("button", { name: "Settings", exact: true }).click();
-    await page.getByText("Study connection", { exact: true }).click();
-    await page
-      .getByRole("button", { name: "Start a live study run", exact: true })
-      .click();
-    await chooseDesignedRun(page);
-    // A new live run is a fresh force-field world; keep the legacy fixture.
-    // The live run starts once the last run's learning is saved.
+    // Every run is a live Claude run; the legacy world keeps its study state.
     await page.waitForFunction(
       () => (window as any).__deadAir.game.study.profile === "live",
     );
-    await useLegacyWorld(page);
     await page.evaluate(
       (flags) => {
         const g = (window as any).__deadAir.game,

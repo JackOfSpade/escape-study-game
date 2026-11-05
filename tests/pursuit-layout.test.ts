@@ -237,7 +237,7 @@ test("completed zero-key solvers can reach stairs from every room with all entra
 test("loading older forward worlds preserves their existing geometry and ongoing state", () => {
   for (const version of [2, 3]) {
     const g = createGame(42, roadmap, undefined, { layout: "forward" });
-    if (version === 3) redesign(g, roadmap);
+    if (version === 3) redesign(g);
     const before = JSON.stringify(g.floors);
     assert.equal(g.floors[0].generation?.version, version);
     assert.equal(g.floors[0].boundary, undefined);
@@ -529,7 +529,7 @@ test("each sector's gates, doorways and terminals are joined by wide circulation
 
 test("historical stage floors are read as four band sectors plus two lobbies with gates", () => {
   const g = createGame(42, roadmap, undefined, { layout: "forward" });
-  redesign(g, roadmap);
+  redesign(g);
   const f = g.floors[1],
     stages = f.generation!.stages!;
   const sectors = floorSectors(f);

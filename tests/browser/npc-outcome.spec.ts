@@ -272,7 +272,21 @@ test("the Claude terminal cannot steal an NPC's solo terminal; an NPC's later ac
   await page.locator("#world").focus();
   await page.keyboard.press("e");
   await expect(page.locator("#notice")).toContainText("another survivor");
-  expect(relay.calls).toHaveLength(0);
+  // A live run prepares its next question in the background
+  // (encounterId "prepared"); nothing may be generated for or sent about the
+  // NPC-owned terminal.
+  expect(
+    relay.calls.filter(
+      (call: any) =>
+        !(
+          call.operation === "generate" &&
+          call.payload?.encounterId === "prepared"
+        ),
+    ),
+  ).toHaveLength(0);
+  expect(
+    relay.calls.filter((call: any) => call.payload?.encounterId === ids.owned),
+  ).toHaveLength(0);
   expect(
     await page.evaluate(
       (id) => (window as any).__deadAir.game.encounters[id].owner,

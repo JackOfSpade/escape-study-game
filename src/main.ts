@@ -22,6 +22,8 @@ import {
 import { FramePerformance } from "./frame-performance";
 import gameShell from "./game-shell.html?raw";
 import { escapeHtml as escape } from "./html";
+import { connectionSteps } from "./connection-steps";
+import { moveToLiveStudy } from "./live-study";
 import { markdownToHtml } from "./markdown";
 import {
   assess,
@@ -186,13 +188,13 @@ try {
 }
 /** The local world is only a backdrop while the first design is being prepared. */
 function newRunPreview(seed: number) {
-  const study = initialStudy(roadmap);
+  const study = initialStudy(roadmap, "live");
   activateRunFocus(study);
   const preview = createGame(seed, roadmap, study);
   preview.preparingRun = true;
   return preview;
 }
-// Apply the role profile before the factory prepares development questions.
+// Apply the role profile before the factory builds the run.
 function activateRunFocus(study: Game["study"]) {
   activateCareerFocus(
     roadmap,
@@ -208,6 +210,7 @@ function newPlayableGame(
   activateRunFocus(study);
   return createGame(seed, roadmap, study, design);
 }
+moveToLiveStudy(game, roadmap);
 activateCareerFocus(
   roadmap,
   game.study,
@@ -466,7 +469,11 @@ function prepareQuestion(e: Encounter): Promise<void> {
           $("#start-card").hidden = true;
           syncSpectatorBar();
         }
-      } else questionChanged();
+      } else {
+        questionChanged();
+        // A request that failed may mean Claude went away; the terminal shows the steps.
+        if (active === e.id) await recheckConnection();
+      }
     } catch (error) {
       if (game !== requestGame) return;
       e.error = String(error);
@@ -717,7 +724,6 @@ function setStudyMode(enabled: boolean) {
   }
   void persist();
 }
-
 const studyWorkspaceView = createStudyWorkspaceView(
   $("#study-workspace"),
   roadmap,
@@ -726,7 +732,6 @@ const studyWorkspaceView = createStudyWorkspaceView(
 function renderStudyWorkspace() {
   studyWorkspaceView.render();
 }
-
 $("#study-only-toggle").onclick = () => setStudyMode(true);
 $("#study-only-menu").onclick = () => setStudyMode(true);
 $("#study-only-exit").onclick = () => setStudyMode(false);
@@ -1346,10 +1351,17 @@ async function interact() {
   jumpRequested = false;
   lastQuestion = e.id;
   game.lastStudyEncounter = e.id;
-  if (e.mode === "solo") e.owner = "human";
-  // Start preparing first: an untouched preloaded practice question is
-  // refreshed to the current track before the terminal presents it.
-  const preparing = prepareQuestion(e);
+  // A recent check is trusted and confirmed behind; an old one is confirmed
+  // first, so a signed-out CLI never claims the terminal or sends a request.
+  if (performance.now() - connectionCheckedAt > OPEN_CONNECTION_POLL_MS)
+    await recheckConnection();
+  else void recheckConnection();
+  if (active !== e.id) return;
+  if (connectionLocked(e)) {
+    showEmbeddedTerminal(e);
+    return;
+  }
+  const preparing = startConnectedQuestion(e);
   showEmbeddedTerminal(e);
   await preparing;
 }
@@ -1365,6 +1377,65 @@ function eligibleForUI() {
   }
 }
 watchStreamingReplies(() => renderTerminal());
+/** Without Claude a terminal cannot be used, only explain how to enable it. */
+const connectionLocked = (e: Encounter) =>
+  status().mode !== "claude-cli" && e.state !== "consumed";
+const terminalConnectionLocked = () => {
+  const e = active ? game.encounters[active] : undefined;
+  return !!e && connectionLocked(e);
+};
+const LOCKED_CONNECTION_POLL_MS = 2500;
+const OPEN_CONNECTION_POLL_MS = 15000;
+let connectionCheckedAt = 0;
+let connectionChecking: Promise<void> | undefined;
+function recheckConnection() {
+  connectionChecking ??= (async () => {
+    const lockedId = terminalConnectionLocked() ? active : undefined;
+    await checkBridge();
+    connectionCheckedAt = performance.now();
+    connectionChecking = undefined;
+    const e = active ? game.encounters[active] : undefined;
+    if (!e) return;
+    if (lockedId === e.id && !connectionLocked(e)) void startConnectedQuestion(e);
+    renderTerminal(true);
+  })();
+  return connectionChecking;
+}
+function watchTerminalConnection() {
+  if (
+    performance.now() - connectionCheckedAt >=
+    (terminalConnectionLocked()
+      ? LOCKED_CONNECTION_POLL_MS
+      : OPEN_CONNECTION_POLL_MS)
+  )
+    void recheckConnection();
+}
+/** Solo ownership starts here, so walking away from a locked terminal claims nothing. */
+function startConnectedQuestion(e: Encounter) {
+  delete e.error;
+  if (
+    e.mode === "solo" &&
+    !finalQuestion &&
+    !e.studyOnly &&
+    e.state !== "consumed" &&
+    (!e.owner || e.owner === "human")
+  )
+    e.owner = "human";
+  return prepareQuestion(e);
+}
+function renderConnectionSteps() {
+  const { problem, steps } = connectionSteps(status());
+  setText("#terminal-connect-problem", problem);
+  setHtml(
+    $("#terminal-connect-steps"),
+    steps
+      .map(
+        (step) =>
+          `<li>${escape(step.text)}${step.command ? `<code>${escape(step.command)}</code>` : ""}</li>`,
+      )
+      .join(""),
+  );
+}
 /** The question and conversation appear in the game while Claude CLI serves it. */
 function showEmbeddedTerminal(e: Encounter) {
   if (active !== e.id) return;
@@ -1376,6 +1447,7 @@ function showEmbeddedTerminal(e: Encounter) {
 }
 /** A slow reply cannot kill the player, but typing and reading still carry risk. */
 function waitingOnEmbeddedReply() {
+  if (terminalConnectionLocked()) return true;
   const e =
     status().mode === "claude-cli" && active
       ? game.encounters[active]
@@ -1401,6 +1473,19 @@ function renderTerminal(force = false) {
   )
     return;
   const e = game.encounters[active];
+  const locked = connectionLocked(e);
+  $("#terminal-connect").hidden = !locked;
+  $("#terminal-body").hidden = locked;
+  if (locked) {
+    setText("#terminal-type", "TERMINAL LOCKED / GAME PAUSED");
+    setText("#problem-title", "Connect Claude to use this terminal");
+    setText(
+      "#terminal-provenance",
+      "The game is paused while you do this. Your work is saved. Leave the terminal to keep playing without it.",
+    );
+    renderConnectionSteps();
+    return;
+  }
   tab = terminalChannel(e);
   setText(
     "#conversation-title",
@@ -1482,7 +1567,7 @@ function renderTerminal(force = false) {
           ? "Study bridge · Saved provider provenance"
           : !e.problem && game.study.profile === "live"
             ? "Live study request · Awaiting a validated problem"
-            : "Development practice · AI acceptance required · No academic credit",
+            : "Earlier practice question · No academic credit",
   );
   if (e.problem?.contract.practice)
     $("#terminal-provenance").textContent +=
@@ -1567,7 +1652,6 @@ function renderTerminal(force = false) {
     }
     if (inspection?.state === "applied") presentNpcOutcome(game, e, roadmap);
   }
-
   const proposals = e.proposals ?? [],
     candidateBox = $("#workspace-proposals");
   candidateBox.hidden = !proposals.length;
@@ -1625,16 +1709,6 @@ function renderTerminal(force = false) {
     !e.problem ||
     e.state === "consumed" ||
     e.submissions.some((s) => s.status === "pending");
-  const disconnected =
-    status().mode === "development" && e.state !== "consumed";
-  $("#completion-connection").hidden = !disconnected;
-  setText(
-    "#completion-connection",
-    disconnected
-      ? "The study connection is unavailable. Your work is saved. Check that Claude CLI is installed and signed in, then retry."
-      : "",
-  );
-  $("#retry-connection").hidden = !disconnected;
   const lastSubmission = e.submissions.at(-1),
     retryCompletion = $<HTMLButtonElement>("#retry-submission");
   retryCompletion.hidden =
@@ -1842,12 +1916,7 @@ $("#run-code").onclick = () => {
   persist();
   renderTerminal();
 };
-$("#retry-connection").onclick = () => {
-  void checkBridge().then(() => {
-    resumeQuestions();
-    if (active) renderTerminal();
-  });
-};
+$("#terminal-connect-retry").onclick = () => void recheckConnection();
 $("#submit").onclick = () => {
   if (!active) return;
   const e = game.encounters[active];
@@ -2126,7 +2195,6 @@ function renderInspector() {
       input.value = "";
     }
   };
-
   const historical = game.study.learner?.historicalReviews ?? [];
   if (historical.length)
     $("#inspector-content").insertAdjacentHTML(
@@ -2290,43 +2358,6 @@ $("#reconnect").onclick = () => {
     resumeQuestions();
   });
 };
-$("#live-profile").onclick = async () => {
-  if (status().mode === "development") {
-    game.notice =
-      "Check that Claude CLI is installed and signed in before starting a live profile.";
-    setText("#live-profile-status", game.notice);
-    return;
-  }
-  const learner = game.study.learner;
-  if (!(await fresh($("#live-profile-status")))) return;
-  const next = initialStudy(roadmap, "live");
-  if (learner) next.learner = learner;
-  next.archives = game.study.archives;
-  next.environmentObservations = game.study.environmentObservations ??= [];
-  next.environmentReviews = game.study.environmentReviews ??= [];
-  next.roadmapReconciliations = game.study.roadmapReconciliations ??= [];
-  next.roadmapAdoptionBackups = game.study.roadmapAdoptionBackups ??= [];
-  next.assessments = game.study.assessments;
-  next.topicAssessments = game.study.topicAssessments;
-  next.roadmapExport = game.study.roadmapExport;
-  activateCareerFocus(
-    roadmap,
-    next,
-    game.study.careerFocus ?? "product-feature-owner",
-  );
-  game.study = next;
-  // This is a fresh run: discard unissued development questions before live generation.
-  for (const e of Object.values(game.encounters))
-    if (e.questionRoom && e.problem?.provenance === "development") {
-      delete e.problem;
-      e.state = "available";
-      e.workspace = "";
-    }
-  game.notice =
-    "Live study profile: original curriculum state retained; development visits are not academic evidence.";
-  persist();
-  showPauseHome();
-};
 $("#export").onclick = () =>
   download("zombie-escape-study-game-run.json", encode(game));
 $("#import").onchange = async () => {
@@ -2338,6 +2369,7 @@ async function restoreRunBackup(file: File) {
   if (importStatus) importStatus.textContent = "";
   try {
     const next = recover(decode(await file.text()));
+    moveToLiveStudy(next, roadmap);
     activateCareerFocus(
       roadmap,
       next.study,
@@ -2585,6 +2617,7 @@ function ui() {
   if (game.studyWorkspace?.enabled) {
     renderStudyStatus();
     renderStudyWorkspace();
+    if (active) watchTerminalConnection();
     renderTerminal();
     return;
   }
@@ -2660,7 +2693,6 @@ function ui() {
       ? `${a.keys ?? 0} KEYS`
       : `${a.inventory.reduce((n, i) => n + i.weight, 0)} / ${CONFIG.capacity} KG`;
   document.body.classList.toggle("force-fields", game.rules === "force-fields");
-  // Starting a live run stays available once connected; only the recheck is not.
   $("#reconnect").hidden = status().mode === "claude-cli";
   const sig = JSON.stringify([a.inventory, a.keys, game.rules]);
   if (sig !== inventorySignature) {
@@ -2719,6 +2751,7 @@ function ui() {
   if (!game.paused) prepareNextQuestion(game, roadmap);
   if (active) {
     const e = game.encounters[active];
+    if (!game.paused) watchTerminalConnection();
     if (!game.paused && !materializing) {
       const pending = materializeObservedWork(game, e);
       if (pending) {

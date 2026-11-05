@@ -21,6 +21,7 @@ import {
 } from "../src/model";
 import { decode, encode, recover } from "../src/persistence";
 import { createGame, createPlayableGame } from "../src/world";
+import { devProblem, preparePracticeRooms } from "./helpers/practice-questions";
 
 const roadmap: Roadmap = JSON.parse(
   readFileSync("public/curriculum.json", "utf8"),
@@ -29,7 +30,8 @@ const roadmap: Roadmap = JSON.parse(
 /** Synthetic factories only: no save storage, study connector or AI request. */
 function unpaced(seed = 42) {
   const g = createGame(seed, roadmap, undefined, { layout: "forward" });
-  redesign(g, roadmap, { randomized: true });
+  redesign(g, { randomized: true });
+  preparePracticeRooms(g, roadmap);
   return g;
 }
 
@@ -40,8 +42,10 @@ function entry(g: Game, floor = 0): Furniture {
 }
 
 function problem(g: Game, seconds?: number, depth = 1): Problem {
-  const source = Object.values(g.encounters).find((e) => e.problem)?.problem;
-  assert.ok(source, "Development factory supplies a local practice problem");
+  // Playable worlds carry no questions; the fixture supplies one without touching g.
+  const source =
+    Object.values(g.encounters).find((e) => e.problem)?.problem ??
+    devProblem(structuredClone(g), roadmap);
   return {
     ...structuredClone(source),
     contract: { ...structuredClone(source.contract), depth },
