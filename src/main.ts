@@ -50,6 +50,8 @@ import {
   send,
   status,
   submit,
+  generatingEncounter,
+  generationProgress,
 } from "./ai";
 import { AudioDirector } from "./audio";
 import { eligible, initialStudy, syncLearningView } from "./curriculum";
@@ -1396,7 +1398,8 @@ function recheckConnection() {
     connectionChecking = undefined;
     const e = active ? game.encounters[active] : undefined;
     if (!e) return;
-    if (lockedId === e.id && !connectionLocked(e)) void startConnectedQuestion(e);
+    if (lockedId === e.id && !connectionLocked(e))
+      void startConnectedQuestion(e);
     renderTerminal(true);
   })();
   return connectionChecking;
@@ -1447,23 +1450,88 @@ function showEmbeddedTerminal(e: Encounter) {
 }
 /** A slow reply cannot kill the player, but typing and reading still carry risk. */
 function waitingOnEmbeddedReply() {
-  if (terminalConnectionLocked()) return true;
+  return !!embeddedWait();
+}
+/** Why the simulation is held for Claude, if it is. */
+function embeddedWait(): "locked" | "question" | "reply" | undefined {
+  if (terminalConnectionLocked()) return "locked";
   const e =
     status().mode === "claude-cli" && active
       ? game.encounters[active]
       : undefined;
-  return (
-    !!e &&
-    (!!e.generation ||
-      !!e.tutorRequests?.some(
-        (j) => j.state === "pending" && j.provider === "claude-cli",
-      ) ||
-      e.submissions.some(
-        (s) =>
-          s.status === "pending" &&
-          s.completionRequest?.provider === "claude-cli",
-      ))
-  );
+  if (!e) return undefined;
+  if (generatingEncounter(game, e)) return "question";
+  return e.tutorRequests?.some(
+    (j) => j.state === "pending" && j.provider === "claude-cli",
+  ) ||
+    e.submissions.some(
+      (s) =>
+        s.status === "pending" &&
+        s.completionRequest?.provider === "claude-cli",
+    )
+    ? "reply"
+    : undefined;
+}
+const GENERATION_STEPS = [
+  "Connected to Claude",
+  "Claude is writing a curriculum-scoped problem",
+  "Checking the problem against your roadmap",
+  "Opening it in this terminal",
+];
+const generationSeen = new Map<string, number>();
+let generationRenderedAt = 0;
+/** Live stages and elapsed time while Claude writes this terminal's question.
+ * The request is a single call, so the stages are the client's own. */
+function generationHtml(e: Encounter) {
+  const source = generatingEncounter(game, e);
+  if (!source?.generation) return undefined;
+  const progress = generationProgress(source);
+  const phase = progress?.phase ?? "writing";
+  let started = generationSeen.get(source.generation);
+  if (started === undefined) {
+    started = progress?.startedAt ?? Date.now();
+    generationSeen.set(source.generation, started);
+  }
+  const seconds = Math.max(0, Math.floor((Date.now() - started) / 1000));
+  const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+  const current = phase === "checking" ? 2 : 1;
+  const steps = GENERATION_STEPS.map((label, i) => {
+    const text =
+      i === 1 && phase === "joining"
+        ? "Finishing the question Claude started preparing in the background"
+        : label;
+    const state = i < current ? "done" : i === current ? "active" : "todo";
+    return `<li class="${state}">${escape(text)}</li>`;
+  }).join("");
+  const paused = embeddedWait() === "question";
+  return `<div class="generation-progress" role="status"><div class="generation-bar" aria-hidden="true"><span></span></div><ol class="generation-steps">${steps}</ol><p class="generation-elapsed">Elapsed <strong>${clock}</strong>${seconds >= 60 ? " · Still working: a validated problem can take a few minutes." : ""}</p><p class="generation-note">${paused ? "The game is paused until the question arrives, so the wait costs you nothing. " : ""}You can leave immediately; the request is saved.</p></div>`;
+}
+/** Mark the held game beside the terminal and keep the progress clock live. */
+let replyPauseShown: string | undefined;
+function syncReplyPause(time: number) {
+  const open =
+    !!active &&
+    !$("#terminal").hidden &&
+    document.body.classList.contains("terminal-open");
+  const wait = open ? embeddedWait() : undefined;
+  const key = wait ?? "";
+  if (key !== replyPauseShown) {
+    replyPauseShown = key;
+    const box = $("#reply-pause");
+    box.hidden = !wait;
+    setText(
+      "#reply-pause-detail",
+      wait === "question"
+        ? "Waiting for Claude to write your question. Zombies, survivors and timers are frozen."
+        : wait === "reply"
+          ? "Waiting for Claude's reply. Zombies, survivors and timers are frozen."
+          : "Connect Claude to continue. Zombies, survivors and timers are frozen.",
+    );
+  }
+  if (wait === "question" && time - generationRenderedAt >= 500) {
+    generationRenderedAt = time;
+    renderTerminal();
+  }
 }
 function renderTerminal(force = false) {
   if (
@@ -1592,12 +1660,13 @@ function renderTerminal(force = false) {
     $("#problem"),
     e.problem?.prompt !== undefined
       ? markdownToHtml(e.problem.prompt)
-      : escape(
-          e.state === "consumed"
-            ? "Other survivors have already used this one-time terminal. No saved question is available for this simulated NPC-only outcome. It grants no human learning credit. Find an unused terminal to work toward your personal access."
-            : (e.error ??
-                "Generating a stable curriculum-scoped problem. You can leave immediately."),
-        ),
+      : (e.state !== "consumed" && !e.error && generationHtml(e)) ||
+          escape(
+            e.state === "consumed"
+              ? "Other survivors have already used this one-time terminal. No saved question is available for this simulated NPC-only outcome. It grants no human learning credit. Find an unused terminal to work toward your personal access."
+              : (e.error ??
+                  "Generating a stable curriculum-scoped problem. You can leave immediately."),
+          ),
   );
   if (force || document.activeElement !== editor || e.state === "consumed") {
     if (editor.value !== e.workspace) editor.value = e.workspace;
@@ -2868,6 +2937,7 @@ function frame(time: number) {
   }
   const renderStarted = performance.now();
   syncGameView();
+  syncReplyPause(time);
   if (!game.studyWorkspace?.enabled) {
     if (firstPersonView) {
       try {

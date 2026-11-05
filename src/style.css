@@ -1017,7 +1017,7 @@ body.reduced * {
 
 /* One answer area with one mode-specific conversation alongside it. */
 .terminal-open main {
-  grid-template-columns: minmax(280px, 0.65fr) minmax(640px, 1.35fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 .terminal-layout {
   display: grid;
@@ -1156,7 +1156,7 @@ body.reduced * {
 /* Solo study workspace: keep the simulation visible while giving work most of the screen. */
 @container (min-width: 1101px) {
   .force-fields.terminal-open main {
-    grid-template-columns: minmax(240px, 0.4fr) minmax(760px, 1.6fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 }
 .force-fields .terminal-layout {
@@ -1499,4 +1499,135 @@ body.reduced * {
 .message-body strong {
   font-size: inherit;
   color: var(--ink);
+}
+
+/* The simulation is held while Claude writes or replies: say so over the game. */
+.reply-pause {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  background: rgb(5 10 12 / 0.55);
+  backdrop-filter: grayscale(0.8) blur(1px);
+  pointer-events: none;
+}
+.reply-pause[hidden] {
+  display: none;
+}
+.reply-pause-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: min(320px, 85%);
+  padding: 18px 22px;
+  text-align: center;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.reply-pause-card strong {
+  color: var(--ink);
+  font-size: 18px;
+  letter-spacing: 0.5px;
+}
+.reply-pause-icon {
+  width: 22px;
+  height: 26px;
+  border-left: 7px solid var(--accent);
+  border-right: 7px solid var(--accent);
+  animation: reply-pause-pulse 1.6s ease-in-out infinite;
+}
+@keyframes reply-pause-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Question generation: an indeterminate bar, stages and an elapsed clock. */
+.generation-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.generation-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--editor);
+  overflow: hidden;
+}
+.generation-bar span {
+  display: block;
+  width: 35%;
+  height: 100%;
+  background: var(--accent);
+  animation: generation-slide 1.4s ease-in-out infinite;
+}
+@keyframes generation-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(290%);
+  }
+}
+.generation-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.generation-steps li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+}
+.generation-steps li::before {
+  content: "";
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+}
+.generation-steps li.done::before {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.generation-steps li.active {
+  color: var(--ink);
+}
+.generation-steps li.active::before {
+  border-color: var(--accent);
+  border-top-color: transparent;
+  animation: generation-spin 0.9s linear infinite;
+}
+@keyframes generation-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.generation-elapsed,
+.generation-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.generation-elapsed strong {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+@media (prefers-reduced-motion: reduce) {
+  .generation-bar span,
+  .generation-steps li.active::before,
+  .reply-pause-icon {
+    animation: none;
+  }
 }
