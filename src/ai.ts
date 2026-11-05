@@ -438,6 +438,31 @@ function takePrepared(g: Game, r: Roadmap) {
     ? prepared
     : undefined;
 }
+/** Where a question request is, for the terminal's progress display. The
+ * request is one bridge call, so these are the client-side stages around it. */
+export type GenerationPhase = "joining" | "writing" | "checking";
+const generationProgresses = new WeakMap<
+  Encounter,
+  { id: string; phase: GenerationPhase; startedAt: number }
+>();
+/** The encounter whose request is writing this one's question: itself, or a
+ * room peer whose single generation is shared with the whole room. */
+export function generatingEncounter(g: Game, e: Encounter) {
+  if (e.problem || e.state === "consumed") return undefined;
+  if (e.generation) return e;
+  return e.questionRoom
+    ? roomEncounters(g, e).find((peer) => peer.generation)
+    : undefined;
+}
+export function generationProgress(e: Encounter) {
+  const p = generationProgresses.get(e);
+  return p && p.id === e.generation ? p : undefined;
+}
+function markGeneration(e: Encounter, id: string, phase: GenerationPhase) {
+  const p = generationProgresses.get(e);
+  if (p?.id === id) p.phase = phase;
+  else generationProgresses.set(e, { id, phase, startedAt: Date.now() });
+}
 async function ensureIndividualProblem(g: Game, e: Encounter, r: Roadmap) {
   if (e.problem || e.state === "consumed") return;
   // Every question comes from Claude; there is no local stand-in.
@@ -453,13 +478,16 @@ async function ensureIndividualProblem(g: Game, e: Encounter, r: Roadmap) {
     profile = study.profile,
     native = live(g);
   e.generation = generation;
+  markGeneration(e, generation, "writing");
   let prepared: ReturnType<typeof takePrepared>,
     regenerate = false;
   try {
     let p: Problem;
     if (native && !e.studyOnly && !e.pendingGeneration) {
       // Arriving during preparation joins that call rather than paying twice.
+      if (preparing.get(study)) markGeneration(e, generation, "joining");
       await preparing.get(study);
+      markGeneration(e, generation, "writing");
       if (!generationCurrent(g, e, generation)) return;
       prepared = takePrepared(g, r);
     }
@@ -498,6 +526,7 @@ async function ensureIndividualProblem(g: Game, e: Encounter, r: Roadmap) {
       !generationCurrent(g, e, generation)
     )
       return;
+    markGeneration(e, generation, "checking");
     validateProblem(p, e, r, g, contract);
     if (native) {
       g.study.learner ??= initialLearner(r);
