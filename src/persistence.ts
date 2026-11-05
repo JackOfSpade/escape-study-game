@@ -5,6 +5,7 @@ import { fnv1a } from "./hash";
 import { reconcileKnowledgeGaps } from "./knowledge-probe";
 import { type Game } from "./model";
 import { checkpointPhysics } from "./physics";
+import { upgradeSavedPracticePrompt } from "./practice-problem";
 import {
   closeDirectStudy,
   recoverDirectStudy,
@@ -268,6 +269,7 @@ export function recover(g: Game) {
   ])) {
     e.chatOpen = false;
     delete e.groupRequest;
+    upgradeSavedPracticePrompt(e.problem);
     interruptPending(
       e.groupRequests,
       "Application restarted; retry the exact saved group question.",

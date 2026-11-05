@@ -197,6 +197,7 @@ Write the update message (under 150 words) to stakeholders. It must state the ne
     title: "Recipe page navigation / loading trace",
     prompt: `A user clicks a link to https://recipes.example/pasta for the first time. Setup facts (already done; not part of the question): the DNS lookup and the HTTPS connection to recipes.example are complete, and the server returns this HTML in 300 ms:
 
+\`\`\`html
 <head>
   <link rel="stylesheet" href="/app.css">
   <script src="/app.js"></script>
@@ -206,6 +207,7 @@ Write the update message (under 150 words) to stakeholders. It must state the ne
   <img src="/hero.jpg">
   <div id="steps"></div>
 </body>
+\`\`\`
 
 app.js (120 KB) runs when the synchronous script loads and registers a DOMContentLoaded callback. That callback waits until the DOM is ready (DOMContentLoaded), then fetches /api/steps and inserts the returned steps into #steps; the callback never accesses #steps before it exists. Assume no caching and no service worker.
 
@@ -222,17 +224,21 @@ Answer two things:
     title: "Nested click handlers / event trace",
     prompt: `Given this markup and script:
 
+\`\`\`html
 <form id="f" action="/search">
   <div id="card">
     <a id="link" href="/item/7">Item 7</a>
     <button id="save">Save</button>
   </div>
 </form>
+\`\`\`
 
+\`\`\`js
 card.addEventListener("click", (e) => log("card " + e.target.id));
 link.addEventListener("click", (e) => { e.preventDefault(); log("link"); });
 save.addEventListener("click", (e) => { e.stopPropagation(); log("save"); });
 f.addEventListener("submit", () => log("submit"));
+\`\`\`
 
 A button inside a form has type "submit" by default. Predict the full log output and any navigation or form submission when the user (1) clicks the link, and (2) clicks Save. Explain which call causes each difference.`,
     rubric: [
@@ -245,6 +251,7 @@ A button inside a form has type "submit" by default. Predict the full log output
     title: "Profile fetch / status and cancellation",
     prompt: `Consider this code:
 
+\`\`\`js
 async function loadProfile(id, signal) {
   try {
     const res = await fetch("/api/users/" + id, { signal });
@@ -254,6 +261,7 @@ async function loadProfile(id, signal) {
     showError("Network problem");
   }
 }
+\`\`\`
 
 Semantics: fetch resolves for any HTTP status, including 404 and 500, and rejects only on network failure or abort; aborting rejects with an error named "AbortError". The server returns 404 with body {"error":"not found"} for unknown users.
 
@@ -268,12 +276,14 @@ Trace what the user sees for (1) a 404, (2) a 500 whose body is an HTML error pa
     title: "Blocking filter / task scheduling",
     prompt: `A product table has a filter box:
 
+\`\`\`js
 input.addEventListener("input", () => {
   spinner.hidden = false;
   const rows = filterAndSort(allRows, input.value); // ~900 ms synchronous
   render(rows);
   spinner.hidden = true;
 });
+\`\`\`
 
 The browser runs one task at a time on the main thread and only paints between tasks. Users report that typed characters appear late and the spinner never shows.
 
@@ -288,10 +298,12 @@ Explain both symptoms using the task and rendering model. Then predict whether w
     title: "Clickable divs / native semantics",
     prompt: `A settings page contains:
 
+\`\`\`html
 <div class="nav" onclick="router.go('/billing')">Billing</div>
 <div class="btn" onclick="saveSettings()">Save</div>
 <div onclick="location.hash = '#tab=' + next">Next tab</div>
 const prefs = JSON.parse(document.cookie.split("prefs=")[1]); // theme only, never sent to the server
+\`\`\`
 
 For each line, choose the native platform element or API you would use instead (link, button, form behavior, history/navigation, or storage) and give one concrete behavior the user or browser gets from the native choice that the current code lacks. Name one case where you would still add framework routing code on top.`,
     rubric: [
@@ -304,8 +316,10 @@ For each line, choose the native platform element or API you would use instead (
     title: "Order screen / component boundaries",
     prompt: `An order-tracking screen was split by visual position:
 
+\`\`\`text
 <TopHalf>   order number, status badge, "Cancel order" button
 <BottomHalf> item list, "Cancel order" confirmation dialog, delivery map
+\`\`\`
 
 Behavior facts: cancelling is allowed only while status is "placed"; after a successful cancel the status badge and the item list both change; the delivery map polls a courier location API every 10 s and nothing else uses that data; the item list's sort choice affects only the list.
 
@@ -318,7 +332,8 @@ Propose a component breakdown whose boundaries follow behavior and data ownershi
   },
   "PE:T05.2": {
     title: "Cart component / redundant state",
-    prompt: `function Cart({ items }) {
+    prompt: `\`\`\`jsx
+function Cart({ items }) {
   const [count, setCount] = useState(items.length);
   const [total, setTotal] = useState(sum(items));
   const [coupon, setCoupon] = useState("");
@@ -327,6 +342,7 @@ Propose a component breakdown whose boundaries follow behavior and data ownershi
   function applyCoupon(code) { setCoupon(code); setDiscounted(applyCode(total, code)); }
   // renders count, total, discounted, and a coupon input
 }
+\`\`\`
 
 Semantics: useState keeps its value across renders and ignores later changes to its initial argument; effects run after the render is painted. sum(items) returns the total of item prices; applyCode(total, code) returns the discounted total; both are pure and neither mutates its inputs.
 
@@ -341,6 +357,7 @@ Identify which values are source-of-truth state and which are derived. Describe 
     title: "Filter panel / controlled data flow",
     prompt: `A product list has a sidebar with a "Price under" input and an "In stock only" checkbox. Today the sidebar reads them with refs only when the user clicks Apply:
 
+\`\`\`jsx
 function Sidebar({ onApply }) {
   const priceRef = useRef(); const stockRef = useRef();
   return (<>
@@ -349,6 +366,7 @@ function Sidebar({ onApply }) {
     <button onClick={() => onApply(priceRef.current.value, stockRef.current.checked)}>Apply</button>
   </>);
 }
+\`\`\`
 
 New requirements: a "Clear filters" button in the page header must reset both controls, and the list must update as the user types (no Apply button).
 
@@ -361,7 +379,8 @@ Decide which component owns the filter state and describe in words (or sketch in
   },
   "PE:T05.4": {
     title: "Chat room component / effects and cleanup",
-    prompt: `function ChatRoom({ roomId, draft }) {
+    prompt: `\`\`\`jsx
+function ChatRoom({ roomId, draft }) {
   const [messages, setMessages] = useState([]);
   const [unread, setUnread] = useState(0);
   useEffect(() => { setUnread(messages.filter((m) => !m.read).length); }, [messages]);
@@ -371,6 +390,7 @@ Decide which component owns the filter state and describe in words (or sketch in
   }, [roomId]);
   useEffect(() => { if (draft.sent) analytics.track("message_sent"); }, [draft]);
 }
+\`\`\`
 
 Semantics: chat.connect opens a socket that stays open until conn.close() is called. An effect's returned function runs before the effect re-runs and on unmount.
 
@@ -383,7 +403,8 @@ For each effect, decide whether it is really a value computed during render, log
   },
   "PE:T05.5": {
     title: "Profile editor / state identity",
-    prompt: `function Page({ selectedUser }) {
+    prompt: `\`\`\`jsx
+function Page({ selectedUser }) {
   return (
     <div>
       {isAdmin ? <AdminBanner /> : null}
@@ -395,6 +416,7 @@ function ProfileForm({ user }) {
   const [name, setName] = useState(user.name);
   return <input value={name} onChange={(e) => setName(e.target.value)} />;
 }
+\`\`\`
 
 Semantics: React preserves a component's state while the same component type stays at the same position in the tree; changing its key creates a fresh instance. A null child still occupies its position.
 
@@ -440,7 +462,8 @@ Decide which pieces of state belong in the path, which in query parameters, and 
   },
   "PE:T06.4": {
     title: "City weather / stale responses",
-    prompt: `function Weather({ city }) {
+    prompt: `\`\`\`jsx
+function Weather({ city }) {
   const [data, setData] = useState(null);
   useEffect(() => {
     fetch("/api/weather?city=" + city)
@@ -449,6 +472,7 @@ Decide which pieces of state belong in the path, which in query parameters, and 
   }, [city]);
   return <p>{data ? data.city + ": " + data.temp : "Loading"}</p>;
 }
+\`\`\`
 
 Semantics: the effect re-runs when city changes, and the function an effect returns runs before the next run. Responses can arrive in any order.
 
@@ -474,10 +498,12 @@ A keyboard-only user submits with an invalid Postcode and an empty Phone. Descri
     title: "Toolbar markup / semantic controls",
     prompt: `A photo editor's toolbar is built like this:
 
+\`\`\`html
 <div class="icon" onclick="undo()"><svg>...</svg></div>
 <span class="toggle on" onclick="toggleGrid()">Grid</span>
 <div class="dropdown" onclick="openMenu()">Export ▾</div>
 <input type="range" min="0" max="100"> <span>Brightness</span>
+\`\`\`
 
 Each control works with a mouse. The undo icon has no text. The Grid toggle has an on/off state shown only by the "on" class.
 
@@ -492,13 +518,13 @@ For each control, choose the native HTML element you would use, how it gets an a
     title: "Cookie dialog / focus trace",
     prompt: `A page loads with this order in the DOM:
 
-1. <a href="/">Logo</a>
-2. <div class="menu-btn" onclick="openNav()">Menu</div>
-3. <input id="search">
-4. A cookie dialog (shown on load, visually on top) containing: <p>text</p>, <button>Accept</button>, <button>Settings</button>
+1. \`<a href="/">Logo</a>\`
+2. \`<div class="menu-btn" onclick="openNav()">Menu</div>\`
+3. \`<input id="search">\`
+4. A cookie dialog (shown on load, visually on top) containing: \`<p>text</p>\`, \`<button>Accept</button>\`, \`<button>Settings</button>\`
 5. Footer links
 
-CSS includes *:focus { outline: none; }. The dialog has no focus management; when Accept is clicked, the dialog is removed from the DOM.
+CSS includes \`*:focus { outline: none; }\`. The dialog has no focus management; when Accept is clicked, the dialog is removed from the DOM.
 
 Trace each Tab press for a keyboard user starting from page load until they reach Accept, and say what they see while tabbing. Then trace where focus goes after pressing Enter on Accept. List the repairs needed for an unreachable control, missing visible focus, and dialog focus behavior.`,
     rubric: [
@@ -509,13 +535,15 @@ Trace each Tab press for a keyboard user starting from page load until they reac
   },
   "PE:T08.3": {
     title: "Pricing cards / responsive layout",
-    prompt: `.plans { display: flex; }
+    prompt: `\`\`\`css
+.plans { display: flex; }
 .plan { flex: 0 0 380px; margin-right: 24px; }
 .plan h3 { white-space: nowrap; }
 @media (max-width: 375px) {
   .plans { flex-direction: column; }
   .plan { flex-basis: auto; width: 100%; }
 }
+\`\`\`
 
 Note: flex: 0 0 380px means each card neither grows nor shrinks from a 380 px basis.
 
@@ -530,10 +558,12 @@ Explain why each of the three narrow-width problems happens from this CSS. Then 
   },
   "PE:T08.4": {
     title: "Order summary / locale formatting",
-    prompt: `const line = "Ordered " + qty + " item" + (qty === 1 ? "" : "s") +
+    prompt: `\`\`\`js
+const line = "Ordered " + qty + " item" + (qty === 1 ? "" : "s") +
   " on " + (d.getMonth() + 1) + "/" + d.getDate() + "/" + d.getFullYear() +
   " for $" + total.toFixed(2);
 button.style.width = "80px"; // label "Buy again"
+\`\`\`
 
 The app will launch in German (de-DE, prices in EUR), Polish (pl-PL, PLN), and Arabic (ar-EG, EGP). Facts: Polish has more than two plural forms; the German label for "Buy again" is "Erneut kaufen"; Arabic is right-to-left.
 
@@ -548,11 +578,13 @@ List each locale assumption in this code and the visible defect it causes in one
     title: "Notification bell / prioritized review",
     prompt: `Review this notification popover component:
 
+\`\`\`html
 <div class="bell" onclick="toggle()"><img src="bell.svg"></div>
 <div class="popover" style="position:absolute; width:420px; left:-300px">
   <div class="item">{name} commented on {doc} · {timeAgoEnglish}</div>
   ...
 </div>
+\`\`\`
 
 Facts: the popover opens only on mouse click; Escape does nothing; on a 360 px phone the popover extends off the left edge of the screen; "timeAgoEnglish" returns strings like "3 mins ago"; the unread count is shown as a red dot only; the bell image has no alt text; the item font is 13 px gray (#999) on white, contrast 2.8:1.
 
@@ -608,7 +640,8 @@ For each of three bottlenecks (the charting code, the late hero image, the Proje
   },
   "PE:T09.4": {
     title: "Contacts table / avoidable work",
-    prompt: `function Contacts({ contacts, query }) {
+    prompt: `\`\`\`jsx
+function Contacts({ contacts, query }) {
   const [selectedId, setSelectedId] = useState(null);
   const sorted = [...contacts].sort(byLastName); // 5,000 contacts
   const visible = sorted.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()));
@@ -618,6 +651,7 @@ For each of three bottlenecks (the charting code, the late hero image, the Proje
          onSelect={() => setSelectedId(c.id)} />
   ));
 }
+\`\`\`
 
 Profile: clicking a row takes 320 ms; every Row remounts and re-renders, and the sort takes 40 ms on each click. A teammate proposes wrapping Row in React.memo and every function in useCallback.
 
@@ -643,10 +677,12 @@ Plan how you will measure the change: which metrics you compare, which populatio
     title: "Event check-in / resource boundaries",
     prompt: `A conference app's check-in screen has three tabs (Upcoming, Checked in, No-shows). Staff tap a badge card to check an attendee in, can undo within 5 minutes, and can add a walk-in attendee. A draft API mirrors the screen:
 
+\`\`\`text
 GET /checkinScreen/tab1
 GET /checkinScreen/tab2
 POST /checkinScreen/tapCard?row=14
 POST /checkinScreen/undoButton
+\`\`\`
 
 Explain two problems with these contracts. Propose resource or action boundaries and stable identifiers for events, attendees, and check-ins that support the workflow, including how undo is expressed and how the three tabs are fetched. Say which identifier the client must send to check someone in.`,
     rubric: [
