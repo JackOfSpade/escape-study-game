@@ -30,7 +30,7 @@ import { fieldAllows } from "../force-fields";
 import { floorSectors } from "../floor-plan";
 import { carvedCells } from "../room-shapes";
 import { cornerWallGeometries } from "./corner-walls";
-import { stationFacing } from "../spatial";
+import { readStationFacing } from "../spatial";
 import {
   CONFIG,
   H,
@@ -1258,7 +1258,7 @@ export class FirstPersonView {
             station,
             game,
             palette,
-            stationFacing(floor, station),
+            readStationFacing(floor, station),
             floor.setting?.terminal,
           );
         const encounter = game.encounters[station.encounter];
