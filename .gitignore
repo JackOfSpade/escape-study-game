@@ -5,3 +5,4 @@ test-results/
 .local/
 .env
 .artifacts/
+.scratch/

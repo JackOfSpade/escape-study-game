@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { mockClaudeStudy } from "./study-harness";
+import { enterNativeGame, mockClaudeStudy } from "./study-harness";
 
 test("tier skill map shows connected topic nodes vertically and marks the current topic in a split pane", async ({
   page,
@@ -192,4 +192,39 @@ test("tier skill map shows connected topic nodes vertically and marks the curren
     path: ".artifacts/study-skill-map-split-pane.png",
     fullPage: true,
   });
+});
+
+test("the study terminal takes the wide workspace while the map keeps its reading measure", async ({
+  page,
+}) => {
+  await mockClaudeStudy(page);
+  await enterNativeGame(page);
+  await page.setViewportSize({ width: 2000, height: 1100 });
+  await page.evaluate(() => {
+    (window as any).__deadAir.game.study.profile = "live";
+  });
+  await page.locator("#study-only-toggle").click();
+  await page.locator("#study-next").click();
+  const terminal = page.locator("#study-terminal-slot #terminal");
+  await expect(terminal).toBeVisible();
+  await expect(page.locator("#study-terminal-slot #problem")).not.toBeEmpty();
+  const [map, mapPane, input] = await Promise.all([
+    page.locator(".study-skill-map").boundingBox(),
+    terminal.boundingBox(),
+    page.locator("#chat-input").boundingBox(),
+  ]);
+  expect(map).not.toBeNull();
+  expect(mapPane).not.toBeNull();
+  expect(input).not.toBeNull();
+  // The map keeps a readable measure; the question terminal no longer inherits
+  // it, so the conversation and its composer get the rest of the page.
+  expect(mapPane!.width).toBeGreaterThan(map!.width + 200);
+  expect(input!.width).toBeGreaterThan(500);
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth >
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(false);
 });

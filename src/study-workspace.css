@@ -25,8 +25,16 @@ html.study-only body {
   padding: 56px 28px;
 }
 .study-workspace-inner {
-  max-width: 1000px;
+  width: min(100%, 1720px);
   margin: 0 auto;
+}
+/* Reading surfaces (map, session card) keep a comfortable measure; the
+   question terminal below is free to use the full workspace width. */
+.study-workspace-toolbar,
+.study-session,
+#study-progress {
+  width: min(100%, 1440px);
+  margin-inline: auto;
 }
 .study-workspace-toolbar {
   display: flex;
