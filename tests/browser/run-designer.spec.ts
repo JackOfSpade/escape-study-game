@@ -762,3 +762,76 @@ test("settled design failures keep the captured draft until Cancel or Escape wit
   expect(after.design.generationId).toBe(retry.payload.generationId);
   expect(relay.calls.at(-1).payload.phase).toBe("content-review");
 });
+
+test("a prepared run opens on a black title card in the designer's typography", async ({
+  page,
+}) => {
+  const relay = await designer(page);
+  const titleCard = {
+    title: { font: "special-elite", color: "#f2e6c9", size: 72 },
+    story: { font: "libre-baskerville", color: "#c9d6d2", size: 19 },
+  };
+  relay.setReply((body, response) =>
+    body.payload.phase === "structure"
+      ? { ...response, structure: { ...response.structure, titleCard } }
+      : response,
+  );
+  await open(page);
+  await page.locator("#start").click();
+  await prepared(page);
+  const { design } = await state(page);
+  expect(design.design.titleCard).toEqual(titleCard);
+  const card = page.locator("#start-card");
+  await expect(card).toHaveClass(/title-card/);
+  expect(
+    await card.evaluate((el) => getComputedStyle(el).backgroundColor),
+  ).toBe("rgb(0, 0, 0)");
+  const title = card.locator(".title-card-title");
+  await expect(title).toHaveText(design.design.title);
+  const titleStyle = await title.evaluate((el) => {
+    const s = getComputedStyle(el);
+    return { font: s.fontFamily, color: s.color, size: s.fontSize };
+  });
+  expect(titleStyle).toEqual({
+    font: '"Special Elite", "Courier New", monospace',
+    color: "rgb(242, 230, 201)",
+    size: "72px",
+  });
+  const story = card.locator(".title-card-story");
+  await expect(story).toContainText(design.design.premise);
+  await expect(story).toContainText(design.design.opening);
+  expect(
+    await story.evaluate((el) => getComputedStyle(el).fontFamily),
+  ).toContain("Libre Baskerville");
+  // The Start button sits beneath all of the text.
+  const storyBox = (await story.boundingBox())!,
+    startBox = (await page.locator("#start").boundingBox())!;
+  expect(startBox.y).toBeGreaterThan(storyBox.y + storyBox.height);
+  await card.screenshot({ path: ".artifacts/handoff/design/title-card.png" });
+
+  await page.locator("#start").click();
+  await expect.poll(async () => (await state(page)).status).toBe("playing");
+  await expect(card).toBeHidden();
+  // The opening story is not repeated over the game, and key help is only
+  // in the Esc menu.
+  await expect(page.locator("#notice")).not.toHaveClass(/shown/);
+  await expect(page.locator(".viewport .controls")).toHaveCount(0);
+  // Gameplay messages appear briefly, and the same message shows again when
+  // it recurs after fading.
+  const notice = page.locator("#notice");
+  const say = () =>
+    page.evaluate(() => {
+      (window as any).__deadAir.game.notice =
+        "Pack full or cache access not earned.";
+    });
+  await say();
+  await expect(notice).toHaveClass(/shown/);
+  await expect(notice).not.toHaveClass(/shown/, { timeout: 9000 });
+  await say();
+  await expect(notice).toHaveClass(/shown/);
+  await expect(notice).toHaveText("Pack full or cache access not earned.");
+  await pause(page);
+  await expect(page.locator("#pause-menu .controls")).toContainText(
+    "jump barricade",
+  );
+});

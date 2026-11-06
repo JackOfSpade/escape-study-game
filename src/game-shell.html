@@ -90,13 +90,6 @@
           Key granted
         </div>
         <div id="inventory" class="inventory" aria-label="Equipment"></div>
-        <div class="controls">
-          <span><kbd>WASD</kbd> move</span
-          ><span id="arrow-hint"><kbd>←/→</kbd> turn · <kbd>↑/↓</kbd> walk</span
-          ><span><kbd>E</kbd> interact</span
-          ><span><kbd>Space</kbd> jump barricade</span
-          ><span><kbd>Esc</kbd> pause / restart</span>
-        </div>
         <p id="notice" role="status"></p>
       </div>
     </section>
@@ -299,6 +292,16 @@
       Generate new level · later restarts use it
     </button>
     <button id="save-quit" class="quiet">Save and quit</button>
+    <section class="pause-controls" aria-labelledby="pause-controls-title">
+      <span class="eyebrow" id="pause-controls-title">CONTROLS</span>
+      <ul class="controls">
+        <li><kbd>WASD</kbd> move</li>
+        <li id="arrow-hint"><kbd>←/→</kbd> turn · <kbd>↑/↓</kbd> walk</li>
+        <li><kbd>E</kbd> interact</li>
+        <li><kbd>Space</kbd> jump barricade</li>
+        <li><kbd>Esc</kbd> pause / resume</li>
+      </ul>
+    </section>
     <div id="agent-tools" class="agent-only">
       <span class="eyebrow">AGENT TOOLS</span>
       <button

@@ -206,20 +206,21 @@ canvas {
   display: block;
   outline: none;
 }
+/* Key help lives in the Esc menu instead of over the game. */
+.pause-controls {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
 .controls {
-  position: absolute;
-  bottom: var(--hud-inset);
-  left: var(--hud-inset);
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin: 0;
-  padding: 8px 10px;
-  border-radius: 6px;
-  background: #0b1418b3;
-  pointer-events: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px 14px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
 }
 kbd {
   font:
@@ -231,10 +232,14 @@ kbd {
   padding: 2px 4px;
   margin-right: 4px;
 }
+/* Gameplay feedback appears briefly, then fades; the run's opening story is
+   shown on the title card instead. */
 #notice {
   position: absolute;
   left: var(--hud-inset);
-  bottom: calc(var(--hud-inset) + 42px);
+  bottom: var(--hud-inset);
+  opacity: 0;
+  transition: opacity 0.6s ease;
   max-width: min(560px, calc(100% - 2 * var(--hud-inset)));
   font-size: 12px;
   color: var(--accent);
@@ -243,6 +248,10 @@ kbd {
   border-radius: 6px;
   background: #0b1418d9;
   pointer-events: none;
+}
+#notice.shown {
+  opacity: 1;
+  transition-duration: 0.15s;
 }
 #notice:empty {
   display: none;
@@ -432,9 +441,6 @@ body.spectating .inventory {
   color: var(--muted);
   font-size: 10px;
 }
-body.spectating .controls {
-  visibility: hidden;
-}
 body.spectating canvas {
   cursor: grab;
 }
@@ -525,6 +531,48 @@ body.spectating canvas.dragging {
 }
 .overlay .quiet {
   margin-top: 10px;
+}
+/* The opening title card: a black screen carrying the designer's title and
+   backstory in the designer's typography. */
+.overlay.title-card {
+  background: #000;
+  align-items: center;
+  justify-content: safe center;
+  text-align: center;
+}
+.title-card-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: min(760px, 100%);
+  animation: title-card-in 1.6s ease both;
+}
+.overlay .title-card-title {
+  line-height: 1.08;
+  letter-spacing: normal;
+  margin: 0 0 28px;
+  overflow-wrap: anywhere;
+}
+.title-card-story {
+  line-height: 1.6;
+}
+.overlay .title-card-story p {
+  color: inherit;
+  font-size: inherit;
+  margin: 0 0 1em;
+}
+.title-card #start {
+  margin-top: 24px;
+}
+@keyframes title-card-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .title-card-inner {
+    animation: none;
+  }
 }
 .overlay .save-result {
   color: var(--accent);
@@ -825,13 +873,6 @@ body.reduced * {
   .overlay h2 {
     font-size: 40px;
   }
-  .controls {
-    gap: 8px 12px;
-    max-width: calc(100% - 24px);
-  }
-  .controls span:last-child {
-    display: none;
-  }
   .overlay {
     padding: 7%;
   }
@@ -1119,7 +1160,6 @@ body.reduced * {
     top: auto;
     bottom: 10px;
   }
-  .terminal-open .controls,
   .terminal-open #notice,
   .terminal-open .inventory {
     display: none;
@@ -1195,7 +1235,7 @@ body.reduced * {
   font-size: 14px;
 }
 .force-fields #loot,
-.force-fields .controls span:has(kbd):nth-child(3) {
+.force-fields .controls li:nth-child(3) {
   display: none;
 }
 @container (max-width: 760px) {
