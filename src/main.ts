@@ -739,7 +739,13 @@ function setStudyMode(enabled: boolean) {
 const studyWorkspaceView = createStudyWorkspaceView(
   $("#study-workspace"),
   roadmap,
-  () => ({ game, starting: studyStarting, saving: studySaving, saveError }),
+  () => ({
+    game,
+    starting: studyStarting,
+    saving: studySaving,
+    saveError,
+    terminalOpen: !!active,
+  }),
 );
 function renderStudyWorkspace() {
   studyWorkspaceView.render();
@@ -750,6 +756,14 @@ $("#study-only-exit").onclick = () => setStudyMode(false);
 $("#study-save-retry").onclick = () => void saveStudySession();
 $("#study-next").onclick = async () => {
   if (studyStarting) return;
+  // Reopen an unfinished question rather than starting another.
+  const unfinished = workspaceQuestion(game);
+  if (unfinished && !active) {
+    openStudyTerminal(unfinished);
+    renderStudyWorkspace();
+    renderStudyStatus();
+    return;
+  }
   studyStarting = true;
   setText("#study-message", "");
   studyStatusShown = false;
@@ -1262,6 +1276,9 @@ function closeTerminal() {
 let terminalHome: Comment | undefined;
 function placeTerminal(inStudy: boolean) {
   const terminal = $("#terminal");
+  // The study view is built around the open question; leaving it there only
+  // stranded the learner, so the button exists only in the game view.
+  $("#leave").hidden = inStudy;
   if (inStudy) {
     if (!terminalHome) {
       terminalHome = document.createComment("terminal-home");

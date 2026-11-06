@@ -23,6 +23,7 @@ import {
   drawFurniture,
   drawTerminal,
   drawWorkstation,
+  outdoorColors,
   terrainCanvas,
 } from "./office-art";
 import { spectating, type SpectatorView } from "./spectator";
@@ -286,11 +287,25 @@ export function render(
   }
   const theme = g.surge.state === "active" ? "mutation" : "normal";
   if (f.city) {
-    ctx.fillStyle = "#353e43";
+    // A designed outdoors paints its ground, streets and neighbours in its own
+    // colours; every other run keeps the fixed city palette.
+    const outdoors = outdoorColors(f, p.sky);
+    if (outdoors) {
+      const bounds = f.city.bounds;
+      ctx.fillStyle = outdoors.ground;
+      ctx.fillRect(
+        bounds.left,
+        bounds.top,
+        bounds.right - bounds.left,
+        bounds.bottom - bounds.top,
+      );
+    }
+    ctx.fillStyle = outdoors?.path ?? "#353e43";
     for (const road of f.city.roads)
       ctx.fillRect(road.x - road.w / 2, road.y - road.h / 2, road.w, road.h);
     for (const block of f.city.obstacles) {
-      ctx.fillStyle = block.kind === "building" ? p.wall : "#61584b";
+      ctx.fillStyle =
+        block.kind === "building" ? (outdoors?.neighbor ?? p.wall) : "#61584b";
       ctx.fillRect(
         block.x - block.w / 2,
         block.y - block.h / 2,

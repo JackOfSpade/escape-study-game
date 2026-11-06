@@ -13,6 +13,7 @@ import {
   propSurfaceFace,
 } from "./environment-faces";
 import { cityWall } from "./city-layout";
+import { PROP_CATALOG } from "./scene-catalog.mjs";
 import { streetLayout } from "./view3d/exterior-layout";
 
 function canonical(value: unknown): string {
@@ -240,7 +241,21 @@ export function bindDesignedEnvironment(game: Game) {
 export function rebindComposedObjects(game: Game) {
   const design = game.design?.design,
     objects = (design && "setting" in design && design.setting?.objects) || [];
-  for (const floor of game.floors)
+  const props = (design && "setting" in design && design.setting?.props) || [];
+  for (const floor of game.floors) {
+    // A composed tabletop prop's recipe is rebound the same way.
+    for (const p of floor.scene?.props ?? []) {
+      if (Object.hasOwn(PROP_CATALOG, p.kind)) {
+        delete p.object;
+        continue;
+      }
+      const recipe = props.find((r) => r.id === p.kind);
+      if (!recipe)
+        throw Error(
+          `Saved prop ${p.id} names a prop that is not in the run design`,
+        );
+      p.object = structuredClone(recipe);
+    }
     for (const o of floor.furniture) {
       if (o.kind !== "custom") {
         delete o.object;
@@ -260,4 +275,5 @@ export function rebindComposedObjects(game: Game) {
       o.maxHp = spec.hp;
       o.hp = Math.min(o.hp, spec.hp);
     }
+  }
 }

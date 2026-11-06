@@ -15,7 +15,7 @@ import { FLOOR_HEIGHT } from "../stair-route";
 import { outsideBuilding } from "./exterior-layout";
 import type { RunFacade, RunWindowStyle } from "../setting-catalog.mjs";
 import { resolveRoofFeatures } from "../venue";
-import { roofFeatureParts } from "./roof-features";
+import { PartAnimator, roofFeatureParts } from "./roof-features";
 
 export interface PerimeterWindow {
   x: number;
@@ -194,6 +194,7 @@ export class BuildingShell {
     side: DoubleSide,
   });
   private tint = new Color();
+  private roofMotion = new PartAnimator();
 
   constructor() {
     this.group.name = "building-shell";
@@ -587,6 +588,23 @@ export class BuildingShell {
       );
       solid.push(...parts.solid);
       lamps.push(...parts.lamps);
+      for (const part of parts.animated) {
+        const mesh = new Mesh(
+          part.geometry,
+          part.lamp ? this.roofLamps : this.roofMetal,
+        );
+        mesh.name = "roof-feature-moving";
+        mesh.position.set(...part.position);
+        this.group.add(mesh);
+        this.roofMotion.add(
+          mesh,
+          mesh.position,
+          part.yaw,
+          part.motion,
+          part.rate,
+          part.phase,
+        );
+      }
       kinds.push(feature.kind);
     }
     this.merge(solid, this.roofMetal, "roof-feature-structure");
@@ -606,7 +624,13 @@ export class BuildingShell {
     this.group.add(mesh);
   }
 
+  /** Moves the roof's animated parts; a no-op when none exist. */
+  animate(time: number, calm = false) {
+    if (this.roofMotion.count) this.roofMotion.update(time, calm);
+  }
+
   private clear() {
+    this.roofMotion.dispose();
     for (const child of [...this.group.children]) {
       (child as Mesh).geometry.dispose();
       child.removeFromParent();

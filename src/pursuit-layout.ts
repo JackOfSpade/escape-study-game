@@ -10,6 +10,8 @@ import {
 import { carveStairwells } from "./stairwell";
 import { layoutRandom } from "./building-layout";
 import { inRect, sizeFits, type Sector } from "./floor-plan";
+import { carveRoomShapes, cornerCells } from "./room-shapes";
+import { fieldClearance } from "./office-layout";
 import {
   fieldDoor,
   forwardFieldQuota,
@@ -50,6 +52,13 @@ export function pursuitLayout(g: Game, f: Floor) {
       f,
       layoutRandom(f.design?.layoutSeed ?? g.seed, 0x726f6f6d, f.index),
       (fl) => pursuitLayoutErrors(g, fl),
+    );
+    // Designed room shapes: carve corners now that routes and terminals are
+    // fixed (absent roomShapes does nothing and draws no random numbers).
+    carveRoomShapes(
+      f,
+      (fl) => pursuitLayoutErrors(g, fl),
+      f.design && "roomShapes" in f.design ? fieldClearance(f) : [],
     );
     return;
   }
@@ -405,6 +414,12 @@ function sectorShapeErrors(
 ) {
   const errors: string[] = [];
   const b = f.boundary!;
+  // Corners carved by a designed room shape are solid by intent.
+  const carved = new Set(
+    (f.generation?.corners ?? [])
+      .flatMap(cornerCells)
+      .map((c) => c.y * W + c.x),
+  );
   for (const s of sectors) {
     const k = s.order;
     const inSector = (x: number, y: number) =>
@@ -439,7 +454,10 @@ function sectorShapeErrors(
       for (let y = rect.y1 - 1; y <= rect.y2 + 1; y++)
         for (let x = rect.x1 - 1; x <= rect.x2 + 1; x++) {
           const ring = !inRect(rect, x, y);
-          if (!ring && (f.tiles[y][x] || !inSector(x, y)))
+          if (
+            !ring &&
+            ((f.tiles[y][x] && !carved.has(y * W + x)) || !inSector(x, y))
+          )
             errors.push(`sub-room ${room.id} interior blocked at ${x},${y}`);
           if (ring && !f.tiles[y][x]) {
             open++;

@@ -24,6 +24,28 @@ import {
 } from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type { Floor } from "../model";
+import type { RunNeighborStyle, RunSurroundings } from "../setting-catalog.mjs";
+import {
+  NEIGHBOR_RIM,
+  PLINTH,
+  lotCells,
+  mix,
+  neighborCell,
+  neighborCore,
+  neighborPlinth,
+  neighborStone,
+  type Footprint,
+  type NeighborEmit,
+  type NeighborStyle,
+} from "./neighbors";
+import { roofFeatureParts } from "./roof-features";
+import {
+  groundMaterialParams,
+  groundTexture,
+  pathPattern,
+  type GroundPattern,
+} from "./textures";
+import { WeatherField } from "./weather";
 
 import {
   cityWall,
@@ -35,7 +57,11 @@ import {
   cityGroundRectangles,
   cityBackdrop,
   cityLayout,
+  overlapsPad,
+  roadGround,
+  sceneryPads,
   streetLayout,
+  type SceneryPad,
 } from "./exterior-layout";
 
 export {
@@ -46,6 +72,7 @@ export {
 } from "./exterior-layout";
 
 function asphaltTexture() {
+  if (typeof document === "undefined") return undefined;
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 96;
   const c = canvas.getContext("2d")!;
@@ -72,12 +99,17 @@ function asphaltTexture() {
   return texture;
 }
 
+function maybeMap(map: CanvasTexture | undefined) {
+  return map ? { map } : {};
+}
+
 /** A colour scaled in linear light, returned as sRGB hex. */
 function tone(hex: string, factor: number) {
   return `#${new Color(hex).multiplyScalar(factor).getHexString()}`;
 }
 
 function messageTexture(title: string, subtitle: string, warning = false) {
+  if (typeof document === "undefined") return undefined;
   const canvas = document.createElement("canvas");
   canvas.width = 384;
   canvas.height = 80;
@@ -98,6 +130,78 @@ function messageTexture(title: string, subtitle: string, warning = false) {
   return texture;
 }
 
+interface FlatRect {
+  x: number;
+  z: number;
+  w: number;
+  d: number;
+}
+
+/** The ring of streets of a city that has no stored plan (older saves). */
+function legacyRoads(floor: Floor): FlatRect[] {
+  const city = cityLayout(floor);
+  if (!city) return [];
+  const rects: FlatRect[] = [
+    { x: city.left - 9, z: 15, w: 10, d: 230 },
+    { x: city.right + 9, z: 15, w: 10, d: 230 },
+    { x: 20, z: city.north - 8, w: 240, d: 10 },
+    { x: 20, z: city.south + 9, w: 240, d: 10 },
+  ];
+  const layout = streetLayout(floor);
+  if (layout)
+    rects.push({
+      x: (layout.left + layout.right) / 2,
+      z: (layout.front + 1 + floor.tiles.length) / 2,
+      w: layout.right - layout.left,
+      d: floor.tiles.length - layout.front - 1,
+    });
+  return rects;
+}
+
+/** The parts of a flat rectangle that lie outside the building footprint,
+ * which the continuous ground already cuts out. */
+function outsideFootprint(floor: Floor, r: FlatRect): FlatRect[] {
+  const b = floor.boundary;
+  if (!b) return [r];
+  const out: FlatRect[] = [],
+    x0 = r.x - r.w / 2,
+    x1 = r.x + r.w / 2,
+    z0 = r.z - r.d / 2,
+    z1 = r.z + r.d / 2,
+    add = (ax: number, bx: number, az: number, bz: number) => {
+      if (bx - ax > 1e-6 && bz - az > 1e-6)
+        out.push({
+          x: (ax + bx) / 2,
+          z: (az + bz) / 2,
+          w: bx - ax,
+          d: bz - az,
+        });
+    };
+  if (z1 <= b.top || z0 >= b.bottom) return [r];
+  add(x0, x1, z0, Math.min(z1, b.top));
+  add(x0, x1, Math.max(z0, b.bottom), z1);
+  for (
+    let row = Math.max(b.top, Math.floor(z0));
+    row < Math.min(b.bottom, Math.ceil(z1));
+    row++
+  ) {
+    const edge = b.rows[row],
+      a = Math.max(z0, row),
+      c = Math.min(z1, row + 1);
+    if (!edge) continue;
+    add(x0, Math.min(x1, edge.left), a, c);
+    add(Math.max(x0, edge.right), x1, a, c);
+  }
+  return out;
+}
+
+const MUTATION_HORIZON = new Color("#453447");
+const MUTATION_ZENITH = new Color("#171629");
+/** The densest fog still shows the street ahead of the entrance. */
+const FOG_FLOOR = 48;
+/** Beyond this many detailed neighbour pieces a block falls back to one mass. */
+const PIECE_BUDGET = 6000;
+
 /** A fixed set of merged meshes and two unshadowed practical lights. The city
  * is shared by all floors in world coordinates; no gameplay tiles are changed. */
 export class ExteriorDressing {
@@ -106,8 +210,9 @@ export class ExteriorDressing {
   enabled = false;
   private world = new Group();
   private environmentSurfaces?: EnvironmentSurfaces;
+  private asphaltMap = asphaltTexture();
   private asphalt = new MeshStandardMaterial({
-    map: asphaltTexture(),
+    ...(this.asphaltMap ? { map: this.asphaltMap } : {}),
     color: "#77838a",
     emissive: "#293b45",
     emissiveIntensity: 0.45,
@@ -136,20 +241,22 @@ export class ExteriorDressing {
     fog: false,
   });
   private signMaterial = new MeshBasicMaterial({
-    map: messageTexture("MERCER CIVIC CENTRE", "RECEPTION  •  STUDY HALL"),
+    ...maybeMap(
+      messageTexture("MERCER CIVIC CENTRE", "RECEPTION  •  STUDY HALL"),
+    ),
     color: "#d8cfb2",
     fog: false,
   });
   private quarantineMaterial = new MeshBasicMaterial({
-    map: messageTexture(
-      "EVACUATION SUSPENDED",
-      "QUARANTINE ZONE  •  06:40",
-      true,
+    ...maybeMap(
+      messageTexture("EVACUATION SUSPENDED", "QUARANTINE ZONE  •  06:40", true),
     ),
     fog: false,
   });
   private routeMaterial = new MeshBasicMaterial({
-    map: messageTexture("ROOFTOP ASSEMBLY ↑", "STREET EXITS COMPROMISED", true),
+    ...maybeMap(
+      messageTexture("ROOFTOP ASSEMBLY ↑", "STREET EXITS COMPROMISED", true),
+    ),
     fog: false,
   });
   private emergency = new MeshBasicMaterial({ vertexColors: true, fog: false });
@@ -203,6 +310,21 @@ export class ExteriorDressing {
     vertexColors: true,
     fog: false,
   });
+  /** The designed surroundings of this build, if any. Absent keeps every
+   * default look byte for byte. */
+  private look?: RunSurroundings;
+  private mutation = false;
+  private skyHorizon = new Color("#344552");
+  private weather = new WeatherField();
+  private groundTextures = new Map<string, CanvasTexture>();
+  private themedGround = false;
+  private pathMaterial?: MeshStandardMaterial;
+  private iceMaterial?: MeshStandardMaterial;
+  private icePieces: BufferGeometry[] = [];
+  private pads: SceneryPad[] = [];
+  private pieces = 0;
+  private fogMix = 1;
+  private fogClock = 0;
 
   constructor() {
     this.group.name = "street-exterior";
@@ -218,17 +340,62 @@ export class ExteriorDressing {
       this.entranceLight,
       this.streetLight,
       this.fireLight,
+      this.weather.group,
     );
     this.group.visible = false;
   }
 
   setTheme(mutation: boolean) {
-    this.horizon.set(mutation ? "#453447" : "#344552");
-    (this.skyMaterial.uniforms.zenith.value as Color).set(
-      mutation ? "#171629" : "#111e32",
-    );
+    this.mutation = mutation;
     this.moonMaterial.color.set(mutation ? "#b59ba9" : "#8c9baf");
     this.solid.emissive.set(mutation ? "#3a2833" : "#243440");
+    this.applyAtmosphere();
+  }
+
+  /** Sky gradient and fog colour: the default night, or the designed one. The
+   * surge still pulls a designed palette toward the mutation hue. */
+  private applyAtmosphere() {
+    if (!this.skyMaterial) return;
+    const mutation = !!this.mutation,
+      zenith = this.skyMaterial.uniforms.zenith.value as Color,
+      look = this.look;
+    if (!look) {
+      this.horizon.set(mutation ? "#453447" : "#344552");
+      this.skyMaterial.uniforms.horizon.value = this.horizon;
+      zenith.set(mutation ? "#171629" : "#111e32");
+      return;
+    }
+    const pull = mutation ? 0.3 : 0;
+    this.horizon.set(look.fog.color).lerp(MUTATION_HORIZON, pull);
+    // Thick fog swallows the horizon band, so the sky meets it without a seam.
+    this.skyHorizon
+      .set(look.sky.horizon)
+      .lerp(MUTATION_HORIZON, pull)
+      .lerp(this.horizon, Math.min(1, look.fog.density) * 0.7);
+    this.skyMaterial.uniforms.horizon.value = this.skyHorizon;
+    zenith.set(look.sky.zenith).lerp(MUTATION_ZENITH, pull);
+  }
+
+  /** The fog distances for this frame. A designed fog thickens the air outside
+   * and only a little indoors; it always leaves the street in front of the
+   * entrance readable, and eases between the two as the player crosses the
+   * door. An undesigned run keeps the caller's distances. */
+  fogRange(near: number, far: number, outside: boolean, time: number) {
+    const density = this.look?.fog.density ?? 0;
+    if (!density) return { near, far };
+    const dt = Math.min(0.25, Math.max(0, time - (this.fogClock ?? 0)));
+    this.fogClock = time;
+    const target = outside ? 1 : 0.35;
+    let blend = this.fogMix ?? 1;
+    blend +=
+      Math.sign(target - blend) * Math.min(Math.abs(target - blend), dt * 1.2);
+    this.fogMix = blend;
+    const strength = density * blend,
+      keep = (1 - strength) ** 2;
+    return {
+      near: near * (1 - strength) + 6 * strength,
+      far: FOG_FLOOR + (far - FOG_FLOOR) * keep,
+    };
   }
 
   build(floor: Floor, floors?: Floor[]) {
@@ -236,10 +403,12 @@ export class ExteriorDressing {
     const ground = floors?.[0] ?? floor,
       city = cityLayout(ground);
     this.enabled = this.group.visible = !!city;
+    this.applyLook(city ? ground : undefined);
     if (!city) return;
     this.updateSigns(ground);
-    if (this.asphalt.fog !== !!ground.city) {
-      this.asphalt.fog = !!ground.city;
+    const fogOn = !!ground.city || !!this.look;
+    if (this.asphalt.fog !== fogOn) {
+      this.asphalt.fog = fogOn;
       this.asphalt.needsUpdate = true;
     }
     const opaque: BufferGeometry[] = [],
@@ -264,7 +433,8 @@ export class ExteriorDressing {
     const layout = streetLayout(ground);
     this.canopyLights = [];
     this.canopyBody = [];
-    if (layout) this.buildArrival(ground, layout, opaque, panes, lit, box);
+    if (layout)
+      this.buildArrival(ground, layout, opaque, panes, lit, box, signals);
     else {
       this.entranceLight.intensity = 0;
       this.streetLight.intensity = 0;
@@ -273,6 +443,9 @@ export class ExteriorDressing {
     this.merge(panes, this.glass, "dim-exterior-windows");
     this.merge(lit, this.warm, "lit-exterior-windows-practicals");
     this.merge(signals, this.emergency, "city-emergency-signals");
+    this.merge(this.icePieces, this.iceStuff(), "themed-ice-neighbors");
+    this.icePieces = [];
+    this.buildScenery(ground);
     this.merge(this.canopyBody, this.solid, "entrance-canopy");
     this.canopyBody = [];
     this.merge(
@@ -289,6 +462,233 @@ export class ExteriorDressing {
       );
       this.world.add(this.environmentSurfaces.group);
     }
+  }
+
+  /** Applies (or clears) the designed surroundings: ground and path surfaces,
+   * atmosphere, weather and the fog flags of the exterior materials. */
+  private applyLook(floor?: Floor) {
+    const look = floor?.setting?.surroundings;
+    this.look = look;
+    this.pieces = 0;
+    this.pads = [];
+    this.icePieces = [];
+    this.fogMix = 1;
+    if (look && floor) {
+      const known = new Set(floor.setting!.objects.map((o) => o.id));
+      this.pads = sceneryPads(
+        floor,
+        look.scenery.filter((id) => known.has(id)),
+      );
+    }
+    this.applyGround(look);
+    for (const material of [
+      this.solid,
+      this.glass,
+      this.warm,
+      this.emergency,
+    ] as const) {
+      const fog = !!look;
+      if (material && material.fog !== fog) {
+        material.fog = fog;
+        material.needsUpdate = true;
+      }
+    }
+    this.weather?.setKind(look?.weather ?? "none");
+    this.applyAtmosphere();
+  }
+
+  private groundTex(pattern: GroundPattern) {
+    if (typeof document === "undefined") return undefined;
+    let texture = this.groundTextures.get(pattern);
+    if (!texture) {
+      texture = groundTexture(pattern);
+      this.groundTextures.set(pattern, texture);
+    }
+    return texture;
+  }
+
+  private applyGround(look?: RunSurroundings) {
+    if (!look) {
+      if (!this.themedGround) return;
+      this.themedGround = false;
+      this.asphalt.map = this.asphaltMap ?? null;
+      this.asphalt.color.set("#77838a");
+      this.asphalt.emissive.set("#293b45");
+      this.asphalt.roughness = 1;
+      this.asphalt.metalness = 0;
+      this.asphalt.needsUpdate = true;
+      return;
+    }
+    const params = groundMaterialParams(look.ground);
+    this.themedGround = true;
+    this.asphalt.map = this.groundTex(look.ground) ?? null;
+    this.asphalt.color.set(look.groundColor);
+    this.asphalt.emissive.set(tone(look.groundColor, 0.33));
+    this.asphalt.roughness = params.roughness;
+    this.asphalt.metalness = params.metalness;
+    this.asphalt.needsUpdate = true;
+  }
+
+  private iceStuff() {
+    return (this.iceMaterial ??= new MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.12,
+      metalness: 0.1,
+      transparent: true,
+      opacity: 0.62,
+      depthWrite: false,
+      emissive: "#27394a",
+      emissiveIntensity: 0.4,
+      fog: true,
+    }));
+  }
+
+  /** A neighbour look other than buildings, if the design asks for one. */
+  private get themedStyle(): NeighborStyle | undefined {
+    const style: RunNeighborStyle | undefined = this.look?.neighbors;
+    return style && style !== "buildings" ? style : undefined;
+  }
+
+  /** A building colour pulled toward the designed neighbour colour. */
+  private neighborTone(color: string) {
+    return this.look ? mix(color, this.look.neighborColor, 0.8) : color;
+  }
+
+  private emitter(
+    solid: BufferGeometry[],
+    glow: BufferGeometry[],
+  ): NeighborEmit {
+    return (geometry, color, layer) => {
+      this.pieces++;
+      this.part(
+        layer === "ice" ? this.icePieces : layer === "glow" ? glow : solid,
+        geometry,
+        color,
+      );
+    };
+  }
+
+  /** Fills one solid lot in the designed neighbour style. Only the outer rim
+   * is detailed; the lot's footprint, and so its collision, is never altered.
+   * A cell that shares a scenery pad becomes a raised bed instead. */
+  private neighborLot(
+    lot: Footprint,
+    height: number,
+    seed: number,
+    far: boolean,
+    solid: BufferGeometry[],
+    glow: BufferGeometry[],
+    style: NeighborStyle | undefined = this.themedStyle,
+  ) {
+    const look = this.look;
+    if (!look || !style) return;
+    const emit = this.emitter(solid, glow),
+      { rim, core } = lotCells(lot, NEIGHBOR_RIM, far ? 30 : 12);
+    rim.forEach((cell, i) => {
+      if (this.pads.some((pad) => overlapsPad(pad, cell)))
+        neighborPlinth(cell, look.neighborColor, emit);
+      else if (this.pieces > PIECE_BUDGET)
+        neighborCore(style, cell, look.neighborColor, emit);
+      else
+        neighborCell(
+          style,
+          cell,
+          height,
+          look.neighborColor,
+          seed * 977 + i,
+          emit,
+          far || this.pieces > PIECE_BUDGET * 0.6,
+        );
+    });
+    if (core) neighborCore(style, core, look.neighborColor, emit);
+  }
+
+  /** Flat roads follow the design's path colour. They are laid just above the
+   * ground, outside the building footprint, and never raise a physical edge. */
+  private buildPaths(floor: Floor) {
+    const look = this.look,
+      b = floor.boundary;
+    if (!look || !b) return;
+    const rects = (
+      floor.city
+        ? floor.city.roads.map((r) => ({ x: r.x, z: r.y, w: r.w, d: r.h }))
+        : legacyRoads(floor)
+    ).flatMap((r) => outsideFootprint(floor, r));
+    if (!rects.length) return;
+    const patches = rects.map((r) => {
+      const geometry = new PlaneGeometry(r.w, r.d)
+          .rotateX(-Math.PI / 2)
+          .translate(r.x, -0.02, r.z),
+        uv = geometry.getAttribute("uv"),
+        p = geometry.getAttribute("position");
+      for (let i = 0; i < uv.count; i++)
+        uv.setXY(i, (p.getX(i) + 118) / 280, (p.getZ(i) + 124) / 280);
+      return geometry;
+    });
+    const pattern = pathPattern(look.ground),
+      params = groundMaterialParams(pattern),
+      map = this.groundTex(pattern);
+    this.pathMaterial?.dispose();
+    this.pathMaterial = new MeshStandardMaterial({
+      ...(map ? { map } : {}),
+      color: look.pathColor,
+      emissive: tone(look.pathColor, 0.33),
+      emissiveIntensity: 0.45,
+      roughness: params.roughness,
+      metalness: params.metalness,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
+      fog: true,
+    });
+    const mesh = new Mesh(mergeGeometries(patches)!, this.pathMaterial);
+    for (const patch of patches) patch.dispose();
+    mesh.name = "themed-paths";
+    this.world.add(mesh);
+  }
+
+  /** Each scenery object, a few times, on a raised bed in a lot beside the
+   * street. They are drawn from the same composed recipe the rooms use, are
+   * scaled up to read at street distance and never collide. */
+  private buildScenery(floor: Floor) {
+    const setting = floor.setting;
+    if (!setting || !this.pads.length) return;
+    const solid: BufferGeometry[] = [],
+      lamps: BufferGeometry[] = [];
+    for (const pad of this.pads) {
+      const object = setting.objects.find((o) => o.id === pad.id);
+      if (!object) continue;
+      const parts = roofFeatureParts(
+        { kind: pad.id as never, x: 0, y: 0, outward: { x: 0, y: 1 } },
+        0,
+        setting.objects,
+      );
+      const scale = Math.min(
+          4,
+          Math.max(
+            0.5,
+            Math.min(
+              5 / Math.max(0.1, object.size.h),
+              6.4 / Math.max(0.1, Math.hypot(object.size.w, object.size.d)),
+            ),
+          ),
+        ),
+        // The shared builder offsets a deep piece from the parapet; undo it.
+        shift = Math.min(0.8, Math.max(0, object.size.d / 2 - 0.3)) - 0.2;
+      for (const [list, into] of [
+        [parts.solid, solid],
+        [parts.lamps, lamps],
+      ] as const)
+        for (const g of list) {
+          g.translate(0, 0, shift)
+            .scale(scale, scale, scale)
+            .rotateY(pad.angle)
+            .translate(pad.x, PLINTH, pad.z);
+          into.push(g);
+        }
+    }
+    this.merge(solid, this.solid, "themed-scenery");
+    this.merge(lamps, this.emergency, "themed-scenery-lit");
   }
 
   private updateSigns(floor: Floor) {
@@ -308,11 +708,8 @@ export class ExteriorDressing {
       [this.quarantineMaterial, 2, true],
     ] as const) {
       material.map?.dispose();
-      material.map = messageTexture(
-        values[offset],
-        values[offset + 1],
-        warning,
-      );
+      material.map =
+        messageTexture(values[offset], values[offset + 1], warning) ?? null;
       material.needsUpdate = true;
     }
   }
@@ -333,6 +730,7 @@ export class ExteriorDressing {
       d: number,
       color: string,
     ) => void,
+    signals: BufferGeometry[] = [],
   ) {
     const front = layout.front + 1.025;
     const entrance = layout.entrance;
@@ -351,6 +749,7 @@ export class ExteriorDressing {
     this.entranceLight.position.set(entrance, 2.65, front + 0.8);
 
     // Flat paving and flush markings never suggest an extra physical obstacle.
+    const roads = roadGround(this.look?.ground);
     box(
       opaque,
       (layout.left + layout.right) / 2,
@@ -359,20 +758,22 @@ export class ExteriorDressing {
       layout.right - layout.left,
       0.025,
       1.25,
-      "#7f8580",
+      this.look ? tone(this.look.pathColor, 1.2) : "#7f8580",
     );
-    box(
-      opaque,
-      (layout.left + layout.right) / 2,
-      0.015,
-      front + 1.28,
-      layout.right - layout.left,
-      0.05,
-      0.15,
-      "#a0a298",
-    );
-    for (let x = layout.left; x < layout.right; x += 3.2)
-      box(opaque, x + 0.8, 0.005, front + 4.6, 1.4, 0.025, 0.075, "#c2b88d");
+    if (roads) {
+      box(
+        opaque,
+        (layout.left + layout.right) / 2,
+        0.015,
+        front + 1.28,
+        layout.right - layout.left,
+        0.05,
+        0.15,
+        "#a0a298",
+      );
+      for (let x = layout.left; x < layout.right; x += 3.2)
+        box(opaque, x + 0.8, 0.005, front + 4.6, 1.4, 0.025, 0.075, "#c2b88d");
+    }
 
     if (!floor.city) {
       // Guardrails sit at the actual solid edge of the open arrival lane, so the
@@ -406,7 +807,18 @@ export class ExteriorDressing {
     }
     let lights = 0;
     for (const p of floor.city ? [] : layout.props) {
-      if (p.kind === "car") {
+      if (!roads) {
+        // Theme-neutral clutter takes the place of cars, lamps and cones.
+        const emit = this.emitter(opaque, signals);
+        neighborStone(
+          p.x,
+          p.y,
+          Math.max(0.2, Math.min(p.w, p.h) * 0.9),
+          this.look!.neighborColor,
+          lights + Math.floor(p.x * 7 + p.y * 13),
+          emit,
+        );
+      } else if (p.kind === "car") {
         const body = p.x < entrance ? "#465b67" : "#70564e";
         box(opaque, p.x, 0.48, p.y, 0.86, 0.52, 2.6, body);
         box(opaque, p.x, 0.92, p.y - 0.1, 0.73, 0.46, 1.35, body);
@@ -608,6 +1020,7 @@ export class ExteriorDressing {
     for (const part of patches) part.dispose();
     ground.name = "continuous-city-ground";
     this.world.add(ground);
+    this.buildPaths(floor);
   }
   private buildCity(
     floor: Floor,
@@ -643,88 +1056,103 @@ export class ExteriorDressing {
     // raised here lies outside playable cells, including the arrival queue.
     // Horizontal sidewalks own crossing rectangles; vertical strips stop at
     // their edges, so camera motion never reveals two coplanar top surfaces.
-    const sidewalkWidth = 1.65,
+    const roads = roadGround(this.look?.ground),
+      sidewalkTone = this.look ? tone(this.look.pathColor, 1.2) : "#6d7675",
+      sidewalkWidth = 1.65,
       sidewalkZ = [
         northRoad - 5.6,
         northRoad + 5.6,
         southRoad - 5.6,
         southRoad + 5.6,
       ];
-    for (const x of [westRoad, eastRoad]) {
-      for (let z = -100; z < 130; z += 5)
-        if (
-          ![northRoad, southRoad].some(
-            (crossing) => Math.abs(z - crossing) < 11.35,
+    if (roads)
+      for (const x of [westRoad, eastRoad]) {
+        for (let z = -100; z < 130; z += 5)
+          if (
+            ![northRoad, southRoad].some(
+              (crossing) => Math.abs(z - crossing) < 11.35,
+            )
           )
-        )
-          box(opaque, x, 0.004, z, 0.1, 0.035, 2.7, "#a5a088");
-      for (const side of [-1, 1]) {
-        let start = -49;
-        for (const crossing of [...sidewalkZ, 81 + sidewalkWidth / 2]) {
-          const end = Math.min(81, crossing - sidewalkWidth / 2);
-          if (end > start)
-            box(
-              opaque,
-              x + side * 5.6,
-              0.025,
-              (start + end) / 2,
-              sidewalkWidth,
-              0.12,
-              end - start,
-              "#6d7675",
-            );
-          start = crossing + sidewalkWidth / 2;
+            box(opaque, x, 0.004, z, 0.1, 0.035, 2.7, "#a5a088");
+        for (const side of [-1, 1]) {
+          let start = -49;
+          for (const crossing of [...sidewalkZ, 81 + sidewalkWidth / 2]) {
+            const end = Math.min(81, crossing - sidewalkWidth / 2);
+            if (end > start)
+              box(
+                opaque,
+                x + side * 5.6,
+                0.025,
+                (start + end) / 2,
+                sidewalkWidth,
+                0.12,
+                end - start,
+                sidewalkTone,
+              );
+            start = crossing + sidewalkWidth / 2;
+          }
         }
       }
-    }
-    for (const z of [northRoad, southRoad]) {
-      for (let x = -100; x < 140; x += 5)
-        if (
-          ![westRoad, eastRoad].some(
-            (crossing) => Math.abs(x - crossing) < 11.35,
+    if (roads)
+      for (const z of [northRoad, southRoad]) {
+        for (let x = -100; x < 140; x += 5)
+          if (
+            ![westRoad, eastRoad].some(
+              (crossing) => Math.abs(x - crossing) < 11.35,
+            )
           )
-        )
-          box(opaque, x, 0.004, z, 2.7, 0.035, 0.1, "#a5a088");
-      for (const side of [-1, 1])
-        box(
-          opaque,
-          22,
-          0.025,
-          z + side * 5.6,
-          155,
-          0.12,
-          sidewalkWidth,
-          "#6d7675",
-        );
-      for (const x of [westRoad, eastRoad])
-        for (let stripe = 0; stripe < 7; stripe++) {
+            box(opaque, x, 0.004, z, 2.7, 0.035, 0.1, "#a5a088");
+        for (const side of [-1, 1])
           box(
             opaque,
-            x + 7.5,
-            0.015,
-            z - 3 + stripe,
-            2,
-            0.035,
-            0.45,
-            "#a0a59d",
+            22,
+            0.025,
+            z + side * 5.6,
+            155,
+            0.12,
+            sidewalkWidth,
+            sidewalkTone,
           );
-          box(
-            opaque,
-            x - 3 + stripe,
-            0.015,
-            z + 7.5,
-            0.45,
-            0.035,
-            2,
-            "#a0a59d",
-          );
-        }
-    }
+        for (const x of [westRoad, eastRoad])
+          for (let stripe = 0; stripe < 7; stripe++) {
+            box(
+              opaque,
+              x + 7.5,
+              0.015,
+              z - 3 + stripe,
+              2,
+              0.035,
+              0.45,
+              "#a0a59d",
+            );
+            box(
+              opaque,
+              x - 3 + stripe,
+              0.015,
+              z + 7.5,
+              0.45,
+              0.035,
+              2,
+              "#a0a59d",
+            );
+          }
+      }
     // Near blocks have shopfronts, recessed windows, flat roofs and plant.
     // Distant blocks deliberately omit small window geometry.
     for (const [i, b] of city.blocks.entries()) {
       const height = b.stories * 3.15,
-        palette = b.distant ? "#3e4b57" : b.color;
+        palette = this.neighborTone(b.distant ? "#3e4b57" : b.color);
+      if (this.themedStyle) {
+        this.neighborLot(
+          { x: b.x, z: b.y, w: b.w, d: b.d },
+          height,
+          i + 3,
+          b.distant,
+          opaque,
+          signals,
+        );
+        continue;
+      }
       box(opaque, b.x, height / 2, b.y, b.w, height, b.d, palette);
       box(
         opaque,
@@ -926,7 +1354,20 @@ export class ExteriorDressing {
     };
     // Vehicles stopped in several directions: a collision at the cordon,
     // parked cars with no drivers, and a burned queue on the northern street.
-    for (let i = 0; i < 6; i++) {
+    // A ground with no streets gets scattered stones in their place.
+    if (!roads) {
+      const emit = this.emitter(opaque, signals);
+      for (let i = 0; i < 14; i++)
+        neighborStone(
+          city.left + 2 + i * 4.3,
+          (i % 2 ? southRoad : northRoad) + ((i * 5) % 7) - 3,
+          0.5 + (i % 3) * 0.35,
+          this.look!.neighborColor,
+          i,
+          emit,
+        );
+    }
+    for (let i = 0; i < (roads ? 6 : 0); i++) {
       car(
         city.left + 4 + i * 6,
         southRoad + (i % 2 ? 2 : -2),
@@ -935,7 +1376,7 @@ export class ExteriorDressing {
       );
       car(city.left + i * 7, northRoad - 2, "#52616c", Math.PI / 2, i > 2);
     }
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < (roads ? 3 : 0); i++) {
       car(westRoad - 2, city.north + i * 11, "#596b64", i === 1 ? -0.2 : 0);
       car(eastRoad + 2, city.north + i * 11, "#685653", Math.PI);
     }
@@ -944,71 +1385,82 @@ export class ExteriorDressing {
     // abandoned bags and interrupted direction signs tell what happened.
     const ax = city.left + 5,
       az = southRoad - 3;
-    box(opaque, ax, 1.15, az, 2.05, 1.9, 4.3, "#b2b5aa");
-    box(opaque, ax, 0.7, az - 2.35, 2, 0.9, 1, "#a6afa9");
-    box(panes, ax, 1.4, az - 2.45, 1.8, 0.7, 0.85, "#345360");
-    box(opaque, ax, 1.2, az + 2.17, 1.5, 1.6, 0.08, "#26353a");
-    box(opaque, ax + 1.3, 1.2, az + 2.3, 0.8, 1.6, 0.1, "#b9baac", -0.9);
-    for (const side of [-1, 1]) {
-      box(
-        signals,
-        ax + side * 1.07,
-        1.32,
-        az + 0.2,
-        0.025,
-        0.7,
-        0.22,
-        "#ad4a3d",
-      );
-      for (const arm of [-1, 1])
+    if (roads) {
+      box(opaque, ax, 1.15, az, 2.05, 1.9, 4.3, "#b2b5aa");
+      box(opaque, ax, 0.7, az - 2.35, 2, 0.9, 1, "#a6afa9");
+      box(panes, ax, 1.4, az - 2.45, 1.8, 0.7, 0.85, "#345360");
+      box(opaque, ax, 1.2, az + 2.17, 1.5, 1.6, 0.08, "#26353a");
+      box(opaque, ax + 1.3, 1.2, az + 2.3, 0.8, 1.6, 0.1, "#b9baac", -0.9);
+      for (const side of [-1, 1]) {
         box(
           signals,
           ax + side * 1.07,
           1.32,
-          az + 0.2 + arm * 0.23,
+          az + 0.2,
           0.025,
+          0.7,
           0.22,
-          0.24,
           "#ad4a3d",
         );
-      for (const axle of [-1.35, 1.35])
-        box(opaque, ax + side, 0.34, az + axle, 0.22, 0.65, 0.65, "#242c2d");
-    }
-    box(signals, ax - 0.5, 2.17, az - 1, 0.55, 0.16, 0.35, "#76413c");
-    box(signals, ax + 0.5, 2.17, az - 1, 0.55, 0.16, 0.35, "#3f647f");
-    box(opaque, ax + 2.2, 0.68, az + 2.3, 0.8, 0.16, 1.8, "#6e8580", 0.2);
-    for (const side of [-1, 1])
-      box(
-        opaque,
-        ax + 2.2 + side * 0.3,
-        0.36,
-        az + 2.3,
-        0.05,
-        0.6,
-        1.4,
-        "#687a7d",
-      );
-
-    // Evacuation bus stopped beyond the cordon; dark windows and a side impact.
-    const bx = city.right - 6,
-      bz = southRoad + 2;
-    box(opaque, bx, 1.45, bz, 7.5, 2.4, 2.4, "#8c8162");
-    box(opaque, bx, 2.72, bz, 7.65, 0.18, 2.45, "#77776d");
-    for (let i = 0; i < 7; i++)
+        for (const arm of [-1, 1])
+          box(
+            signals,
+            ax + side * 1.07,
+            1.32,
+            az + 0.2 + arm * 0.23,
+            0.025,
+            0.22,
+            0.24,
+            "#ad4a3d",
+          );
+        for (const axle of [-1.35, 1.35])
+          box(opaque, ax + side, 0.34, az + axle, 0.22, 0.65, 0.65, "#242c2d");
+      }
+      box(signals, ax - 0.5, 2.17, az - 1, 0.55, 0.16, 0.35, "#76413c");
+      box(signals, ax + 0.5, 2.17, az - 1, 0.55, 0.16, 0.35, "#3f647f");
+      box(opaque, ax + 2.2, 0.68, az + 2.3, 0.8, 0.16, 1.8, "#6e8580", 0.2);
       for (const side of [-1, 1])
         box(
-          panes,
-          bx - 2.9 + i * 0.95,
-          1.95,
-          bz + side * 1.215,
-          0.72,
-          0.83,
-          0.03,
-          "#283d48",
+          opaque,
+          ax + 2.2 + side * 0.3,
+          0.36,
+          az + 2.3,
+          0.05,
+          0.6,
+          1.4,
+          "#687a7d",
         );
-    for (const axle of [-2.5, 2.5])
-      for (const side of [-1, 1])
-        box(opaque, bx + axle, 0.5, bz + side * 1.15, 0.85, 1, 0.28, "#252c2d");
+
+      // Evacuation bus stopped beyond the cordon; dark windows and a side impact.
+      const bx = city.right - 6,
+        bz = southRoad + 2;
+      box(opaque, bx, 1.45, bz, 7.5, 2.4, 2.4, "#8c8162");
+      box(opaque, bx, 2.72, bz, 7.65, 0.18, 2.45, "#77776d");
+      for (let i = 0; i < 7; i++)
+        for (const side of [-1, 1])
+          box(
+            panes,
+            bx - 2.9 + i * 0.95,
+            1.95,
+            bz + side * 1.215,
+            0.72,
+            0.83,
+            0.03,
+            "#283d48",
+          );
+      for (const axle of [-2.5, 2.5])
+        for (const side of [-1, 1])
+          box(
+            opaque,
+            bx + axle,
+            0.5,
+            bz + side * 1.15,
+            0.85,
+            1,
+            0.28,
+            "#252c2d",
+          );
+    }
 
     const cordon = floor.tiles.length + 1.5;
     for (const x of [13, 17, 27, 31]) {
@@ -1066,12 +1518,13 @@ export class ExteriorDressing {
         box(opaque, x + 0.2, 0.22, z + 0.3, 0.48, 0.44, 0.3, "#485454", 0.13);
     }
     // Street lights retain a silhouette even where the power grid has failed.
-    for (const x of [westRoad + 5, eastRoad - 5])
-      for (const z of [northRoad + 5, 16, southRoad - 5]) {
-        box(opaque, x, 2.7, z, 0.12, 5.4, 0.12, "#4d5b64");
-        box(opaque, x + 0.65, 5.46, z, 1.42, 0.12, 0.12, "#53626c");
-        box(lit, x + 1.1, 5.355, z, 0.45, 0.07, 0.25, "#b7b88c");
-      }
+    if (roads)
+      for (const x of [westRoad + 5, eastRoad - 5])
+        for (const z of [northRoad + 5, 16, southRoad - 5]) {
+          box(opaque, x, 2.7, z, 0.12, 5.4, 0.12, "#4d5b64");
+          box(opaque, x + 0.65, 5.46, z, 1.42, 0.12, 0.12, "#53626c");
+          box(lit, x + 1.1, 5.355, z, 0.45, 0.07, 0.25, "#b7b88c");
+        }
   }
 
   private buildPhysicalCity(
@@ -1098,8 +1551,21 @@ export class ExteriorDressing {
       v = Math.imul(v ^ (v >>> 16), 0x45d9f3b);
       return (v ^ (v >>> 16)) >>> 0;
     };
+    const roads = roadGround(this.look?.ground),
+      themed = !!this.themedStyle;
     for (const [i, block] of cityBackdrop(floor).entries()) {
       const height = block.stories * 3.15;
+      if (themed) {
+        this.neighborLot(
+          { x: block.x, z: block.y, w: block.w, d: block.d },
+          height,
+          hash(i + 211),
+          true,
+          opaque,
+          signals,
+        );
+        continue;
+      }
       box(
         opaque,
         block.x,
@@ -1108,7 +1574,7 @@ export class ExteriorDressing {
         block.w,
         height,
         block.d,
-        block.color,
+        this.neighborTone(block.color),
       );
       box(
         opaque,
@@ -1184,6 +1650,16 @@ export class ExteriorDressing {
               d: (o.h - 2 * depth) / along,
             });
       for (const [j, part] of addresses.entries()) {
+        if (this.pads.some((pad) => overlapsPad(pad, part))) {
+          // A scenery bed replaces the address: a low solid plinth that the
+          // lot's collision box already explains.
+          neighborPlinth(
+            { x: part.x, z: part.z, w: part.w, d: part.d },
+            this.look!.neighborColor,
+            this.emitter(opaque, signals),
+          );
+          continue;
+        }
         const { w, d, x, z } = part,
           id = address++,
           roll = hash(id + 13),
@@ -1193,7 +1669,7 @@ export class ExteriorDressing {
               Math.max(0, Math.abs(x - 22) - w / 2),
               Math.max(0, Math.abs(z - 25) - d / 2),
             ) < 95;
-        box(opaque, x, height / 2, z, w, height, d, o.color);
+        box(opaque, x, height / 2, z, w, height, d, this.neighborTone(o.color));
         box(opaque, x, height + 0.15, z, w, 0.3, d, "#34434b");
         if (w > 5 && d > 5)
           box(
@@ -1389,6 +1865,30 @@ export class ExteriorDressing {
       // The real concrete wedge and supported treads belong to StairGallery.
       // Its exact footprint is still a solid urban obstacle for flat walkers.
       if (o.kind === "stair-base") continue;
+      if (themed && o.kind === "building") {
+        this.neighborLot(
+          { x: o.x, z: o.y, w: o.w, d: o.h },
+          o.height,
+          hash(index + 5),
+          Math.hypot(o.x - 22, o.y - 30) > 120,
+          opaque,
+          signals,
+        );
+        continue;
+      }
+      if (!roads && o.kind !== "building") {
+        // Wrecks and rubble are boulders where there are no streets to park on.
+        this.neighborLot(
+          { x: o.x, z: o.y, w: o.w, d: o.h },
+          Math.min(o.height, 6),
+          hash(index + 9),
+          Math.hypot(o.x - 22, o.y - 30) > 120,
+          opaque,
+          signals,
+          "rocks",
+        );
+        continue;
+      }
       if (o.kind === "building") {
         facade(o);
         for (const face of [
@@ -1397,7 +1897,11 @@ export class ExteriorDressing {
           { x: o.x, z: o.y - o.h / 2 - 0.6, nx: 0, nz: -1, span: o.w },
           { x: o.x, z: o.y + o.h / 2 + 0.6, nx: 0, nz: 1, span: o.w },
         ])
-          if (face.span > 3 && cityWall(floor, face.x, face.z) === false) {
+          if (
+            roads &&
+            face.span > 3 &&
+            cityWall(floor, face.x, face.z) === false
+          ) {
             // Low curb paving remains walkable; stop short of intersections so
             // two strips never put coplanar top faces over the same corner.
             for (
@@ -1572,7 +2076,7 @@ export class ExteriorDressing {
       ) as Mesh<BufferGeometry, MeshBasicMaterial>;
     }
     // Flush paint is a guide, not a collision edge. Crossings share asphalt.
-    for (const approach of plan.approaches)
+    for (const approach of roads ? plan.approaches : [])
       for (let i = 1; i < approach.points.length; i++) {
         const a = approach.points[i - 1],
           b = approach.points[i],
@@ -1661,7 +2165,7 @@ export class ExteriorDressing {
       );
       // Bounded practical fittings repeat along the long street. The poles
       // stand within the adjoining solid addresses, leaving the full road free.
-      for (let n = 18; n < length - 12; n += 24) {
+      for (let n = 18; n < (roads ? length - 12 : 0); n += 24) {
         const x = corner.x + dx * n + nx * (width / 2 + 0.12),
           z = corner.y + dz * n + nz * (width / 2 + 0.12);
         box(opaque, x, 2.75, z, 0.12, 5.5, 0.12, "#4f6068");
@@ -1734,7 +2238,7 @@ export class ExteriorDressing {
         o.w > 3 &&
         o.h > 3,
     );
-    for (const [i, o] of nearBuildings.slice(0, 12).entries()) {
+    for (const [i, o] of (roads ? nearBuildings.slice(0, 12) : []).entries()) {
       const x = o.x - o.w / 2 + 0.12,
         z = o.y - o.h / 2 + 0.15;
       box(opaque, x, 2.5, z, 0.13, 5, 0.13, "#4f6068");
@@ -1821,16 +2325,17 @@ export class ExteriorDressing {
         nx,
         nz,
       });
-      box(
-        opaque,
-        x - nx * 0.06,
-        0.85,
-        z - nz * 0.06,
-        nx ? 0.05 : 1.8,
-        1.7,
-        nz ? 0.05 : 1.8,
-        "#202c2b",
-      );
+      if (!themed)
+        box(
+          opaque,
+          x - nx * 0.06,
+          0.85,
+          z - nz * 0.06,
+          nx ? 0.05 : 1.8,
+          1.7,
+          nz ? 0.05 : 1.8,
+          "#202c2b",
+        );
       box(
         signals,
         x,
@@ -1919,7 +2424,18 @@ export class ExteriorDressing {
   }
 
   /** Analytic ages recycle a fixed particle pool; no emission arrays grow. */
-  update(time: number, reducedMotion = false) {
+  update(
+    time: number,
+    reducedMotion = false,
+    view?: { x: number; y: number; z: number; exposed: boolean },
+  ) {
+    // Weather follows the viewer and fades out indoors.
+    if (this.weather?.active)
+      this.weather.update(
+        time,
+        view ?? { x: 22, y: 1.6, z: 30, exposed: false },
+        reducedMotion,
+      );
     if (!this.incidents?.length || !this.smoke || !this.flames) return;
     const clock = reducedMotion ? 0 : time,
       smoke = this.smoke.geometry.getAttribute("position"),
@@ -2001,6 +2517,10 @@ export class ExteriorDressing {
     this.flames?.material.map?.dispose();
     this.flames?.material.dispose();
     this.smoke = this.flames = undefined;
+    this.pathMaterial?.dispose();
+    this.pathMaterial = undefined;
+    this.pads = [];
+    this.icePieces = [];
     this.incidents = [];
     if (this.fireLight) this.fireLight.intensity = 0;
     while (this.world.children.length) {
@@ -2014,7 +2534,13 @@ export class ExteriorDressing {
     this.clear();
     this.sky.geometry.dispose();
     this.moon.geometry.dispose();
-    this.asphalt.map?.dispose();
+    this.weather?.dispose();
+    this.iceMaterial?.dispose();
+    for (const texture of this.groundTextures?.values() ?? [])
+      texture.dispose();
+    this.groundTextures?.clear();
+    this.asphaltMap?.dispose();
+    this.asphalt.map = null;
     this.signMaterial.map?.dispose();
     this.quarantineMaterial.map?.dispose();
     this.routeMaterial.map?.dispose();

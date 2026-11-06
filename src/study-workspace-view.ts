@@ -12,6 +12,8 @@ interface WorkspaceViewState {
   starting: boolean;
   saving: boolean;
   saveError: string;
+  /** Whether the question terminal is showing; a closed one can be resumed. */
+  terminalOpen: boolean;
 }
 
 const topicKey = (node: HTMLElement) =>
@@ -159,7 +161,7 @@ export function createStudyWorkspaceView(
   });
 
   function render() {
-    const { game, starting, saving, saveError } = readState();
+    const { game, starting, saving, saveError, terminalOpen } = readState();
     if (!game.studyWorkspace?.enabled) return;
     const html = workspaceProgressHtml(game, roadmap);
     if (writtenHtml !== html) {
@@ -215,9 +217,12 @@ export function createStudyWorkspaceView(
 
     const current = workspaceQuestion(game);
     const assessment = workspaceAssessment(game);
+    // An unfinished question whose terminal was closed is resumed here, so
+    // the learner can never be left without a way back to it.
+    const resumable = !!current && !terminalOpen;
     next.disabled =
       starting ||
-      !!current ||
+      (!!current && !resumable) ||
       saving ||
       !!saveError ||
       (assessment !== undefined && assessment.status !== "applied");
@@ -225,9 +230,11 @@ export function createStudyWorkspaceView(
       next,
       starting
         ? "Preparing question…"
-        : current
-          ? "Question in progress"
-          : "Start next question",
+        : resumable
+          ? "Resume question"
+          : current
+            ? "Question in progress"
+            : "Start next question",
     );
     reviewRetry.hidden = assessment?.status !== "review-required";
     saveRetry.hidden = !saveError;

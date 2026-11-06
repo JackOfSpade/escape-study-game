@@ -7,7 +7,12 @@ import {
   SphereGeometry,
   TorusGeometry,
 } from "three";
-import type { RunObjectAxis, RunObjectShape } from "../setting-catalog.mjs";
+import { MOTION_LIMITS } from "../setting-catalog.mjs";
+import type {
+  RunObjectAxis,
+  RunObjectMotion,
+  RunObjectShape,
+} from "../setting-catalog.mjs";
 
 /** A right-triangular prism filling the unit box: full height at the back
  * (-z) and tapering to nothing at the front (+z), extruded across x. Each
@@ -117,3 +122,71 @@ export const AXIS_SHAPES: readonly RunObjectShape[] = [
   "wedge",
   "torus",
 ];
+
+const DEGREES = Math.PI / 180;
+/** Pitch and roll in radians for a composed part, or undefined when it is
+ * level. Positive pitch tips the top toward the front (+y of the recipe);
+ * positive roll tips it toward +x. */
+export function partTilt(part: { pitch?: number; roll?: number }) {
+  const pitch = (part.pitch ?? 0) * DEGREES,
+    roll = (part.roll ?? 0) * DEGREES;
+  return pitch || roll ? { pitch, roll } : undefined;
+}
+
+/** What one animated part does at an instant. yaw turns it about its
+ * vertical centre line (added to the object's own yaw), lift raises it, and
+ * glow scales a glow part's brightness (1 = full). */
+export interface PartMotionPose {
+  yaw: number;
+  lift: number;
+  glow: number;
+}
+
+/** Pulse and flicker only modulate brightness, so on a part that does not
+ * glow they do nothing: it stays still. */
+export const effectiveMotion = (
+  motion: RunObjectMotion | undefined,
+  finish: string | undefined,
+): RunObjectMotion =>
+  !motion || ((motion === "pulse" || motion === "flicker") && finish !== "glow")
+    ? "none"
+    : motion;
+
+/** A stable 0..1 offset so neighbouring parts do not move in lockstep. */
+export const motionPhase = (index: number) =>
+  (Math.imul(index + 7, 2654435761) >>> 8) / 0x1000000;
+
+const hashStep = (n: number) =>
+  (Math.imul(Math.imul(n | 0, 0x45d9f3b) ^ 0x2c1b3c6d, 0x45d9f3b) >>> 0) /
+  0x100000000;
+
+/** The pose of a part with a motion at `time` seconds. Every pose stays
+ * inside what partReach() promised: spin and sway only turn about the
+ * vertical, bob lifts at most MOTION_LIMITS.bob, and pulse and flicker only
+ * change brightness. Calm (reduced flash) stops flicker and softens pulse. */
+export function partMotion(
+  motion: RunObjectMotion,
+  rate: number,
+  phase: number,
+  time: number,
+  calm = false,
+  out: PartMotionPose = { yaw: 0, lift: 0, glow: 1 },
+): PartMotionPose {
+  out.yaw = 0;
+  out.lift = 0;
+  out.glow = 1;
+  const cycles =
+      time * (calm && motion === "pulse" ? Math.min(rate, 0.5) : rate) + phase,
+    wave = Math.sin(cycles * Math.PI * 2);
+  if (motion === "spin") out.yaw = cycles * Math.PI * 2;
+  else if (motion === "sway") out.yaw = MOTION_LIMITS.sway * DEGREES * wave;
+  else if (motion === "bob") out.lift = MOTION_LIMITS.bob * (0.5 + 0.5 * wave);
+  else if (motion === "pulse")
+    out.glow = calm
+      ? 0.85 + 0.15 * (0.5 + 0.5 * wave)
+      : 0.55 + 0.45 * (0.5 + 0.5 * wave);
+  else if (motion === "flicker" && !calm)
+    out.glow =
+      0.3 + 0.7 * hashStep(Math.floor(cycles * 6) + Math.floor(phase * 1e6));
+  return out;
+}

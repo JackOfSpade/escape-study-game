@@ -32,6 +32,70 @@ export interface RunObjectPart {
   h: number;
   color: string;
   finish: RunObjectFinish;
+  /** Tilt in degrees: pitch turns about x (tips toward the front), roll
+   * about y (tips sideways). */
+  pitch: number;
+  roll: number;
+  motion: RunObjectMotion;
+  /** Cycles per second for the motion. */
+  rate: number;
+}
+export type RunObjectMotion =
+  "none" | "spin" | "bob" | "sway" | "pulse" | "flicker";
+/** A small composed tabletop prop, placed by id as a scene prop kind. */
+export interface RunCustomProp {
+  id: string;
+  name: string;
+  size: { w: number; d: number; h: number };
+  parts: RunObjectPart[];
+}
+export type RunGround =
+  | "asphalt"
+  | "cobble"
+  | "sand"
+  | "snow"
+  | "grass"
+  | "rock"
+  | "regolith"
+  | "seabed"
+  | "ice"
+  | "moss"
+  | "mud"
+  | "tile";
+export type RunNeighborStyle =
+  | "buildings"
+  | "ruins"
+  | "rocks"
+  | "trees"
+  | "ice"
+  | "coral"
+  | "dunes"
+  | "crystals"
+  | "tents"
+  | "hedges";
+export type RunWeather =
+  | "none"
+  | "rain"
+  | "snow"
+  | "bubbles"
+  | "dust"
+  | "embers"
+  | "spores"
+  | "ash"
+  | "leaves";
+/** The world around the building; streets and blocks keep their gameplay
+ * shape and only change how they look. */
+export interface RunSurroundings {
+  ground: RunGround;
+  groundColor: string;
+  pathColor: string;
+  sky: { zenith: string; horizon: string };
+  fog: { color: string; density: number };
+  neighbors: RunNeighborStyle;
+  neighborColor: string;
+  weather: RunWeather;
+  /** Composed object ids scattered outside as visual scenery. */
+  scenery: string[];
 }
 /** An AI-composed furniture type. Collision is its w×d footprint; health,
  * push resistance and drag speed come from OBJECT_WEIGHTS[weight]. */
@@ -106,6 +170,8 @@ export interface RunSetting {
   /** The look of the study terminals, in the place's own idiom. */
   terminal: RunTerminal;
   objects: RunCustomObject[];
+  props: RunCustomProp[];
+  surroundings: RunSurroundings;
   /** For venue custom: furniture names (built-in kinds or object ids) that
    * furnish each room function the designer does not furnish itself. */
   filler: Record<RunRoomFunction, string[]> | null;
@@ -143,6 +209,33 @@ export const OBJECT_LIMITS: Readonly<{
 }>;
 export function surfaceTop(o: RunCustomObject): number | null;
 export function parseCustomObject(o: unknown, path: string): RunCustomObject;
+export function parseCustomProp(o: unknown, path: string): RunCustomProp;
+/** Space a part can occupy in any pose (tilt and motion), object frame. */
+export function partReach(part: RunObjectPart): {
+  x: number;
+  y: number;
+  z: number;
+  w: number;
+  d: number;
+  h: number;
+};
+export const OBJECT_MOTIONS: readonly RunObjectMotion[];
+export const MOTION_LIMITS: Readonly<{
+  bob: number;
+  sway: number;
+  rate: readonly [number, number];
+  tilt: number;
+}>;
+export const PROP_OBJECT_LIMITS: Readonly<{
+  props: number;
+  parts: number;
+  totalParts: number;
+  size: number;
+}>;
+export const GROUNDS: readonly RunGround[];
+export const NEIGHBOR_STYLES: readonly RunNeighborStyle[];
+export const WEATHERS: readonly RunWeather[];
+export const SCENERY_LIMIT: number;
 export const FLOOR_FINISHES: readonly RunFloorFinish[];
 export const FACADES: readonly RunFacade[];
 export const WINDOW_STYLES: readonly RunWindowStyle[];

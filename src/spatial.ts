@@ -177,6 +177,11 @@ const STATION_REACH = STATION_BODY.h / 2 + 0.325;
  * a pushed chair would flip it. Once settled the desk keeps it for the run.
  */
 export function stationFacing(f: Floor, s: Station) {
+  return (s.facing ??= readStationFacing(f, s));
+}
+/** The facing `stationFacing` would settle, without storing it: read-only
+ * callers such as the renderer must not mutate game state. */
+export function readStationFacing(f: Floor, s: Station): 1 | -1 {
   if (s.facing) return s.facing;
   const clear = ([1, -1] as const).filter((sign) => {
     const y = s.y + sign * STATION_REACH;
@@ -187,7 +192,7 @@ export function stationFacing(f: Floor, s: Station) {
   const open = clear.find(
     (sign) => !solid(f, { x: s.x, y: s.y + sign * STATION_REACH }, 0.26),
   );
-  return (s.facing = open ?? clear[0] ?? 1);
+  return open ?? clear[0] ?? 1;
 }
 /** Where a body stands to use a terminal: at the keyboard, facing the screen.
  * Falls back to the other sides only if something has been left in the way. */

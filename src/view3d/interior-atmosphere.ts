@@ -588,7 +588,11 @@ export class InteriorAtmosphere {
     this.floors.set(floor, context);
     this.lightmap.build(floor.index, plan);
     if (floor.index === this.practicalFloor) this.practicalWeights.clear();
-    this.syncFurnishings(context);
+    this.syncFurnishings(
+      context,
+      this.run?.time,
+      this.run ? !!this.run.settings.reducedFlash : undefined,
+    );
     for (const pool of [solids, tubes, ...cards]) pool.flush();
     group.userData = {
       zones: plan.zones.map((z) => ({ id: z.id, power: z.power })),
@@ -730,8 +734,12 @@ export class InteriorAtmosphere {
     return details;
   }
 
-  private syncFurnishings(context: FloorAtmosphere) {
-    context.authoredScene?.sync();
+  private syncFurnishings(
+    context: FloorAtmosphere,
+    time?: number,
+    calm?: boolean,
+  ) {
+    context.authoredScene?.sync(time, calm);
     context.environmentSurfaces?.sync();
     for (const { object, details } of context.furnishings) {
       const angle = object.angle ?? 0,
@@ -783,7 +791,8 @@ export class InteriorAtmosphere {
     for (const [other, context] of this.floors) {
       context.group.visible =
         other === floor || other.index === player.stairTravel?.toFloor;
-      if (context.group.visible) this.syncFurnishings(context);
+      if (context.group.visible)
+        this.syncFurnishings(context, game.time, !!game.settings.reducedFlash);
     }
     const feet = player.elevated?.feet ?? player.floor * FLOOR_HEIGHT,
       indoors =

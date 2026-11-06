@@ -466,6 +466,18 @@ function broadcastSetting(
       screen: "#40e0d0",
     },
     objects: [],
+    props: [],
+    surroundings: {
+      ground: "asphalt",
+      groundColor: "#3b3f44",
+      pathColor: "#2b2e33",
+      sky: { zenith: "#0d1622", horizon: "#3a4656" },
+      fog: { color: "#1c2430", density: 0 },
+      neighbors: "buildings",
+      neighborColor: "#4a4f57",
+      weather: "none",
+      scenery: [],
+    },
     filler: null,
   };
 }

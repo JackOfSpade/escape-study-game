@@ -65,6 +65,18 @@ const setting = (venue: "office" | "broadcast") =>
       screen: "#40e0d0",
     },
     objects: [],
+    props: [],
+    surroundings: {
+      ground: "asphalt",
+      groundColor: "#3b3f44",
+      pathColor: "#2b2e33",
+      sky: { zenith: "#0d1622", horizon: "#3a4656" },
+      fog: { color: "#1c2430", density: 0 },
+      neighbors: "buildings",
+      neighborColor: "#4a4f57",
+      weather: "none",
+      scenery: [],
+    },
     filler: null,
   });
 const worlds = new Map<number, Game>();
@@ -202,6 +214,10 @@ type Part = {
   h: number;
   color: string;
   finish: "matte" | "metal" | "glass" | "glow";
+  pitch: number;
+  roll: number;
+  motion: "none";
+  rate: number;
 };
 const part = (
   shape: Part["shape"],
@@ -210,7 +226,22 @@ const part = (
   color: string,
   finish: Part["finish"] = "matte",
   axis: Part["axis"] = "up",
-): Part => ({ shape, axis, x, y, z, w, d, h, color, finish });
+): Part => ({
+  shape,
+  axis,
+  x,
+  y,
+  z,
+  w,
+  d,
+  h,
+  color,
+  finish,
+  pitch: 0,
+  roll: 0,
+  motion: "none",
+  rate: 1,
+});
 const OBJECTS = [
   {
     id: "cryo-pod",

@@ -167,9 +167,28 @@ test("the study view shows the embedded terminal and returns it to the game layo
     "What would the planner do then?",
   );
 
-  await page.locator("#leave").click();
+  // Study mode offers no way to walk away from the open question.
+  await expect(page.locator("#leave")).toBeHidden();
+  // If the terminal is closed anyway, the unfinished question is resumable
+  // instead of stranding the learner behind a disabled button.
+  await page.evaluate(() =>
+    document.querySelector<HTMLButtonElement>("#leave")!.click(),
+  );
   await expect(page.locator("#terminal")).toBeHidden();
   await expect(page.locator("#study-workspace")).toBeVisible();
+  const next = page.locator("#study-next");
+  await expect(next).toHaveText("Resume question");
+  await expect(next).toBeEnabled();
+  await next.click();
+  await expect(terminal).toBeVisible();
+  await expect(terminal.locator("#problem")).toContainText(
+    "Why does the leading index column matter?",
+  );
+  await expect(page.locator("#messages")).toContainText(
+    "What would the planner do then?",
+  );
+  await expect(next).toHaveText("Question in progress");
+  await expect(next).toBeDisabled();
 
   await page.locator("#study-only-exit").click();
   await expect(page.locator("#study-workspace")).toBeHidden();

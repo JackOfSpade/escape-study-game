@@ -9,7 +9,11 @@ import {
   type FurnitureKind,
   type Point,
 } from "./model";
-import { surfaceTop, type RunCustomObject } from "./setting-catalog.mjs";
+import {
+  surfaceTop,
+  type RunCustomObject,
+  type RunCustomProp,
+} from "./setting-catalog.mjs";
 import {
   blockedGrid,
   makeFurniture,
@@ -18,6 +22,7 @@ import {
 } from "./office-layout";
 import {
   PROP_CATALOG,
+  type ScenePropKind,
   type SceneFurnitureDesign,
   type ScenePropDesign,
   type SceneRoomDesign,
@@ -42,8 +47,13 @@ export interface ResolvedSceneFurniture {
 }
 export interface ResolvedSceneProp extends Omit<
   ScenePropStructure,
-  "at" | "angle"
+  "at" | "angle" | "kind"
 > {
+  /** A built-in prop kind, or the id of one of the design's setting.props. */
+  kind: string;
+  /** The composed recipe of a design-invented prop; always rebound from the
+   * fingerprinted design on load. Absent for built-in kinds. */
+  object?: RunCustomProp;
   /** Historical labels only; version 3 writing lives in its surface manifest. */
   label?: string;
   text?: string;
@@ -79,6 +89,17 @@ function sceneKind(
 ): { kind: FurnitureKind; object?: RunCustomObject } {
   const object = floor.setting?.objects.find((o) => o.id === name);
   return object ? { kind: "custom", object } : { kind: name as FurnitureKind };
+}
+/** Envelope (and recipe, for a design's own prop) behind a scene prop kind. */
+function propSpec(
+  floor: Floor,
+  kind: string,
+): { size: { w: number; d: number; h: number }; object?: RunCustomProp } {
+  if (Object.hasOwn(PROP_CATALOG, kind))
+    return { size: PROP_CATALOG[kind as ScenePropKind] };
+  const object = floor.setting?.props?.find((o) => o.id === kind);
+  if (!object) throw Error(`unknown prop ${kind}`);
+  return { size: object.size, object };
 }
 /** Largest centred tabletop of a surface object, or of a built-in kind. */
 function supportSurface(
@@ -405,11 +426,23 @@ function resolveProp(
   item: ScenePropDesign | ScenePropStructure,
   siblings: ResolvedSceneProp[],
 ) {
-  const catalog = PROP_CATALOG[item.kind],
+  let spec: ReturnType<typeof propSpec>;
+  try {
+    spec = propSpec(floor, item.kind);
+  } catch {
+    return failure(
+      floor,
+      room,
+      item.id,
+      `prop ${item.kind} is neither built in nor in setting.props`,
+    );
+  }
+  const catalog = spec.size,
     support = supportSurface(object),
     { at, angle, ...details } = item,
     prop: ResolvedSceneProp = {
       ...details,
+      ...(spec.object ? { object: structuredClone(spec.object) } : {}),
       id: `${object.id}-${item.id}`,
       designId: item.id,
       furnitureId: object.id,
@@ -666,8 +699,15 @@ export function sceneSaveErrors(floor: Floor): string[] {
         errors.push(`Scene prop ${prop.id} is missing or duplicated`);
         continue;
       }
+      let spec: ReturnType<typeof propSpec>;
+      try {
+        spec = propSpec(floor, prop.kind);
+      } catch {
+        errors.push(`Scene prop ${prop.id} names an unknown prop`);
+        continue;
+      }
       const actual = matches[0],
-        catalog = PROP_CATALOG[prop.kind],
+        catalog = spec.size,
         { at: _at, angle: _angle, id: _id, ...metadata } = prop;
       if (
         !hasKeys(actual, [
@@ -678,6 +718,7 @@ export function sceneSaveErrors(floor: Floor): string[] {
           "accent",
           "condition",
           "owner",
+          ...(spec.object ? ["object"] : []),
           ...("label" in prop ? ["label", "text"] : []),
           "designId",
           "furnitureId",
@@ -693,6 +734,7 @@ export function sceneSaveErrors(floor: Floor): string[] {
         Object.entries(metadata).some(
           ([key, value]) => actual[key as keyof ResolvedSceneProp] !== value,
         ) ||
+        JSON.stringify(actual.object) !== JSON.stringify(spec.object) ||
         actual.designId !== prop.id ||
         actual.furnitureId !== id ||
         actual.room !== room.room ||
