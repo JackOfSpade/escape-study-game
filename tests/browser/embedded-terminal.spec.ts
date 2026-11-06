@@ -106,6 +106,14 @@ test("Claude CLI serves a question and conversation inside the game, pausing onl
   expect(generated).toHaveLength(1);
   expect(generated[0]).not.toHaveProperty("chatCode");
 
+  // There is no send button: Enter sends, while Shift+Enter only adds a line.
+  await expect(page.locator("#chat-form button")).toHaveCount(0);
+  await page.locator("#chat-input").fill("It decides what the index can seek.");
+  await page.locator("#chat-input").press("Shift+Enter");
+  await expect(page.locator("#chat-input")).toHaveValue(
+    "It decides what the index can seek.\n",
+  );
+  expect(claude.held.release).toBeUndefined();
   await page.locator("#chat-input").fill("It decides what the index can seek.");
   await page.locator("#chat-input").press("Enter");
   await expect.poll(() => claude.held.release !== undefined).toBe(true);

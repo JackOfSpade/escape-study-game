@@ -1699,7 +1699,6 @@ function renderRevealGate(e: Encounter) {
   );
   const button = $<HTMLButtonElement>("#reveal-question");
   button.onclick = revealQuestion;
-  $<HTMLButtonElement>("#chat-form button").disabled = true;
   $<HTMLTextAreaElement>("#chat-input").disabled = true;
   if (
     !ownsKeyboard(document.activeElement) ||
@@ -1775,16 +1774,6 @@ function renderTerminal(force = false) {
   $("#saved-answer").hidden = !dialogue || !e.workspace;
   setText("#saved-answer-text", e.workspace);
   $("#submission-help").hidden = dialogue;
-  const chatPending = (e.tutorRequests ?? []).some(
-    (j) => j.state === "pending",
-  );
-  // A visible NPC-outcome reconstruction supplies the question for chat too.
-  const discussable =
-    !!e.problem ||
-    (outcomeIsVisible(game, e, roadmap) &&
-      !!e.outcomeInspection?.candidate?.problem);
-  $<HTMLButtonElement>("#chat-form button").disabled =
-    !discussable || (dialogue && chatPending);
   $("#chat-input").setAttribute(
     "aria-label",
     dialogue ? "Message Terminal AI" : "Message",
