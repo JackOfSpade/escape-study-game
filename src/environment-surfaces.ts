@@ -410,7 +410,7 @@ export function buildEnvironmentSurfaces(
           propId: prop.id,
           ...face,
         },
-        `${prop.kind} face. ${prop.condition} condition. Give this individual object its own authored writing or illustration.`,
+        `${prop.object?.name ?? prop.kind} face. ${prop.condition} condition. Give this individual object its own authored writing or illustration.`,
         prop.room,
         tiny ? 0 : 28,
         tiny ? 0 : 100,

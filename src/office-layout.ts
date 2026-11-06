@@ -19,6 +19,7 @@ import { boxesOverlap, normalizeAngle, turn } from "./furniture-geometry";
 import { canPlace, inFurniture, wall } from "./spatial";
 import { stairwellApproach } from "./stairwell";
 import { floorSectors, inRect, type Rect } from "./floor-plan";
+import { cornerCells } from "./room-shapes";
 import { realizeAuthoredScene } from "./authored-scene";
 import { floorVenue } from "./venue";
 import {
@@ -1302,6 +1303,20 @@ function sectorOfficeZones(f: Floor): OfficeZone[] {
       x2: r.x2 + 1,
       y2: r.y2 + 1,
     }));
+    // Carved corners (roomShapes): nothing stands against a smooth corner wall.
+    const carvedRects = (zone?: string) =>
+      (f.generation?.corners ?? [])
+        .filter((c) => c.room === s.room && c.zone === zone)
+        .map((c) => {
+          const cells = cornerCells(c);
+          return {
+            x1: Math.min(...cells.map((p) => p.x)) - 1,
+            y1: Math.min(...cells.map((p) => p.y)) - 1,
+            x2: Math.max(...cells.map((p) => p.x)) + 1,
+            y2: Math.max(...cells.map((p) => p.y)) + 1,
+          };
+        });
+    exclude.push(...carvedRects());
     const types: OfficeRoomType[] =
       f.design && s.room !== undefined
         ? [f.design.roomTypes[s.room]]
@@ -1326,6 +1341,9 @@ function sectorOfficeZones(f: Floor): OfficeZone[] {
         id: room.id,
         ...room.rect,
         types: [SUB_ROOM_TYPES[room.kind]],
+        ...(carvedRects(room.id).length
+          ? { exclude: carvedRects(room.id) }
+          : {}),
       });
   }
   return zones;

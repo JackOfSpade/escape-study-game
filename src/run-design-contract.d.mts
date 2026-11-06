@@ -129,11 +129,15 @@ export interface LegacyRunDesign {
     helicopterInterval: number;
   };
 }
+export type RunRoomShape = "rect" | "chamfered" | "rounded" | "octagon";
+export declare const ROOM_SHAPES: readonly RunRoomShape[];
 export interface RunFloorStructureV3 extends Omit<
   LegacyRunFloorDesign,
   "stories" | "scene"
 > {
   scene: SceneFloorStructure;
+  /** Per study room 0..3; absent means rectangular as before. */
+  roomShapes?: RunRoomShape[];
 }
 export type RunFloorDesign = LegacyRunFloorDesign | RunFloorStructureV3;
 export type RunExteriorStructureV3 = Omit<

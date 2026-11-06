@@ -28,6 +28,8 @@ import { human } from "../engine";
 import { doorLeaves, doorSeeThrough, doorStyle } from "../door-style";
 import { fieldAllows } from "../force-fields";
 import { floorSectors } from "../floor-plan";
+import { carvedCells } from "../room-shapes";
+import { cornerWallGeometries } from "./corner-walls";
 import { stationFacing } from "../spatial";
 import {
   CONFIG,
@@ -47,6 +49,7 @@ import { floorZone } from "../office-art";
 import type {
   RunObjectAxis,
   RunObjectFinish,
+  RunObjectMotion,
   RunObjectShape,
   RunTerminal,
 } from "../setting-catalog.mjs";
@@ -60,7 +63,15 @@ import {
   wallRectangles,
 } from "./geometry";
 import { InstancePool } from "./instances";
-import { AXIS_SHAPES, objectGeometry } from "./object-shapes";
+import {
+  AXIS_SHAPES,
+  effectiveMotion,
+  motionPhase,
+  objectGeometry,
+  partMotion,
+  partTilt,
+  type PartMotionPose,
+} from "./object-shapes";
 import { furnitureHeightOf } from "./furniture-height";
 import { lootSlot } from "./targeting";
 import { AdaptiveResolution } from "./resolution";
@@ -138,6 +149,29 @@ const OBJECT_POOL_CAPACITY: Record<RunObjectFinish, number> = {
   glass: 2048,
   glow: 2048,
 };
+/** The tilt and motion of a composed part, or undefined when it is level and
+ * still. */
+function partPose(
+  part: {
+    pitch?: number;
+    roll?: number;
+    motion?: RunObjectMotion;
+    rate?: number;
+    finish?: string;
+  },
+  index: number,
+): PartPose | undefined {
+  const tilt = partTilt(part),
+    motion = effectiveMotion(part.motion, part.finish);
+  if (!tilt && motion === "none") return undefined;
+  return {
+    pitch: tilt?.pitch ?? 0,
+    roll: tilt?.roll ?? 0,
+    motion,
+    rate: part.rate ?? 1,
+    phase: motionPhase(index),
+  };
+}
 /** Boxes and spheres are symmetric, so only the other shapes keep an axis. */
 const objectBatch = (
   shape: RunObjectShape,
@@ -175,6 +209,16 @@ interface Part {
     "bar" | "pane" | "debris" | "leg" | "arm" | "damage" | "door" | "accent";
   /** Swings around this hinge with a door's leaf. */
   leaf?: { x: number; z: number; sign: number };
+  /** A composed part's tilt (radians) and motion. Absent for level, still
+   * parts, which then cost nothing per frame. */
+  pose?: PartPose;
+}
+interface PartPose {
+  pitch: number;
+  roll: number;
+  motion: RunObjectMotion;
+  rate: number;
+  phase: number;
 }
 /** A frame, its leaves and a status light whose colour shows personal access
  * and whose length shows the door's remaining health. */
@@ -395,6 +439,9 @@ export class FirstPersonView {
   private building = new BuildingShell();
   private gallery = new StairGallery();
   private exterior = new ExteriorDressing();
+  private animationTime = 0;
+  private animationCalm = false;
+  private motionPose: PartMotionPose = { yaw: 0, lift: 0, glow: 1 };
   private atmosphere = new InteriorAtmosphere();
   private pools!: Record<Batch, InstancePool>;
   private poolList: InstancePool[] = [];
@@ -590,6 +637,18 @@ export class FirstPersonView {
     const city = game.floors[0].city;
     fog.near = city ? 100 : 38;
     fog.far = city ? 700 : 170;
+    if (this.exterior.enabled) {
+      // A designed fog thickens the air outside; undesigned runs keep 38/170
+      // or 100/700 untouched.
+      const range = this.exterior.fogRange(
+        fog.near,
+        fog.far,
+        outside,
+        game.time,
+      );
+      fog.near = range.near;
+      fog.far = range.far;
+    }
     fog.color.copy(this.exterior.enabled ? this.exterior.horizon : palette.sky);
     (this.scene.background as Color).copy(fog.color);
     this.fill.intensity = outside ? 1.1 : 0.95 + (1 - floor.dark) * 0.22;
@@ -613,7 +672,13 @@ export class FirstPersonView {
       eyeZ + horizontal * Math.sin(yaw),
     );
     this.camera.lookAt(this.target);
-    this.exterior.update(game.time, game.settings.reducedFlash);
+    this.exterior.update(game.time, game.settings.reducedFlash, {
+      x: eyeX,
+      y: eyeY,
+      z: eyeZ,
+      exposed: outside || a.floor === game.floors.length - 1,
+    });
+    this.building.animate(game.time, game.settings.reducedFlash);
     this.gallery.update(game);
     this.atmosphere.group.visible = !!floor.boundary;
     if (floor.boundary) {
@@ -858,6 +923,12 @@ export class FirstPersonView {
           : tile,
       ),
     );
+    // Carved room corners (floors[].roomShapes) are solid cells drawn as one
+    // smooth chamfer or curve instead of stepped blocks.
+    if (floor.generation?.corners?.length) {
+      for (const c of carvedCells(floor)) interiorTiles[c.y][c.x] = 0;
+      boxes.push(...cornerWallGeometries(floor));
+    }
     for (const r of wallRectangles(interiorTiles))
       boxes.push(
         new BoxGeometry(r.w, 2.8, r.h).translate(
@@ -1131,8 +1202,10 @@ export class FirstPersonView {
     anchor?: Part["anchor"],
     color?: string,
     finish?: RunObjectFinish,
+    pose?: PartPose,
   ) {
     parts.push({
+      pose,
       fixed: color ? readableColor(color, finish) : undefined,
       finish,
       batch,
@@ -1162,6 +1235,8 @@ export class FirstPersonView {
     exteriorOnly = false,
   ) {
     this.frame++;
+    this.animationTime = game.time;
+    this.animationCalm = !!game.settings.reducedFlash;
     // Static objects rely on depth-tested walls for occlusion. A centre-point
     // LOS query can hide a visible door face or a desk extending around a corner.
     const fogDistance = sightRadius(floor) + 3;
@@ -1356,19 +1431,38 @@ export class FirstPersonView {
         (p.fixed && p.finish !== "glow")
       )
         this.tint.multiplyScalar(0.45 + 0.55 * health);
+      const pose = p.pose,
+        moved =
+          pose && pose.motion !== "none" ? this.motionOf(pose) : undefined;
+      if (moved && p.finish === "glow") this.tint.multiplyScalar(moved.glow);
       this.pools[p.batch].set(
         p.slot,
         anchor.x + x * c - z * s,
-        p.y - (broken && p.role === "leg" ? 0.07 : 0),
+        p.y - (broken && p.role === "leg" ? 0.07 : 0) + (moved?.lift ?? 0),
         anchor.y + x * s + z * c,
         p.w * (bar && !vertical ? health : 1),
         p.h,
         p.d * (bar && vertical ? health : 1),
-        angle,
+        angle + (moved?.yaw ?? 0),
         this.tint,
-        lean,
+        pose ? -pose.roll : lean,
+        pose?.pitch ?? 0,
+        !!pose,
       );
     }
+  }
+
+  /** Animated composed parts follow the render clock; calm (reduced flash)
+   * stops flicker and softens pulse. Static parts never reach this. */
+  private motionOf(pose: PartPose) {
+    return partMotion(
+      pose.motion,
+      pose.rate,
+      pose.phase,
+      this.animationTime,
+      this.animationCalm,
+      this.motionPose,
+    );
   }
 
   private furnitureParts(parts: Part[], o: Furniture) {
@@ -1387,6 +1481,7 @@ export class FirstPersonView {
       anchor?: Part["anchor"],
       color?: string,
       finish?: RunObjectFinish,
+      pose?: PartPose,
     ) =>
       this.part(
         parts,
@@ -1402,6 +1497,7 @@ export class FirstPersonView {
         anchor,
         color,
         finish,
+        pose,
       );
     if (o.destroyed) {
       part(
@@ -2136,6 +2232,7 @@ export class FirstPersonView {
             undefined,
             p.color,
             p.finish,
+            partPose(p, i),
           );
         });
         break;

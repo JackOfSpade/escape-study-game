@@ -10,6 +10,17 @@ const radio = JSON.parse(
   readFileSync("tests/fixtures/run-designs/radio-broadcast.json", "utf8"),
 );
 const { environment, ...structure } = radio;
+/** Give every composed part the neutral pose and motion the contract requires. */
+const neutralParts = (objects: { parts: object[] }[]) => {
+  for (const o of objects)
+    o.parts = o.parts.map((p) => ({
+      ...p,
+      pitch: 0,
+      roll: 0,
+      motion: "none",
+      rate: 1,
+    }));
+};
 const request = (phase: string) => ({
   version: 3,
   phase,
@@ -119,6 +130,7 @@ test("composed objects in a structure fit the schema and the validator", () => {
       ],
     },
   ];
+  neutralParts(s.setting.objects);
   s.setting.filler = {
     reception: ["cryo-pod", "reception"],
     break: ["sofa"],
@@ -208,6 +220,7 @@ test("the validator rejects floating, oversized or unsupported composed objects"
         ],
       },
     ];
+    neutralParts(s.setting.objects);
     return s;
   };
   assert.doesNotThrow(() => parseRunStructure(base()));
@@ -325,6 +338,7 @@ test("object roles, wedge and torus parts, larger sizes and roof objects validat
         ],
       },
     ];
+    neutralParts(s.setting.objects);
     s.setting.exterior.roofFeatures = [{ kind: "ramp-hall", x: 0.5, y: 0.5 }];
     return s;
   };
@@ -369,6 +383,10 @@ test("wedges and tori never count as a prop surface", () => {
     h: 0.5,
     color: "#808080",
     finish: "matte",
+    pitch: 0,
+    roll: 0,
+    motion: "none",
+    rate: 1,
   });
   for (const shape of ["wedge", "torus"])
     assert.equal(

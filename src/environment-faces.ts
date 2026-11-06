@@ -1,11 +1,10 @@
 import type { Furniture } from "./model";
 import type { ResolvedSceneProp } from "./authored-scene";
-import type { ScenePropKind } from "./scene-catalog.mjs";
 import { furnitureHeightOf } from "./view3d/furniture-height";
 
 /** Fractions of the catalog envelope, shared by visible labels and saved slots. */
 export const PROP_LABEL_FACES: Partial<
-  Record<ScenePropKind, { y: number; z: number; w: number; h: number }>
+  Record<string, { y: number; z: number; w: number; h: number }>
 > = {
   mug: { y: 0.45, z: 0.453, w: 0.55, h: 0.36 },
   bottle: { y: 0.34, z: 0.485, w: 0.7, h: 0.3 },
@@ -34,6 +33,10 @@ export function furnitureLabelFace(host: Furniture) {
         (p) =>
           p.shape === "box" &&
           p.finish !== "glass" &&
+          // A tilted or moving part has no steady front face to hold a tag.
+          !p.pitch &&
+          !p.roll &&
+          (!p.motion || p.motion === "none") &&
           p.h >= 0.06 &&
           Math.abs(p.x) <= p.w / 2 - 0.05,
       )
@@ -137,8 +140,69 @@ export function furnitureLabelFace(host: Furniture) {
   return face;
 }
 
+/** A design-invented prop reads on the top or front face of its largest solid
+ * box that never tilts or moves, else on the top of its envelope. Parts are in
+ * the recipe frame (x across, y back to front, z up), scaled by the placement. */
+function composedPropFace(prop: ResolvedSceneProp) {
+  const s = prop.scale,
+    solid = (prop.object?.parts ?? [])
+      .filter(
+        (p) =>
+          p.shape === "box" &&
+          p.pitch === 0 &&
+          p.roll === 0 &&
+          p.motion === "none" &&
+          p.finish !== "glass" &&
+          p.finish !== "glow" &&
+          p.w * s >= 0.03 &&
+          Math.min(p.d, p.h) * s >= 0.012,
+      )
+      .sort((a, b) => b.w * b.d * b.h - a.w * a.d * a.h)[0];
+  if (!solid)
+    return {
+      x: 0,
+      y: 0,
+      z: prop.h + 0.002,
+      width: prop.w * 0.76,
+      height: prop.d * 0.78,
+      yaw: 0,
+      pitch: -Math.PI / 2,
+    };
+  // A top covered by another part (a lid, a flame, a lens) cannot be read.
+  const covered = (prop.object?.parts ?? []).some(
+      (o) =>
+        o !== solid &&
+        o.z + o.h > solid.z + solid.h + 0.004 &&
+        o.z < solid.z + solid.h + 0.2 &&
+        Math.abs(o.x - solid.x) < (o.w + solid.w) / 2 - 0.01 &&
+        Math.abs(o.y - solid.y) < (o.d + solid.d) / 2 - 0.01,
+    ),
+    top = covered ? 0 : solid.w * solid.d,
+    front = solid.w * solid.h;
+  return front > top
+    ? {
+        x: solid.x * s,
+        y: (solid.y + solid.d / 2) * s + 0.002,
+        z: (solid.z + solid.h / 2) * s,
+        width: solid.w * s * 0.86,
+        height: solid.h * s * 0.7,
+        yaw: 0,
+        pitch: 0,
+      }
+    : {
+        x: solid.x * s,
+        y: solid.y * s,
+        z: (solid.z + solid.h) * s + 0.002,
+        width: solid.w * s * 0.86,
+        height: solid.d * s * 0.86,
+        yaw: 0,
+        pitch: -Math.PI / 2,
+      };
+}
+
 /** Game coordinates: x/y are horizontal, z is elevation, local to the prop. */
 export function propSurfaceFace(prop: ResolvedSceneProp) {
+  if (prop.object) return composedPropFace(prop);
   const face = PROP_LABEL_FACES[prop.kind];
   return {
     x: prop.kind === "mug" ? -prop.w * 0.08 : 0,

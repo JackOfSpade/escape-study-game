@@ -7,6 +7,7 @@ import {
   Group,
   InstancedBufferAttribute,
   LinearFilter,
+  MeshBasicMaterial,
   MeshStandardMaterial,
   PlaneGeometry,
   SphereGeometry,
@@ -18,7 +19,16 @@ import {
   SCENE_LIMITS,
   type ScenePropDesign,
 } from "../scene-catalog.mjs";
+import type { RunObjectAxis, RunObjectMotion } from "../setting-catalog.mjs";
 import type { ResolvedSceneProp } from "../authored-scene";
+import {
+  AXIS_SHAPES,
+  motionPhase,
+  objectGeometry,
+  partMotion,
+  partTilt,
+  type PartMotionPose,
+} from "./object-shapes";
 import {
   furnitureSurfaceHeightOf,
   furnitureSurfaceBoundsOf,
@@ -28,6 +38,7 @@ import { InstancePool } from "./instances";
 import {
   PROP_LABEL_FACES as LABEL_FACES,
   furnitureLabelFace,
+  propSurfaceFace,
 } from "../environment-faces";
 import type { InteriorLightmap } from "./interior-lightmap";
 
@@ -270,6 +281,27 @@ interface Binding {
   angle: number;
   color: string;
   rotationX?: number;
+  /** A composed part's own colour, tilt and motion. Level, still parts leave
+   * this out and cost nothing per frame beyond the shared diffing. */
+  fixed?: Color;
+  tilt?: {
+    pitch: number;
+    roll: number;
+    motion: RunObjectMotion;
+    rate: number;
+    phase: number;
+    glow: boolean;
+  };
+}
+type Finish = "matte" | "metal" | "glass" | "glow";
+/** Dark parts stay readable under the room lighting; glow keeps its colour. */
+function readable(color: string, finish: Finish) {
+  const value = new Color(color);
+  if (finish === "glow") return value;
+  const hsl = { h: 0, s: 0, l: 0 };
+  value.getHSL(hsl);
+  if (hsl.l < 0.16) value.setHSL(hsl.h, hsl.s, 0.16);
+  return value;
 }
 const CELL_W = 256,
   CELL_H = 128,
@@ -372,6 +404,11 @@ export class AuthoredScene {
   private readonly material: MeshStandardMaterial;
   private readonly labelMaterial: MeshStandardMaterial;
   private readonly atlas?: CanvasTexture;
+  private readonly extraMaterials: (
+    MeshStandardMaterial | MeshBasicMaterial
+  )[] = [];
+  private readonly motionPose: PartMotionPose = { yaw: 0, lift: 0, glow: 1 };
+  private readonly tint = new Color();
   private disposed = false;
 
   constructor(
@@ -404,6 +441,59 @@ export class AuthoredScene {
           return [shape, pool];
         }),
       ) as Record<Shape, InstancePool>,
+      composedTotal = (floor.scene?.props ?? []).reduce(
+        (n, p) => n + (p.object?.parts.length ?? 0),
+        0,
+      ),
+      composedPools = new Map<string, InstancePool>(),
+      composedMaterials: Partial<
+        Record<Finish, MeshStandardMaterial | MeshBasicMaterial>
+      > = {},
+      composedPool = (
+        shape: Shape | "wedge" | "torus",
+        axis: RunObjectAxis,
+        finish: Finish,
+      ) => {
+        const key = `${shape}:${AXIS_SHAPES.includes(shape as never) ? axis : "up"}:${finish}`;
+        let pool = composedPools.get(key);
+        if (!pool) {
+          let material = composedMaterials[finish];
+          if (!material) {
+            if (finish === "matte") material = this.material;
+            else {
+              material =
+                finish === "glow"
+                  ? new MeshBasicMaterial({ color: "white" })
+                  : new MeshStandardMaterial({
+                      color: "white",
+                      roughness: finish === "glass" ? 0.12 : 0.4,
+                      metalness: finish === "metal" ? 0.3 : 0,
+                      transparent: finish === "glass",
+                      opacity: finish === "glass" ? 0.4 : 1,
+                      depthWrite: finish !== "glass",
+                    });
+              if (material instanceof MeshStandardMaterial)
+                lightmap.patch(material);
+              this.extraMaterials.push(material);
+            }
+            composedMaterials[finish] = material;
+          }
+          pool = new InstancePool(
+            this.group,
+            objectGeometry(
+              shape,
+              AXIS_SHAPES.includes(shape as never) ? axis : "up",
+            ),
+            material,
+            composedTotal,
+            false,
+          );
+          pool.mesh.name = `authored-scene-composed-${key.replaceAll(":", "-")}`;
+          this.pools.push(pool);
+          composedPools.set(key, pool);
+        }
+        return pool;
+      },
       labels: Label[] = [],
       labelBindings: Omit<Binding, "pool" | "slot">[] = [],
       hosts = new Map(floor.furniture.map((f) => [f.id, f])),
@@ -497,7 +587,71 @@ export class AuthoredScene {
     for (const prop of floor.scene?.props ?? []) {
       const host = hosts.get(prop.furnitureId);
       if (!host) continue;
-      for (const part of authoredPropParts(prop)) {
+      if (prop.object) {
+        // A design-invented prop: its own recipe parts, scaled with the
+        // placement. x across, y back to front, z the bottom; the part
+        // centre then maps to (x, elevation, depth) in the prop's frame.
+        const k = prop.scale;
+        prop.object.parts.forEach((p, i) => {
+          const pool = composedPool(p.shape, p.axis, p.finish),
+            grow = 0.0004 * (i + 1),
+            tilt = partTilt(p),
+            animated = p.motion !== "none";
+          this.parts.push({
+            furniture: host,
+            prop,
+            pool,
+            slot: pool.allocate(),
+            x: p.x * k,
+            y: (p.z + p.h / 2) * k,
+            z: p.y * k,
+            w: p.w * k + grow,
+            h: p.h * k + grow,
+            d: p.d * k + grow,
+            angle: 0,
+            color: p.color,
+            fixed: readable(p.color, p.finish),
+            tilt:
+              tilt || animated
+                ? {
+                    pitch: tilt?.pitch ?? 0,
+                    roll: tilt?.roll ?? 0,
+                    motion: p.motion,
+                    rate: p.rate,
+                    phase: motionPhase(i),
+                    glow: p.finish === "glow",
+                  }
+                : undefined,
+          });
+        });
+        if (!(prop.label || prop.text || prop.owner)) continue;
+        const face = propSurfaceFace(prop);
+        label(
+          {
+            title: prop.label ?? "",
+            text: prop.text ?? "",
+            owner: prop.owner,
+            color: prop.color,
+            accent: prop.accent,
+            condition: prop.condition,
+          },
+          {
+            furniture: host,
+            prop,
+            x: face.x,
+            y: face.z,
+            z: face.y,
+            w: face.width,
+            h: face.height,
+            d: 1,
+            angle: 0,
+            color: "#ffffff",
+            rotationX: face.pitch,
+          },
+        );
+        continue;
+      }
+      for (const part of authoredPropParts(prop as PropAppearance)) {
         const pool = pools[part.shape];
         this.parts.push({
           ...part,
@@ -595,12 +749,14 @@ export class AuthoredScene {
       furniture: floor.scene?.furniture.length ?? 0,
       props: floor.scene?.props.length ?? 0,
       labels: labels.length,
-      drawCallBudget: floor.environment ? 4 : 5,
+      drawCallBudget: (floor.environment ? 4 : 5) + composedPools.size,
     };
     this.sync();
   }
 
-  sync() {
+  /** `time` (seconds) and `calm` (reduced flash) drive composed part motion;
+   * the caller's game clock keeps it in step with the rest of the scene. */
+  sync(time = performance.now() / 1000, calm = true) {
     if (this.disposed) return;
     const present = new Set(this.floor.furniture);
     for (const part of this.parts) {
@@ -618,18 +774,37 @@ export class AuthoredScene {
         angle = host?.angle ?? 0,
         hc = Math.cos(angle),
         hs = Math.sin(angle);
+      const tilt = part.tilt;
+      let lift = 0,
+        yaw = 0,
+        tint: Color | string = part.fixed ?? part.color;
+      if (tilt && tilt.motion !== "none") {
+        const moved = partMotion(
+          tilt.motion,
+          tilt.rate,
+          tilt.phase,
+          time,
+          calm,
+          this.motionPose,
+        );
+        lift = moved.lift;
+        yaw = moved.yaw;
+        if (tilt.glow && part.fixed)
+          tint = this.tint.copy(part.fixed).multiplyScalar(moved.glow);
+      }
       part.pool.set(
         part.slot,
         host ? host.x + x * hc - z * hs : part.x,
-        (prop?.top ?? 0) + part.y,
+        (prop?.top ?? 0) + part.y + lift,
         host ? host.y + x * hs + z * hc : part.z,
         part.w,
         part.h,
         part.d,
-        angle + turn + part.angle,
-        part.color,
-        0,
-        part.rotationX ?? 0,
+        angle + turn + part.angle + yaw,
+        tint,
+        tilt ? -tilt.roll : 0,
+        tilt ? tilt.pitch : (part.rotationX ?? 0),
+        !!tilt,
       );
     }
     this.pools.forEach((pool) => pool.flush());
@@ -640,6 +815,7 @@ export class AuthoredScene {
     this.disposed = true;
     this.pools.forEach((pool) => pool.dispose(false));
     this.material.dispose();
+    this.extraMaterials.forEach((material) => material.dispose());
     this.labelMaterial.dispose();
     this.atlas?.dispose();
     this.group.removeFromParent();

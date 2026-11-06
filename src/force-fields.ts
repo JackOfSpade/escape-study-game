@@ -200,6 +200,8 @@ export function redesign(
     if (roof.boundary) buildingRoof(roof);
     else carveStairwells(roof);
   }
+  const designed = Boolean(g.design || options.blueprint);
+  const floorErrors: string[] = [];
   for (const floor of g.floors)
     if (floor.generation?.version === 2) {
       pursuitLayout(g, floor);
@@ -208,14 +210,26 @@ export function redesign(
       // Fresh runs are furnished from their venue (an office unless the design
       // chose otherwise): a few movable physical pieces per room, kept clear
       // of every field opening and terminal.
-      furnishOffice(
-        floor,
-        pursuitOfficeZones(floor),
-        fieldClearance(floor),
-        floor.entry,
-        g.seed,
-        floor.furniture.filter((o) => /-room\d-door$/.test(o.id)),
-      );
+      const furnish = () =>
+        furnishOffice(
+          floor,
+          pursuitOfficeZones(floor),
+          fieldClearance(floor),
+          floor.entry,
+          g.seed,
+          floor.furniture.filter((o) => /-room\d-door$/.test(o.id)),
+        );
+      if (designed) {
+        // Report every floor's problems together for one repair round.
+        try {
+          furnish();
+        } catch (error) {
+          floorErrors.push(
+            error instanceof Error ? error.message : String(error),
+          );
+          continue;
+        }
+      } else furnish();
       applyDoorDesign(g, floor, options.blueprint);
       // Saved designs bind writing to the furnished building, so their
       // terminals move only around what is already placed.
@@ -227,11 +241,12 @@ export function redesign(
           ...furnishingErrors(floor),
         ];
         if (errors.length)
-          throw Error(
+          floorErrors.push(
             `Invalid designed floor ${floor.index}: ${errors.join("; ")}`,
           );
       }
     }
+  if (floorErrors.length) throw Error(floorErrors.join("; "));
   if (options.randomized) {
     const errors = buildingLayoutErrors(g);
     if (errors.length) throw Error(`Invalid building: ${errors.join("; ")}`);

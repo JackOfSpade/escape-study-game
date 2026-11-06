@@ -4,8 +4,10 @@ import type {
   RunObjectPart,
   RunTerminal,
 } from "./setting-catalog.mjs";
+import { partReach } from "./setting-catalog.mjs";
 import { H, W } from "./model";
 import { inRect, sectorAt } from "./floor-plan";
+import { carvedCells, cornerProfile } from "./room-shapes";
 
 /** Procedural top-down office art. Floors, walls and every furniture kind are
  * painted once into cached canvases and reused each frame, so the per-frame
@@ -380,6 +382,22 @@ function paintFloorCell(
   }
 }
 
+/** The top-down colours of a designed outdoors, already dimmed toward the
+ * scene palette so the sight overlay keeps its mood. Undesigned floors have
+ * none, and the caller keeps its fixed colours. */
+export function outdoorColors(
+  f: Floor,
+  sky: string,
+): { ground: string; path: string; neighbor: string } | undefined {
+  const look = f.setting?.surroundings;
+  if (!look) return undefined;
+  return {
+    ground: mixHex(look.groundColor, sky, 0.45),
+    path: mixHex(look.pathColor, sky, 0.45),
+    neighbor: mixHex(look.neighborColor, sky, 0.4),
+  };
+}
+
 /** Blend two #rrggbb colours; an unparseable tint leaves the base unchanged. */
 function mixHex(base: string, tint: string, t: number) {
   const parse = (h: string) =>
@@ -408,18 +426,32 @@ export function terrainCanvas(f: Floor, theme: Theme, seed: number) {
     look = s
       ? `${f.setting!.venue}/${s.roomFloor}/${s.hallFloor}/${s.wall}/${s.trim}/${s.roomTint}/${s.hallTint}/`
       : "";
-  const key = `${f.index}/${theme}/${seed}/${f.generation?.version ?? 0}/${look}${f.tiles.map((r) => r.join("")).join("")}`;
+  const corners = f.generation?.corners ?? [],
+    shapes = corners.length ? JSON.stringify(corners) : "";
+  const outdoor = f.setting?.surroundings?.groundColor,
+    ground = outdoor ? `ground:${outdoor}/` : "";
+  const key = `${f.index}/${theme}/${seed}/${f.generation?.version ?? 0}/${look}${ground}${shapes}${f.tiles.map((r) => r.join("")).join("")}`;
   if (terrain?.key === key) return terrain.canvas;
   const canvas = terrain?.canvas ?? document.createElement("canvas");
   canvas.width = W * PX;
   canvas.height = H * PX;
   const c = canvas.getContext("2d")!,
     m = MATERIALS[theme];
+  // Carved room corners are drawn as one smooth wall over open-looking floor.
+  const carved = new Set(carvedCells(f).map((p) => p.y * W + p.x));
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++)
-      if (!f.tiles[y][x]) {
+      if (!f.tiles[y][x] || carved.has(y * W + x)) {
         const zone = floorZone(f, x, y);
         paintFloorCell(c, m, zone, x, y, seed);
+        // Outside paving takes the designed ground colour; the cell keeps its
+        // own texture beneath the wash.
+        if (outdoor && zone === "concrete" && /^#[0-9a-f]{6}$/i.test(outdoor)) {
+          c.globalAlpha = 0.55;
+          c.fillStyle = outdoor;
+          c.fillRect(x * PX, y * PX, PX, PX);
+          c.globalAlpha = 1;
+        }
         if (s && zone !== "concrete" && zone !== "roof") {
           // The designer's tint is blended over the finish, rooms and halls
           // separately, keeping the finish's own texture visible beneath.
@@ -440,7 +472,7 @@ export function terrainCanvas(f: Floor, theme: Theme, seed: number) {
   // shadow cast onto the floor along the wall's south and east faces.
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
-      if (!f.tiles[y][x]) continue;
+      if (!f.tiles[y][x] || carved.has(y * W + x)) continue;
       const px = x * PX,
         py = y * PX;
       c.fillStyle = wallTop;
@@ -457,6 +489,27 @@ export function terrainCanvas(f: Floor, theme: Theme, seed: number) {
       if (!solidAt(x, y + 1)) c.fillRect(px, py + PX, PX, PX * 0.12);
       if (!solidAt(x + 1, y)) c.fillRect(px + PX, py, PX * 0.12, PX);
     }
+  for (const corner of corners) {
+    const outline = cornerProfile(corner);
+    c.beginPath();
+    outline.forEach((p, i) =>
+      i ? c.lineTo(p.x * PX, p.y * PX) : c.moveTo(p.x * PX, p.y * PX),
+    );
+    c.closePath();
+    c.fillStyle = wallTop;
+    c.fill();
+    // Lit rim and contact shadow along the visible chamfer or curve only.
+    c.lineJoin = "round";
+    c.strokeStyle = wallEdge;
+    c.lineWidth = 3;
+    c.beginPath();
+    outline
+      .slice(1)
+      .forEach((p, i) =>
+        i ? c.lineTo(p.x * PX, p.y * PX) : c.moveTo(p.x * PX, p.y * PX),
+      );
+    c.stroke();
+  }
   terrain = { key, canvas };
   return canvas;
 }
@@ -1063,14 +1116,28 @@ const PAINTERS: Record<FurnitureKind, Painter> = {
 /** Top-down projection of a composed object's parts in local metres: taller
  * parts paint last, lower ones darker; glow gets a halo, metal a highlight,
  * glass is semi-transparent. Cylinders, spheres and cones are circles. */
+/** The plan-view box of a tilted part: its tipped extents at rest, in the
+ * same frame as the part. */
+function tiltedFootprint(part: RunObjectPart): RunObjectPart {
+  const reach = partReach({
+    ...part,
+    pitch: part.pitch ?? 0,
+    roll: part.roll ?? 0,
+    motion: "none",
+  });
+  return { ...part, w: reach.w, d: reach.d, z: reach.z, h: reach.h };
+}
 function paintCustomObject(
   c: CanvasRenderingContext2D,
   object: RunCustomObject,
 ) {
   const height = Math.max(0.01, object.size.h),
     parts = [...object.parts].sort((a, b) => a.z + a.h - (b.z + b.h));
-  for (const part of parts) {
-    const top = part.z + part.h,
+  for (const source of parts) {
+    // A tilted part shows the footprint of its tipped box; its motion is not
+    // drawn on the plan, which keeps the part at rest.
+    const part = source.pitch || source.roll ? tiltedFootprint(source) : source,
+      top = part.z + part.h,
       shade = Math.min(1, top / height),
       base = /^#[0-9a-f]{6}$/i.test(part.color) ? part.color : "#808080",
       fill = mixHex(base, "#000000", 0.4 * (1 - shade)),

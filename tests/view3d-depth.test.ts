@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  Color,
   Euler,
   Group,
   MeshBasicMaterial,
@@ -40,6 +41,7 @@ interface Part {
   role?: string;
   color?: string;
   finish?: string;
+  pose?: { pitch: number; roll: number; motion: string; rate: number };
 }
 interface Generators {
   furnitureParts(parts: Part[], object: Furniture): void;
@@ -70,8 +72,9 @@ function recorder() {
       _anchor?: string,
       color?: string,
       finish?: string,
+      pose?: Part["pose"],
     ) {
-      target.push({ x, y, z, w, h, d, tint, batch, role, color, finish });
+      target.push({ x, y, z, w, h, d, tint, batch, role, color, finish, pose });
     },
     visual: () => ({ parts }),
     pools: new Proxy({} as Record<string, { set(): void }>, {
@@ -377,7 +380,10 @@ test("terminals, pickup markings and door frames keep different finishes on dist
   }
 });
 
-const crate: RunCustomObject = {
+type PoseKeys = "pitch" | "roll" | "motion" | "rate";
+const crateRecipe: Omit<RunCustomObject, "parts"> & {
+  parts: Omit<RunCustomObject["parts"][number], PoseKeys>[];
+} = {
   id: "cryo-pod",
   name: "Cryo pod",
   role: "bed",
@@ -483,7 +489,21 @@ const crate: RunCustomObject = {
       color: "#cccccc",
       finish: "matte",
     },
-  ].filter((p) => p.w > 0) as RunCustomObject["parts"],
+  ].filter((p) => p.w > 0) as Omit<
+    RunCustomObject["parts"][number],
+    PoseKeys
+  >[],
+};
+// A parsed design always carries a neutral pose on every part.
+const crate: RunCustomObject = {
+  ...crateRecipe,
+  parts: crateRecipe.parts.map((part) => ({
+    pitch: 0,
+    roll: 0,
+    motion: "none" as const,
+    rate: 1,
+    ...part,
+  })),
 };
 function customObject(health: number): Furniture {
   return {
@@ -672,6 +692,10 @@ test("wedge and torus parts keep their axis in the instance pool key", () => {
         w: 1,
         d: 0.8,
         h: 0.5,
+        pitch: 0,
+        roll: 0,
+        motion: "none",
+        rate: 1,
         color: "#445566",
         finish: "matte",
       },
@@ -684,6 +708,10 @@ test("wedge and torus parts keep their axis in the instance pool key", () => {
         w: 0.8,
         d: 0.2,
         h: 0.8,
+        pitch: 0,
+        roll: 0,
+        motion: "none",
+        rate: 1,
         color: "#667788",
         finish: "glow",
       },
@@ -756,4 +784,170 @@ test("a station without a terminal setting keeps today's desk and monitor parts"
     ],
   );
   assert.ok(parts.every((p) => p.color === undefined));
+});
+
+const posed = (over: Record<string, unknown>) =>
+  ({
+    shape: "box",
+    axis: "up",
+    x: 0,
+    y: 0,
+    z: 0,
+    w: 0.5,
+    d: 0.2,
+    h: 0.5,
+    color: "#aa8844",
+    finish: "matte",
+    pitch: 0,
+    roll: 0,
+    motion: "none",
+    rate: 1,
+    ...over,
+  }) as RunCustomObject["parts"][number];
+
+function posedFurniture(parts: RunCustomObject["parts"]): Furniture {
+  const object: RunCustomObject = {
+    id: "mill",
+    name: "Mill",
+    role: "decor",
+    weight: "heavy",
+    size: { w: 1.2, d: 1.2, h: 2 },
+    surface: false,
+    parts,
+  };
+  return {
+    kind: "custom",
+    object,
+    w: 1.2,
+    h: 1.2,
+    x: 5,
+    y: 5,
+    angle: 0,
+    floor: 0,
+    hp: 100,
+    maxHp: 100,
+    destroyed: false,
+  } as unknown as Furniture;
+}
+
+/** Runs the real furniture() draw path against recording pools. */
+function rendering(object: Furniture) {
+  const proto = FirstPersonView.prototype as any,
+    sets: unknown[][] = [];
+  let next = 0;
+  const view: any = {
+    frame: 1,
+    visuals: new Map(),
+    run: undefined,
+    tint: new Color(),
+    animationTime: 0,
+    animationCalm: false,
+    motionPose: { yaw: 0, lift: 0, glow: 1 },
+    release() {},
+    visual: proto.visual,
+    part: proto.part,
+    furnitureParts: proto.furnitureParts,
+    motionOf: proto.motionOf,
+    pool: () => ({ allocate: () => next++ }),
+    pools: new Proxy(
+      {},
+      {
+        get: () => ({
+          set(slot: number, ...args: unknown[]) {
+            sets[slot] = args.map((a) =>
+              a instanceof Color ? a.clone() : a,
+            ) as never;
+          },
+        }),
+      },
+    ),
+    color: () => new Color("#888888"),
+  };
+  const palette = {} as never,
+    actor = { x: 5, y: 5 } as never;
+  return {
+    at(time: number, calm = false) {
+      view.animationTime = time;
+      view.animationCalm = calm;
+      proto.furniture.call(view, object, actor, palette);
+      return sets.map((a) => [...a]);
+    },
+  };
+}
+
+test("tilted composed parts carry a pose and level still parts carry none", () => {
+  const { view, parts } = recorder();
+  generators.furnitureParts.call(
+    view,
+    parts,
+    posedFurniture([
+      posed({ z: 0 }),
+      posed({ pitch: 30, roll: -10, z: 0.6 }),
+      posed({ motion: "spin", rate: 2, z: 1.2 }),
+    ]),
+  );
+  const custom = parts.filter((p) => p.color);
+  assert.equal(custom[0].pose, undefined);
+  assert.ok(Math.abs(custom[1].pose!.pitch - (30 * Math.PI) / 180) < 1e-9);
+  assert.ok(Math.abs(custom[1].pose!.roll + (10 * Math.PI) / 180) < 1e-9);
+  assert.equal(custom[2].pose!.motion, "spin");
+  assert.equal(custom[2].pose!.rate, 2);
+});
+
+test("animated parts move between two times while static parts keep one pose", () => {
+  const draw = rendering(
+    posedFurniture([
+      posed({ z: 0 }),
+      posed({ z: 0.6, motion: "spin", rate: 1, w: 0.6, d: 0.1 }),
+      posed({ z: 1.2, motion: "bob", rate: 1 }),
+      posed({ z: 1.6, motion: "sway", rate: 1 }),
+    ]),
+  );
+  const a = draw.at(0.1),
+    b = draw.at(0.31);
+  assert.deepEqual(a[0], b[0], "the still part is unchanged");
+  assert.notDeepEqual(a[1], b[1], "the spinner turns");
+  assert.notDeepEqual(a[2], b[2], "the bobber rises");
+  assert.notDeepEqual(a[3], b[3], "the swayer rocks");
+  // [x, y, z, w, h, d, angle, colour, lean, rotationX, rollOuter]
+  assert.equal(a[2][0], b[2][0]);
+  assert.equal(a[2][2], b[2][2]);
+  assert.ok(Math.abs((b[2][1] as number) - (a[2][1] as number)) <= 0.06 + 1e-9);
+  const sway = [a[3][6] as number, b[3][6] as number];
+  for (const angle of sway)
+    assert.ok(Math.abs(angle) <= (12 * Math.PI) / 180 + 1e-9);
+});
+
+test("a tilted part is posed with pitch and roll outside its own centre", () => {
+  const draw = rendering(
+    posedFurniture([posed({ z: 0, pitch: 25, roll: 15 })]),
+  );
+  const [pose] = draw.at(0);
+  assert.ok(Math.abs((pose[9] as number) - (25 * Math.PI) / 180) < 1e-9);
+  assert.ok(Math.abs((pose[8] as number) + (15 * Math.PI) / 180) < 1e-9);
+  assert.equal(pose[10], true);
+  assert.deepEqual(draw.at(7)[0], pose, "a still tilt never changes");
+});
+
+test("pulse changes only the brightness of a glow part and flicker calms", () => {
+  const draw = rendering(
+    posedFurniture([
+      posed({ z: 0, finish: "glow", motion: "pulse", rate: 1 }),
+      posed({ z: 0.7, finish: "glow", motion: "flicker", rate: 3 }),
+    ]),
+  );
+  const seen = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7].map((t) => draw.at(t));
+  for (const frame of seen) {
+    assert.deepEqual(frame[0].slice(0, 7), seen[0][0].slice(0, 7));
+    assert.deepEqual(frame[1].slice(0, 7), seen[0][1].slice(0, 7));
+  }
+  const brightness = (frame: unknown[][], i: number) =>
+    (frame[i][7] as Color).r;
+  assert.ok(new Set(seen.map((f) => brightness(f, 0))).size > 3);
+  assert.ok(new Set(seen.map((f) => brightness(f, 1))).size > 1);
+  const pulse = seen.map((f) => brightness(f, 0)),
+    top = Math.max(...pulse);
+  for (const level of pulse) assert.ok(level / top >= 0.55 - 1e-6);
+  const calm = [0, 0.1, 0.2, 0.3].map((t) => draw.at(t, true));
+  assert.equal(new Set(calm.map((f) => brightness(f, 1))).size, 1);
 });

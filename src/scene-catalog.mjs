@@ -133,9 +133,11 @@ export function parseSceneDesign(
   path = "scene",
   structural = false,
   objects = [],
+  props = [],
 ) {
-  // A design's own composed objects are placeable by their id.
-  const custom = new Map(objects.map((o) => [o.id, o]));
+  // A design's own composed objects and props are placeable by their id.
+  const custom = new Map(objects.map((o) => [o.id, o])),
+    customProps = new Set(props.map((o) => o.id));
   object(value, ["version", "rooms"], path);
   fail(
     value.version === (structural ? 2 : 1),
@@ -242,7 +244,10 @@ export function parseSceneDesign(
           r,
         );
         id(prop.id, `${r}.id`);
-        choice(prop.kind, Object.keys(PROP_CATALOG), `${r}.kind`);
+        fail(
+          Object.hasOwn(PROP_CATALOG, prop.kind) || customProps.has(prop.kind),
+          `${r}.kind must be one of ${Object.keys(PROP_CATALOG).join(", ")} or an id from setting.props`,
+        );
         position(prop.at, -1, `${r}.at`);
         number(prop.angle, -180, 180, `${r}.angle`);
         number(prop.scale, 0.65, 1.25, `${r}.scale`);
@@ -275,6 +280,7 @@ export function parseSceneStructure(
   rosterNames,
   path = "scene",
   objects = [],
+  props = [],
 ) {
-  return parseSceneDesign(value, rosterNames, path, true, objects);
+  return parseSceneDesign(value, rosterNames, path, true, objects, props);
 }

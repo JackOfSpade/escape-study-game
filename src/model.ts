@@ -463,6 +463,9 @@ export interface Floor {
     sectors?: Sector[];
     /** Version 5 plan family chosen for this floor. */
     family?: "stack" | "columns" | "serpentine";
+    /** Corners carved by floors[].roomShapes: solid tiles drawn as one smooth
+     * chamfer or curve. Absent on undesigned floors and older saves. */
+    corners?: import("./room-shapes").CarvedCorner[];
   };
   index: number;
   tiles: number[][];

@@ -44,7 +44,7 @@ export class InstancePool {
     this.mesh.frustumCulled = false;
     this.mesh.castShadow = shadow;
     this.mesh.receiveShadow = shadow;
-    this.poses = new Float64Array(capacity * 9);
+    this.poses = new Float64Array(capacity * 10);
     this.shown = new Uint8Array(capacity);
     scene.add(this.mesh);
   }
@@ -89,8 +89,9 @@ export class InstancePool {
     color: Color | string,
     lean = 0,
     rotationX = 0,
+    rollOuter = false,
   ) {
-    const offset = slot * 9,
+    const offset = slot * 10,
       poses = this.poses;
     if (
       !this.shown[slot] ||
@@ -102,7 +103,8 @@ export class InstancePool {
       poses[offset + 5] !== d ||
       poses[offset + 6] !== angle ||
       poses[offset + 7] !== lean ||
-      poses[offset + 8] !== rotationX
+      poses[offset + 8] !== rotationX ||
+      poses[offset + 9] !== (rollOuter ? 1 : 0)
     ) {
       this.shown[slot] = 1;
       poses[offset] = x;
@@ -114,10 +116,18 @@ export class InstancePool {
       poses[offset + 6] = angle;
       poses[offset + 7] = lean;
       poses[offset + 8] = rotationX;
+      poses[offset + 9] = rollOuter ? 1 : 0;
       this.transform.position.set(x, y, z);
       // Yaw surrounds the local limb rotations, so a forward swing follows
       // the person's facing at every heading on the floor.
-      this.transform.rotation.set(rotationX, -angle, lean, "YXZ");
+      // A composed part tips by pitch, then roll, then turns with the object:
+      // yaw outside roll outside pitch ("YZX"), the order partReach assumes.
+      this.transform.rotation.set(
+        rotationX,
+        -angle,
+        lean,
+        rollOuter ? "YZX" : "YXZ",
+      );
       this.transform.scale.set(w, h, d);
       this.transform.updateMatrix();
       this.mesh.setMatrixAt(slot, this.transform.matrix);

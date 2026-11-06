@@ -341,7 +341,8 @@
               ]
             }
           ]
-        }
+        },
+        "roomShapes": ["octagon", "rounded", "rect", "chamfered"]
       },
       {
         "name": "CREW DECK",
@@ -399,8 +400,8 @@
                       "owner": "Esme"
                     },
                     {
-                      "id": "r0-0-book-1",
-                      "kind": "book",
+                      "id": "r0-0-ration-tin-1",
+                      "kind": "ration-tin",
                       "at": {
                         "x": 0.55,
                         "y": -0.3
@@ -550,10 +551,24 @@
                   "owner": "Paz",
                   "props": [
                     {
-                      "id": "r1-2-note-0",
-                      "kind": "note",
+                      "id": "r1-2-sample-vial-0",
+                      "kind": "sample-vial",
                       "at": {
                         "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Paz"
+                    },
+                    {
+                      "id": "r1-2-note-1",
+                      "kind": "note",
+                      "at": {
+                        "x": 0.55,
                         "y": -0.3
                       },
                       "angle": 0,
@@ -706,7 +721,8 @@
               ]
             }
           ]
-        }
+        },
+        "roomShapes": ["rounded", "chamfered", "octagon", "rect"]
       },
       {
         "name": "SCIENCE DECK",
@@ -846,8 +862,8 @@
                       "owner": "Luz"
                     },
                     {
-                      "id": "r1-0-book-1",
-                      "kind": "book",
+                      "id": "r1-0-ration-tin-1",
+                      "kind": "ration-tin",
                       "at": {
                         "x": 0.55,
                         "y": -0.3
@@ -1066,10 +1082,24 @@
                   "owner": "Mei",
                   "props": [
                     {
-                      "id": "r3-2-note-0",
-                      "kind": "note",
+                      "id": "r3-2-sample-vial-0",
+                      "kind": "sample-vial",
                       "at": {
                         "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Mei"
+                    },
+                    {
+                      "id": "r3-2-note-1",
+                      "kind": "note",
+                      "at": {
+                        "x": 0.55,
                         "y": -0.3
                       },
                       "angle": 0,
@@ -1084,7 +1114,8 @@
               ]
             }
           ]
-        }
+        },
+        "roomShapes": ["chamfered", "rect", "rounded", "octagon"]
       },
       {
         "name": "COMMAND DECK",
@@ -1197,10 +1228,24 @@
                   "owner": "Jules",
                   "props": [
                     {
-                      "id": "r0-2-note-0",
-                      "kind": "note",
+                      "id": "r0-2-sample-vial-0",
+                      "kind": "sample-vial",
                       "at": {
                         "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Jules"
+                    },
+                    {
+                      "id": "r0-2-note-1",
+                      "kind": "note",
+                      "at": {
+                        "x": 0.55,
                         "y": -0.3
                       },
                       "angle": 0,
@@ -1404,8 +1449,8 @@
                       "owner": "Sol"
                     },
                     {
-                      "id": "r3-0-book-1",
-                      "kind": "book",
+                      "id": "r3-0-ration-tin-1",
+                      "kind": "ration-tin",
                       "at": {
                         "x": 0.55,
                         "y": -0.3
@@ -1462,7 +1507,8 @@
               ]
             }
           ]
-        }
+        },
+        "roomShapes": ["rect", "octagon", "chamfered", "rounded"]
       }
     ],
     "roofName": "ASCENT PAD",
@@ -1612,7 +1658,7 @@
     },
     "exterior": {
       "buildingName": "ARES HABITAT 4",
-      "buildingSubtitle": "HYDROPONICS \u2022 SCIENCE \u2022 COMMAND",
+      "buildingSubtitle": "HYDROPONICS • SCIENCE • COMMAND",
       "quarantineTitle": "DECK SEAL ACTIVE",
       "quarantineSubtitle": "AWAIT ASCENT SHUTTLE",
       "skyline": {
@@ -1727,6 +1773,10 @@
               "w": 0.9,
               "d": 0.9,
               "h": 0.25,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#3a4048",
               "finish": "metal"
             },
@@ -1739,6 +1789,10 @@
               "w": 0.78,
               "d": 0.78,
               "h": 1.55,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#9fd8ff",
               "finish": "glass"
             },
@@ -1751,6 +1805,10 @@
               "w": 0.4,
               "d": 0.4,
               "h": 1.2,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#cfe6f2",
               "finish": "matte"
             },
@@ -1763,6 +1821,10 @@
               "w": 0.86,
               "d": 0.86,
               "h": 0.3,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#3a4048",
               "finish": "metal"
             },
@@ -1775,6 +1837,10 @@
               "w": 0.32,
               "d": 0.05,
               "h": 0.14,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "pulse",
+              "rate": 0.5,
               "color": "#56f0c8",
               "finish": "glow"
             },
@@ -1787,6 +1853,10 @@
               "w": 0.08,
               "d": 0.08,
               "h": 1.55,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#2a2f36",
               "finish": "metal"
             }
@@ -1813,6 +1883,10 @@
               "w": 1.4,
               "d": 0.8,
               "h": 0.85,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#4b525c",
               "finish": "metal"
             },
@@ -1825,6 +1899,10 @@
               "w": 1.4,
               "d": 0.2,
               "h": 0.45,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#2c3138",
               "finish": "matte"
             },
@@ -1837,6 +1915,10 @@
               "w": 1.1,
               "d": 0.04,
               "h": 0.3,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#ff9b3d",
               "finish": "glow"
             },
@@ -1849,6 +1931,10 @@
               "w": 0.12,
               "d": 0.12,
               "h": 0.02,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#ff3b30",
               "finish": "glow"
             }
@@ -1875,6 +1961,10 @@
               "w": 0.06,
               "d": 0.6,
               "h": 1.9,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#d9dde2",
               "finish": "metal"
             },
@@ -1887,6 +1977,10 @@
               "w": 0.06,
               "d": 0.6,
               "h": 1.9,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#d9dde2",
               "finish": "metal"
             },
@@ -1899,6 +1993,10 @@
               "w": 1.48,
               "d": 0.56,
               "h": 0.06,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#e7ecef",
               "finish": "matte"
             },
@@ -1911,6 +2009,10 @@
               "w": 1.4,
               "d": 0.5,
               "h": 0.22,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#4fae5a",
               "finish": "matte"
             },
@@ -1923,6 +2025,10 @@
               "w": 1.48,
               "d": 0.56,
               "h": 0.06,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#e7ecef",
               "finish": "matte"
             },
@@ -1935,6 +2041,10 @@
               "w": 1.4,
               "d": 0.5,
               "h": 0.26,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#62c46b",
               "finish": "matte"
             },
@@ -1947,6 +2057,10 @@
               "w": 1.48,
               "d": 0.5,
               "h": 0.06,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "pulse",
+              "rate": 0.3,
               "color": "#c47cff",
               "finish": "glow"
             }
@@ -1973,6 +2087,10 @@
               "w": 0.6,
               "d": 0.6,
               "h": 1.4,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#e9edf0",
               "finish": "metal"
             },
@@ -1985,6 +2103,10 @@
               "w": 0.6,
               "d": 0.6,
               "h": 0.2,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#e9edf0",
               "finish": "metal"
             },
@@ -1997,6 +2119,10 @@
               "w": 0.12,
               "d": 0.12,
               "h": 0.15,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#2f6fd6",
               "finish": "metal"
             },
@@ -2009,6 +2135,10 @@
               "w": 0.08,
               "d": 0.04,
               "h": 0.08,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#7dff8a",
               "finish": "glow"
             }
@@ -2035,6 +2165,10 @@
               "w": 1,
               "d": 0.6,
               "h": 2.1,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#b85c38",
               "finish": "metal"
             },
@@ -2047,6 +2181,10 @@
               "w": 0.86,
               "d": 0.02,
               "h": 1.7,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#9fd8ff",
               "finish": "glass"
             },
@@ -2059,6 +2197,10 @@
               "w": 0.36,
               "d": 0.3,
               "h": 0.45,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#f2f2ee",
               "finish": "matte"
             },
@@ -2071,6 +2213,10 @@
               "w": 0.5,
               "d": 0.3,
               "h": 0.9,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#f2f2ee",
               "finish": "matte"
             }
@@ -2097,6 +2243,10 @@
               "w": 1.8,
               "d": 0.9,
               "h": 0.74,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#5a6470",
               "finish": "metal"
             },
@@ -2109,6 +2259,10 @@
               "w": 1.6,
               "d": 0.1,
               "h": 0.5,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#20252b",
               "finish": "matte"
             },
@@ -2121,6 +2275,10 @@
               "w": 0.6,
               "d": 0.02,
               "h": 0.36,
+              "pitch": -15,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#4fd1ff",
               "finish": "glow"
             },
@@ -2133,6 +2291,10 @@
               "w": 0.6,
               "d": 0.02,
               "h": 0.36,
+              "pitch": -15,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#4fd1ff",
               "finish": "glow"
             }
@@ -2159,6 +2321,10 @@
               "w": 0.2,
               "d": 0.6,
               "h": 0.7,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#8a9099",
               "finish": "metal"
             },
@@ -2171,6 +2337,10 @@
               "w": 2,
               "d": 1,
               "h": 0.06,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#e3e6e8",
               "finish": "matte"
             }
@@ -2197,6 +2367,10 @@
               "w": 2.1,
               "d": 1,
               "h": 0.45,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#d4d8dc",
               "finish": "matte"
             },
@@ -2209,6 +2383,10 @@
               "w": 1.9,
               "d": 0.9,
               "h": 0.15,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#3d6fb0",
               "finish": "matte"
             },
@@ -2221,6 +2399,10 @@
               "w": 2.1,
               "d": 1,
               "h": 0.5,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#c7ecff",
               "finish": "glass"
             },
@@ -2233,6 +2415,10 @@
               "w": 0.1,
               "d": 0.04,
               "h": 0.06,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#ffd65a",
               "finish": "glow"
             }
@@ -2259,6 +2445,10 @@
               "w": 1.2,
               "d": 0.8,
               "h": 0.95,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#e8eef2",
               "finish": "metal"
             },
@@ -2271,6 +2461,10 @@
               "w": 0.9,
               "d": 0.03,
               "h": 0.12,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#7fe3ff",
               "finish": "glow"
             },
@@ -2283,6 +2477,10 @@
               "w": 1.2,
               "d": 0.8,
               "h": 0.05,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#b9c3cc",
               "finish": "metal"
             }
@@ -2309,6 +2507,10 @@
               "w": 0.5,
               "d": 0.5,
               "h": 0.1,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#3a3a3a",
               "finish": "metal"
             },
@@ -2321,6 +2523,10 @@
               "w": 0.18,
               "d": 0.18,
               "h": 0.7,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
               "color": "#9a9fa6",
               "finish": "metal"
             },
@@ -2333,6 +2539,10 @@
               "w": 0.3,
               "d": 0.3,
               "h": 0.4,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "spin",
+              "rate": 0.4,
               "color": "#c96b2c",
               "finish": "metal"
             }
@@ -2340,6 +2550,111 @@
           "role": "decor"
         }
       ],
+      "props": [
+        {
+          "id": "ration-tin",
+          "name": "Ration tin",
+          "size": {
+            "w": 0.2,
+            "d": 0.2,
+            "h": 0.13
+          },
+          "parts": [
+            {
+              "shape": "cylinder",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "w": 0.2,
+              "d": 0.2,
+              "h": 0.1,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#b8bcc2",
+              "finish": "metal"
+            },
+            {
+              "shape": "cylinder",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0.1,
+              "w": 0.21,
+              "d": 0.21,
+              "h": 0.025,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#ff9b3d",
+              "finish": "metal"
+            }
+          ]
+        },
+        {
+          "id": "sample-vial",
+          "name": "Sample vial",
+          "size": {
+            "w": 0.08,
+            "d": 0.08,
+            "h": 0.2
+          },
+          "parts": [
+            {
+              "shape": "cylinder",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "w": 0.08,
+              "d": 0.08,
+              "h": 0.15,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#9fd8ff",
+              "finish": "glass"
+            },
+            {
+              "shape": "cylinder",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0.15,
+              "w": 0.06,
+              "d": 0.06,
+              "h": 0.04,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#7fe3ff",
+              "finish": "glow"
+            }
+          ]
+        }
+      ],
+      "surroundings": {
+        "ground": "regolith",
+        "groundColor": "#8a4a32",
+        "pathColor": "#6e3a28",
+        "sky": {
+          "zenith": "#2a1410",
+          "horizon": "#c27a4a"
+        },
+        "fog": {
+          "color": "#b8673f",
+          "density": 0.45
+        },
+        "neighbors": "rocks",
+        "neighborColor": "#7a3b26",
+        "weather": "dust",
+        "scenery": ["oxygen-tank"]
+      },
       "filler": {
         "reception": ["airlock-console", "suit-locker", "cryo-pod"],
         "break": ["bunk-pod", "cafeTable", "chair", "oxygen-tank"],
@@ -2351,7 +2666,7 @@
     },
     "environment": {
       "version": 1,
-      "surfaceFingerprint": "7496fe676076bfe5",
+      "surfaceFingerprint": "73bca201d8e03fbf",
       "surfaces": [
         {
           "id": "building:entrance-sign",
@@ -2370,7 +2685,7 @@
             "yaw": 0,
             "pitch": 0
           },
-          "context": "AIRLOCK & HYDROPONICS.  ARES HABITAT 4. HYDROPONICS \u2022 SCIENCE \u2022 COMMAND",
+          "context": "AIRLOCK & HYDROPONICS.  ARES HABITAT 4. HYDROPONICS • SCIENCE • COMMAND",
           "maxTitle": 48,
           "maxBody": 100,
           "allowsArt": true
@@ -4204,98 +4519,6 @@
           "allowsArt": true
         },
         {
-          "id": "f0-lobby-break2-cafeTable0:papers",
-          "floor": 0,
-          "scope": "interior",
-          "role": "desk-papers",
-          "room": null,
-          "owner": null,
-          "binding": {
-            "kind": "furniture",
-            "furnitureId": "f0-lobby-break2-cafeTable0",
-            "x": -0.186,
-            "y": -0.15300000000000002,
-            "z": 0.8285,
-            "width": 0.2375,
-            "height": 0.27549999999999997,
-            "yaw": 0,
-            "pitch": -1.5707963267948966
-          },
-          "context": "AIRLOCK & HYDROPONICS.  Top sheet of this desk's paper stack.",
-          "maxTitle": 28,
-          "maxBody": 100,
-          "allowsArt": true
-        },
-        {
-          "id": "f0-room1-break1-cafeTable0:note",
-          "floor": 0,
-          "scope": "interior",
-          "role": "desk-note",
-          "room": 1,
-          "owner": "Cal",
-          "binding": {
-            "kind": "furniture",
-            "furnitureId": "f0-room1-break1-cafeTable0",
-            "x": -0.198,
-            "y": -0.1652,
-            "z": 0.8380000000000001,
-            "width": 0.205,
-            "height": 0.23779999999999996,
-            "yaw": 0,
-            "pitch": -1.5707963267948966
-          },
-          "context": "AIRLOCK & HYDROPONICS. Crew Quarters Personal note on this desk's paper stack.",
-          "maxTitle": 28,
-          "maxBody": 100,
-          "allowsArt": true
-        },
-        {
-          "id": "f0-room1-break1-cafeTable0:photo",
-          "floor": 0,
-          "scope": "interior",
-          "role": "desk-photo",
-          "room": 1,
-          "owner": "Cal",
-          "binding": {
-            "kind": "furniture",
-            "furnitureId": "f0-room1-break1-cafeTable0",
-            "x": 0.198,
-            "y": -0.1565,
-            "z": 0.93,
-            "width": 0.136,
-            "height": 0.176,
-            "yaw": 0,
-            "pitch": 0
-          },
-          "context": "AIRLOCK & HYDROPONICS. Crew Quarters Framed desk photograph. Illustrate the people or scene; any caption belongs to this frame.",
-          "maxTitle": 24,
-          "maxBody": 60,
-          "allowsArt": true
-        },
-        {
-          "id": "f0-room1-break2-cafeTable0:papers",
-          "floor": 0,
-          "scope": "interior",
-          "role": "desk-papers",
-          "room": 1,
-          "owner": "Cal",
-          "binding": {
-            "kind": "furniture",
-            "furnitureId": "f0-room1-break2-cafeTable0",
-            "x": -0.186,
-            "y": -0.15300000000000002,
-            "z": 0.8285,
-            "width": 0.2375,
-            "height": 0.27549999999999997,
-            "yaw": 0,
-            "pitch": -1.5707963267948966
-          },
-          "context": "AIRLOCK & HYDROPONICS. Crew Quarters Top sheet of this desk's paper stack.",
-          "maxTitle": 28,
-          "maxBody": 100,
-          "allowsArt": true
-        },
-        {
           "id": "f0-scene-room0-r0-airlock-console-0-r0-0-papers-0:face",
           "floor": 0,
           "scope": "interior",
@@ -4836,7 +5059,7 @@
           "owner": "Cal",
           "binding": {
             "kind": "fixed",
-            "x": 14.5,
+            "x": 15.5,
             "y": 7.014,
             "z": 1.65,
             "width": 1.12,
@@ -4916,7 +5139,7 @@
           "allowsArt": true
         },
         {
-          "id": "f0:wall:12:6:0:1",
+          "id": "f0:wall:12:7:0:1",
           "floor": 0,
           "scope": "interior",
           "role": "wall-poster",
@@ -4925,7 +5148,7 @@
           "binding": {
             "kind": "fixed",
             "x": 12.5,
-            "y": 7.014,
+            "y": 8.014,
             "z": 1.69,
             "width": 0.62,
             "height": 0.86,
@@ -4933,28 +5156,6 @@
             "pitch": 0
           },
           "context": "AIRLOCK & HYDROPONICS. Airlock Antechamber Printed wall poster; every poster is a separate object.",
-          "maxTitle": 48,
-          "maxBody": 160,
-          "allowsArt": true
-        },
-        {
-          "id": "f0:wall:17:6:0:1",
-          "floor": 0,
-          "scope": "interior",
-          "role": "wall-poster",
-          "room": 1,
-          "owner": "Cal",
-          "binding": {
-            "kind": "fixed",
-            "x": 17.5,
-            "y": 7.014,
-            "z": 1.69,
-            "width": 0.62,
-            "height": 0.86,
-            "yaw": 0,
-            "pitch": 0
-          },
-          "context": "AIRLOCK & HYDROPONICS. Crew Quarters Printed wall poster; every poster is a separate object.",
           "maxTitle": 48,
           "maxBody": 160,
           "allowsArt": true
@@ -5087,6 +5288,28 @@
             "pitch": 0
           },
           "context": "AIRLOCK & HYDROPONICS.  Printed wall poster; every poster is a separate object.",
+          "maxTitle": 48,
+          "maxBody": 160,
+          "allowsArt": true
+        },
+        {
+          "id": "f0:wall:36:15:0:-1",
+          "floor": 0,
+          "scope": "interior",
+          "role": "wall-poster",
+          "room": 3,
+          "owner": "Dev",
+          "binding": {
+            "kind": "fixed",
+            "x": 36.5,
+            "y": 14.986,
+            "z": 1.69,
+            "width": 0.62,
+            "height": 0.86,
+            "yaw": -3.141592653589793,
+            "pitch": 0
+          },
+          "context": "AIRLOCK & HYDROPONICS. Core Sample Store Printed wall poster; every poster is a separate object.",
           "maxTitle": 48,
           "maxBody": 160,
           "allowsArt": true
@@ -5227,30 +5450,6 @@
           "allowsArt": true
         },
         {
-          "id": "f1-scene-room0-r0-mess-table-0-r0-0-book-1:face",
-          "floor": 1,
-          "scope": "interior",
-          "role": "prop-face",
-          "room": 0,
-          "owner": "Esme",
-          "binding": {
-            "kind": "prop",
-            "furnitureId": "f1-scene-room0-r0-mess-table-0",
-            "propId": "f1-scene-room0-r0-mess-table-0-r0-0-book-1",
-            "x": 0,
-            "y": 0,
-            "z": 0.03349,
-            "width": 0.14212,
-            "height": 0.18564000000000003,
-            "yaw": 0,
-            "pitch": -1.5707963267948966
-          },
-          "context": "CREW DECK. Mess Hall book face. intact condition. Give this individual object its own authored writing or illustration.",
-          "maxTitle": 28,
-          "maxBody": 100,
-          "allowsArt": true
-        },
-        {
           "id": "f1-scene-room0-r0-mess-table-0-r0-0-bottle-2:face",
           "floor": 1,
           "scope": "interior",
@@ -5294,6 +5493,30 @@
             "pitch": 0
           },
           "context": "CREW DECK. Mess Hall mug face. intact condition. Give this individual object its own authored writing or illustration.",
+          "maxTitle": 28,
+          "maxBody": 100,
+          "allowsArt": true
+        },
+        {
+          "id": "f1-scene-room0-r0-mess-table-0-r0-0-ration-tin-1:face",
+          "floor": 1,
+          "scope": "interior",
+          "role": "prop-face",
+          "room": 0,
+          "owner": "Esme",
+          "binding": {
+            "kind": "prop",
+            "furnitureId": "f1-scene-room0-r0-mess-table-0",
+            "propId": "f1-scene-room0-r0-mess-table-0-r0-0-ration-tin-1",
+            "x": 0,
+            "y": 0,
+            "z": 0.1125,
+            "width": 0.1292,
+            "height": 0.13260000000000002,
+            "yaw": 0,
+            "pitch": -1.5707963267948966
+          },
+          "context": "CREW DECK. Mess Hall Ration tin face. intact condition. Give this individual object its own authored writing or illustration.",
           "maxTitle": 28,
           "maxBody": 100,
           "allowsArt": true
@@ -5463,7 +5686,7 @@
           "allowsArt": true
         },
         {
-          "id": "f1-scene-room1-r1-sample-freezer-2-r1-2-note-0:face",
+          "id": "f1-scene-room1-r1-sample-freezer-2-r1-2-note-1:face",
           "floor": 1,
           "scope": "interior",
           "role": "prop-face",
@@ -5472,7 +5695,7 @@
           "binding": {
             "kind": "prop",
             "furnitureId": "f1-scene-room1-r1-sample-freezer-2",
-            "propId": "f1-scene-room1-r1-sample-freezer-2-r1-2-note-0",
+            "propId": "f1-scene-room1-r1-sample-freezer-2-r1-2-note-1",
             "x": 0,
             "y": 0,
             "z": 0.006698,
@@ -5482,6 +5705,30 @@
             "pitch": -1.5707963267948966
           },
           "context": "CREW DECK. Mission Control note face. intact condition. Give this individual object its own authored writing or illustration.",
+          "maxTitle": 28,
+          "maxBody": 100,
+          "allowsArt": true
+        },
+        {
+          "id": "f1-scene-room1-r1-sample-freezer-2-r1-2-sample-vial-0:face",
+          "floor": 1,
+          "scope": "interior",
+          "role": "prop-face",
+          "room": 1,
+          "owner": "Paz",
+          "binding": {
+            "kind": "prop",
+            "furnitureId": "f1-scene-room1-r1-sample-freezer-2",
+            "propId": "f1-scene-room1-r1-sample-freezer-2-r1-2-sample-vial-0",
+            "x": 0,
+            "y": 0,
+            "z": 0.17200000000000001,
+            "width": 0.051680000000000004,
+            "height": 0.053040000000000004,
+            "yaw": 0,
+            "pitch": -1.5707963267948966
+          },
+          "context": "CREW DECK. Mission Control Sample vial face. intact condition. Give this individual object its own authored writing or illustration.",
           "maxTitle": 28,
           "maxBody": 100,
           "allowsArt": true
@@ -5794,7 +6041,7 @@
           "owner": "Esme",
           "binding": {
             "kind": "fixed",
-            "x": 3.5,
+            "x": 4.5,
             "y": 7.014,
             "z": 1.65,
             "width": 1.12,
@@ -6230,6 +6477,29 @@
           "allowsArt": true
         },
         {
+          "id": "f2-lobby-break3-cafeTable0:papers",
+          "floor": 2,
+          "scope": "interior",
+          "role": "desk-papers",
+          "room": null,
+          "owner": null,
+          "binding": {
+            "kind": "furniture",
+            "furnitureId": "f2-lobby-break3-cafeTable0",
+            "x": -0.186,
+            "y": -0.15300000000000002,
+            "z": 0.8285,
+            "width": 0.2375,
+            "height": 0.27549999999999997,
+            "yaw": 0,
+            "pitch": -1.5707963267948966
+          },
+          "context": "SCIENCE DECK.  Top sheet of this desk's paper stack.",
+          "maxTitle": 28,
+          "maxBody": 100,
+          "allowsArt": true
+        },
+        {
           "id": "f2-scene-room0-r0-drill-bit-1:label",
           "floor": 2,
           "scope": "interior",
@@ -6370,30 +6640,6 @@
           "allowsArt": true
         },
         {
-          "id": "f2-scene-room1-r1-mess-table-0-r1-0-book-1:face",
-          "floor": 2,
-          "scope": "interior",
-          "role": "prop-face",
-          "room": 1,
-          "owner": "Luz",
-          "binding": {
-            "kind": "prop",
-            "furnitureId": "f2-scene-room1-r1-mess-table-0",
-            "propId": "f2-scene-room1-r1-mess-table-0-r1-0-book-1",
-            "x": 0,
-            "y": 0,
-            "z": 0.03349,
-            "width": 0.14212,
-            "height": 0.18564000000000003,
-            "yaw": 0,
-            "pitch": -1.5707963267948966
-          },
-          "context": "SCIENCE DECK. Mess Hall book face. intact condition. Give this individual object its own authored writing or illustration.",
-          "maxTitle": 28,
-          "maxBody": 100,
-          "allowsArt": true
-        },
-        {
           "id": "f2-scene-room1-r1-mess-table-0-r1-0-bottle-2:face",
           "floor": 2,
           "scope": "interior",
@@ -6437,6 +6683,30 @@
             "pitch": 0
           },
           "context": "SCIENCE DECK. Mess Hall mug face. intact condition. Give this individual object its own authored writing or illustration.",
+          "maxTitle": 28,
+          "maxBody": 100,
+          "allowsArt": true
+        },
+        {
+          "id": "f2-scene-room1-r1-mess-table-0-r1-0-ration-tin-1:face",
+          "floor": 2,
+          "scope": "interior",
+          "role": "prop-face",
+          "room": 1,
+          "owner": "Luz",
+          "binding": {
+            "kind": "prop",
+            "furnitureId": "f2-scene-room1-r1-mess-table-0",
+            "propId": "f2-scene-room1-r1-mess-table-0-r1-0-ration-tin-1",
+            "x": 0,
+            "y": 0,
+            "z": 0.1125,
+            "width": 0.1292,
+            "height": 0.13260000000000002,
+            "yaw": 0,
+            "pitch": -1.5707963267948966
+          },
+          "context": "SCIENCE DECK. Mess Hall Ration tin face. intact condition. Give this individual object its own authored writing or illustration.",
           "maxTitle": 28,
           "maxBody": 100,
           "allowsArt": true
@@ -6700,7 +6970,7 @@
           "allowsArt": true
         },
         {
-          "id": "f2-scene-room3-r3-sample-freezer-2-r3-2-note-0:face",
+          "id": "f2-scene-room3-r3-sample-freezer-2-r3-2-note-1:face",
           "floor": 2,
           "scope": "interior",
           "role": "prop-face",
@@ -6709,7 +6979,7 @@
           "binding": {
             "kind": "prop",
             "furnitureId": "f2-scene-room3-r3-sample-freezer-2",
-            "propId": "f2-scene-room3-r3-sample-freezer-2-r3-2-note-0",
+            "propId": "f2-scene-room3-r3-sample-freezer-2-r3-2-note-1",
             "x": 0,
             "y": 0,
             "z": 0.006698,
@@ -6719,6 +6989,30 @@
             "pitch": -1.5707963267948966
           },
           "context": "SCIENCE DECK. Mission Control note face. intact condition. Give this individual object its own authored writing or illustration.",
+          "maxTitle": 28,
+          "maxBody": 100,
+          "allowsArt": true
+        },
+        {
+          "id": "f2-scene-room3-r3-sample-freezer-2-r3-2-sample-vial-0:face",
+          "floor": 2,
+          "scope": "interior",
+          "role": "prop-face",
+          "room": 3,
+          "owner": "Mei",
+          "binding": {
+            "kind": "prop",
+            "furnitureId": "f2-scene-room3-r3-sample-freezer-2",
+            "propId": "f2-scene-room3-r3-sample-freezer-2-r3-2-sample-vial-0",
+            "x": 0,
+            "y": 0,
+            "z": 0.17200000000000001,
+            "width": 0.051680000000000004,
+            "height": 0.053040000000000004,
+            "yaw": 0,
+            "pitch": -1.5707963267948966
+          },
+          "context": "SCIENCE DECK. Mission Control Sample vial face. intact condition. Give this individual object its own authored writing or illustration.",
           "maxTitle": 28,
           "maxBody": 100,
           "allowsArt": true
@@ -6843,7 +7137,7 @@
           "owner": "Ellis",
           "binding": {
             "kind": "fixed",
-            "x": 3.5,
+            "x": 4.5,
             "y": 8.014,
             "z": 1.65,
             "width": 1.12,
@@ -6887,7 +7181,7 @@
           "owner": "Ren",
           "binding": {
             "kind": "fixed",
-            "x": 3.5,
+            "x": 7.5,
             "y": 20.014,
             "z": 1.65,
             "width": 1.12,
@@ -7077,6 +7371,28 @@
           "allowsArt": true
         },
         {
+          "id": "f2:wall:3:10:1:0",
+          "floor": 2,
+          "scope": "interior",
+          "role": "wall-poster",
+          "room": 0,
+          "owner": "Ellis",
+          "binding": {
+            "kind": "fixed",
+            "x": 4.014,
+            "y": 10.5,
+            "z": 1.69,
+            "width": 0.62,
+            "height": 0.86,
+            "yaw": -1.5707963267948966,
+            "pitch": 0
+          },
+          "context": "SCIENCE DECK. Core Sample Store Printed wall poster; every poster is a separate object.",
+          "maxTitle": 48,
+          "maxBody": 160,
+          "allowsArt": true
+        },
+        {
           "id": "f2:wall:3:19:0:-1",
           "floor": 2,
           "scope": "interior",
@@ -7138,28 +7454,6 @@
             "pitch": 0
           },
           "context": "SCIENCE DECK.  Printed wall poster; every poster is a separate object.",
-          "maxTitle": 48,
-          "maxBody": 160,
-          "allowsArt": true
-        },
-        {
-          "id": "f2:wall:40:11:0:1",
-          "floor": 2,
-          "scope": "interior",
-          "role": "wall-poster",
-          "room": 3,
-          "owner": "Ada",
-          "binding": {
-            "kind": "fixed",
-            "x": 40.5,
-            "y": 12.014,
-            "z": 1.69,
-            "width": 0.62,
-            "height": 0.86,
-            "yaw": 0,
-            "pitch": 0
-          },
-          "context": "SCIENCE DECK. Mission Control Printed wall poster; every poster is a separate object.",
           "maxTitle": 48,
           "maxBody": 160,
           "allowsArt": true
@@ -7325,52 +7619,6 @@
           "allowsArt": true
         },
         {
-          "id": "f3-room2-cubicles4-desk0:papers",
-          "floor": 3,
-          "scope": "interior",
-          "role": "desk-papers",
-          "room": 2,
-          "owner": "Jules",
-          "binding": {
-            "kind": "furniture",
-            "furnitureId": "f3-room2-cubicles4-desk0",
-            "x": -0.47200000000000003,
-            "y": -0.17200000000000001,
-            "z": 0.8685,
-            "width": 0.2375,
-            "height": 0.27549999999999997,
-            "yaw": 0,
-            "pitch": -1.5707963267948966
-          },
-          "context": "COMMAND DECK. Hydroponics Bay Top sheet of this desk's paper stack.",
-          "maxTitle": 28,
-          "maxBody": 100,
-          "allowsArt": true
-        },
-        {
-          "id": "f3-room2-cubicles4-desk0:photo",
-          "floor": 3,
-          "scope": "interior",
-          "role": "desk-photo",
-          "room": 2,
-          "owner": "Jules",
-          "binding": {
-            "kind": "furniture",
-            "furnitureId": "f3-room2-cubicles4-desk0",
-            "x": 0.48400000000000004,
-            "y": -0.1755,
-            "z": 0.9700000000000001,
-            "width": 0.136,
-            "height": 0.176,
-            "yaw": 0,
-            "pitch": 0
-          },
-          "context": "COMMAND DECK. Hydroponics Bay Framed desk photograph. Illustrate the people or scene; any caption belongs to this frame.",
-          "maxTitle": 24,
-          "maxBody": 60,
-          "allowsArt": true
-        },
-        {
           "id": "f3-scene-room0-r0-comms-desk-0-r0-0-headphones-2:face",
           "floor": 3,
           "scope": "interior",
@@ -7489,7 +7737,7 @@
           "allowsArt": true
         },
         {
-          "id": "f3-scene-room0-r0-sample-freezer-2-r0-2-note-0:face",
+          "id": "f3-scene-room0-r0-sample-freezer-2-r0-2-note-1:face",
           "floor": 3,
           "scope": "interior",
           "role": "prop-face",
@@ -7498,7 +7746,7 @@
           "binding": {
             "kind": "prop",
             "furnitureId": "f3-scene-room0-r0-sample-freezer-2",
-            "propId": "f3-scene-room0-r0-sample-freezer-2-r0-2-note-0",
+            "propId": "f3-scene-room0-r0-sample-freezer-2-r0-2-note-1",
             "x": 0,
             "y": 0,
             "z": 0.006698,
@@ -7508,6 +7756,30 @@
             "pitch": -1.5707963267948966
           },
           "context": "COMMAND DECK. Mission Control note face. intact condition. Give this individual object its own authored writing or illustration.",
+          "maxTitle": 28,
+          "maxBody": 100,
+          "allowsArt": true
+        },
+        {
+          "id": "f3-scene-room0-r0-sample-freezer-2-r0-2-sample-vial-0:face",
+          "floor": 3,
+          "scope": "interior",
+          "role": "prop-face",
+          "room": 0,
+          "owner": "Jules",
+          "binding": {
+            "kind": "prop",
+            "furnitureId": "f3-scene-room0-r0-sample-freezer-2",
+            "propId": "f3-scene-room0-r0-sample-freezer-2-r0-2-sample-vial-0",
+            "x": 0,
+            "y": 0,
+            "z": 0.17200000000000001,
+            "width": 0.051680000000000004,
+            "height": 0.053040000000000004,
+            "yaw": 0,
+            "pitch": -1.5707963267948966
+          },
+          "context": "COMMAND DECK. Mission Control Sample vial face. intact condition. Give this individual object its own authored writing or illustration.",
           "maxTitle": 28,
           "maxBody": 100,
           "allowsArt": true
@@ -7770,30 +8042,6 @@
           "allowsArt": true
         },
         {
-          "id": "f3-scene-room3-r3-mess-table-0-r3-0-book-1:face",
-          "floor": 3,
-          "scope": "interior",
-          "role": "prop-face",
-          "room": 3,
-          "owner": "Sol",
-          "binding": {
-            "kind": "prop",
-            "furnitureId": "f3-scene-room3-r3-mess-table-0",
-            "propId": "f3-scene-room3-r3-mess-table-0-r3-0-book-1",
-            "x": 0,
-            "y": 0,
-            "z": 0.03349,
-            "width": 0.14212,
-            "height": 0.18564000000000003,
-            "yaw": 0,
-            "pitch": -1.5707963267948966
-          },
-          "context": "COMMAND DECK. Mess Hall book face. intact condition. Give this individual object its own authored writing or illustration.",
-          "maxTitle": 28,
-          "maxBody": 100,
-          "allowsArt": true
-        },
-        {
           "id": "f3-scene-room3-r3-mess-table-0-r3-0-bottle-2:face",
           "floor": 3,
           "scope": "interior",
@@ -7837,6 +8085,30 @@
             "pitch": 0
           },
           "context": "COMMAND DECK. Mess Hall mug face. intact condition. Give this individual object its own authored writing or illustration.",
+          "maxTitle": 28,
+          "maxBody": 100,
+          "allowsArt": true
+        },
+        {
+          "id": "f3-scene-room3-r3-mess-table-0-r3-0-ration-tin-1:face",
+          "floor": 3,
+          "scope": "interior",
+          "role": "prop-face",
+          "room": 3,
+          "owner": "Sol",
+          "binding": {
+            "kind": "prop",
+            "furnitureId": "f3-scene-room3-r3-mess-table-0",
+            "propId": "f3-scene-room3-r3-mess-table-0-r3-0-ration-tin-1",
+            "x": 0,
+            "y": 0,
+            "z": 0.1125,
+            "width": 0.1292,
+            "height": 0.13260000000000002,
+            "yaw": 0,
+            "pitch": -1.5707963267948966
+          },
+          "context": "COMMAND DECK. Mess Hall Ration tin face. intact condition. Give this individual object its own authored writing or illustration.",
           "maxTitle": 28,
           "maxBody": 100,
           "allowsArt": true
@@ -7932,28 +8204,6 @@
           "allowsArt": true
         },
         {
-          "id": "f3:graffiti:24:23:0:-1",
-          "floor": 3,
-          "scope": "interior",
-          "role": "graffiti",
-          "room": 2,
-          "owner": "Jules",
-          "binding": {
-            "kind": "fixed",
-            "x": 24.5,
-            "y": 22.986,
-            "z": 1.15,
-            "width": 1.2,
-            "height": 0.65,
-            "yaw": -3.141592653589793,
-            "pitch": 0
-          },
-          "context": "COMMAND DECK. Hydroponics Bay Paint or marker graffiti on this solid wall; transparent art background is allowed.",
-          "maxTitle": 36,
-          "maxBody": 100,
-          "allowsArt": true
-        },
-        {
           "id": "f3:graffiti:29:17:0:-1",
           "floor": 3,
           "scope": "interior",
@@ -7968,6 +8218,28 @@
             "width": 1.2,
             "height": 0.65,
             "yaw": -3.141592653589793,
+            "pitch": 0
+          },
+          "context": "COMMAND DECK. Mess Hall Paint or marker graffiti on this solid wall; transparent art background is allowed.",
+          "maxTitle": 36,
+          "maxBody": 100,
+          "allowsArt": true
+        },
+        {
+          "id": "f3:graffiti:30:11:-1:0",
+          "floor": 3,
+          "scope": "interior",
+          "role": "graffiti",
+          "room": 3,
+          "owner": "Sol",
+          "binding": {
+            "kind": "fixed",
+            "x": 29.986,
+            "y": 11.5,
+            "z": 1.15,
+            "width": 1.2,
+            "height": 0.65,
+            "yaw": 1.5707963267948966,
             "pitch": 0
           },
           "context": "COMMAND DECK. Mess Hall Paint or marker graffiti on this solid wall; transparent art background is allowed.",
@@ -8086,23 +8358,23 @@
           "allowsArt": true
         },
         {
-          "id": "f3:wall:14:16:1:0",
+          "id": "f3:wall:12:23:0:1",
           "floor": 3,
           "scope": "interior",
           "role": "wall-poster",
-          "room": 1,
-          "owner": "Mei",
+          "room": null,
+          "owner": null,
           "binding": {
             "kind": "fixed",
-            "x": 15.014,
-            "y": 16.5,
+            "x": 12.5,
+            "y": 24.014,
             "z": 1.69,
             "width": 0.62,
             "height": 0.86,
-            "yaw": -1.5707963267948966,
+            "yaw": 0,
             "pitch": 0
           },
-          "context": "COMMAND DECK. Core Sample Store Printed wall poster; every poster is a separate object.",
+          "context": "COMMAND DECK.  Printed wall poster; every poster is a separate object.",
           "maxTitle": 48,
           "maxBody": 160,
           "allowsArt": true
@@ -8196,23 +8468,23 @@
           "allowsArt": true
         },
         {
-          "id": "f3:wall:26:17:0:-1",
+          "id": "f3:wall:26:23:0:-1",
           "floor": 3,
           "scope": "interior",
-          "role": "wall-poster",
-          "room": 1,
-          "owner": "Mei",
+          "role": "wall-whiteboard",
+          "room": 2,
+          "owner": "Jules",
           "binding": {
             "kind": "fixed",
             "x": 26.5,
-            "y": 16.986,
+            "y": 22.986,
             "z": 1.69,
-            "width": 0.62,
-            "height": 0.86,
+            "width": 1.7,
+            "height": 0.93,
             "yaw": -3.141592653589793,
             "pitch": 0
           },
-          "context": "COMMAND DECK. Core Sample Store Printed wall poster; every poster is a separate object.",
+          "context": "COMMAND DECK. Hydroponics Bay Wall-mounted whiteboard writing and diagrams.",
           "maxTitle": 48,
           "maxBody": 160,
           "allowsArt": true
@@ -8240,23 +8512,23 @@
           "allowsArt": true
         },
         {
-          "id": "f3:wall:30:8:1:0",
+          "id": "f3:wall:31:7:0:-1",
           "floor": 3,
           "scope": "interior",
           "role": "wall-poster",
-          "room": 3,
-          "owner": "Sol",
+          "room": null,
+          "owner": null,
           "binding": {
             "kind": "fixed",
-            "x": 31.014,
-            "y": 8.5,
+            "x": 31.5,
+            "y": 6.986,
             "z": 1.69,
             "width": 0.62,
             "height": 0.86,
-            "yaw": -1.5707963267948966,
+            "yaw": -3.141592653589793,
             "pitch": 0
           },
-          "context": "COMMAND DECK. Mess Hall Printed wall poster; every poster is a separate object.",
+          "context": "COMMAND DECK.  Printed wall poster; every poster is a separate object.",
           "maxTitle": 48,
           "maxBody": 160,
           "allowsArt": true
@@ -8284,23 +8556,23 @@
           "allowsArt": true
         },
         {
-          "id": "f3:wall:37:7:0:1",
+          "id": "f3:wall:40:22:0:-1",
           "floor": 3,
           "scope": "interior",
           "role": "wall-poster",
-          "room": 3,
-          "owner": "Sol",
+          "room": 2,
+          "owner": "Jules",
           "binding": {
             "kind": "fixed",
-            "x": 37.5,
-            "y": 8.014,
+            "x": 40.5,
+            "y": 21.986,
             "z": 1.69,
             "width": 0.62,
             "height": 0.86,
-            "yaw": 0,
+            "yaw": -3.141592653589793,
             "pitch": 0
           },
-          "context": "COMMAND DECK. Mess Hall Printed wall poster; every poster is a separate object.",
+          "context": "COMMAND DECK. Hydroponics Bay Printed wall poster; every poster is a separate object.",
           "maxTitle": 48,
           "maxBody": 160,
           "allowsArt": true
@@ -9339,59 +9611,11 @@
           "drawing": null
         },
         {
-          "surfaceId": "f0-lobby-break2-cafeTable0:papers",
-          "layout": "text",
-          "title": [
-            {
-              "text": "Thin Orbit"
-            }
-          ],
-          "body": [],
-          "description": "",
-          "drawing": null
-        },
-        {
-          "surfaceId": "f0-room1-break1-cafeTable0:note",
-          "layout": "text",
-          "title": [
-            {
-              "text": "Thin Habitat"
-            }
-          ],
-          "body": [],
-          "description": "",
-          "drawing": null
-        },
-        {
-          "surfaceId": "f0-room1-break1-cafeTable0:photo",
-          "layout": "text",
-          "title": [
-            {
-              "text": "Thin Storm"
-            }
-          ],
-          "body": [],
-          "description": "",
-          "drawing": null
-        },
-        {
-          "surfaceId": "f0-room1-break2-cafeTable0:papers",
-          "layout": "text",
-          "title": [
-            {
-              "text": "Thin Sol"
-            }
-          ],
-          "body": [],
-          "description": "",
-          "drawing": null
-        },
-        {
           "surfaceId": "f0-scene-room0-r0-airlock-console-0-r0-0-papers-0:face",
           "layout": "text",
           "title": [
             {
-              "text": "Thin Ledger"
+              "text": "Thin Orbit"
             }
           ],
           "body": [],
@@ -9440,7 +9664,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Thin Shuttle"
+              "text": "Thin Habitat"
             }
           ],
           "body": [],
@@ -9452,7 +9676,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Thin Helmet"
+              "text": "Thin Storm"
             }
           ],
           "body": [],
@@ -9464,7 +9688,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Thin Garden"
+              "text": "Thin Sol"
             }
           ],
           "body": [],
@@ -9476,7 +9700,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Thin Relay"
+              "text": "Thin Ledger"
             }
           ],
           "body": [],
@@ -9488,7 +9712,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Thin Canal"
+              "text": "Thin Shuttle"
             }
           ],
           "body": [],
@@ -9500,7 +9724,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Thin Ridge"
+              "text": "Thin Helmet"
             }
           ],
           "body": [],
@@ -9512,7 +9736,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Thin Drill"
+              "text": "Thin Garden"
             }
           ],
           "body": [],
@@ -9524,7 +9748,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Thin Window"
+              "text": "Thin Relay"
             }
           ],
           "body": [],
@@ -9536,7 +9760,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Thin Signal"
+              "text": "Thin Canal"
             }
           ],
           "body": [],
@@ -9548,7 +9772,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Sealed Crater"
+              "text": "Thin Ridge"
             }
           ],
           "body": [],
@@ -9560,7 +9784,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Sealed Uplink"
+              "text": "Thin Drill"
             }
           ],
           "body": [],
@@ -9572,7 +9796,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Sealed Regolith"
+              "text": "Thin Window"
             }
           ],
           "body": [],
@@ -9584,7 +9808,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Sealed Airlock"
+              "text": "Thin Signal"
             }
           ],
           "body": [],
@@ -9596,7 +9820,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Sealed Rover"
+              "text": "Sealed Crater"
             }
           ],
           "body": [],
@@ -9608,7 +9832,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Sealed Seedling"
+              "text": "Sealed Uplink"
             }
           ],
           "body": [],
@@ -9620,7 +9844,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Sealed Ration"
+              "text": "Sealed Regolith"
             }
           ],
           "body": [],
@@ -9632,7 +9856,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Sealed Dune"
+              "text": "Sealed Airlock"
             }
           ],
           "body": [],
@@ -9644,7 +9868,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Sealed Beacon"
+              "text": "Sealed Rover"
             }
           ],
           "body": [],
@@ -9656,7 +9880,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Sealed Valve"
+              "text": "Sealed Seedling"
             }
           ],
           "body": [],
@@ -9668,7 +9892,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Sealed Orbit"
+              "text": "Sealed Ration"
             }
           ],
           "body": [],
@@ -9692,7 +9916,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Sealed Habitat"
+              "text": "Sealed Dune"
             }
           ],
           "body": [],
@@ -9704,7 +9928,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Sealed Storm"
+              "text": "Sealed Beacon"
             }
           ],
           "body": [],
@@ -9716,7 +9940,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Sealed Sol"
+              "text": "Sealed Valve"
             }
           ],
           "body": [],
@@ -9736,7 +9960,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f0:wall:12:6:0:1",
+          "surfaceId": "f0:wall:12:7:0:1",
           "layout": "text",
           "title": [
             {
@@ -9748,7 +9972,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f0:wall:17:6:0:1",
+          "surfaceId": "f0:wall:21:16:0:-1",
           "layout": "text",
           "title": [
             {
@@ -9760,7 +9984,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f0:wall:21:16:0:-1",
+          "surfaceId": "f0:wall:21:23:0:1",
           "layout": "text",
           "title": [
             {
@@ -9772,7 +9996,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f0:wall:21:23:0:1",
+          "surfaceId": "f0:wall:27:6:0:-1",
           "layout": "text",
           "title": [
             {
@@ -9784,7 +10008,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f0:wall:27:6:0:-1",
+          "surfaceId": "f0:wall:30:25:-1:0",
           "layout": "text",
           "title": [
             {
@@ -9796,7 +10020,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f0:wall:30:25:-1:0",
+          "surfaceId": "f0:wall:33:11:-1:0",
           "layout": "text",
           "title": [
             {
@@ -9808,7 +10032,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f0:wall:33:11:-1:0",
+          "surfaceId": "f0:wall:35:6:0:-1",
           "layout": "text",
           "title": [
             {
@@ -9820,7 +10044,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f0:wall:35:6:0:-1",
+          "surfaceId": "f0:wall:36:15:0:-1",
           "layout": "text",
           "title": [
             {
@@ -9872,7 +10096,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Sealed Ledger"
+              "text": "Sealed Orbit"
             }
           ],
           "body": [],
@@ -9884,7 +10108,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Sealed Shuttle"
+              "text": "Sealed Habitat"
             }
           ],
           "body": [],
@@ -9896,19 +10120,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Sealed Helmet"
-            }
-          ],
-          "body": [],
-          "description": "",
-          "drawing": null
-        },
-        {
-          "surfaceId": "f1-scene-room0-r0-mess-table-0-r0-0-book-1:face",
-          "layout": "text",
-          "title": [
-            {
-              "text": "Sealed Garden"
+              "text": "Sealed Storm"
             }
           ],
           "body": [],
@@ -9920,7 +10132,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Sealed Relay"
+              "text": "Sealed Sol"
             }
           ],
           "body": [],
@@ -9932,7 +10144,19 @@
           "layout": "text",
           "title": [
             {
-              "text": "Sealed Canal"
+              "text": "Sealed Ledger"
+            }
+          ],
+          "body": [],
+          "description": "",
+          "drawing": null
+        },
+        {
+          "surfaceId": "f1-scene-room0-r0-mess-table-0-r0-0-ration-tin-1:face",
+          "layout": "text",
+          "title": [
+            {
+              "text": "Sealed Shuttle"
             }
           ],
           "body": [],
@@ -9944,7 +10168,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Sealed Ridge"
+              "text": "Sealed Helmet"
             }
           ],
           "body": [],
@@ -9956,7 +10180,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Sealed Drill"
+              "text": "Sealed Garden"
             }
           ],
           "body": [],
@@ -10005,7 +10229,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Sealed Window"
+              "text": "Sealed Relay"
             }
           ],
           "body": [],
@@ -10017,7 +10241,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Sealed Signal"
+              "text": "Sealed Canal"
             }
           ],
           "body": [],
@@ -10029,7 +10253,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Amber Crater"
+              "text": "Sealed Ridge"
             }
           ],
           "body": [],
@@ -10041,7 +10265,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Amber Uplink"
+              "text": "Sealed Drill"
             }
           ],
           "body": [],
@@ -10049,11 +10273,23 @@
           "drawing": null
         },
         {
-          "surfaceId": "f1-scene-room1-r1-sample-freezer-2-r1-2-note-0:face",
+          "surfaceId": "f1-scene-room1-r1-sample-freezer-2-r1-2-note-1:face",
           "layout": "text",
           "title": [
             {
-              "text": "Amber Regolith"
+              "text": "Sealed Window"
+            }
+          ],
+          "body": [],
+          "description": "",
+          "drawing": null
+        },
+        {
+          "surfaceId": "f1-scene-room1-r1-sample-freezer-2-r1-2-sample-vial-0:face",
+          "layout": "text",
+          "title": [
+            {
+              "text": "Sealed Signal"
             }
           ],
           "body": [],
@@ -10065,7 +10301,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Amber Airlock"
+              "text": "Amber Crater"
             }
           ],
           "body": [],
@@ -10077,7 +10313,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Amber Rover"
+              "text": "Amber Uplink"
             }
           ],
           "body": [],
@@ -10089,7 +10325,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Amber Seedling"
+              "text": "Amber Regolith"
             }
           ],
           "body": [],
@@ -10101,7 +10337,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Amber Ration"
+              "text": "Amber Airlock"
             }
           ],
           "body": [],
@@ -10113,7 +10349,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Amber Dune"
+              "text": "Amber Rover"
             }
           ],
           "body": [],
@@ -10125,7 +10361,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Amber Beacon"
+              "text": "Amber Seedling"
             }
           ],
           "body": [],
@@ -10137,7 +10373,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Amber Valve"
+              "text": "Amber Ration"
             }
           ],
           "body": [],
@@ -10149,7 +10385,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Amber Orbit"
+              "text": "Amber Dune"
             }
           ],
           "body": [],
@@ -10161,7 +10397,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Amber Habitat"
+              "text": "Amber Beacon"
             }
           ],
           "body": [],
@@ -10173,7 +10409,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Amber Storm"
+              "text": "Amber Valve"
             }
           ],
           "body": [],
@@ -10185,7 +10421,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Amber Sol"
+              "text": "Amber Orbit"
             }
           ],
           "body": [],
@@ -10197,7 +10433,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Amber Ledger"
+              "text": "Amber Habitat"
             }
           ],
           "body": [],
@@ -10209,7 +10445,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Amber Shuttle"
+              "text": "Amber Storm"
             }
           ],
           "body": [],
@@ -10233,7 +10469,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Amber Helmet"
+              "text": "Amber Sol"
             }
           ],
           "body": [],
@@ -10245,7 +10481,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Amber Garden"
+              "text": "Amber Ledger"
             }
           ],
           "body": [],
@@ -10257,7 +10493,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Amber Relay"
+              "text": "Amber Shuttle"
             }
           ],
           "body": [],
@@ -10413,7 +10649,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Amber Canal"
+              "text": "Amber Helmet"
             }
           ],
           "body": [],
@@ -10425,7 +10661,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Amber Ridge"
+              "text": "Amber Garden"
             }
           ],
           "body": [],
@@ -10437,7 +10673,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Amber Drill"
+              "text": "Amber Relay"
             }
           ],
           "body": [],
@@ -10449,7 +10685,19 @@
           "layout": "text",
           "title": [
             {
-              "text": "Amber Window"
+              "text": "Amber Canal"
+            }
+          ],
+          "body": [],
+          "description": "",
+          "drawing": null
+        },
+        {
+          "surfaceId": "f2-lobby-break3-cafeTable0:papers",
+          "layout": "text",
+          "title": [
+            {
+              "text": "Amber Ridge"
             }
           ],
           "body": [],
@@ -10461,7 +10709,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Amber Signal"
+              "text": "Amber Drill"
             }
           ],
           "body": [],
@@ -10473,7 +10721,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Rust Crater"
+              "text": "Amber Window"
             }
           ],
           "body": [],
@@ -10485,7 +10733,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Rust Uplink"
+              "text": "Amber Signal"
             }
           ],
           "body": [],
@@ -10497,7 +10745,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Rust Regolith"
+              "text": "Rust Crater"
             }
           ],
           "body": [],
@@ -10509,7 +10757,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Rust Airlock"
+              "text": "Rust Uplink"
             }
           ],
           "body": [],
@@ -10521,19 +10769,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Rust Rover"
-            }
-          ],
-          "body": [],
-          "description": "",
-          "drawing": null
-        },
-        {
-          "surfaceId": "f2-scene-room1-r1-mess-table-0-r1-0-book-1:face",
-          "layout": "text",
-          "title": [
-            {
-              "text": "Rust Seedling"
+              "text": "Rust Regolith"
             }
           ],
           "body": [],
@@ -10545,7 +10781,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Rust Ration"
+              "text": "Rust Airlock"
             }
           ],
           "body": [],
@@ -10557,7 +10793,19 @@
           "layout": "text",
           "title": [
             {
-              "text": "Rust Dune"
+              "text": "Rust Rover"
+            }
+          ],
+          "body": [],
+          "description": "",
+          "drawing": null
+        },
+        {
+          "surfaceId": "f2-scene-room1-r1-mess-table-0-r1-0-ration-tin-1:face",
+          "layout": "text",
+          "title": [
+            {
+              "text": "Rust Seedling"
             }
           ],
           "body": [],
@@ -10569,7 +10817,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Rust Beacon"
+              "text": "Rust Ration"
             }
           ],
           "body": [],
@@ -10581,7 +10829,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Rust Valve"
+              "text": "Rust Dune"
             }
           ],
           "body": [],
@@ -10593,7 +10841,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Rust Orbit"
+              "text": "Rust Beacon"
             }
           ],
           "body": [],
@@ -10605,7 +10853,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Rust Habitat"
+              "text": "Rust Valve"
             }
           ],
           "body": [],
@@ -10617,7 +10865,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Rust Storm"
+              "text": "Rust Orbit"
             }
           ],
           "body": [],
@@ -10629,7 +10877,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Rust Sol"
+              "text": "Rust Habitat"
             }
           ],
           "body": [],
@@ -10678,7 +10926,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Rust Ledger"
+              "text": "Rust Storm"
             }
           ],
           "body": [],
@@ -10690,7 +10938,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Rust Shuttle"
+              "text": "Rust Sol"
             }
           ],
           "body": [],
@@ -10702,7 +10950,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Rust Helmet"
+              "text": "Rust Ledger"
             }
           ],
           "body": [],
@@ -10714,7 +10962,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Rust Garden"
+              "text": "Rust Shuttle"
             }
           ],
           "body": [],
@@ -10722,11 +10970,23 @@
           "drawing": null
         },
         {
-          "surfaceId": "f2-scene-room3-r3-sample-freezer-2-r3-2-note-0:face",
+          "surfaceId": "f2-scene-room3-r3-sample-freezer-2-r3-2-note-1:face",
           "layout": "text",
           "title": [
             {
-              "text": "Rust Relay"
+              "text": "Rust Helmet"
+            }
+          ],
+          "body": [],
+          "description": "",
+          "drawing": null
+        },
+        {
+          "surfaceId": "f2-scene-room3-r3-sample-freezer-2-r3-2-sample-vial-0:face",
+          "layout": "text",
+          "title": [
+            {
+              "text": "Rust Garden"
             }
           ],
           "body": [],
@@ -10738,7 +10998,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Rust Canal"
+              "text": "Rust Relay"
             }
           ],
           "body": [],
@@ -10750,7 +11010,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Rust Ridge"
+              "text": "Rust Canal"
             }
           ],
           "body": [],
@@ -10762,7 +11022,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Rust Drill"
+              "text": "Rust Ridge"
             }
           ],
           "body": [],
@@ -10774,7 +11034,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Rust Window"
+              "text": "Rust Drill"
             }
           ],
           "body": [],
@@ -10786,7 +11046,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Rust Signal"
+              "text": "Rust Window"
             }
           ],
           "body": [],
@@ -10810,7 +11070,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Silent Crater"
+              "text": "Rust Signal"
             }
           ],
           "body": [],
@@ -10822,7 +11082,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Silent Uplink"
+              "text": "Silent Crater"
             }
           ],
           "body": [],
@@ -10834,7 +11094,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Silent Regolith"
+              "text": "Silent Uplink"
             }
           ],
           "body": [],
@@ -10926,11 +11186,23 @@
           "drawing": null
         },
         {
-          "surfaceId": "f2:wall:3:19:0:-1",
+          "surfaceId": "f2:wall:3:10:1:0",
           "layout": "text",
           "title": [
             {
               "text": "Spare parts list"
+            }
+          ],
+          "body": [],
+          "description": "",
+          "drawing": null
+        },
+        {
+          "surfaceId": "f2:wall:3:19:0:-1",
+          "layout": "text",
+          "title": [
+            {
+              "text": "Silent Regolith"
             }
           ],
           "body": [],
@@ -10962,7 +11234,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f2:wall:40:11:0:1",
+          "surfaceId": "f2:wall:6:15:0:1",
           "layout": "text",
           "title": [
             {
@@ -10974,7 +11246,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f2:wall:6:15:0:1",
+          "surfaceId": "f3-lobby-break0-cafeTable1:papers",
           "layout": "text",
           "title": [
             {
@@ -10986,7 +11258,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f3-lobby-break0-cafeTable1:papers",
+          "surfaceId": "f3-lobby-break1-cafeTable0:papers",
           "layout": "text",
           "title": [
             {
@@ -10998,7 +11270,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f3-lobby-break1-cafeTable0:papers",
+          "surfaceId": "f3-lobby-break1-cafeTable0:photo",
           "layout": "text",
           "title": [
             {
@@ -11010,7 +11282,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f3-lobby-break1-cafeTable0:photo",
+          "surfaceId": "f3-lobby-break2-cafeTable0:papers",
           "layout": "text",
           "title": [
             {
@@ -11022,7 +11294,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f3-lobby-break2-cafeTable0:papers",
+          "surfaceId": "f3-lobby-break4-cafeTable1:note",
           "layout": "text",
           "title": [
             {
@@ -11034,47 +11306,11 @@
           "drawing": null
         },
         {
-          "surfaceId": "f3-lobby-break4-cafeTable1:note",
-          "layout": "text",
-          "title": [
-            {
-              "text": "Silent Habitat"
-            }
-          ],
-          "body": [],
-          "description": "",
-          "drawing": null
-        },
-        {
           "surfaceId": "f3-lobby-break4-cafeTable1:photo",
           "layout": "text",
           "title": [
             {
-              "text": "Silent Storm"
-            }
-          ],
-          "body": [],
-          "description": "",
-          "drawing": null
-        },
-        {
-          "surfaceId": "f3-room2-cubicles4-desk0:papers",
-          "layout": "text",
-          "title": [
-            {
-              "text": "Silent Sol"
-            }
-          ],
-          "body": [],
-          "description": "",
-          "drawing": null
-        },
-        {
-          "surfaceId": "f3-room2-cubicles4-desk0:photo",
-          "layout": "text",
-          "title": [
-            {
-              "text": "Silent Ledger"
+              "text": "Silent Habitat"
             }
           ],
           "body": [],
@@ -11123,7 +11359,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Silent Shuttle"
+              "text": "Silent Storm"
             }
           ],
           "body": [],
@@ -11135,7 +11371,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Silent Helmet"
+              "text": "Silent Sol"
             }
           ],
           "body": [],
@@ -11147,7 +11383,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Silent Garden"
+              "text": "Silent Ledger"
             }
           ],
           "body": [],
@@ -11159,7 +11395,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Silent Relay"
+              "text": "Silent Shuttle"
             }
           ],
           "body": [],
@@ -11167,11 +11403,23 @@
           "drawing": null
         },
         {
-          "surfaceId": "f3-scene-room0-r0-sample-freezer-2-r0-2-note-0:face",
+          "surfaceId": "f3-scene-room0-r0-sample-freezer-2-r0-2-note-1:face",
           "layout": "text",
           "title": [
             {
-              "text": "Silent Canal"
+              "text": "Silent Helmet"
+            }
+          ],
+          "body": [],
+          "description": "",
+          "drawing": null
+        },
+        {
+          "surfaceId": "f3-scene-room0-r0-sample-freezer-2-r0-2-sample-vial-0:face",
+          "layout": "text",
+          "title": [
+            {
+              "text": "Silent Garden"
             }
           ],
           "body": [],
@@ -11183,7 +11431,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Silent Ridge"
+              "text": "Silent Relay"
             }
           ],
           "body": [],
@@ -11195,7 +11443,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Silent Drill"
+              "text": "Silent Canal"
             }
           ],
           "body": [],
@@ -11207,7 +11455,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Silent Window"
+              "text": "Silent Ridge"
             }
           ],
           "body": [],
@@ -11219,7 +11467,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Silent Signal"
+              "text": "Silent Drill"
             }
           ],
           "body": [],
@@ -11231,7 +11479,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Frosted Crater"
+              "text": "Silent Window"
             }
           ],
           "body": [],
@@ -11243,7 +11491,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Frosted Uplink"
+              "text": "Silent Signal"
             }
           ],
           "body": [],
@@ -11255,7 +11503,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Frosted Regolith"
+              "text": "Frosted Crater"
             }
           ],
           "body": [],
@@ -11267,7 +11515,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Frosted Airlock"
+              "text": "Frosted Uplink"
             }
           ],
           "body": [],
@@ -11279,7 +11527,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Frosted Rover"
+              "text": "Frosted Regolith"
             }
           ],
           "body": [],
@@ -11291,7 +11539,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Frosted Seedling"
+              "text": "Frosted Airlock"
             }
           ],
           "body": [],
@@ -11303,19 +11551,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Frosted Ration"
-            }
-          ],
-          "body": [],
-          "description": "",
-          "drawing": null
-        },
-        {
-          "surfaceId": "f3-scene-room3-r3-mess-table-0-r3-0-book-1:face",
-          "layout": "text",
-          "title": [
-            {
-              "text": "Frosted Dune"
+              "text": "Frosted Rover"
             }
           ],
           "body": [],
@@ -11327,7 +11563,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Frosted Beacon"
+              "text": "Frosted Seedling"
             }
           ],
           "body": [],
@@ -11339,7 +11575,19 @@
           "layout": "text",
           "title": [
             {
-              "text": "Frosted Valve"
+              "text": "Frosted Ration"
+            }
+          ],
+          "body": [],
+          "description": "",
+          "drawing": null
+        },
+        {
+          "surfaceId": "f3-scene-room3-r3-mess-table-0-r3-0-ration-tin-1:face",
+          "layout": "text",
+          "title": [
+            {
+              "text": "Frosted Dune"
             }
           ],
           "body": [],
@@ -11351,7 +11599,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Frosted Orbit"
+              "text": "Frosted Beacon"
             }
           ],
           "body": [],
@@ -11363,7 +11611,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Frosted Habitat"
+              "text": "Frosted Valve"
             }
           ],
           "body": [],
@@ -11375,7 +11623,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Frosted Storm"
+              "text": "Frosted Orbit"
             }
           ],
           "body": [],
@@ -11387,19 +11635,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Frosted Sol"
-            }
-          ],
-          "body": [],
-          "description": "",
-          "drawing": null
-        },
-        {
-          "surfaceId": "f3:graffiti:24:23:0:-1",
-          "layout": "text",
-          "title": [
-            {
-              "text": "Frosted Ledger"
+              "text": "Frosted Habitat"
             }
           ],
           "body": [],
@@ -11411,7 +11647,19 @@
           "layout": "text",
           "title": [
             {
-              "text": "Frosted Shuttle"
+              "text": "Frosted Storm"
+            }
+          ],
+          "body": [],
+          "description": "",
+          "drawing": null
+        },
+        {
+          "surfaceId": "f3:graffiti:30:11:-1:0",
+          "layout": "text",
+          "title": [
+            {
+              "text": "Frosted Sol"
             }
           ],
           "body": [],
@@ -11435,7 +11683,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Frosted Helmet"
+              "text": "Frosted Ledger"
             }
           ],
           "body": [],
@@ -11447,7 +11695,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Frosted Garden"
+              "text": "Frosted Shuttle"
             }
           ],
           "body": [],
@@ -11459,7 +11707,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Frosted Relay"
+              "text": "Frosted Helmet"
             }
           ],
           "body": [],
@@ -11471,7 +11719,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Frosted Canal"
+              "text": "Frosted Garden"
             }
           ],
           "body": [],
@@ -11479,11 +11727,11 @@
           "drawing": null
         },
         {
-          "surfaceId": "f3:wall:14:16:1:0",
+          "surfaceId": "f3:wall:12:23:0:1",
           "layout": "text",
           "title": [
             {
-              "text": "Frosted Ridge"
+              "text": "Frosted Relay"
             }
           ],
           "body": [],
@@ -11495,7 +11743,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Frosted Drill"
+              "text": "Frosted Canal"
             }
           ],
           "body": [],
@@ -11507,7 +11755,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Frosted Window"
+              "text": "Frosted Ridge"
             }
           ],
           "body": [],
@@ -11519,7 +11767,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Frosted Signal"
+              "text": "Frosted Drill"
             }
           ],
           "body": [],
@@ -11531,7 +11779,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Orbital Crater"
+              "text": "Frosted Window"
             }
           ],
           "body": [],
@@ -11539,11 +11787,11 @@
           "drawing": null
         },
         {
-          "surfaceId": "f3:wall:26:17:0:-1",
+          "surfaceId": "f3:wall:26:23:0:-1",
           "layout": "text",
           "title": [
             {
-              "text": "Orbital Uplink"
+              "text": "Frosted Signal"
             }
           ],
           "body": [],
@@ -11555,7 +11803,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Orbital Regolith"
+              "text": "Orbital Crater"
             }
           ],
           "body": [],
@@ -11563,11 +11811,11 @@
           "drawing": null
         },
         {
-          "surfaceId": "f3:wall:30:8:1:0",
+          "surfaceId": "f3:wall:31:7:0:-1",
           "layout": "text",
           "title": [
             {
-              "text": "Orbital Airlock"
+              "text": "Orbital Uplink"
             }
           ],
           "body": [],
@@ -11579,7 +11827,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Orbital Rover"
+              "text": "Orbital Regolith"
             }
           ],
           "body": [],
@@ -11587,11 +11835,11 @@
           "drawing": null
         },
         {
-          "surfaceId": "f3:wall:37:7:0:1",
+          "surfaceId": "f3:wall:40:22:0:-1",
           "layout": "text",
           "title": [
             {
-              "text": "Orbital Seedling"
+              "text": "Orbital Airlock"
             }
           ],
           "body": [],
@@ -11603,7 +11851,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Orbital Ration"
+              "text": "Orbital Rover"
             }
           ],
           "body": [],

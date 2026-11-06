@@ -344,3 +344,169 @@ export function cityGroundRectangles(floor: Floor): CityGroundRectangle[] {
   }
   return rectangles;
 }
+
+/** Grounds that carry streets, lamp posts and parked cars. Every other ground
+ * gets theme-neutral clutter instead. */
+export function roadGround(ground?: string) {
+  return (
+    !ground || ground === "asphalt" || ground === "cobble" || ground === "tile"
+  );
+}
+
+/** The designed surroundings of the ground floor, if any. */
+export function surroundingsOf(floor: Floor) {
+  return floor.setting?.surroundings;
+}
+
+/** A visual-only plot cut into the face of a solid lot. The lot keeps its
+ * footprint and collision; the plot only changes what its outer rim looks
+ * like, and a raised bed there carries one scenery object. */
+export interface SceneryPad {
+  id: string;
+  /** Centre of the pad, in world units. */
+  x: number;
+  z: number;
+  w: number;
+  d: number;
+  /** Turn of the object about the vertical, in radians. */
+  angle: number;
+}
+
+/** Pad dimensions: along the lot face, and into the lot. */
+export const SCENERY_PAD = { along: 10, into: 7 } as const;
+/** Nothing is placed within this distance of the arrival queue or a spawn. */
+const ENTRANCE_CLEARANCE = 16;
+const SPAWN_CLEARANCE = 14;
+
+interface Lot {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+function sceneryHash(seed: number, n: number) {
+  let v = Math.imul((seed ^ 0x2545f491) + n * 0x9e3779b1, 0x45d9f3b);
+  v = Math.imul(v ^ (v >>> 16), 0x45d9f3b);
+  return ((v ^ (v >>> 16)) >>> 0) / 4294967296;
+}
+
+/** Where the scenery stands. Pads sit inside solid lots near the building,
+ * inset from the lot's road face, so they never overlap a road, the entrance
+ * lane or a spawn approach, and are chosen from the city seed alone (never the
+ * simulation random stream). The same inputs always give the same pads. */
+export function sceneryPads(
+  floor: Floor,
+  ids: readonly string[],
+  perId = 3,
+): SceneryPad[] {
+  const b = floor.boundary;
+  if (!b || !ids.length) return [];
+  const want = Math.min(24, ids.length * perId),
+    seed = floor.city?.seed ?? 1 + b.top * 31 + b.bottom,
+    lots: Lot[] = floor.city
+      ? floor.city.obstacles
+          .filter((o) => o.kind === "building")
+          .map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h }))
+      : (cityLayout(floor)?.blocks ?? [])
+          .filter((blk) => !blk.distant)
+          .map((blk) => ({ x: blk.x, y: blk.y, w: blk.w, h: blk.d })),
+    roads = floor.city?.roads ?? [],
+    spawns = floor.city?.approaches.flatMap((a) => a.points) ?? [],
+    entrance = floor.furniture.find((o) => o.id === "main-gate")?.x ?? 22,
+    front = b.bottom,
+    footprint = {
+      left: Math.min(...b.rows.slice(b.top, b.bottom).map((r) => r.left)),
+      right: Math.max(...b.rows.slice(b.top, b.bottom).map((r) => r.right)),
+    };
+  const candidates: (SceneryPad & { rank: number })[] = [];
+  let index = 0;
+  for (const lot of lots) {
+    if (Math.min(lot.w, lot.h) < 8) continue;
+    for (const side of [0, 1, 2, 3]) {
+      const alongX = side < 2,
+        sign = side % 2 ? 1 : -1,
+        length = alongX ? lot.w : lot.h,
+        into = Math.min(SCENERY_PAD.into, (alongX ? lot.h : lot.w) / 2),
+        slots = Math.max(
+          0,
+          Math.floor((length - SCENERY_PAD.along) / (SCENERY_PAD.along + 4)) +
+            1,
+        );
+      for (let s = 0; s < slots; s++) {
+        const along =
+          slots === 1
+            ? 0
+            : -length / 2 +
+              SCENERY_PAD.along / 2 +
+              (s * (length - SCENERY_PAD.along)) / (slots - 1);
+        const x = alongX
+            ? lot.x + along
+            : lot.x + sign * (lot.w / 2 - into / 2),
+          z = alongX ? lot.y + sign * (lot.h / 2 - into / 2) : lot.y + along,
+          w = alongX ? SCENERY_PAD.along : into,
+          d = alongX ? into : SCENERY_PAD.along;
+        index++;
+        const distance = Math.hypot(x - 22, z - 30);
+        // Beyond ~110 m a plot is a dot; closer ones are rated by the seed.
+        if (distance > 110) continue;
+        if (
+          // The arrival queue and the plaza in front of the gate.
+          (Math.abs(x - entrance) < w / 2 + ENTRANCE_CLEARANCE &&
+            z > front - d / 2 - 2 &&
+            z < front + ENTRANCE_CLEARANCE + 12 + d / 2) ||
+          // Never beside the building's own walls.
+          (x + w / 2 > footprint.left - 2 &&
+            x - w / 2 < footprint.right + 2 &&
+            z + d / 2 > b.top - 3 &&
+            z - d / 2 < b.bottom + 3) ||
+          spawns.some((p) => Math.hypot(p.x - x, p.y - z) < SPAWN_CLEARANCE) ||
+          roads.some(
+            (r) =>
+              x + w / 2 > r.x - r.w / 2 - 0.5 &&
+              x - w / 2 < r.x + r.w / 2 + 0.5 &&
+              z + d / 2 > r.y - r.h / 2 - 0.5 &&
+              z - d / 2 < r.y + r.h / 2 + 0.5,
+          )
+        )
+          continue;
+        candidates.push({
+          id: "",
+          x,
+          z,
+          w,
+          d,
+          angle: sceneryHash(seed, index * 3 + 1) * Math.PI * 2,
+          rank: sceneryHash(seed, index * 3) + distance / 180,
+        });
+      }
+    }
+  }
+  candidates.sort((a, b2) => a.rank - b2.rank);
+  const chosen: SceneryPad[] = [];
+  for (const c of candidates) {
+    if (chosen.length >= want) break;
+    // One pad per stretch of frontage, so a type is not stacked in one place.
+    if (chosen.some((p) => Math.hypot(p.x - c.x, p.z - c.z) < 16)) continue;
+    chosen.push({
+      id: ids[chosen.length % ids.length],
+      x: c.x,
+      z: c.z,
+      w: c.w,
+      d: c.d,
+      angle: c.angle,
+    });
+  }
+  return chosen;
+}
+
+/** Whether a cell of a lot overlaps the pad (they then share a raised bed). */
+export function overlapsPad(
+  pad: Pick<SceneryPad, "x" | "z" | "w" | "d">,
+  cell: { x: number; z: number; w: number; d: number },
+) {
+  return (
+    Math.abs(pad.x - cell.x) < (pad.w + cell.w) / 2 &&
+    Math.abs(pad.z - cell.z) < (pad.d + cell.d) / 2
+  );
+}

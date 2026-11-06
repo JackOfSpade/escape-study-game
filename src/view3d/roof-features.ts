@@ -5,17 +5,30 @@ import {
   ConeGeometry,
   CylinderGeometry,
   Float32BufferAttribute,
+  Group,
+  Mesh,
+  MeshBasicMaterial,
+  type Material,
   Quaternion,
   SphereGeometry,
   Vector3,
 } from "three";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type {
   RunCustomObject,
+  RunObjectMotion,
   RunObjectPart,
   RunRoofFeatureKind,
 } from "../setting-catalog.mjs";
 import type { ResolvedRoofFeature } from "../venue";
-import { objectGeometry } from "./object-shapes";
+import {
+  effectiveMotion,
+  motionPhase,
+  objectGeometry,
+  partMotion,
+  partTilt,
+  type PartMotionPose,
+} from "./object-shapes";
 
 type V3 = [number, number, number];
 export interface RoofFeatureParts {
@@ -23,17 +36,161 @@ export interface RoofFeatureParts {
   solid: BufferGeometry[];
   /** Unlit emissive lamps (aviation lights, display faces). */
   lamps: BufferGeometry[];
+  /** Parts that move: each is centred on its own pivot so the caller can
+   * add a mesh at `position` (the world pivot) and hand it to a
+   * PartAnimator. Empty for a feature that stands still. */
+  animated: AnimatedRoofPart[];
+}
+export interface AnimatedRoofPart {
+  /** Centred on the pivot, tilted, vertex-coloured. */
+  geometry: BufferGeometry;
+  lamp: boolean;
+  /** World position of the pivot, before any bob. */
+  position: V3;
+  /** The feature's own yaw about the vertical. */
+  yaw: number;
+  motion: RunObjectMotion;
+  rate: number;
+  phase: number;
 }
 
 const UP = new Vector3(0, 1, 0);
 const tint = new Color();
 const hash = (i: number) => Math.imul(i + 13, 15485863) >>> 0;
 
+function colorize(geometry: BufferGeometry, color: string) {
+  tint.set(color);
+  const count = geometry.getAttribute("position").count,
+    colors = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) tint.toArray(colors, i * 3);
+  geometry.setAttribute("color", new Float32BufferAttribute(colors, 3));
+}
+
+/** One composed part's geometry, centred on its own middle: scaled to its
+ * extents, then tipped by pitch (toward the front, +z) and roll (toward +x)
+ * about that centre. Motion is not baked in. */
+export function composedPartGeometry(part: RunObjectPart): BufferGeometry {
+  const g = objectGeometry(part.shape, part.axis);
+  g.scale(part.w, part.h, part.d);
+  const tilt = partTilt(part);
+  if (tilt) g.rotateX(tilt.pitch).rotateZ(-tilt.roll);
+  return g;
+}
+
+/** Drives the meshes of moving parts from a clock. Static meshes are never
+ * registered, so the per-frame cost is bounded by the animated part count. */
+export class PartAnimator {
+  private entries: {
+    mesh: Mesh;
+    base: Vector3;
+    yaw: number;
+    motion: RunObjectMotion;
+    rate: number;
+    phase: number;
+    material?: MeshBasicMaterial;
+  }[] = [];
+  private pose: PartMotionPose = { yaw: 0, lift: 0, glow: 1 };
+
+  get count() {
+    return this.entries.length;
+  }
+
+  /** Register a mesh already placed at `base` with its yaw. A glow part that
+   * pulses or flickers gets its own copy of an unlit material so only it
+   * changes brightness. */
+  add(
+    mesh: Mesh,
+    base: Vector3,
+    yaw: number,
+    motion: RunObjectMotion,
+    rate: number,
+    phase: number,
+  ) {
+    let material: MeshBasicMaterial | undefined;
+    if (
+      (motion === "pulse" || motion === "flicker") &&
+      mesh.material instanceof MeshBasicMaterial
+    ) {
+      material = mesh.material.clone();
+      mesh.material = material;
+    }
+    this.entries.push({
+      mesh,
+      base: base.clone(),
+      yaw,
+      motion,
+      rate,
+      phase,
+      material,
+    });
+    this.update(0, false, this.entries.length - 1);
+  }
+
+  update(time: number, calm = false, only?: number) {
+    const from = only ?? 0,
+      to = only === undefined ? this.entries.length : only + 1;
+    for (let i = from; i < to; i++) {
+      const e = this.entries[i],
+        pose = partMotion(e.motion, e.rate, e.phase, time, calm, this.pose);
+      e.mesh.position.set(e.base.x, e.base.y + pose.lift, e.base.z);
+      e.mesh.rotation.y = e.yaw + pose.yaw;
+      e.material?.color.setScalar(pose.glow);
+    }
+  }
+
+  dispose() {
+    for (const e of this.entries) e.material?.dispose();
+    this.entries.length = 0;
+  }
+}
+
+/** A recipe's parts as meshes in the object's own frame (x across, recipe y
+ * on the z axis, up on y), tilted about each part's centre. Still parts are
+ * merged into one solid and one lamp mesh; moving parts are separate meshes
+ * registered with `animator`, which the caller updates each frame. The group
+ * owns its geometry; materials stay with the caller. */
+export function composedPartsGroup(
+  parts: readonly RunObjectPart[],
+  materials: { solid: Material; lamp: Material },
+  animator: PartAnimator,
+): Group {
+  const group = new Group(),
+    still = { solid: [] as BufferGeometry[], lamp: [] as BufferGeometry[] };
+  parts.forEach((part, i) => {
+    const geometry = composedPartGeometry(part),
+      lamp = part.finish === "glow",
+      pivot = new Vector3(part.x, part.z + part.h / 2, part.y);
+    colorize(geometry, part.color);
+    const motion = effectiveMotion(part.motion, part.finish);
+    if (motion === "none") {
+      geometry.translate(pivot.x, pivot.y, pivot.z);
+      (lamp ? still.lamp : still.solid).push(geometry);
+      return;
+    }
+    const mesh = new Mesh(geometry, lamp ? materials.lamp : materials.solid);
+    mesh.position.copy(pivot);
+    group.add(mesh);
+    animator.add(mesh, pivot, 0, motion, part.rate, motionPhase(i));
+  });
+  for (const [list, material] of [
+    [still.solid, materials.solid],
+    [still.lamp, materials.lamp],
+  ] as const)
+    if (list.length) {
+      const mesh = new Mesh(mergeGeometries(list)!, material);
+      for (const g of list) g.dispose();
+      group.add(mesh);
+    }
+  return group;
+}
+
 /** Visual-only rooftop dressing in a local frame whose +z points out of the
  * building and whose origin is the roof surface under the feature. */
 class Builder {
   readonly solid: BufferGeometry[] = [];
   readonly lamps: BufferGeometry[] = [];
+  readonly animated: AnimatedRoofPart[] = [];
+  private motions = 0;
   private readonly yaw: number;
   constructor(
     private readonly at: ResolvedRoofFeature,
@@ -48,11 +205,7 @@ class Builder {
     color: string,
     local: V3,
   ) {
-    tint.set(color);
-    const count = geometry.getAttribute("position").count,
-      colors = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) tint.toArray(colors, i * 3);
-    geometry.setAttribute("color", new Float32BufferAttribute(colors, 3));
+    colorize(geometry, color);
     geometry
       .translate(local[0], local[1], local[2])
       .rotateY(this.yaw)
@@ -132,16 +285,48 @@ class Builder {
 
   /** One part of a composed object. The object's own frame maps onto the
    * local one with its front (+y) facing out of the building; glow parts are
-   * unlit lamps. Parts are visual only, like every roof feature. */
+   * unlit lamps. Parts tilt about their own centre and may move; they are
+   * visual only, like every roof feature. */
   objectPart(part: RunObjectPart, inset = 0) {
-    const g = objectGeometry(part.shape, part.axis);
-    g.scale(part.w, part.h, part.d);
-    this.place(
-      part.finish === "glow" ? this.lamps : this.solid,
-      g,
-      part.color,
-      [part.x, part.z + part.h / 2, part.y - inset],
-    );
+    const centre: V3 = [part.x, part.z + part.h / 2, part.y - inset],
+      lamp = part.finish === "glow",
+      geometry = composedPartGeometry(part);
+    const motion = effectiveMotion(part.motion, part.finish);
+    if (motion === "none") {
+      this.place(lamp ? this.lamps : this.solid, geometry, part.color, centre);
+      return;
+    }
+    this.animate(geometry, part.color, centre, lamp, motion, part.rate);
+  }
+
+  /** A part that moves: kept apart from the merged geometry. */
+  animate(
+    geometry: BufferGeometry,
+    color: string,
+    local: V3,
+    lamp: boolean,
+    motion: RunObjectMotion,
+    rate: number,
+  ) {
+    colorize(geometry, color);
+    const pivot = new Vector3(...local)
+      .applyAxisAngle(UP, this.yaw)
+      .add(
+        new Vector3(
+          this.at.x + this.at.outward.x * 0.2,
+          this.base,
+          this.at.y + this.at.outward.y * 0.2,
+        ),
+      );
+    this.animated.push({
+      geometry,
+      lamp,
+      position: [pivot.x, pivot.y, pivot.z],
+      yaw: this.yaw,
+      motion,
+      rate,
+      phase: motionPhase(this.motions++),
+    });
   }
 
   private rotate(g: BufferGeometry, [x, y, z]: V3) {
@@ -217,7 +402,15 @@ function beacon(b: Builder) {
   b.box([0.5, 0.08, 0.5], [0, 0.04, 0], "#767b78");
   b.cylinder(0.05, 0.06, 1.0, [0, 0.58, 0], "#8c9291");
   b.cylinder(0.13, 0.15, 0.14, [0, 1.15, 0], IRON, 10);
-  b.cylinder(0.11, 0.11, 0.26, [0, 1.35, 0], RED, 10, true);
+  // The warning lamp breathes, as a real beacon does.
+  b.animate(
+    new CylinderGeometry(0.11, 0.11, 0.26, 10),
+    RED,
+    [0, 1.35, 0],
+    true,
+    "pulse",
+    0.8,
+  );
   b.cylinder(0.14, 0.12, 0.05, [0, 1.51, 0], IRON, 10);
   for (let i = 0; i < 4; i++) {
     const a = (i * Math.PI) / 2 + Math.PI / 4;
@@ -356,5 +549,9 @@ export function roofFeatureParts(
       : 0;
     object?.parts.forEach((part) => builder.objectPart(part, inset));
   }
-  return { solid: builder.solid, lamps: builder.lamps };
+  return {
+    solid: builder.solid,
+    lamps: builder.lamps,
+    animated: builder.animated,
+  };
 }

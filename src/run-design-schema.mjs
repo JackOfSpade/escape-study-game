@@ -3,12 +3,19 @@
 // corrects shape mistakes in the same turn instead of costing a repair round).
 // They describe shape only: the run-design validators remain the authority
 // for cross-field rules, geometry, novelty and writing quality.
-import { PROP_CATALOG, SCENE_FURNITURE_KINDS } from "./scene-catalog.mjs";
+import { SCENE_FURNITURE_KINDS } from "./scene-catalog.mjs";
 import {
   CANOPY_STYLES,
   FACADES,
   FLOOR_FINISHES,
+  GROUNDS,
+  MOTION_LIMITS,
+  NEIGHBOR_STYLES,
   OBJECT_AXES,
+  OBJECT_MOTIONS,
+  PROP_OBJECT_LIMITS,
+  SCENERY_LIMIT,
+  WEATHERS,
   OBJECT_FINISHES,
   OBJECT_LIMITS,
   OBJECT_ROLES,
@@ -20,7 +27,7 @@ import {
   VENUES,
   WINDOW_STYLES,
 } from "./setting-catalog.mjs";
-import { TITLE_CARD_FONTS } from "./run-design-contract.mjs";
+import { ROOM_SHAPES, TITLE_CARD_FONTS } from "./run-design-contract.mjs";
 
 const obj = (properties, required = Object.keys(properties)) => ({
   type: "object",
@@ -94,8 +101,33 @@ const part = obj({
   w: num(...OBJECT_LIMITS.part.w),
   d: num(...OBJECT_LIMITS.part.d),
   h: num(...OBJECT_LIMITS.part.h),
+  pitch: num(-MOTION_LIMITS.tilt, MOTION_LIMITS.tilt),
+  roll: num(-MOTION_LIMITS.tilt, MOTION_LIMITS.tilt),
+  motion: oneOf(OBJECT_MOTIONS),
+  rate: num(...MOTION_LIMITS.rate),
   color: hex,
   finish: oneOf(OBJECT_FINISHES),
+});
+const customProp = obj({
+  id: slug(24),
+  name: str(32),
+  size: obj({
+    w: num(0.02, PROP_OBJECT_LIMITS.size),
+    d: num(0.02, PROP_OBJECT_LIMITS.size),
+    h: num(0.02, PROP_OBJECT_LIMITS.size),
+  }),
+  parts: arr(part, 1, PROP_OBJECT_LIMITS.parts),
+});
+const surroundings = obj({
+  ground: oneOf(GROUNDS),
+  groundColor: hex,
+  pathColor: hex,
+  sky: obj({ zenith: hex, horizon: hex }),
+  fog: obj({ color: hex, density: num(0, 1) }),
+  neighbors: oneOf(NEIGHBOR_STYLES),
+  neighborColor: hex,
+  weather: oneOf(WEATHERS),
+  scenery: arr(slug(24), 0, SCENERY_LIMIT),
 });
 const customObject = obj({
   id: slug(24),
@@ -141,6 +173,8 @@ const setting = obj({
     screen: hex,
   }),
   objects: arr(customObject, 0, OBJECT_LIMITS.objects),
+  props: arr(customProp, 0, PROP_OBJECT_LIMITS.props),
+  surroundings,
   filler: nullable(
     obj(
       Object.fromEntries(ROOM_FUNCTIONS.map((fn) => [fn, arr(str(24), 1, 6)])),
@@ -150,7 +184,8 @@ const setting = obj({
 const condition = oneOf(["intact", "worn", "damaged"]);
 const prop = obj({
   id: slug(24),
-  kind: oneOf(Object.keys(PROP_CATALOG)),
+  // Built-in props or this design's own setting.props ids (validator checks).
+  kind: { type: "string", pattern: "^[a-zA-Z][a-zA-Z0-9-]{0,23}$" },
   at: obj({ x: num(-1, 1), y: num(-1, 1) }),
   angle: num(-180, 180),
   scale: num(0.65, 1.25),
@@ -201,8 +236,10 @@ const floor = obj(
     brokenGuard: obj({ segment: oneOf([3, 4]), bay: oneOf([1, 2]) }),
     scene: obj({ version: { const: 2 }, rooms: arr(room, 4, 4) }),
     doors: arr(door, 4, 4),
+    roomShapes: arr(oneOf(ROOM_SHAPES), 4, 4),
   },
   [
+    "roomShapes",
     "name",
     "family",
     "roomOrder",

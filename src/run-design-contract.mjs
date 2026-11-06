@@ -186,6 +186,14 @@ export const FOOTPRINT_SHAPES = Object.freeze([
   "notched",
   "tee",
 ]);
+/** How a study room's corners and sub-rooms are carved from the grid; the
+ * plan validators still guarantee routes, terminals and egress. */
+export const ROOM_SHAPES = Object.freeze([
+  "rect",
+  "chamfered",
+  "rounded",
+  "octagon",
+]);
 const roomTypes = [
   "break",
   "cubicles",
@@ -278,6 +286,7 @@ function parseBlueprint(v, provisional = false) {
         "brokenGuard",
         ...(v.version >= 2 ? ["scene"] : []),
         ...(Object.hasOwn(f, "doors") ? ["doors"] : []),
+        ...(v3 && Object.hasOwn(f, "roomShapes") ? ["roomShapes"] : []),
       ],
       p,
     );
@@ -323,6 +332,10 @@ function parseBlueprint(v, provisional = false) {
     object(f.brokenGuard, ["segment", "bay"], `${p}.brokenGuard`);
     choice(f.brokenGuard.segment, [3, 4], `${p}.brokenGuard.segment`);
     choice(f.brokenGuard.bay, [1, 2], `${p}.brokenGuard.bay`);
+    if (Object.hasOwn(f, "roomShapes"))
+      array(f.roomShapes, 4, 4, `${p}.roomShapes`, (shape, q) =>
+        choice(shape, ROOM_SHAPES, q),
+      );
   });
   text(v.roofName, 48, "roofName");
   array(v.roster, 19, 19, "roster", (a, p) => {
@@ -346,6 +359,7 @@ function parseBlueprint(v, provisional = false) {
             v.roster.map((a) => a.name),
             `floors[${index}].scene`,
             v.setting?.objects ?? [],
+            v.setting?.props ?? [],
           )
         : parseSceneDesign(
             floor.scene,
@@ -516,7 +530,12 @@ export function summarizeRunDesign(d) {
         o.parts.map((p) => p.shape).sort(),
       ]),
       filler: d.setting.filler,
+      surroundings: d.setting.surroundings,
+      props: d.setting.props.map((o) => o.parts.map((p) => p.shape).sort()),
     });
+    // Carved room shapes change the spatial plan, not just its look.
+    if (d.floors.some((f) => f.roomShapes))
+      spatial.push(d.floors.map((f) => f.roomShapes ?? null));
   }
   if (d.version >= 2) {
     const rooms = d.floors.flatMap((f) => f.scene.rooms),
@@ -840,7 +859,7 @@ version:as requested above; title(1-64 characters), premise(1-240), opening(1-20
 footprint:{shape:${FOOTPRINT_SHAPES.join("|")},width:36|38|40,top:integer2..4,inset:integer2..4,mirrored:boolean,shoulder:integer top+8..top+14}. The footprint is the building's silhouette seen from above and from the street: rectangle is a plain block; chamfered cuts all four corners by inset; stepped narrows one side by inset beyond the shoulder row (mirrored picks the side); waisted pinches both sides by inset around the shoulder row; tapered narrows steadily from the full-width entrance front to a back narrower by inset on each side; notched cuts square inset notches into all four corners; tee keeps a full-width back block and a front wing narrower by inset on each side from the shoulder row. Choose the silhouette that suits this building.
 ${SETTING_GUIDANCE}
 floors:exactly4 entries in ascending order, each {name(1-48),family:stack|columns|serpentine,roomOrder:permutation[0,1,3],layoutSeed:uint32,roomTypes:4 entries indexed rooms0..3 each break|cubicles|meeting|storage|reception|manager (their meaning follows setting.venue),subroomKinds:1..4 unique entries office|meeting|storage|break,furnitureDensity:0.5..1.5,fieldQuotas:4 integers2..6 indexed rooms0..3 (the public entrance to room2 is always free; its outgoing field uses quota2),power:4 entries lit|dim|outage indexed rooms0..3 with room2 lit,stories:exactly6 {title(1-36),lines:1..4 strings each1-50},brokenGuard:{segment:3|4,bay:1|2}}. The six story cards are three wall posters, a whiteboard, a desk photo caption and a desk note. These are actual visible words, not instructions to a renderer. layoutSeed fills smaller geometrical details; family/order are your direct choices. Each ordinary floor keeps all four study rooms along the route; no bypasses. Free hall and entry remain readable.
-Optional doors, on any floor: doors:exactly4 DoorDesign where doors[r] is the door leading out of room r and doors[2] also covers the hall entrance, and mainDoor:DoorDesign at the top level for the building's main entrance. DoorDesign:{material:wood|steel|glass|fire|security,color:hex,accent:hex,window:none|slit|half|full,label:1..32 short name shown to the player,health:integer400..2400 starting hit points}. Vary doors so they fit each room and the premise. Glass, half and full windows can be seen through when closed, and doors close themselves when zombies come near. The engine always keeps door access rules and can raise the hall entrance's health to protect study time.
+Version3 floors also take roomShapes:4 entries indexed rooms0..3 each ${ROOM_SHAPES.join("|")}: how that study room and its sub-rooms are carved from the grid (chamfered cuts the corners at 45°, rounded curves them, octagon makes eight-sided rooms; rect keeps square corners). The engine keeps every route, terminal and exit valid and may square off a corner that would block one. Optional doors, on any floor: doors:exactly4 DoorDesign where doors[r] is the door leading out of room r and doors[2] also covers the hall entrance, and mainDoor:DoorDesign at the top level for the building's main entrance. DoorDesign:{material:wood|steel|glass|fire|security,color:hex,accent:hex,window:none|slit|half|full,label:1..32 short name shown to the player,health:integer400..2400 starting hit points}. Vary doors so they fit each room and the premise. Glass, half and full windows can be seen through when closed, and doors close themselves when zombies come near. The engine always keeps door access rules and can raise the hall entrance's health to protect study time.
 Include titleCard at the top level of every new design (it is optional only so older designs stay valid): {title:TitleStyle,story:TitleStyle}. The game opens on a pure black screen showing the run's title in the title style, then the premise and opening as the scene-setting backstory in the story style, with a Start button beneath. TitleStyle:{font:one of ${Object.keys(TITLE_CARD_FONTS).join("|")},color:six-digit hex readable on pure black (WCAG contrast at least 3 for title and 4.5 for story),size:integer pixels (title ${TITLE_CARD_SIZES.title[0]}..${TITLE_CARD_SIZES.title[1]}, story ${TITLE_CARD_SIZES.story[0]}..${TITLE_CARD_SIZES.story[1]})}. Choose the font, color and size of each so the card sets this premise's particular mood; vary them between runs instead of always choosing the same look, and keep the story readable as several sentences of body text.
 roster:exactly19 {name:unique1-20 characters distinct from You,role:builder|analyst|rusher|medic|skeptic,skill:0.4..0.9,risk:0.2..0.8,social:0.2..0.8}. Build a varied ensemble; names referenced in stories must belong to it.
 city:{roadWidth:integer7..9,boulevardOffset:integer15..19,districtSize:integer18..25,buildingHeightMin:9..18,buildingHeightMax:25..45,damageRate:0..0.7,palette:3..6 six-digit hex colors}.

@@ -451,7 +451,8 @@
               ]
             }
           ]
-        }
+        },
+        "roomShapes": ["rect", "chamfered", "rect", "rect"]
       },
       {
         "name": "STUDIO FLOOR",
@@ -894,7 +895,8 @@
               ]
             }
           ]
-        }
+        },
+        "roomShapes": ["rect", "rect", "chamfered", "rect"]
       },
       {
         "name": "RECORD LIBRARY",
@@ -1365,7 +1367,8 @@
               ]
             }
           ]
-        }
+        },
+        "roomShapes": ["chamfered", "rect", "rect", "rect"]
       },
       {
         "name": "TRANSMITTER LEVEL",
@@ -1836,7 +1839,8 @@
               ]
             }
           ]
-        }
+        },
+        "roomShapes": ["rect", "rect", "rect", "chamfered"]
       }
     ],
     "roofName": "TRANSMITTER ROOF",
@@ -1986,7 +1990,7 @@
     },
     "exterior": {
       "buildingName": "KRDW 91.3 COMMUNITY RADIO",
-      "buildingSubtitle": "STUDIOS \u2022 RECORD LIBRARY",
+      "buildingSubtitle": "STUDIOS • RECORD LIBRARY",
       "quarantineTitle": "SIGNAL CORDON",
       "quarantineSubtitle": "DISTRICT EVACUATION",
       "skyline": {
@@ -2076,11 +2080,29 @@
         "screen": "#7fe8d6"
       },
       "objects": [],
+      "props": [],
+      "surroundings": {
+        "ground": "asphalt",
+        "groundColor": "#3b3f44",
+        "pathColor": "#2b2e33",
+        "sky": {
+          "zenith": "#0d1622",
+          "horizon": "#3a4656"
+        },
+        "fog": {
+          "color": "#1c2430",
+          "density": 0.2
+        },
+        "neighbors": "buildings",
+        "neighborColor": "#4a4f57",
+        "weather": "rain",
+        "scenery": []
+      },
       "filler": null
     },
     "environment": {
       "version": 1,
-      "surfaceFingerprint": "ebce09929f655db8",
+      "surfaceFingerprint": "88104b005a67e342",
       "surfaces": [
         {
           "id": "building:entrance-sign",
@@ -2099,7 +2121,7 @@
             "yaw": 0,
             "pitch": 0
           },
-          "context": "LOBBY & NEWSROOM.  KRDW 91.3 COMMUNITY RADIO. STUDIOS \u2022 RECORD LIBRARY",
+          "context": "LOBBY & NEWSROOM.  KRDW 91.3 COMMUNITY RADIO. STUDIOS • RECORD LIBRARY",
           "maxTitle": 48,
           "maxBody": 100,
           "allowsArt": true
@@ -4048,29 +4070,6 @@
           "allowsArt": true
         },
         {
-          "id": "f0-room1-break2-cafeTable0:papers",
-          "floor": 0,
-          "scope": "interior",
-          "role": "desk-papers",
-          "room": 1,
-          "owner": "Cal",
-          "binding": {
-            "kind": "furniture",
-            "furnitureId": "f0-room1-break2-cafeTable0",
-            "x": -0.186,
-            "y": -0.15300000000000002,
-            "z": 0.8285,
-            "width": 0.2375,
-            "height": 0.27549999999999997,
-            "yaw": 0,
-            "pitch": -1.5707963267948966
-          },
-          "context": "LOBBY & NEWSROOM. Green Room Top sheet of this desk's paper stack.",
-          "maxTitle": 28,
-          "maxBody": 100,
-          "allowsArt": true
-        },
-        {
           "id": "f0-room2b-cubicles0-desk0:note",
           "floor": 0,
           "scope": "interior",
@@ -4255,7 +4254,7 @@
           "allowsArt": true
         },
         {
-          "id": "f0-room3r1-break1-cafeTable0:papers",
+          "id": "f0-room3r1-break1-coffeeTable1:papers",
           "floor": 0,
           "scope": "interior",
           "role": "desk-papers",
@@ -4263,7 +4262,30 @@
           "owner": "Dev",
           "binding": {
             "kind": "furniture",
-            "furnitureId": "f0-room3r1-break1-cafeTable0",
+            "furnitureId": "f0-room3r1-break1-coffeeTable1",
+            "x": -0.252,
+            "y": -0.09599999999999999,
+            "z": 0.4885,
+            "width": 0.2375,
+            "height": 0.21659999999999996,
+            "yaw": 0,
+            "pitch": -1.5707963267948966
+          },
+          "context": "LOBBY & NEWSROOM. Record Library Top sheet of this desk's paper stack.",
+          "maxTitle": 28,
+          "maxBody": 100,
+          "allowsArt": true
+        },
+        {
+          "id": "f0-room3r1-break2-cafeTable0:papers",
+          "floor": 0,
+          "scope": "interior",
+          "role": "desk-papers",
+          "room": 3,
+          "owner": "Dev",
+          "binding": {
+            "kind": "furniture",
+            "furnitureId": "f0-room3r1-break2-cafeTable0",
             "x": -0.186,
             "y": -0.15300000000000002,
             "z": 0.8285,
@@ -4278,7 +4300,7 @@
           "allowsArt": true
         },
         {
-          "id": "f0-room3r1-break1-cafeTable0:photo",
+          "id": "f0-room3r1-break2-cafeTable0:photo",
           "floor": 0,
           "scope": "interior",
           "role": "desk-photo",
@@ -4286,7 +4308,7 @@
           "owner": "Dev",
           "binding": {
             "kind": "furniture",
-            "furnitureId": "f0-room3r1-break1-cafeTable0",
+            "furnitureId": "f0-room3r1-break2-cafeTable0",
             "x": 0.198,
             "y": -0.1565,
             "z": 0.93,
@@ -5154,7 +5176,7 @@
           "allowsArt": true
         },
         {
-          "id": "f0:wall:17:6:0:1",
+          "id": "f0:wall:16:7:-1:0",
           "floor": 0,
           "scope": "interior",
           "role": "wall-poster",
@@ -5162,12 +5184,12 @@
           "owner": "Cal",
           "binding": {
             "kind": "fixed",
-            "x": 17.5,
-            "y": 7.014,
+            "x": 15.986,
+            "y": 7.5,
             "z": 1.69,
             "width": 0.62,
             "height": 0.86,
-            "yaw": 0,
+            "yaw": 1.5707963267948966,
             "pitch": 0
           },
           "context": "LOBBY & NEWSROOM. Green Room Printed wall poster; every poster is a separate object.",
@@ -5220,7 +5242,7 @@
           "allowsArt": true
         },
         {
-          "id": "f0:wall:22:8:1:0",
+          "id": "f0:wall:21:7:-1:0",
           "floor": 0,
           "scope": "interior",
           "role": "wall-poster",
@@ -5228,12 +5250,12 @@
           "owner": "Cal",
           "binding": {
             "kind": "fixed",
-            "x": 23.014,
-            "y": 8.5,
+            "x": 20.986,
+            "y": 7.5,
             "z": 1.69,
             "width": 0.62,
             "height": 0.86,
-            "yaw": -1.5707963267948966,
+            "yaw": 1.5707963267948966,
             "pitch": 0
           },
           "context": "LOBBY & NEWSROOM. Green Room Printed wall poster; every poster is a separate object.",
@@ -5398,30 +5420,30 @@
           "allowsArt": true
         },
         {
-          "id": "f1-lobby-reception0-reception0:note",
+          "id": "f1-lobby-break1-coffeeTable1:papers",
           "floor": 1,
           "scope": "interior",
-          "role": "desk-note",
+          "role": "desk-papers",
           "room": null,
           "owner": null,
           "binding": {
             "kind": "furniture",
-            "furnitureId": "f1-lobby-reception0-reception0",
-            "x": -0.528,
-            "y": -0.1652,
-            "z": 1.128,
-            "width": 0.205,
-            "height": 0.23779999999999996,
+            "furnitureId": "f1-lobby-break1-coffeeTable1",
+            "x": -0.252,
+            "y": -0.09599999999999999,
+            "z": 0.4885,
+            "width": 0.2375,
+            "height": 0.21659999999999996,
             "yaw": 0,
             "pitch": -1.5707963267948966
           },
-          "context": "STUDIO FLOOR.  Personal note on this desk's paper stack.",
+          "context": "STUDIO FLOOR.  Top sheet of this desk's paper stack.",
           "maxTitle": 28,
           "maxBody": 100,
           "allowsArt": true
         },
         {
-          "id": "f1-lobby-reception0-reception0:photo",
+          "id": "f1-lobby-break1-coffeeTable1:photo",
           "floor": 1,
           "scope": "interior",
           "role": "desk-photo",
@@ -5429,10 +5451,10 @@
           "owner": null,
           "binding": {
             "kind": "furniture",
-            "furnitureId": "f1-lobby-reception0-reception0",
-            "x": 0.528,
-            "y": -0.1565,
-            "z": 1.22,
+            "furnitureId": "f1-lobby-break1-coffeeTable1",
+            "x": 0.264,
+            "y": -0.09949999999999999,
+            "z": 0.59,
             "width": 0.136,
             "height": 0.176,
             "yaw": 0,
@@ -5441,29 +5463,6 @@
           "context": "STUDIO FLOOR.  Framed desk photograph. Illustrate the people or scene; any caption belongs to this frame.",
           "maxTitle": 24,
           "maxBody": 60,
-          "allowsArt": true
-        },
-        {
-          "id": "f1-lobby-reception2-coffeeTable1:note",
-          "floor": 1,
-          "scope": "interior",
-          "role": "desk-note",
-          "room": null,
-          "owner": null,
-          "binding": {
-            "kind": "furniture",
-            "furnitureId": "f1-lobby-reception2-coffeeTable1",
-            "x": -0.264,
-            "y": -0.10944,
-            "z": 0.498,
-            "width": 0.205,
-            "height": 0.18695999999999996,
-            "yaw": 0,
-            "pitch": -1.5707963267948966
-          },
-          "context": "STUDIO FLOOR.  Personal note on this desk's paper stack.",
-          "maxTitle": 28,
-          "maxBody": 100,
           "allowsArt": true
         },
         {
@@ -5513,7 +5512,7 @@
           "allowsArt": true
         },
         {
-          "id": "f1-room2c-cubicles4-desk0:papers",
+          "id": "f1-room2c-cubicles3-desk0:papers",
           "floor": 1,
           "scope": "interior",
           "role": "desk-papers",
@@ -5521,7 +5520,7 @@
           "owner": "Tamsin",
           "binding": {
             "kind": "furniture",
-            "furnitureId": "f1-room2c-cubicles4-desk0",
+            "furnitureId": "f1-room2c-cubicles3-desk0",
             "x": -0.47200000000000003,
             "y": -0.17200000000000001,
             "z": 0.8685,
@@ -5536,7 +5535,7 @@
           "allowsArt": true
         },
         {
-          "id": "f1-room2c-cubicles4-desk0:photo",
+          "id": "f1-room2c-cubicles3-desk0:photo",
           "floor": 1,
           "scope": "interior",
           "role": "desk-photo",
@@ -5544,7 +5543,7 @@
           "owner": "Tamsin",
           "binding": {
             "kind": "furniture",
-            "furnitureId": "f1-room2c-cubicles4-desk0",
+            "furnitureId": "f1-room2c-cubicles3-desk0",
             "x": 0.48400000000000004,
             "y": -0.1755,
             "z": 0.9700000000000001,
@@ -5556,6 +5555,29 @@
           "context": "STUDIO FLOOR. Newsroom Framed desk photograph. Illustrate the people or scene; any caption belongs to this frame.",
           "maxTitle": 24,
           "maxBody": 60,
+          "allowsArt": true
+        },
+        {
+          "id": "f1-room3-break1-cafeTable0:papers",
+          "floor": 1,
+          "scope": "interior",
+          "role": "desk-papers",
+          "room": 3,
+          "owner": "Paz",
+          "binding": {
+            "kind": "furniture",
+            "furnitureId": "f1-room3-break1-cafeTable0",
+            "x": -0.186,
+            "y": -0.15300000000000002,
+            "z": 0.8285,
+            "width": 0.2375,
+            "height": 0.27549999999999997,
+            "yaw": 0,
+            "pitch": -1.5707963267948966
+          },
+          "context": "STUDIO FLOOR. Green Room Top sheet of this desk's paper stack.",
+          "maxTitle": 28,
+          "maxBody": 100,
           "allowsArt": true
         },
         {
@@ -6678,6 +6700,29 @@
           "allowsArt": true
         },
         {
+          "id": "f2-lobby-break3-cafeTable0:papers",
+          "floor": 2,
+          "scope": "interior",
+          "role": "desk-papers",
+          "room": null,
+          "owner": null,
+          "binding": {
+            "kind": "furniture",
+            "furnitureId": "f2-lobby-break3-cafeTable0",
+            "x": -0.186,
+            "y": -0.15300000000000002,
+            "z": 0.8285,
+            "width": 0.2375,
+            "height": 0.27549999999999997,
+            "yaw": 0,
+            "pitch": -1.5707963267948966
+          },
+          "context": "RECORD LIBRARY.  Top sheet of this desk's paper stack.",
+          "maxTitle": 28,
+          "maxBody": 100,
+          "allowsArt": true
+        },
+        {
           "id": "f2-room3-manager0-mixingConsole0:papers",
           "floor": 2,
           "scope": "interior",
@@ -7689,6 +7734,28 @@
           "allowsArt": true
         },
         {
+          "id": "f2:wall:3:10:1:0",
+          "floor": 2,
+          "scope": "interior",
+          "role": "wall-poster",
+          "room": 0,
+          "owner": "Ellis",
+          "binding": {
+            "kind": "fixed",
+            "x": 4.014,
+            "y": 10.5,
+            "z": 1.69,
+            "width": 0.62,
+            "height": 0.86,
+            "yaw": -1.5707963267948966,
+            "pitch": 0
+          },
+          "context": "RECORD LIBRARY. Record Library Printed wall poster; every poster is a separate object.",
+          "maxTitle": 48,
+          "maxBody": 160,
+          "allowsArt": true
+        },
+        {
           "id": "f2:wall:33:19:0:-1",
           "floor": 2,
           "scope": "interior",
@@ -7706,28 +7773,6 @@
             "pitch": 0
           },
           "context": "RECORD LIBRARY. Studio B Printed wall poster; every poster is a separate object.",
-          "maxTitle": 48,
-          "maxBody": 160,
-          "allowsArt": true
-        },
-        {
-          "id": "f2:wall:34:22:-1:0",
-          "floor": 2,
-          "scope": "interior",
-          "role": "wall-poster",
-          "room": 2,
-          "owner": "Ren",
-          "binding": {
-            "kind": "fixed",
-            "x": 33.986,
-            "y": 22.5,
-            "z": 1.69,
-            "width": 0.62,
-            "height": 0.86,
-            "yaw": 1.5707963267948966,
-            "pitch": 0
-          },
-          "context": "RECORD LIBRARY. Newsroom Printed wall poster; every poster is a separate object.",
           "maxTitle": 48,
           "maxBody": 160,
           "allowsArt": true
@@ -7890,30 +7935,30 @@
           "allowsArt": true
         },
         {
-          "id": "f3-entry-reception7-reception0:note",
+          "id": "f3-entry-reception8-reception0:papers",
           "floor": 3,
           "scope": "interior",
-          "role": "desk-note",
+          "role": "desk-papers",
           "room": null,
           "owner": null,
           "binding": {
             "kind": "furniture",
-            "furnitureId": "f3-entry-reception7-reception0",
-            "x": -0.528,
-            "y": -0.1652,
-            "z": 1.128,
-            "width": 0.205,
-            "height": 0.23779999999999996,
+            "furnitureId": "f3-entry-reception8-reception0",
+            "x": -0.516,
+            "y": -0.15300000000000002,
+            "z": 1.1185,
+            "width": 0.2375,
+            "height": 0.27549999999999997,
             "yaw": 0,
             "pitch": -1.5707963267948966
           },
-          "context": "TRANSMITTER LEVEL.  Personal note on this desk's paper stack.",
+          "context": "TRANSMITTER LEVEL.  Top sheet of this desk's paper stack.",
           "maxTitle": 28,
           "maxBody": 100,
           "allowsArt": true
         },
         {
-          "id": "f3-entry-reception7-reception0:photo",
+          "id": "f3-entry-reception8-reception0:photo",
           "floor": 3,
           "scope": "interior",
           "role": "desk-photo",
@@ -7921,7 +7966,7 @@
           "owner": null,
           "binding": {
             "kind": "furniture",
-            "furnitureId": "f3-entry-reception7-reception0",
+            "furnitureId": "f3-entry-reception8-reception0",
             "x": 0.528,
             "y": -0.1565,
             "z": 1.22,
@@ -8906,6 +8951,28 @@
           "allowsArt": true
         },
         {
+          "id": "f3:wall:12:23:0:1",
+          "floor": 3,
+          "scope": "interior",
+          "role": "wall-poster",
+          "room": null,
+          "owner": null,
+          "binding": {
+            "kind": "fixed",
+            "x": 12.5,
+            "y": 24.014,
+            "z": 1.69,
+            "width": 0.62,
+            "height": 0.86,
+            "yaw": 0,
+            "pitch": 0
+          },
+          "context": "TRANSMITTER LEVEL.  Printed wall poster; every poster is a separate object.",
+          "maxTitle": 48,
+          "maxBody": 160,
+          "allowsArt": true
+        },
+        {
           "id": "f3:wall:14:16:1:0",
           "floor": 3,
           "scope": "interior",
@@ -9060,23 +9127,23 @@
           "allowsArt": true
         },
         {
-          "id": "f3:wall:30:8:1:0",
+          "id": "f3:wall:31:7:0:-1",
           "floor": 3,
           "scope": "interior",
           "role": "wall-poster",
-          "room": 3,
-          "owner": "Sol",
+          "room": null,
+          "owner": null,
           "binding": {
             "kind": "fixed",
-            "x": 31.014,
-            "y": 8.5,
+            "x": 31.5,
+            "y": 6.986,
             "z": 1.69,
             "width": 0.62,
             "height": 0.86,
-            "yaw": -1.5707963267948966,
+            "yaw": -3.141592653589793,
             "pitch": 0
           },
-          "context": "TRANSMITTER LEVEL. Studio B Printed wall poster; every poster is a separate object.",
+          "context": "TRANSMITTER LEVEL.  Printed wall poster; every poster is a separate object.",
           "maxTitle": 48,
           "maxBody": 160,
           "allowsArt": true
@@ -9099,28 +9166,6 @@
             "pitch": 0
           },
           "context": "TRANSMITTER LEVEL.  Wall-mounted whiteboard writing and diagrams.",
-          "maxTitle": 48,
-          "maxBody": 160,
-          "allowsArt": true
-        },
-        {
-          "id": "f3:wall:37:7:0:1",
-          "floor": 3,
-          "scope": "interior",
-          "role": "wall-poster",
-          "room": 3,
-          "owner": "Sol",
-          "binding": {
-            "kind": "fixed",
-            "x": 37.5,
-            "y": 8.014,
-            "z": 1.69,
-            "width": 0.62,
-            "height": 0.86,
-            "yaw": 0,
-            "pitch": 0
-          },
-          "context": "TRANSMITTER LEVEL. Studio B Printed wall poster; every poster is a separate object.",
           "maxTitle": 48,
           "maxBody": 160,
           "allowsArt": true
@@ -10219,7 +10264,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f0-room1-break2-cafeTable0:papers",
+          "surfaceId": "f0-room2b-cubicles0-desk0:note",
           "layout": "text",
           "title": [
             {
@@ -10231,7 +10276,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f0-room2b-cubicles0-desk0:note",
+          "surfaceId": "f0-room2b-cubicles0-desk0:photo",
           "layout": "text",
           "title": [
             {
@@ -10243,7 +10288,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f0-room2b-cubicles0-desk0:photo",
+          "surfaceId": "f0-room2b-cubicles1-desk0:papers",
           "layout": "text",
           "title": [
             {
@@ -10255,7 +10300,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f0-room2b-cubicles1-desk0:papers",
+          "surfaceId": "f0-room2b-cubicles1-desk0:photo",
           "layout": "text",
           "title": [
             {
@@ -10267,7 +10312,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f0-room2b-cubicles1-desk0:photo",
+          "surfaceId": "f0-room2c-cubicles0-desk0:note",
           "layout": "text",
           "title": [
             {
@@ -10279,7 +10324,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f0-room2c-cubicles0-desk0:note",
+          "surfaceId": "f0-room2c-cubicles0-desk0:photo",
           "layout": "text",
           "title": [
             {
@@ -10291,7 +10336,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f0-room2c-cubicles0-desk0:photo",
+          "surfaceId": "f0-room2c-cubicles1-desk0:papers",
           "layout": "text",
           "title": [
             {
@@ -10303,7 +10348,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f0-room2c-cubicles1-desk0:papers",
+          "surfaceId": "f0-room2c-cubicles1-desk0:photo",
           "layout": "text",
           "title": [
             {
@@ -10315,7 +10360,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f0-room2c-cubicles1-desk0:photo",
+          "surfaceId": "f0-room3r1-break1-coffeeTable1:papers",
           "layout": "text",
           "title": [
             {
@@ -10327,7 +10372,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f0-room3r1-break1-cafeTable0:papers",
+          "surfaceId": "f0-room3r1-break2-cafeTable0:papers",
           "layout": "text",
           "title": [
             {
@@ -10339,7 +10384,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f0-room3r1-break1-cafeTable0:photo",
+          "surfaceId": "f0-room3r1-break2-cafeTable0:photo",
           "layout": "text",
           "title": [
             {
@@ -10870,7 +10915,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f0:wall:17:6:0:1",
+          "surfaceId": "f0:wall:16:7:-1:0",
           "layout": "text",
           "title": [
             {
@@ -10906,7 +10951,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f0:wall:22:8:1:0",
+          "surfaceId": "f0:wall:21:7:-1:0",
           "layout": "text",
           "title": [
             {
@@ -11002,7 +11047,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f1-lobby-reception0-reception0:note",
+          "surfaceId": "f1-lobby-break1-coffeeTable1:papers",
           "layout": "text",
           "title": [
             {
@@ -11014,7 +11059,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f1-lobby-reception0-reception0:photo",
+          "surfaceId": "f1-lobby-break1-coffeeTable1:photo",
           "layout": "text",
           "title": [
             {
@@ -11026,7 +11071,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f1-lobby-reception2-coffeeTable1:note",
+          "surfaceId": "f1-room2b-cubicles2-desk0:papers",
           "layout": "text",
           "title": [
             {
@@ -11038,7 +11083,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f1-room2b-cubicles2-desk0:papers",
+          "surfaceId": "f1-room2b-cubicles2-desk0:photo",
           "layout": "text",
           "title": [
             {
@@ -11050,7 +11095,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f1-room2b-cubicles2-desk0:photo",
+          "surfaceId": "f1-room2c-cubicles3-desk0:papers",
           "layout": "text",
           "title": [
             {
@@ -11062,7 +11107,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f1-room2c-cubicles4-desk0:papers",
+          "surfaceId": "f1-room2c-cubicles3-desk0:photo",
           "layout": "text",
           "title": [
             {
@@ -11074,7 +11119,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f1-room2c-cubicles4-desk0:photo",
+          "surfaceId": "f1-room3-break1-cafeTable0:papers",
           "layout": "text",
           "title": [
             {
@@ -11749,7 +11794,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f2-room3-manager0-mixingConsole0:papers",
+          "surfaceId": "f2-lobby-break3-cafeTable0:papers",
           "layout": "text",
           "title": [
             {
@@ -11761,7 +11806,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f2-scene-room0-r0-recordshelf-0-r0-0-cassette-1:face",
+          "surfaceId": "f2-room3-manager0-mixingConsole0:papers",
           "layout": "text",
           "title": [
             {
@@ -11773,7 +11818,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f2-scene-room0-r0-recordshelf-0-r0-0-record-0:face",
+          "surfaceId": "f2-scene-room0-r0-recordshelf-0-r0-0-cassette-1:face",
           "layout": "text",
           "title": [
             {
@@ -11785,7 +11830,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f2-scene-room0-r0-recordshelf-0:label",
+          "surfaceId": "f2-scene-room0-r0-recordshelf-0-r0-0-record-0:face",
           "layout": "text",
           "title": [
             {
@@ -11797,7 +11842,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f2-scene-room0-r0-recordshelf-1-r0-1-book-1:face",
+          "surfaceId": "f2-scene-room0-r0-recordshelf-0:label",
           "layout": "text",
           "title": [
             {
@@ -11809,7 +11854,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f2-scene-room0-r0-recordshelf-1-r0-1-record-0:face",
+          "surfaceId": "f2-scene-room0-r0-recordshelf-1-r0-1-book-1:face",
           "layout": "text",
           "title": [
             {
@@ -11821,7 +11866,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f2-scene-room0-r0-recordshelf-1:label",
+          "surfaceId": "f2-scene-room0-r0-recordshelf-1-r0-1-record-0:face",
           "layout": "text",
           "title": [
             {
@@ -11833,7 +11878,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f2-scene-room0-r0-reeltoreel-2:label",
+          "surfaceId": "f2-scene-room0-r0-recordshelf-1:label",
           "layout": "text",
           "title": [
             {
@@ -11845,7 +11890,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f2-scene-room0-r0-turntable-3:label",
+          "surfaceId": "f2-scene-room0-r0-reeltoreel-2:label",
           "layout": "text",
           "title": [
             {
@@ -11857,7 +11902,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f2-scene-room1-r1-micstand-1:label",
+          "surfaceId": "f2-scene-room0-r0-turntable-3:label",
           "layout": "text",
           "title": [
             {
@@ -11869,7 +11914,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f2-scene-room1-r1-micstand-2:label",
+          "surfaceId": "f2-scene-room1-r1-micstand-1:label",
           "layout": "text",
           "title": [
             {
@@ -11881,7 +11926,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f2-scene-room1-r1-onairlight-4:label",
+          "surfaceId": "f2-scene-room1-r1-micstand-2:label",
           "layout": "text",
           "title": [
             {
@@ -11893,11 +11938,23 @@
           "drawing": null
         },
         {
-          "surfaceId": "f2-scene-room1-r1-soundpanel-3:label",
+          "surfaceId": "f2-scene-room1-r1-onairlight-4:label",
           "layout": "text",
           "title": [
             {
               "text": "Lantern Groove"
+            }
+          ],
+          "body": [],
+          "description": "",
+          "drawing": null
+        },
+        {
+          "surfaceId": "f2-scene-room1-r1-soundpanel-3:label",
+          "layout": "text",
+          "title": [
+            {
+              "text": "Lantern Reel"
             }
           ],
           "body": [],
@@ -11946,7 +12003,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Lantern Reel"
+              "text": "Lantern Cue"
             }
           ],
           "body": [],
@@ -11958,7 +12015,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Lantern Cue"
+              "text": "Lantern Waveband"
             }
           ],
           "body": [],
@@ -11970,7 +12027,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Lantern Waveband"
+              "text": "Lantern Chorus"
             }
           ],
           "body": [],
@@ -11982,7 +12039,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Lantern Chorus"
+              "text": "Lantern Sleeve"
             }
           ],
           "body": [],
@@ -11994,7 +12051,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Lantern Sleeve"
+              "text": "Lantern Handoff"
             }
           ],
           "body": [],
@@ -12043,7 +12100,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Lantern Handoff"
+              "text": "Lantern Relay"
             }
           ],
           "body": [],
@@ -12055,7 +12112,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Lantern Relay"
+              "text": "Lantern Meter"
             }
           ],
           "body": [],
@@ -12067,7 +12124,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Lantern Meter"
+              "text": "Lantern Dial"
             }
           ],
           "body": [],
@@ -12079,7 +12136,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Lantern Dial"
+              "text": "Lantern Shift"
             }
           ],
           "body": [],
@@ -12091,7 +12148,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Lantern Shift"
+              "text": "Signal Request"
             }
           ],
           "body": [],
@@ -12152,7 +12209,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Signal Request"
+              "text": "Signal Frequency"
             }
           ],
           "body": [],
@@ -12164,7 +12221,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Signal Frequency"
+              "text": "Signal Jingle"
             }
           ],
           "body": [],
@@ -12176,7 +12233,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Signal Jingle"
+              "text": "Signal Playlist"
             }
           ],
           "body": [],
@@ -12188,7 +12245,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Signal Playlist"
+              "text": "Signal Bulletin"
             }
           ],
           "body": [],
@@ -12200,7 +12257,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Signal Bulletin"
+              "text": "Signal Segment"
             }
           ],
           "body": [],
@@ -12212,7 +12269,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Signal Segment"
+              "text": "Signal Tower"
             }
           ],
           "body": [],
@@ -12224,7 +12281,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Signal Tower"
+              "text": "Signal Antenna"
             }
           ],
           "body": [],
@@ -12236,7 +12293,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Signal Antenna"
+              "text": "Signal Needle"
             }
           ],
           "body": [],
@@ -12260,7 +12317,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Signal Needle"
+              "text": "Signal Crossfade"
             }
           ],
           "body": [],
@@ -12272,7 +12329,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Signal Crossfade"
+              "text": "Signal Station"
             }
           ],
           "body": [],
@@ -12284,7 +12341,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Signal Station"
+              "text": "Signal Caller"
             }
           ],
           "body": [],
@@ -12364,7 +12421,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f2:wall:33:19:0:-1",
+          "surfaceId": "f2:wall:3:10:1:0",
           "layout": "text",
           "title": [
             {
@@ -12376,7 +12433,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f2:wall:34:22:-1:0",
+          "surfaceId": "f2:wall:33:19:0:-1",
           "layout": "text",
           "title": [
             {
@@ -12392,7 +12449,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Signal Caller"
+              "text": "Signal Turntable"
             }
           ],
           "body": [],
@@ -12404,7 +12461,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Signal Turntable"
+              "text": "Signal Groove"
             }
           ],
           "body": [],
@@ -12416,7 +12473,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Signal Groove"
+              "text": "Signal Reel"
             }
           ],
           "body": [],
@@ -12428,7 +12485,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Signal Reel"
+              "text": "Signal Cue"
             }
           ],
           "body": [],
@@ -12440,7 +12497,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Signal Cue"
+              "text": "Signal Waveband"
             }
           ],
           "body": [],
@@ -12452,7 +12509,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Signal Waveband"
+              "text": "Signal Chorus"
             }
           ],
           "body": [],
@@ -12464,18 +12521,6 @@
           "layout": "text",
           "title": [
             {
-              "text": "Signal Chorus"
-            }
-          ],
-          "body": [],
-          "description": "",
-          "drawing": null
-        },
-        {
-          "surfaceId": "f3-entry-reception7-reception0:note",
-          "layout": "text",
-          "title": [
-            {
               "text": "Signal Sleeve"
             }
           ],
@@ -12484,7 +12529,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f3-entry-reception7-reception0:photo",
+          "surfaceId": "f3-entry-reception8-reception0:papers",
           "layout": "text",
           "title": [
             {
@@ -12496,7 +12541,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f3-lobby-break1-coffeeTable1:note",
+          "surfaceId": "f3-entry-reception8-reception0:photo",
           "layout": "text",
           "title": [
             {
@@ -12508,7 +12553,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f3-lobby-break2-cafeTable0:papers",
+          "surfaceId": "f3-lobby-break1-coffeeTable1:note",
           "layout": "text",
           "title": [
             {
@@ -12520,7 +12565,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f3-lobby-break3-cafeTable0:note",
+          "surfaceId": "f3-lobby-break2-cafeTable0:papers",
           "layout": "text",
           "title": [
             {
@@ -12532,7 +12577,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f3-room0-manager0-mixingConsole0:papers",
+          "surfaceId": "f3-lobby-break3-cafeTable0:note",
           "layout": "text",
           "title": [
             {
@@ -12544,7 +12589,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f3-scene-room0-r0-equipmentrack-1:label",
+          "surfaceId": "f3-room0-manager0-mixingConsole0:papers",
           "layout": "text",
           "title": [
             {
@@ -12556,11 +12601,23 @@
           "drawing": null
         },
         {
-          "surfaceId": "f3-scene-room0-r0-mixingconsole-0-r0-0-cassette-1:face",
+          "surfaceId": "f3-scene-room0-r0-equipmentrack-1:label",
           "layout": "text",
           "title": [
             {
               "text": "Echo Frequency"
+            }
+          ],
+          "body": [],
+          "description": "",
+          "drawing": null
+        },
+        {
+          "surfaceId": "f3-scene-room0-r0-mixingconsole-0-r0-0-cassette-1:face",
+          "layout": "text",
+          "title": [
+            {
+              "text": "Echo Jingle"
             }
           ],
           "body": [],
@@ -12621,7 +12678,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Echo Jingle"
+              "text": "Echo Playlist"
             }
           ],
           "body": [],
@@ -12633,7 +12690,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Echo Playlist"
+              "text": "Echo Bulletin"
             }
           ],
           "body": [],
@@ -12645,7 +12702,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Echo Bulletin"
+              "text": "Echo Segment"
             }
           ],
           "body": [],
@@ -12657,7 +12714,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Echo Segment"
+              "text": "Echo Tower"
             }
           ],
           "body": [],
@@ -12669,7 +12726,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Echo Tower"
+              "text": "Echo Antenna"
             }
           ],
           "body": [],
@@ -12681,7 +12738,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Echo Antenna"
+              "text": "Echo Needle"
             }
           ],
           "body": [],
@@ -12693,7 +12750,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Echo Needle"
+              "text": "Echo Crossfade"
             }
           ],
           "body": [],
@@ -12705,7 +12762,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Echo Crossfade"
+              "text": "Echo Station"
             }
           ],
           "body": [],
@@ -12717,7 +12774,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Echo Station"
+              "text": "Echo Caller"
             }
           ],
           "body": [],
@@ -12729,7 +12786,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Echo Caller"
+              "text": "Echo Turntable"
             }
           ],
           "body": [],
@@ -12741,7 +12798,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Echo Turntable"
+              "text": "Echo Groove"
             }
           ],
           "body": [],
@@ -12753,7 +12810,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Echo Groove"
+              "text": "Echo Reel"
             }
           ],
           "body": [],
@@ -12765,7 +12822,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Echo Reel"
+              "text": "Echo Cue"
             }
           ],
           "body": [],
@@ -12777,7 +12834,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Echo Cue"
+              "text": "Echo Waveband"
             }
           ],
           "body": [],
@@ -12838,7 +12895,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Echo Waveband"
+              "text": "Echo Chorus"
             }
           ],
           "body": [],
@@ -12850,7 +12907,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Echo Chorus"
+              "text": "Echo Sleeve"
             }
           ],
           "body": [],
@@ -12862,7 +12919,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Echo Sleeve"
+              "text": "Echo Handoff"
             }
           ],
           "body": [],
@@ -12874,7 +12931,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Echo Handoff"
+              "text": "Echo Relay"
             }
           ],
           "body": [],
@@ -12886,7 +12943,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Echo Relay"
+              "text": "Echo Meter"
             }
           ],
           "body": [],
@@ -12898,7 +12955,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Echo Meter"
+              "text": "Echo Dial"
             }
           ],
           "body": [],
@@ -12910,7 +12967,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Echo Dial"
+              "text": "Echo Shift"
             }
           ],
           "body": [],
@@ -12971,7 +13028,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Echo Shift"
+              "text": "Hollow Request"
             }
           ],
           "body": [],
@@ -12983,7 +13040,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Hollow Request"
+              "text": "Hollow Frequency"
             }
           ],
           "body": [],
@@ -12995,7 +13052,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Hollow Frequency"
+              "text": "Hollow Jingle"
             }
           ],
           "body": [],
@@ -13007,7 +13064,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Hollow Jingle"
+              "text": "Hollow Playlist"
             }
           ],
           "body": [],
@@ -13019,7 +13076,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Hollow Playlist"
+              "text": "Hollow Bulletin"
             }
           ],
           "body": [],
@@ -13031,7 +13088,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Hollow Bulletin"
+              "text": "Hollow Segment"
             }
           ],
           "body": [],
@@ -13043,7 +13100,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Hollow Segment"
+              "text": "Hollow Tower"
             }
           ],
           "body": [],
@@ -13067,7 +13124,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Hollow Tower"
+              "text": "Hollow Antenna"
             }
           ],
           "body": [],
@@ -13079,7 +13136,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Hollow Antenna"
+              "text": "Hollow Needle"
             }
           ],
           "body": [],
@@ -13091,7 +13148,7 @@
           "layout": "text",
           "title": [
             {
-              "text": "Hollow Needle"
+              "text": "Hollow Crossfade"
             }
           ],
           "body": [],
@@ -13103,18 +13160,6 @@
           "layout": "text",
           "title": [
             {
-              "text": "Hollow Crossfade"
-            }
-          ],
-          "body": [],
-          "description": "",
-          "drawing": null
-        },
-        {
-          "surfaceId": "f3:wall:14:16:1:0",
-          "layout": "text",
-          "title": [
-            {
               "text": "Hollow Station"
             }
           ],
@@ -13123,7 +13168,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f3:wall:17:9:-1:0",
+          "surfaceId": "f3:wall:12:23:0:1",
           "layout": "text",
           "title": [
             {
@@ -13135,7 +13180,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f3:wall:18:23:0:1",
+          "surfaceId": "f3:wall:14:16:1:0",
           "layout": "text",
           "title": [
             {
@@ -13147,7 +13192,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f3:wall:21:17:0:-1",
+          "surfaceId": "f3:wall:17:9:-1:0",
           "layout": "text",
           "title": [
             {
@@ -13159,7 +13204,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f3:wall:22:10:1:0",
+          "surfaceId": "f3:wall:18:23:0:1",
           "layout": "text",
           "title": [
             {
@@ -13171,7 +13216,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f3:wall:26:17:0:-1",
+          "surfaceId": "f3:wall:21:17:0:-1",
           "layout": "text",
           "title": [
             {
@@ -13183,7 +13228,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f3:wall:26:23:0:-1",
+          "surfaceId": "f3:wall:22:10:1:0",
           "layout": "text",
           "title": [
             {
@@ -13195,7 +13240,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f3:wall:30:8:1:0",
+          "surfaceId": "f3:wall:26:17:0:-1",
           "layout": "text",
           "title": [
             {
@@ -13207,7 +13252,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f3:wall:35:23:0:1",
+          "surfaceId": "f3:wall:26:23:0:-1",
           "layout": "text",
           "title": [
             {
@@ -13219,7 +13264,7 @@
           "drawing": null
         },
         {
-          "surfaceId": "f3:wall:37:7:0:1",
+          "surfaceId": "f3:wall:31:7:0:-1",
           "layout": "text",
           "title": [
             {
@@ -13231,11 +13276,23 @@
           "drawing": null
         },
         {
-          "surfaceId": "f3:wall:7:17:0:1",
+          "surfaceId": "f3:wall:35:23:0:1",
           "layout": "text",
           "title": [
             {
               "text": "Hollow Relay"
+            }
+          ],
+          "body": [],
+          "description": "",
+          "drawing": null
+        },
+        {
+          "surfaceId": "f3:wall:7:17:0:1",
+          "layout": "text",
+          "title": [
+            {
+              "text": "Hollow Meter"
             }
           ],
           "body": [],

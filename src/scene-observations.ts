@@ -138,7 +138,7 @@ export function observableSceneDetails(
         x: pose.x,
         y: pose.y,
         elevation: pose.elevation + prop.h * 0.5,
-        title: prop.label || prop.kind,
+        title: prop.label || prop.object?.name || prop.kind,
         text: [
           prop.text,
           prop.owner ? `Marked for ${prop.owner}.` : "",

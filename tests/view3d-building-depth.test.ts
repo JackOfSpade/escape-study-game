@@ -262,6 +262,18 @@ function designed(
       screen: "#40e0d0",
     },
     objects: [],
+    props: [],
+    surroundings: {
+      ground: "asphalt",
+      groundColor: "#3b3f44",
+      pathColor: "#2b2e33",
+      sky: { zenith: "#0d1622", horizon: "#3a4656" },
+      fog: { color: "#1c2430", density: 0 },
+      neighbors: "buildings",
+      neighborColor: "#4a4f57",
+      weather: "none",
+      scenery: [],
+    },
     filler: null,
   };
 }
@@ -398,6 +410,10 @@ test("a roof feature may be a composed object drawn from its parts", () => {
         w: 1.2,
         d: 1.2,
         h: 2,
+        pitch: 0,
+        roll: 0,
+        motion: "none",
+        rate: 1,
         color: "#f2efe6",
         finish: "matte",
       },
@@ -410,6 +426,10 @@ test("a roof feature may be a composed object drawn from its parts", () => {
         w: 1.4,
         d: 1.4,
         h: 0.6,
+        pitch: 0,
+        roll: 0,
+        motion: "none",
+        rate: 1,
         color: "#8a2f2a",
         finish: "metal",
       },
@@ -422,6 +442,10 @@ test("a roof feature may be a composed object drawn from its parts", () => {
         w: 1.4,
         d: 1.4,
         h: 0.1,
+        pitch: 0,
+        roll: 0,
+        motion: "none",
+        rate: 1,
         color: "#2b2b2b",
         finish: "metal",
       },
@@ -434,6 +458,10 @@ test("a roof feature may be a composed object drawn from its parts", () => {
         w: 0.4,
         d: 0.4,
         h: 0.4,
+        pitch: 0,
+        roll: 0,
+        motion: "none",
+        rate: 1,
         color: "#fff2a0",
         finish: "glow",
       },
@@ -463,5 +491,113 @@ test("a roof feature may be a composed object drawn from its parts", () => {
   const before = JSON.stringify(game.floors.map((f) => f.tiles));
   shell.build(game.floors);
   assert.equal(JSON.stringify(game.floors.map((f) => f.tiles)), before);
+  shell.dispose();
+});
+
+function posedObject(
+  parts: Partial<RunSetting["objects"][number]["parts"][number]>[],
+): RunSetting["objects"][number] {
+  return {
+    id: "windmill-deck",
+    name: "Windmill deck",
+    role: "decor",
+    weight: "heavy",
+    size: { w: 2, d: 2, h: 3 },
+    surface: false,
+    parts: parts.map((p) => ({
+      shape: "box",
+      axis: "up",
+      x: 0,
+      y: 0,
+      z: 0,
+      w: 1,
+      d: 0.2,
+      h: 1,
+      color: "#cccccc",
+      finish: "matte",
+      pitch: 0,
+      roll: 0,
+      motion: "none",
+      rate: 1,
+      ...p,
+    })) as RunSetting["objects"][number]["parts"],
+  };
+}
+
+test("a still roof object has no animated parts and a tilted one bakes its tilt", () => {
+  const level = posedObject([{ d: 1, h: 0.2 }]),
+    tilted = posedObject([{ pitch: 40, roll: 0, d: 1, h: 0.2 }]);
+  const shape = (object: RunSetting["objects"][number]) => {
+    const { shell } = shellOf({
+      ...designed("stucco", "slit", [{ kind: object.id, x: 0.3, y: 0.1 }]),
+      objects: [object],
+    });
+    const mesh = shell.group.getObjectByName("roof-feature-structure") as any,
+      box = new Box3().setFromObject(mesh),
+      moving = shell.group.children.filter(
+        (c) => c.name === "roof-feature-moving",
+      ).length;
+    shell.dispose();
+    return { height: box.max.y - box.min.y, moving };
+  };
+  const flat = shape(level),
+    leaning = shape(tilted);
+  assert.equal(flat.moving, 0);
+  assert.equal(leaning.moving, 0, "tilt alone is baked, not animated");
+  assert.ok(leaning.height > flat.height + 0.05, "a tipped slab stands taller");
+});
+
+test("moving roof parts are registered, move with the clock and stay in reach", () => {
+  const spinner = posedObject([
+    { w: 1.6, d: 0.1, z: 1, h: 0.1, motion: "spin", rate: 1 },
+    { w: 0.2, d: 0.2, h: 0.2, z: 1.5, motion: "bob", rate: 1 },
+  ]);
+  const { shell } = shellOf({
+    ...designed("stucco", "slit", [{ kind: spinner.id, x: 0.3, y: 0.1 }]),
+    objects: [spinner],
+  });
+  const moving = shell.group.children.filter(
+    (c) => c.name === "roof-feature-moving",
+  );
+  assert.equal(moving.length, 2);
+  const [blade, orb] = moving;
+  shell.animate(0);
+  const yaw0 = blade.rotation.y,
+    y0 = orb.position.y;
+  shell.animate(0.37);
+  assert.notEqual(blade.rotation.y, yaw0, "the spinner turns");
+  assert.notEqual(orb.position.y, y0, "the orb bobs");
+  for (let t = 0; t < 4; t += 0.13) {
+    shell.animate(t);
+    const lift = orb.position.y - y0;
+    assert.ok(lift > -0.061 && lift < 0.061, `bob stays bounded at ${t}`);
+  }
+  shell.dispose();
+});
+
+test("the built-in beacon pulses only its brightness and calms under reduced flash", () => {
+  const { shell } = shellOf(
+    designed("stucco", "slit", [{ kind: "beacon", x: 0.5, y: 0.05 }]),
+  );
+  const lamp = shell.group.children.find(
+    (c) => c.name === "roof-feature-moving",
+  ) as any;
+  assert.ok(lamp, "the beacon lamp is animated");
+  const home = lamp.position.clone();
+  const seen = new Set<number>();
+  for (let t = 0; t < 2; t += 0.1) {
+    shell.animate(t);
+    seen.add(+lamp.material.color.r.toFixed(3));
+    assert.ok(lamp.position.equals(home), "position never changes");
+    assert.ok(lamp.material.color.r >= 0.55 - 1e-9);
+    assert.ok(lamp.material.color.r <= 1 + 1e-9);
+  }
+  assert.ok(seen.size > 3, "brightness varies");
+  const calm = new Set<number>();
+  for (let t = 0; t < 4; t += 0.1) {
+    shell.animate(t, true);
+    calm.add(+lamp.material.color.r.toFixed(3));
+    assert.ok(lamp.material.color.r >= 0.85 - 1e-9);
+  }
   shell.dispose();
 });
