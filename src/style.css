@@ -1429,13 +1429,19 @@ body.reduced * {
   min-width: 0;
   max-width: 100%;
 }
+/* An open question gets its own screen below the map. */
+#study-terminal-slot:has(#terminal:not([hidden])) {
+  margin-top: 30vh;
+  min-height: var(--view-height);
+  scroll-margin-top: 0;
+}
 #study-terminal-slot #terminal {
   position: static;
   width: 100%;
   max-width: 100%;
   height: auto;
-  min-height: 0;
-  margin: 24px 0 0;
+  min-height: calc(var(--view-height) - 32px);
+  margin: 0;
   overflow-x: hidden;
 }
 #study-terminal-slot #terminal[hidden] {
