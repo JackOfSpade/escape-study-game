@@ -42,8 +42,43 @@ export interface LegacyRunExteriorDesign {
   streetLabels: string[];
   skyline: { minHeight: number; maxHeight: number; damageRate: number };
 }
+export type RunTitleCardFont =
+  | "space-grotesk"
+  | "dm-sans"
+  | "archivo-black"
+  | "oswald"
+  | "bebas-neue"
+  | "playfair-display"
+  | "cormorant-garamond"
+  | "libre-baskerville"
+  | "special-elite"
+  | "courier-prime"
+  | "ibm-plex-mono"
+  | "vt323"
+  | "creepster"
+  | "caveat"
+  | "permanent-marker";
+export interface RunTitleCardStyle {
+  font: RunTitleCardFont;
+  color: string;
+  size: number;
+}
+/** Designer-chosen typography for the black opening screen. */
+export interface RunTitleCard {
+  title: RunTitleCardStyle;
+  story: RunTitleCardStyle;
+}
+export declare const TITLE_CARD_FONTS: Record<
+  RunTitleCardFont,
+  { family: string; fallback: string }
+>;
+export declare const TITLE_CARD_SIZES: {
+  title: [number, number];
+  story: [number, number];
+};
 export interface LegacyRunDesign {
   mainDoor?: RunDoorDesign;
+  titleCard?: RunTitleCard;
   version: 1 | 2;
   title: string;
   premise: string;

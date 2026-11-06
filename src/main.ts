@@ -140,7 +140,12 @@ import {
 import { createPlayableGame as createGame } from "./world";
 import { chooseRunDesign, type RunChoice } from "./run-design-ui";
 import { clearDesignDraft, rememberDesign } from "./run-designer";
-import type { SavedRunDesign } from "./run-design-contract.mjs";
+import {
+  TITLE_CARD_FONTS,
+  type RunTitleCard,
+  type RunTitleCardStyle,
+  type SavedRunDesign,
+} from "./run-design-contract.mjs";
 import {
   enterStudyWorkspace,
   exitStudyWorkspace,
@@ -846,6 +851,8 @@ function begin() {
   audio.start();
   audio.update(game);
   $("#start-card").hidden = true;
+  $("#start-card").classList.remove("title-card");
+  quietNotice();
   focusWorld(true);
   persist();
 }
@@ -974,8 +981,69 @@ async function fresh(
   if ((await persist()) && !reused) finishRunDesign(previous.id, choice);
   return true;
 }
+/** The notice text stays in the DOM for assistive tech and checks, but is only
+ * shown for a few seconds after it changes. Whatever was already there when a
+ * run starts (its opening story, now on the title card) is never flashed. */
+const NOTICE_SHOWN_MS = 6000;
+let noticeSeen: string | undefined;
+let noticeUntil = 0;
+function syncNotice() {
+  const text = saveError || game.notice;
+  const el = $("#notice");
+  el.textContent = text;
+  // A faded message is finished with, so the same message set again (another
+  // full-pack attempt, say) counts as new and is shown again.
+  if (
+    !saveError &&
+    noticeUntil &&
+    performance.now() >= noticeUntil &&
+    game.status === "playing" &&
+    text === noticeSeen
+  ) {
+    game.notice = "";
+    noticeSeen = "";
+    noticeUntil = 0;
+    el.textContent = "";
+  } else if (noticeSeen === undefined) noticeSeen = text;
+  else if (text !== noticeSeen) {
+    noticeSeen = text;
+    noticeUntil = text ? performance.now() + NOTICE_SHOWN_MS : 0;
+  }
+  el.classList.toggle("shown", !!saveError || performance.now() < noticeUntil);
+}
+function quietNotice() {
+  noticeSeen = saveError || game.notice;
+  noticeUntil = 0;
+}
+/** Typography for a design that predates designer-chosen title cards. */
+const DEFAULT_TITLE_CARD: RunTitleCard = {
+  title: { font: "space-grotesk", color: "#e8f1ee", size: 64 },
+  story: { font: "dm-sans", color: "#a7bcbb", size: 18 },
+};
+const loadedTitleFonts = new Set(["space-grotesk", "dm-sans"]);
+function titleFont(style: RunTitleCardStyle) {
+  const font = TITLE_CARD_FONTS[style.font] ?? TITLE_CARD_FONTS["dm-sans"];
+  if (!loadedTitleFonts.has(style.font) && TITLE_CARD_FONTS[style.font]) {
+    loadedTitleFonts.add(style.font);
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(font.family).replace(/%20/g, "+")}&display=swap`;
+    document.head.append(link);
+  }
+  return `"${font.family}", ${font.fallback}`;
+}
+/** The run opens on a black screen with the designer's title and backstory
+ * in the designer's own typography, and the Start button beneath. */
+function titleCardHtml(saved: SavedRunDesign) {
+  const d = saved.design,
+    card = d.titleCard ?? DEFAULT_TITLE_CARD;
+  const style = (s: RunTitleCardStyle, vw: number) =>
+    `font-family:${escape(titleFont(s))};color:${s.color};font-size:min(${s.size}px, ${vw}vw)`;
+  return `<div class="title-card-inner"><h2 class="title-card-title" style="${style(card.title, 11)}">${escape(d.title)}</h2><div class="title-card-story" style="${style(card.story, 5)}"><p>${escape(d.premise)}</p><p>${escape(d.opening)}</p></div><button id="start">Start game ↗</button><small class="agent-only">${escape(status().detail)}</small></div>`;
+}
 function startCard() {
   const card = $("#start-card");
+  card.classList.remove("title-card");
   if (saveRecoveryError) {
     card.hidden = false;
     card.innerHTML = `<span class="eyebrow">SAVED PROGRESS</span><h2>Save needs<br>recovery.</h2><p id="save-recovery-status" class="save-result failed" role="status">${escape(saveRecoveryError)}</p><button id="save-recovery-retry">Retry loading</button><button id="save-recovery-export" class="quiet">Export recovery data</button><label class="file-label">Restore a run backup <input id="save-recovery-import" type="file" accept=".json,application/json"></label>`;
@@ -1012,7 +1080,10 @@ function startCard() {
   const finishable = spectating(game)
     ? (pendingQuestion() ?? unfinishedLastQuestion(game, lastQuestion))
     : undefined;
-  if (game.status === "ready")
+  if (game.status === "ready" && game.design && !game.preparingRun) {
+    card.classList.add("title-card");
+    card.innerHTML = titleCardHtml(game.design);
+  } else if (game.status === "ready")
     card.innerHTML = `${game.preparingRun ? '<span class="eyebrow">A NEW ESCAPE</span>' : ""}<h2>${game.design ? escape(game.design.design.title) : "The dead are<br>on your heels."}</h2><p>${game.design ? escape(game.design.design.premise) : "Twenty survivors. Four floors. Four seats.<br>Choose your route. Learn your way out."}</p>${game.preparingRun ? "<p>Claude will prepare your game session before play.</p>" : ""}<button id="start">${game.preparingRun ? "Prepare game ↗" : "Start game ↗"}</button><small class="agent-only">${escape(status().detail)}</small>`;
   else
     card.innerHTML = `<span class="eyebrow">${game.status === "escaped" ? "TRANSMISSION RECEIVED" : "SIGNAL LOST"}</span><h2>${game.status === "escaped" ? "You made it." : "Your work survives."}</h2><p>${escape(game.notice)}<br>${game.stats.rescued} extracted · ${game.stats.deaths} lost · ${Math.floor(game.endedAt ?? game.time)} seconds</p>${finishable ? '<button id="finish-question">Continue in the terminal</button>' : ""}<button id="again">Begin another run ↗</button><button id="backup" class="quiet agent-only">Export work & evidence</button><button id="spectate" class="quiet">Watch the building ↗</button>`;
@@ -1164,6 +1235,8 @@ function closeTerminal() {
     }
   }
   active = undefined;
+  questionWait = undefined;
+  revealPending = undefined;
   finalQuestion = false;
   releaseStation(human(game));
   $("#dialogue-reward").hidden = true;
@@ -1452,15 +1525,59 @@ function showEmbeddedTerminal(e: Encounter) {
 function waitingOnEmbeddedReply() {
   return !!embeddedWait();
 }
+/** A question that took at least this long to arrive waits behind a reveal
+ * button, because the player may have stepped away during the wait. A quick
+ * answer is shown directly: the player is evidently still there. */
+const REVEAL_AFTER_MS = 3000;
+/** The open terminal whose question the player is waiting for, and since when. */
+let questionWait: { encounter: string; since: number } | undefined;
+/** The terminal whose arrived question is held until the player reveals it. */
+let revealPending: string | undefined;
+/** Whether this terminal's arrived question is still held for the player.
+ * Holding also defers issuance, so the presentation time is when it was seen. */
+function holdsReveal(e: Encounter) {
+  const unseen =
+    !!e.problem &&
+    e.problemPresentedSequence === undefined &&
+    e.state !== "consumed" &&
+    !game.studyWorkspace?.enabled;
+  if (revealPending === e.id) {
+    if (unseen) return true;
+    revealPending = undefined;
+  }
+  if (
+    unseen &&
+    questionWait?.encounter === e.id &&
+    Date.now() - questionWait.since >= REVEAL_AFTER_MS
+  ) {
+    revealPending = e.id;
+    questionWait = undefined;
+    return true;
+  }
+  return false;
+}
+function revealQuestion() {
+  revealPending = undefined;
+  questionWait = undefined;
+  renderTerminal(true);
+  $<HTMLTextAreaElement>("#chat-input").focus({ preventScroll: true });
+  void persist();
+}
 /** Why the simulation is held for Claude, if it is. */
-function embeddedWait(): "locked" | "question" | "reply" | undefined {
+function embeddedWait():
+  "locked" | "question" | "reveal" | "reply" | undefined {
   if (terminalConnectionLocked()) return "locked";
   const e =
     status().mode === "claude-cli" && active
       ? game.encounters[active]
       : undefined;
   if (!e) return undefined;
-  if (generatingEncounter(game, e)) return "question";
+  if (generatingEncounter(game, e)) {
+    if (questionWait?.encounter !== e.id)
+      questionWait = { encounter: e.id, since: Date.now() };
+    return "question";
+  }
+  if (holdsReveal(e)) return "reveal";
   return e.tutorRequests?.some(
     (j) => j.state === "pending" && j.provider === "claude-cli",
   ) ||
@@ -1504,7 +1621,7 @@ function generationHtml(e: Encounter) {
     return `<li class="${state}">${escape(text)}</li>`;
   }).join("");
   const paused = embeddedWait() === "question";
-  return `<div class="generation-progress" role="status"><div class="generation-bar" aria-hidden="true"><span></span></div><ol class="generation-steps">${steps}</ol><p class="generation-elapsed">Elapsed <strong>${clock}</strong>${seconds >= 60 ? " · Still working: a validated problem can take a few minutes." : ""}</p><p class="generation-note">${paused ? "The game is paused until the question arrives, so the wait costs you nothing. " : ""}You can leave immediately; the request is saved.</p></div>`;
+  return `<div class="generation-progress" role="status"><div class="generation-bar" aria-hidden="true"><span></span></div><ol class="generation-steps">${steps}</ol><p class="generation-elapsed">Elapsed <strong>${clock}</strong>${seconds >= 60 ? " · Still working: a validated problem can take a few minutes." : ""}</p><p class="generation-note">${paused ? "The game is paused while Claude writes and stays paused until you reveal the question, so the wait costs you nothing. " : ""}You can leave immediately; the request is saved.</p></div>`;
 }
 /** Mark the held game beside the terminal and keep the progress clock live. */
 let replyPauseShown: string | undefined;
@@ -1523,15 +1640,47 @@ function syncReplyPause(time: number) {
       "#reply-pause-detail",
       wait === "question"
         ? "Waiting for Claude to write your question. Zombies, survivors and timers are frozen."
-        : wait === "reply"
-          ? "Waiting for Claude's reply. Zombies, survivors and timers are frozen."
-          : "Connect Claude to continue. Zombies, survivors and timers are frozen.",
+        : wait === "reveal"
+          ? "Your question is ready. Zombies, survivors and timers stay frozen until you reveal it in the terminal."
+          : wait === "reply"
+            ? "Waiting for Claude's reply. Zombies, survivors and timers are frozen."
+            : "Connect Claude to continue. Zombies, survivors and timers are frozen.",
     );
   }
   if (wait === "question" && time - generationRenderedAt >= 500) {
     generationRenderedAt = time;
     renderTerminal();
   }
+}
+/** The question has arrived after a long wait: keep the game held and the
+ * question covered until the player chooses to reveal it. */
+function renderRevealGate(e: Encounter) {
+  setText(
+    "#terminal-type",
+    `${e.mode === "shared" ? "LINKED ROOM · ONE WORKSPACE" : e.questionRoom ? "ROOM QUESTION · PRIVATE ANSWER" : "INDIVIDUAL STATION"} / QUESTION READY`,
+  );
+  setText("#problem-title", "Your question is ready");
+  setText(
+    "#terminal-provenance",
+    "Game paused · Zombies, survivors and timers stay frozen until you reveal it",
+  );
+  const steps = GENERATION_STEPS.map(
+    (label) => `<li class="done">${escape(label)}</li>`,
+  ).join("");
+  const problem = $("#problem");
+  setHtml(
+    problem,
+    `<div class="question-ready" role="status"><ol class="generation-steps">${steps}</ol><p class="question-ready-note">Claude finished writing your question. The game stays paused until you reveal it, and resumes the moment you do.</p><button type="button" id="reveal-question">Reveal question and resume ▸</button></div>`,
+  );
+  const button = $<HTMLButtonElement>("#reveal-question");
+  button.onclick = revealQuestion;
+  $<HTMLButtonElement>("#chat-form button").disabled = true;
+  $<HTMLTextAreaElement>("#chat-input").disabled = true;
+  if (
+    !ownsKeyboard(document.activeElement) ||
+    document.activeElement === $("#chat-input")
+  )
+    button.focus({ preventScroll: true });
 }
 function renderTerminal(force = false) {
   if (
@@ -1554,6 +1703,12 @@ function renderTerminal(force = false) {
     renderConnectionSteps();
     return;
   }
+  const composer = $<HTMLTextAreaElement>("#chat-input");
+  if (holdsReveal(e)) {
+    renderRevealGate(e);
+    return;
+  }
+  composer.disabled = false;
   tab = terminalChannel(e);
   setText(
     "#conversation-title",
@@ -1590,7 +1745,6 @@ function renderTerminal(force = false) {
         ? `Knowledge probe · ${probeLine}. Say so if you do not know something; the gap is recorded and the key still granted.`
         : "Work through the question with Terminal AI. Your answers stay in this conversation.",
   );
-  const composer = $<HTMLTextAreaElement>("#chat-input");
   if (force || document.activeElement !== composer)
     composer.value = e.chatDraft ?? "";
   $("#saved-answer").hidden = !dialogue || !e.workspace;
@@ -2717,7 +2871,7 @@ function ui() {
   );
   $("#rescued").textContent = String(game.stats.rescued);
   $("#lost").textContent = String(game.stats.deaths);
-  $("#notice").textContent = saveError || game.notice;
+  syncNotice();
   $("#next-title").textContent =
     game.status === "escaped"
       ? "Extraction confirmed."

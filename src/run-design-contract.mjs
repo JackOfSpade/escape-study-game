@@ -59,6 +59,77 @@ function parseDoorDesign(d, path) {
     `${path}.health must be an integer from 400 to 2400`,
   );
 }
+/** Fonts the opening title card may use, keyed by the name the designer
+ * returns. Each is a Google Fonts family loaded only when chosen; the stack
+ * after it keeps the card readable offline. */
+export const TITLE_CARD_FONTS = {
+  "space-grotesk": {
+    family: "Space Grotesk",
+    fallback: "system-ui, sans-serif",
+  },
+  "dm-sans": { family: "DM Sans", fallback: "system-ui, sans-serif" },
+  "archivo-black": { family: "Archivo Black", fallback: "Impact, sans-serif" },
+  oswald: { family: "Oswald", fallback: "'Arial Narrow', sans-serif" },
+  "bebas-neue": { family: "Bebas Neue", fallback: "Impact, sans-serif" },
+  "playfair-display": {
+    family: "Playfair Display",
+    fallback: "Georgia, serif",
+  },
+  "cormorant-garamond": {
+    family: "Cormorant Garamond",
+    fallback: "Garamond, Georgia, serif",
+  },
+  "libre-baskerville": {
+    family: "Libre Baskerville",
+    fallback: "Baskerville, Georgia, serif",
+  },
+  "special-elite": {
+    family: "Special Elite",
+    fallback: "'Courier New', monospace",
+  },
+  "courier-prime": {
+    family: "Courier Prime",
+    fallback: "'Courier New', monospace",
+  },
+  "ibm-plex-mono": { family: "IBM Plex Mono", fallback: "Menlo, monospace" },
+  vt323: { family: "VT323", fallback: "Menlo, monospace" },
+  creepster: { family: "Creepster", fallback: "Impact, fantasy" },
+  caveat: { family: "Caveat", fallback: "'Comic Sans MS', cursive" },
+  "permanent-marker": {
+    family: "Permanent Marker",
+    fallback: "'Comic Sans MS', cursive",
+  },
+};
+/** Inclusive pixel bounds for each title-card text role. */
+export const TITLE_CARD_SIZES = { title: [28, 96], story: [14, 28] };
+/** Minimum WCAG contrast against the card's pure black background. */
+const TITLE_CARD_CONTRAST = { title: 3, story: 4.5 };
+function contrastOnBlack(hex) {
+  const channel = (i) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  const l = 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
+  return (l + 0.05) / 0.05;
+}
+function parseTitleCard(card, path) {
+  object(card, ["title", "story"], path);
+  for (const role of ["title", "story"]) {
+    const s = card[role],
+      p = `${path}.${role}`;
+    object(s, ["font", "color", "size"], p);
+    choice(s.font, Object.keys(TITLE_CARD_FONTS), `${p}.font`);
+    requireThat(
+      typeof s.color === "string" && /^#[0-9a-fA-F]{6}$/u.test(s.color),
+      `${p}.color needs a six-digit hex color`,
+    );
+    requireThat(
+      contrastOnBlack(s.color) >= TITLE_CARD_CONTRAST[role],
+      `${p}.color is too dark to read on black (contrast ${contrastOnBlack(s.color).toFixed(1)}, needs ${TITLE_CARD_CONTRAST[role]})`,
+    );
+    number(s.size, ...TITLE_CARD_SIZES[role], `${p}.size`, true);
+  }
+}
 function text(v, max, path) {
   requireThat(
     typeof v === "string" &&
@@ -134,6 +205,7 @@ function parseBlueprint(v, provisional = false) {
       "exterior",
       "pacing",
       ...(Object.hasOwn(v, "mainDoor") ? ["mainDoor"] : []),
+      ...(Object.hasOwn(v, "titleCard") ? ["titleCard"] : []),
       ...(v3
         ? ["relationships", ...(!provisional ? ["environment"] : [])]
         : []),
@@ -141,6 +213,7 @@ function parseBlueprint(v, provisional = false) {
     "design",
   );
   if (Object.hasOwn(v, "mainDoor")) parseDoorDesign(v.mainDoor, "mainDoor");
+  if (Object.hasOwn(v, "titleCard")) parseTitleCard(v.titleCard, "titleCard");
   requireThat(
     v.version === 1 || v.version === 2 || v3,
     "unsupported design version",
@@ -711,6 +784,7 @@ version:as requested above; title(1-64 characters), premise(1-240), opening(1-20
 footprint:{shape:rectangle|chamfered|stepped|waisted,width:36|38|40,top:integer2..4,inset:integer2..4,mirrored:boolean,shoulder:integer top+8..top+14}.
 floors:exactly4 entries in ascending order, each {name(1-48),family:stack|columns|serpentine,roomOrder:permutation[0,1,3],layoutSeed:uint32,roomTypes:4 entries indexed rooms0..3 each break|cubicles|meeting|storage|reception|manager,subroomKinds:1..4 unique entries office|meeting|storage|break,furnitureDensity:0.5..1.5,fieldQuotas:4 integers2..6 indexed rooms0..3 (the public entrance to room2 is always free; its outgoing field uses quota2),power:4 entries lit|dim|outage indexed rooms0..3 with room2 lit,stories:exactly6 {title(1-36),lines:1..4 strings each1-50},brokenGuard:{segment:3|4,bay:1|2}}. The six story cards are three wall posters, a whiteboard, a desk photo caption and a desk note. These are actual visible words, not instructions to a renderer. layoutSeed fills smaller geometrical details; family/order are your direct choices. Each ordinary floor keeps all four study rooms along the route; no bypasses. Free hall and entry remain readable.
 Optional doors, on any floor: doors:exactly4 DoorDesign where doors[r] is the door leading out of room r and doors[2] also covers the hall entrance, and mainDoor:DoorDesign at the top level for the building's main entrance. DoorDesign:{material:wood|steel|glass|fire|security,color:hex,accent:hex,window:none|slit|half|full,label:1..32 short name shown to the player,health:integer400..2400 starting hit points}. Vary doors so they fit each room and the premise. Glass, half and full windows can be seen through when closed, and doors close themselves when zombies come near. The engine always keeps door access rules and can raise the hall entrance's health to protect study time.
+Include titleCard at the top level of every new design (it is optional only so older designs stay valid): {title:TitleStyle,story:TitleStyle}. The game opens on a pure black screen showing the run's title in the title style, then the premise and opening as the scene-setting backstory in the story style, with a Start button beneath. TitleStyle:{font:one of ${Object.keys(TITLE_CARD_FONTS).join("|")},color:six-digit hex readable on pure black (WCAG contrast at least 3 for title and 4.5 for story),size:integer pixels (title ${TITLE_CARD_SIZES.title[0]}..${TITLE_CARD_SIZES.title[1]}, story ${TITLE_CARD_SIZES.story[0]}..${TITLE_CARD_SIZES.story[1]})}. Choose the font, color and size of each so the card sets this premise's particular mood; vary them between runs instead of always choosing the same look, and keep the story readable as several sentences of body text.
 roster:exactly19 {name:unique1-20 characters distinct from You,role:builder|analyst|rusher|medic|skeptic,skill:0.4..0.9,risk:0.2..0.8,social:0.2..0.8}. Build a varied ensemble; names referenced in stories must belong to it.
 city:{roadWidth:integer7..9,boulevardOffset:integer15..19,districtSize:integer18..25,buildingHeightMin:9..18,buildingHeightMax:25..45,damageRate:0..0.7,palette:3..6 six-digit hex colors}.
 exterior:{buildingName,buildingSubtitle,quarantineTitle,quarantineSubtitle:each1-48 characters,streetLabels:exactly8 strings1-28 characters,skyline:{minHeight:24..60,maxHeight:72..140,damageRate:0..0.7}}. All heights are metres.
