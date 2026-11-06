@@ -24,6 +24,7 @@ import {
 } from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type { Floor } from "../model";
+
 import {
   cityWall,
   inCityRectangle,
@@ -69,6 +70,11 @@ function asphaltTexture() {
   texture.repeat.set(35, 35);
   texture.anisotropy = 4;
   return texture;
+}
+
+/** A colour scaled in linear light, returned as sRGB hex. */
+function tone(hex: string, factor: number) {
+  return `#${new Color(hex).multiplyScalar(factor).getHexString()}`;
 }
 
 function messageTexture(title: string, subtitle: string, warning = false) {
@@ -191,6 +197,12 @@ export class ExteriorDressing {
   private shopSigns?: Mesh<BufferGeometry, MeshBasicMaterial>;
   private lightPools?: Mesh<BufferGeometry, MeshBasicMaterial>;
   private signKey = "";
+  private canopyLights: BufferGeometry[] = [];
+  private canopyBody: BufferGeometry[] = [];
+  private canopyMaterial = new MeshBasicMaterial({
+    vertexColors: true,
+    fog: false,
+  });
 
   constructor() {
     this.group.name = "street-exterior";
@@ -250,6 +262,8 @@ export class ExteriorDressing {
       this.buildPhysicalCity(ground, ground.city, opaque, panes, lit, signals);
     else this.buildCity(ground, opaque, panes, lit, signals);
     const layout = streetLayout(ground);
+    this.canopyLights = [];
+    this.canopyBody = [];
     if (layout) this.buildArrival(ground, layout, opaque, panes, lit, box);
     else {
       this.entranceLight.intensity = 0;
@@ -259,6 +273,14 @@ export class ExteriorDressing {
     this.merge(panes, this.glass, "dim-exterior-windows");
     this.merge(lit, this.warm, "lit-exterior-windows-practicals");
     this.merge(signals, this.emergency, "city-emergency-signals");
+    this.merge(this.canopyBody, this.solid, "entrance-canopy");
+    this.canopyBody = [];
+    this.merge(
+      this.canopyLights,
+      this.canopyMaterial,
+      "entrance-canopy-lights",
+    );
+    this.canopyLights = [];
     if (ground.environment) {
       this.environmentSurfaces = new EnvironmentSurfaces(
         ground,
@@ -314,8 +336,12 @@ export class ExteriorDressing {
   ) {
     const front = layout.front + 1.025;
     const entrance = layout.entrance;
-    box(opaque, entrance, 2.85, front + 0.45, 4.6, 0.18, 1.35, "#3d4c52");
-    box(lit, entrance, 2.735, front + 0.48, 3.7, 0.035, 0.7, "#e1c68e");
+    const style = floor.setting?.exterior;
+    if (style) this.buildCanopy(style, entrance, front, box);
+    else {
+      box(opaque, entrance, 2.85, front + 0.45, 4.6, 0.18, 1.35, "#3d4c52");
+      box(lit, entrance, 2.735, front + 0.48, 3.7, 0.035, 0.7, "#e1c68e");
+    }
     box(opaque, entrance, 3.22, front + 0.46, 3.8, 0.6, 0.14, "#27383c");
     const sign = new Mesh(new PlaneGeometry(3.55, 0.74), this.signMaterial);
     sign.position.set(entrance, 3.22, front + 0.56);
@@ -436,6 +462,133 @@ export class ExteriorDressing {
       }
     }
     this.streetLight.intensity = lights ? 10 : 0;
+  }
+
+  /** The entrance canopy of a designed building. Every style stays below the
+   * entrance sign, whose slot is fixed by the saved layout. Lit parts use the
+   * unlit canopy-light material so `canopyGlow` shows as authored. */
+  private buildCanopy(
+    style: NonNullable<Floor["setting"]>["exterior"],
+    entrance: number,
+    front: number,
+    box: (
+      out: BufferGeometry[],
+      x: number,
+      y: number,
+      z: number,
+      w: number,
+      h: number,
+      d: number,
+      color: string,
+    ) => void,
+  ) {
+    const glow = style.canopyGlow,
+      lamp = (
+        x: number,
+        y: number,
+        z: number,
+        w: number,
+        h: number,
+        d: number,
+        color = glow,
+      ) => box(this.canopyLights, x, y, z, w, h, d, color);
+    if (style.canopy === "none") return;
+    if (style.canopy === "flat") {
+      box(
+        this.canopyBody,
+        entrance,
+        2.85,
+        front + 0.45,
+        4.6,
+        0.18,
+        1.35,
+        style.trimColor,
+      );
+      lamp(entrance, 2.735, front + 0.48, 3.7, 0.035, 0.7);
+    } else if (style.canopy === "gabled") {
+      const half = 2.3,
+        rise = 0.38,
+        eave = 2.45,
+        angle = Math.atan2(rise, half),
+        length = Math.hypot(half, rise);
+      for (const side of [-1, 1])
+        this.part(
+          this.canopyBody,
+          new BoxGeometry(length, 0.08, 1.35)
+            .rotateZ(-side * angle)
+            .translate(
+              entrance + (side * half) / 2,
+              eave + rise / 2,
+              front + 0.45,
+            ),
+          style.trimColor,
+        );
+      // The street-facing gable end, a triangular prism closing the roof.
+      const sy = rise / 1.5;
+      this.part(
+        this.canopyBody,
+        new CylinderGeometry(1, 1, 0.05, 3)
+          .rotateX(-Math.PI / 2)
+          .scale(half / 0.866, sy, 1)
+          .translate(entrance, eave + 0.5 * sy, front + 1.1),
+        tone(style.trimColor, 0.8),
+      );
+      box(
+        this.canopyBody,
+        entrance,
+        eave - 0.03,
+        front + 1.1,
+        4.6,
+        0.06,
+        0.06,
+        style.trimColor,
+      );
+      lamp(entrance, eave - 0.07, front + 0.48, 3.4, 0.03, 0.7);
+    } else {
+      // Theatre-style marquee: a deep box with a lit fascia and chaser bulbs.
+      const top = 2.775,
+        bottom = 2.225,
+        mid = (top + bottom) / 2,
+        cz = front + 0.5,
+        depth = 1.6,
+        width = 4.8,
+        frontZ = cz + depth / 2;
+      box(
+        this.canopyBody,
+        entrance,
+        mid,
+        cz,
+        width,
+        top - bottom,
+        depth,
+        style.trimColor,
+      );
+      lamp(
+        entrance,
+        mid,
+        frontZ + 0.02,
+        width - 0.5,
+        0.3,
+        0.03,
+        tone(glow, 0.5),
+      );
+      lamp(
+        entrance,
+        bottom - 0.01,
+        cz,
+        width - 0.4,
+        0.02,
+        depth - 0.4,
+        tone(glow, 0.7),
+      );
+      for (let x = -width / 2 + 0.15; x <= width / 2 - 0.1; x += 0.3)
+        for (const y of [top - 0.06, bottom + 0.06])
+          lamp(entrance + x, y, frontZ + 0.04, 0.09, 0.09, 0.07);
+      for (const side of [-1, 1])
+        for (let z = cz - depth / 2 + 0.35; z < frontZ - 0.2; z += 0.4)
+          for (const y of [top - 0.06, bottom + 0.06])
+            lamp(entrance + (side * width) / 2, y, z, 0.07, 0.09, 0.09);
+    }
   }
 
   /** One continuous asphalt mesh under the whole city; patches share a UV
@@ -1874,6 +2027,7 @@ export class ExteriorDressing {
       this.quarantineMaterial,
       this.routeMaterial,
       this.emergency,
+      this.canopyMaterial,
       this.skyMaterial,
       this.moonMaterial,
     ])

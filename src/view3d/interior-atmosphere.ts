@@ -30,7 +30,8 @@ import {
 import { CONFIG, type Floor, type Furniture, type Game } from "../model";
 import { FLOOR_HEIGHT } from "../stair-route";
 import { playerCanSee } from "../visibility";
-import { furnitureHeight } from "./furniture-height";
+import { furnitureHeightOf } from "./furniture-height";
+import { dressingTop } from "../environment-surfaces";
 import { InstancePool } from "./instances";
 import { InteriorLightmap } from "./interior-lightmap";
 import { outsideBuilding } from "./exterior-layout";
@@ -601,7 +602,7 @@ export class InteriorAtmosphere {
     const details: Detail[] = [],
       { plan } = context,
       roll = interiorHash(plan.seed, object.floor, object.id),
-      top = furnitureHeight(object.kind) + 0.055;
+      top = dressingTop(object);
     const solid = (
       x: number,
       y: number,
@@ -648,10 +649,10 @@ export class InteriorAtmosphere {
       card(
         3,
         0,
-        furnitureHeight(object.kind) * 0.65,
+        furnitureHeightOf(object) * 0.65,
         object.h * 0.52 + 0.045,
         object.w * 0.89,
-        furnitureHeight(object.kind) * 0.56,
+        furnitureHeightOf(object) * 0.56,
       );
       return details;
     }

@@ -1,7 +1,7 @@
 import { propWorldPose } from "./authored-scene";
 import { type Actor, type Floor, type Game, type Point } from "./model";
 import { rayBoxDistance, wallRayDistance } from "./visibility";
-import { furnitureSurfaceHeight } from "./view3d/furniture-height";
+import { furnitureSurfaceHeightOf } from "./view3d/furniture-height";
 import { FLOOR_HEIGHT } from "./stair-route";
 import { surfaceWorldPose } from "./environment-surfaces";
 import {
@@ -73,7 +73,7 @@ function readable(
     const entry = eye + (target.elevation - eye) * (near / length),
       exit = eye + (target.elevation - eye) * (far / length);
     if (
-      Math.min(entry, exit) < furnitureSurfaceHeight(object.kind) &&
+      Math.min(entry, exit) < furnitureSurfaceHeightOf(object) &&
       Math.max(entry, exit) > 0
     )
       return false;

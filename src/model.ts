@@ -1,5 +1,6 @@
 import type { LearnerLedger, ScopeDefinition } from "./learning-model";
 import type { Sector } from "./floor-plan";
+import { OBJECT_WEIGHTS } from "./setting-catalog.mjs";
 export type Track = "PY" | "PE";
 /** A connected AI provider; development practice has no provider. */
 export type Provider = "study-mode" | "chatgpt-handoff" | "claude-cli";
@@ -327,7 +328,19 @@ export type FurnitureKind =
   | "screen"
   | "box"
   | "drawers"
-  | "armchair";
+  | "armchair"
+  // Broadcast venue: studio, control room and record library equipment.
+  | "mixingConsole"
+  | "micStand"
+  | "recordShelf"
+  | "turntable"
+  | "studioMonitor"
+  | "equipmentRack"
+  | "soundPanel"
+  | "onAirLight"
+  | "reelToReel"
+  // A design's AI-composed object; its shape lives in Furniture.object.
+  | "custom";
 /** How a door looks; collision, access and health stay with the engine. */
 export interface DoorStyle {
   material: "wood" | "steel" | "glass" | "fire" | "security";
@@ -337,6 +350,9 @@ export interface DoorStyle {
   label: string;
 }
 export interface Furniture extends Point {
+  /** Recipe of an AI-composed object (kind "custom"), rebound from the saved
+   * design on load. Absent for built-in kinds. */
+  object?: import("./setting-catalog.mjs").RunCustomObject;
   /** Immutable authored presentation; pose, damage and destruction stay native. */
   appearance?: {
     color: string;
@@ -405,7 +421,7 @@ export type OfficeRoomType =
  * Rows use world coordinates; partitions and furnishings never change this mask. */
 export interface BuildingFootprint {
   version: 1;
-  shape: "rectangle" | "chamfered" | "stepped" | "waisted";
+  shape: import("./run-design-contract.mjs").RunFootprintShape;
   width: number;
   depth: number;
   top: number;
@@ -420,6 +436,8 @@ export interface Floor {
   scene?: import("./authored-scene").ResolvedScene;
   /** Frozen authored choices; shared by rendering, collisions and NPC facts. */
   design?: import("./run-design-contract.mjs").RunFloorDesign;
+  /** Authored venue, finishes and exterior style, copied onto every floor. */
+  setting?: import("./setting-catalog.mjs").RunSetting;
   /** Authored neighbourhood signs and skyline, stored on the ground floor. */
   exteriorDesign?: import("./run-design-contract.mjs").RunExteriorDesign;
   /** Persisted physical ground-level streets and urban obstacles for fresh runs. */
@@ -776,7 +794,30 @@ export const FURNITURE: Record<
   screen: { w: 1.6, h: 0.3, hp: 120, speed: 1, resist: 40 },
   box: { w: 0.55, h: 0.45, hp: 40, speed: 1.6, resist: 10 },
   drawers: { w: 0.45, h: 0.55, hp: 300, speed: 1, resist: 60 },
+  // Broadcast studio, control room and record library equipment.
+  mixingConsole: { w: 1.8, h: 0.9, hp: 1300, speed: 0.45, resist: 260 },
+  micStand: { w: 0.45, h: 0.45, hp: 70, speed: 1.8, resist: 12 },
+  recordShelf: { w: 1.8, h: 0.5, hp: 1800, speed: 0.35, resist: 320 },
+  turntable: { w: 1, h: 0.65, hp: 260, speed: 1, resist: 60 },
+  studioMonitor: { w: 0.55, h: 0.5, hp: 180, speed: 1.2, resist: 45 },
+  equipmentRack: { w: 0.75, h: 0.85, hp: 1900, speed: 0.4, resist: 330 },
+  soundPanel: { w: 1.5, h: 0.22, hp: 160, speed: 1.2, resist: 35 },
+  onAirLight: { w: 0.5, h: 0.35, hp: 90, speed: 1.5, resist: 18 },
+  reelToReel: { w: 0.8, h: 0.6, hp: 320, speed: 0.9, resist: 80 },
+  // Placeholder only: a composed object's size comes from its recipe and its
+  // physics from its weight class; use furnitureSpec(o) for instances.
+  custom: { w: 1, h: 1, hp: 650, speed: 0.8, resist: 140 },
 };
+/** What people call a placed object: a composed object's own name, else its kind. */
+export function furnitureName(o: Pick<Furniture, "kind" | "object">) {
+  return o.object?.name.toLowerCase() ?? o.kind;
+}
+/** Physical constants of one placed object, including AI-composed ones. */
+export function furnitureSpec(o: Pick<Furniture, "kind" | "object">) {
+  if (o.kind !== "custom" || !o.object) return FURNITURE[o.kind];
+  const weight = OBJECT_WEIGHTS[o.object.weight];
+  return { w: o.object.size.w, h: o.object.size.d, ...weight };
+}
 export const HELIPAD: Point = { x: 21.5, y: 10.5 };
 export const HELIPAD_RADIUS = 2.8;
 

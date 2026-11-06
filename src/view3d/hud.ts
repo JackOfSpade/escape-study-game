@@ -8,18 +8,37 @@ import {
 } from "../engine";
 import { surfacePoint } from "../furniture-geometry";
 import { distance, type Game } from "../model";
-import { objectName } from "../render";
+import { HoverLabel } from "../hover-label";
 import { accessDoorPrompt, lookTarget, lookTargetPrompt } from "./targeting";
 
 /** Use the same reach queries and priority as E; the prompt never grants reach. */
-export function interactionPrompt(game: Game, yaw?: number) {
+export function interactionPrompt(
+  game: Game,
+  yaw?: number,
+  hover?: HoverLabel,
+  now = 0,
+) {
   const a = human(game);
-  if (a.grip) return "E · Release grip";
-  if (canBoard(game, a)) return "E · Board helicopter";
-  if (yaw !== undefined) {
-    const target = lookTarget(game, yaw);
-    if (target) return lookTargetPrompt(game, target);
+  if (a.grip) {
+    hover?.update(undefined, now);
+    return "E · Release grip";
   }
+  if (canBoard(game, a)) {
+    hover?.update(undefined, now);
+    return "E · Board helicopter";
+  }
+  const target = yaw === undefined ? undefined : lookTarget(game, yaw);
+  // A furniture name appears only while the crosshair is on that object, and
+  // only for a couple of seconds per glance.
+  const shown = hover?.update(
+    target?.kind === "grip" ? target.object.id : undefined,
+    now,
+  );
+  // Only furniture names are timed; terminal, item and door prompts stay up.
+  if (target)
+    return target.kind === "grip" && shown === false
+      ? ""
+      : lookTargetPrompt(game, target);
   const object = nearestGrip(game, a),
     station = nearestStation(game, a),
     door = nearbyDoor(game, a);
@@ -31,7 +50,7 @@ export function interactionPrompt(game: Game, yaw?: number) {
         door ? distance(a, doorFrame(door)) : Infinity,
       )
   )
-    return `E · Grip ${objectName(object.kind).toLowerCase()}`;
+    return "";
   const e = station && game.encounters[station.encounter];
   const usable = !!e && !(e.mode === "solo" && e.owner && e.owner !== a.id);
   if (
@@ -53,6 +72,7 @@ export class FirstPersonHud {
   private hp = 100;
   private damageUntil = 0;
   private lastPrompt = -Infinity;
+  private hover = new HoverLabel();
 
   constructor(
     private root: HTMLElement,
@@ -84,8 +104,11 @@ export class FirstPersonHud {
     this.hp = a.hp;
     this.root.hidden = !visible;
     const showPrompt = visible && !typing && !game.paused;
+    if (!showPrompt) this.hover.reset();
     if (!showPrompt || now - this.lastPrompt >= 100) {
-      const text = showPrompt ? interactionPrompt(game, yaw) : "";
+      const text = showPrompt
+        ? interactionPrompt(game, yaw, this.hover, now)
+        : "";
       if (this.prompt.textContent !== text) this.prompt.textContent = text;
       this.prompt.hidden = !text;
       this.lastPrompt = showPrompt ? now : -Infinity;

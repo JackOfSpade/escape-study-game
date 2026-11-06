@@ -2,15 +2,20 @@ import {
   BoxGeometry,
   BufferGeometry,
   Color,
+  DoubleSide,
   Float32BufferAttribute,
   Group,
   Mesh,
+  MeshBasicMaterial,
   MeshStandardMaterial,
 } from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { CONFIG, type Floor } from "../model";
 import { FLOOR_HEIGHT } from "../stair-route";
 import { outsideBuilding } from "./exterior-layout";
+import type { RunFacade, RunWindowStyle } from "../setting-catalog.mjs";
+import { resolveRoofFeatures } from "../venue";
+import { roofFeatureParts } from "./roof-features";
 
 export interface PerimeterWindow {
   x: number;
@@ -80,6 +85,83 @@ export function perimeterWindows(floor: Floor): PerimeterWindow[] {
   return windows;
 }
 
+/** Window opening proportions, relative to a storey that starts at y = 0. The
+ * default is the original punched window, in its original literal numbers. */
+interface WindowSpec {
+  bottom: [number, number]; // centre y, height of the wall below the opening
+  top: [number, number];
+  pier: [number, number] | null; // offset from cell centre, thickness
+  side: [number, number]; // centre y, height of frame and pier
+  frame: [number, number]; // offset, thickness of the vertical frame bars
+  bars: [number, number]; // y of the horizontal frame bars
+  barLength: number;
+  glass: [number, number, number]; // width, height, centre y
+  sill: [number, number, number]; // y, length along the wall, across it
+}
+
+const PUNCHED: WindowSpec = {
+  bottom: [0.425, 0.85],
+  top: [2.575, 0.45],
+  pier: [0.46, 0.08],
+  side: [1.6, 1.5],
+  frame: [0.4, 0.035],
+  bars: [0.89, 2.31],
+  barLength: 0.84,
+  glass: [0.79, 1.35, 1.6],
+  sill: [0.855, 0.92, 1.12],
+};
+
+function windowSpec(style: RunWindowStyle, curtain: boolean): WindowSpec {
+  if (style === "punched" && !curtain) return PUNCHED;
+  let [sill, head, pier] =
+    style === "strip"
+      ? [1.0, 2.15, 0]
+      : style === "ribbon"
+        ? [1.2, 1.9, 0]
+        : style === "slit"
+          ? [0.45, 2.5, 0.3]
+          : [0.85, 2.35, 0.08];
+  // A curtain wall is mostly glass between hairline piers.
+  if (curtain) {
+    sill = Math.max(0.25, sill - 0.3);
+    head = Math.min(2.6, head + 0.15);
+    pier = Math.min(pier, 0.03);
+  }
+  const half = 0.5 - pier,
+    open = head - sill,
+    mid = (sill + head) / 2;
+  return {
+    bottom: [sill / 2, sill],
+    top: [(head + 2.8) / 2, 2.8 - head],
+    pier: pier ? [0.5 - pier / 2, pier] : null,
+    side: [mid, open],
+    frame: [half - 0.02, 0.03],
+    bars: [sill + 0.04, head - 0.04],
+    barLength: half * 2,
+    glass: [half * 2 - 0.05, open - 0.15, mid],
+    sill: [sill + 0.005, half * 2 + 0.08, half * 2 + 0.28],
+  };
+}
+
+const COURSE: Partial<Record<RunFacade, { height: number; grow: number }>> = {
+  brick: { height: 0.28, grow: 0.012 },
+  clapboard: { height: 0.23, grow: 0.03 },
+  metal: { height: 0.7, grow: 0 },
+};
+
+function noise(a: number, b: number, c: number) {
+  const n = Math.imul(
+    (a * 73856093) ^ (b * 19349663) ^ (c * 83492791),
+    2654435761,
+  );
+  return (n >>> 0) / 4294967296;
+}
+
+/** A solid colour scaled in linear light, returned as sRGB hex. */
+function tone(hex: string, factor: number) {
+  return `#${new Color(hex).multiplyScalar(factor).getHexString()}`;
+}
+
 /** A persistent whole-building facade. Every storey is present from the street
  * and every real window is an opening through the entire shell thickness. */
 export class BuildingShell {
@@ -101,6 +183,16 @@ export class BuildingShell {
     roughness: 0.3,
     metalness: 0.05,
   });
+  private roofMetal = new MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.62,
+    metalness: 0.3,
+    side: DoubleSide,
+  });
+  private roofLamps = new MeshBasicMaterial({
+    vertexColors: true,
+    side: DoubleSide,
+  });
   private tint = new Color();
 
   constructor() {
@@ -111,6 +203,30 @@ export class BuildingShell {
     this.clear();
     this.group.visible = !!floors[0]?.boundary;
     if (!this.group.visible) return;
+    // A designed building restyles its facade, windows, wall faces and roof.
+    // Without a setting every colour and dimension below is the original.
+    const setting = floors[0].setting,
+      ext = setting?.exterior,
+      facade = ext?.facade,
+      course = facade ? COURSE[facade] : undefined,
+      curtain = facade === "glass",
+      spec = ext ? windowSpec(ext.windows, curtain) : PUNCHED,
+      liner = setting?.interior.wall;
+    this.frames.color.set(
+      ext ? (curtain ? "#1c262c" : tone(ext.trimColor, 0.75)) : "#263e48",
+    );
+    this.glass.color.set(curtain ? "#3d6b7c" : "#9ab5bd");
+    this.glass.opacity = curtain ? 0.24 : 0.1;
+    this.group.userData = ext ? { facade, windows: ext.windows } : {};
+    const baseColor = (x: number, z: number) =>
+      ext
+        ? (x + z) % 7 === 0
+          ? tone(ext.facadeColor, 0.81)
+          : ext.facadeColor
+        : (x + z) % 7 === 0
+          ? "#657779"
+          : "#7e8987";
+    const trim = ext?.trimColor ?? "#465e68";
     const walls: BufferGeometry[] = [],
       frames: BufferGeometry[] = [],
       glass: BufferGeometry[] = [];
@@ -135,6 +251,100 @@ export class BuildingShell {
       }
       out.push(geometry);
     };
+    /** One piece of solid facade wall: a single box, or courses of brick,
+     * boards, panels or glazing bands when the building has a finish. */
+    const piece = (
+      x: number,
+      z: number,
+      cx: number,
+      cz: number,
+      base: number,
+      yc: number,
+      h: number,
+      w: number,
+      d: number,
+      color: string,
+      storey: number,
+    ) => {
+      if (!ext || facade === "concrete") {
+        box(walls, cx, base + yc, cz, w, h, d, color);
+        return;
+      }
+      const y0 = yc - h / 2,
+        y1 = yc + h / 2,
+        cut = course ? course.height : facade === "stucco" ? 0.45 : 0;
+      const edges = [y0];
+      if (facade === "glass") {
+        for (const e of [0.85, 2.35]) if (e > y0 && e < y1) edges.push(e);
+      } else if (facade === "stucco") {
+        if (cut > y0 && cut < y1) edges.push(cut);
+      } else
+        for (
+          let e = (Math.floor(y0 / cut + 1e-6) + 1) * cut;
+          e < y1 - 1e-6;
+          e += cut
+        )
+          edges.push(e);
+      edges.push(y1);
+      for (let i = 0; i < edges.length - 1; i++) {
+        const a = edges[i],
+          b = edges[i + 1],
+          mid = (a + b) / 2;
+        let factor = 1,
+          grow = 0;
+        if (facade === "brick") {
+          const k = Math.floor(mid / cut);
+          factor = 0.86 + 0.26 * noise(x, z, k + storey * 13);
+          if (k % 9 === 8) factor *= 0.82;
+          grow = k % 2 ? course!.grow : 0;
+        } else if (facade === "clapboard") {
+          const k = Math.floor(mid / cut);
+          factor = 0.95 + 0.05 * (k % 2) + 0.03 * noise(x, z, k);
+          grow = k % 2 ? course!.grow : 0;
+        } else if (facade === "metal") {
+          const k = Math.floor(mid / cut);
+          factor = 0.93 + 0.09 * ((x + z + k) % 2);
+        } else if (facade === "stucco") {
+          factor = mid < cut ? 0.78 : 0.96 + 0.06 * noise(x, z, storey);
+        } else if (facade === "glass") {
+          factor = mid < 0.85 || mid > 2.35 ? 0.55 : 1.12;
+        }
+        box(
+          walls,
+          cx,
+          base + mid,
+          cz,
+          w + grow,
+          b - a,
+          d + grow,
+          tone(color, factor),
+        );
+      }
+    };
+    /** Plaster in the interior wall colour over the faces that look inward. */
+    const lining = (
+      cx: number,
+      cz: number,
+      base: number,
+      yc: number,
+      h: number,
+      w: number,
+      d: number,
+      inward: readonly (readonly [number, number])[],
+    ) => {
+      if (!liner) return;
+      for (const [dx, dz] of inward)
+        box(
+          walls,
+          cx + dx * 0.51 * (w === 1 ? 1 : 0),
+          base + yc,
+          cz + dz * 0.51 * (d === 1 ? 1 : 0),
+          dx ? 0.02 : w,
+          h,
+          dz ? 0.02 : d,
+          liner,
+        );
+    };
     for (const floor of floors) {
       if (!floor.boundary) continue;
       const base = floor.index * FLOOR_HEIGHT,
@@ -149,72 +359,162 @@ export class BuildingShell {
             cz = z + 0.5,
             window = windows.get(`${cx}/${cz}`);
           const color = roof
-            ? "#8d9694"
-            : (x + z) % 7 === 0
-              ? "#657779"
-              : "#7e8987";
+            ? ext
+              ? tone(ext.facadeColor, 1.12)
+              : "#8d9694"
+            : baseColor(x, z);
           if (roof) {
-            box(walls, cx, base + 0.46, cz, 1, 0.92, 1, color);
-            box(walls, cx, base + 0.96, cz, 1.06, 0.08, 1.06, "#b0b5a7");
+            piece(x, z, cx, cz, base, 0.46, 0.92, 1, 1, color, floor.index);
+            box(
+              walls,
+              cx,
+              base + 0.96,
+              cz,
+              1.06,
+              0.08,
+              1.06,
+              ext ? ext.trimColor : "#b0b5a7",
+            );
             continue;
           }
-          if (!window) box(walls, cx, base + 1.4, cz, 1, 2.8, 1, color);
-          else {
-            const alongX = window.axis === "x";
-            box(walls, cx, base + 0.425, cz, 1, 0.85, 1, color);
-            box(walls, cx, base + 2.575, cz, 1, 0.45, 1, color);
+          // The faces of this cell that look into the building.
+          const inward = (
+            [
+              [0, -1],
+              [0, 1],
+              [-1, 0],
+              [1, 0],
+            ] as const
+          ).filter(([dx, dz]) => inside(floor, x + dx, z + dz));
+          if (!window) {
+            piece(x, z, cx, cz, base, 1.4, 2.8, 1, 1, color, floor.index);
+            lining(cx, cz, base, 1.4, 2.8, 1, 1, inward);
+            if (curtain)
+              for (const sx of [-1, 1])
+                for (const sz of [-1, 1])
+                  box(
+                    walls,
+                    cx + sx * 0.485,
+                    base + 1.4,
+                    cz + sz * 0.485,
+                    0.07,
+                    2.8,
+                    0.07,
+                    ext!.trimColor,
+                  );
+            else if (facade === "metal")
+              for (const [w, d] of [
+                [0.05, 1.03],
+                [1.03, 0.05],
+              ])
+                box(walls, cx, base + 1.4, cz, w, 2.8, d, ext!.trimColor);
+          } else {
+            const alongX = window.axis === "x",
+              back: readonly (readonly [number, number])[] = alongX
+                ? [[0, -window.normal]]
+                : [[-window.normal, 0]];
+            piece(
+              x,
+              z,
+              cx,
+              cz,
+              base,
+              spec.bottom[0],
+              spec.bottom[1],
+              1,
+              1,
+              color,
+              floor.index,
+            );
+            piece(
+              x,
+              z,
+              cx,
+              cz,
+              base,
+              spec.top[0],
+              spec.top[1],
+              1,
+              1,
+              color,
+              floor.index,
+            );
+            lining(cx, cz, base, spec.bottom[0], spec.bottom[1], 1, 1, back);
+            lining(cx, cz, base, spec.top[0], spec.top[1], 1, 1, back);
             for (const side of [-1, 1]) {
-              box(
-                walls,
-                cx + (alongX ? side * 0.46 : 0),
-                base + 1.6,
-                cz + (alongX ? 0 : side * 0.46),
-                alongX ? 0.08 : 1,
-                1.5,
-                alongX ? 1 : 0.08,
-                color,
-              );
+              if (spec.pier) {
+                const [offset, thickness] = spec.pier,
+                  px = cx + (alongX ? side * offset : 0),
+                  pz = cz + (alongX ? 0 : side * offset),
+                  pw = alongX ? thickness : 1,
+                  pd = alongX ? 1 : thickness;
+                piece(
+                  x,
+                  z,
+                  px,
+                  pz,
+                  base,
+                  spec.side[0],
+                  spec.side[1],
+                  pw,
+                  pd,
+                  color,
+                  floor.index,
+                );
+                if (liner)
+                  for (const [dx, dz] of back)
+                    box(
+                      walls,
+                      px + dx * 0.51,
+                      base + spec.side[0],
+                      pz + dz * 0.51,
+                      dx ? 0.02 : pw,
+                      spec.side[1],
+                      dz ? 0.02 : pd,
+                      liner,
+                    );
+              }
               box(
                 frames,
-                cx + (alongX ? side * 0.4 : 0),
-                base + 1.6,
-                cz + (alongX ? 0 : side * 0.4),
-                alongX ? 0.035 : 0.08,
-                1.5,
-                alongX ? 0.08 : 0.035,
+                cx + (alongX ? side * spec.frame[0] : 0),
+                base + spec.side[0],
+                cz + (alongX ? 0 : side * spec.frame[0]),
+                alongX ? spec.frame[1] : 0.08,
+                spec.side[1],
+                alongX ? 0.08 : spec.frame[1],
               );
             }
-            for (const height of [0.89, 2.31])
+            for (const height of spec.bars)
               box(
                 frames,
                 cx,
                 base + height,
                 cz,
-                alongX ? 0.84 : 0.12,
+                alongX ? spec.barLength : 0.12,
                 0.055,
-                alongX ? 0.12 : 0.84,
+                alongX ? 0.12 : spec.barLength,
               );
             box(
               glass,
               cx,
-              base + 1.6,
+              base + spec.glass[2],
               cz,
-              alongX ? 0.79 : 0.025,
-              1.35,
-              alongX ? 0.025 : 0.79,
+              alongX ? spec.glass[0] : 0.025,
+              spec.glass[1],
+              alongX ? 0.025 : spec.glass[0],
             );
             // Projecting sill catches the cold sky light from inside.
             box(
               frames,
               cx,
-              base + 0.855,
+              base + spec.sill[0],
               cz,
-              alongX ? 0.92 : 1.12,
+              alongX ? spec.sill[1] : spec.sill[2],
               0.055,
-              alongX ? 1.12 : 0.92,
+              alongX ? spec.sill[2] : spec.sill[1],
             );
           }
-          box(walls, cx, base + 3.2, cz, 1.04, 0.8, 1.04, "#465e68");
+          box(walls, cx, base + 3.2, cz, 1.04, 0.8, 1.04, trim);
         }
       if (!roof) {
         // Open stair/entrance portals still have continuous floor beams above
@@ -228,7 +528,7 @@ export class BuildingShell {
           southWidth,
           0.8,
           1.04,
-          "#465e68",
+          trim,
         );
         box(
           walls,
@@ -238,7 +538,7 @@ export class BuildingShell {
           2,
           0.8,
           1.04,
-          "#465e68",
+          trim,
         );
       }
       // Thin floor plates reveal the true storey spacing without populating
@@ -262,11 +562,41 @@ export class BuildingShell {
     this.merge(walls, this.structure, "facade-structure");
     this.merge(frames, this.frames, "facade-window-frames");
     this.merge(glass, this.glass, "facade-glazing");
+    if (ext) this.buildRoofFeatures(floors, ext.roofFeatures, setting?.objects);
+  }
+
+  /** Radio masts, dishes, tanks and the like stand on the roof's outer ring,
+   * leaning toward the parapet. They are visual only: the roof walkable
+   * area, helipad and stairs are untouched. */
+  private buildRoofFeatures(
+    floors: Floor[],
+    features: NonNullable<Floor["setting"]>["exterior"]["roofFeatures"],
+    objects: NonNullable<Floor["setting"]>["objects"] = [],
+  ) {
+    const roof = floors.find((f) => f.index === CONFIG.floors);
+    if (!roof?.boundary || !features.length) return;
+    const solid: BufferGeometry[] = [],
+      lamps: BufferGeometry[] = [],
+      kinds: string[] = [];
+    for (const feature of resolveRoofFeatures(roof.boundary, features)) {
+      if (!feature) continue;
+      const parts = roofFeatureParts(
+        feature,
+        CONFIG.floors * FLOOR_HEIGHT,
+        objects,
+      );
+      solid.push(...parts.solid);
+      lamps.push(...parts.lamps);
+      kinds.push(feature.kind);
+    }
+    this.merge(solid, this.roofMetal, "roof-feature-structure");
+    this.merge(lamps, this.roofLamps, "roof-feature-lamps");
+    this.group.userData.roofFeatures = kinds;
   }
 
   private merge(
     parts: BufferGeometry[],
-    material: MeshStandardMaterial,
+    material: MeshStandardMaterial | MeshBasicMaterial,
     name: string,
   ) {
     if (!parts.length) return;
@@ -288,5 +618,7 @@ export class BuildingShell {
     this.structure.dispose();
     this.frames.dispose();
     this.glass.dispose();
+    this.roofMetal.dispose();
+    this.roofLamps.dispose();
   }
 }

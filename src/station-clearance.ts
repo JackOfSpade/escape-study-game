@@ -4,7 +4,12 @@ import { inFurniture, inStation, STATION_BODY } from "./spatial";
 
 /** Corners this small behind a desk are not a sealed-off part of a floor. */
 const POCKET = 2;
-const SURFACE_HOSTS = new Set<string>(["desk", "reception", "whiteboard"]);
+const SURFACE_HOSTS = new Set<string>([
+  "desk",
+  "reception",
+  "whiteboard",
+  "mixingConsole",
+]);
 let originalDesks = false;
 /** Rebuild a saved design whose writing was bound before terminals could move. */
 export function withOriginalDesks<T>(build: () => T): T {
@@ -134,7 +139,8 @@ function solidSet(f: Floor) {
   const views = entranceViews(f),
     desks: Station[] = [];
   // Almost every floor is clear, which one whole-floor check proves.
-  if (!views.some((v) => seals(v.links, f.stations, v.whole))) return f.stations;
+  if (!views.some((v) => seals(v.links, f.stations, v.whole)))
+    return f.stations;
   for (const s of f.stations)
     if (!views.some((v) => seals(v.links, [...desks, s], v.whole, f.stations)))
       desks.push(s);
@@ -210,7 +216,9 @@ export function moveBlockingDesks(f: Floor, valid: () => boolean) {
       if (!fits(p)) continue;
       Object.assign(s, p);
       if (
-        !views.some((v) => seals(v.links, [...desks, s], v.whole, f.stations)) &&
+        !views.some((v) =>
+          seals(v.links, [...desks, s], v.whole, f.stations),
+        ) &&
         valid()
       ) {
         desks.push(s);

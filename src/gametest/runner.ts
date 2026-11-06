@@ -66,7 +66,8 @@ function read(
       return e.door.latched;
     }
     if (q.field === "doorOpen") {
-      if (!("field" in e) || !e.field) throw Error(`${q.id} is not an access door`);
+      if (!("field" in e) || !e.field)
+        throw Error(`${q.id} is not an access door`);
       return e.field.leaf?.open ?? 0;
     }
     if (q.field === "maxHp") {
@@ -113,6 +114,11 @@ function read(
   if (q.type === "soundConnected")
     return soundConnected(g.floors[q.floor], q.a, q.b);
   if (q.type === "buildingLayoutErrors") return buildingLayoutErrors(g).length;
+  if (q.type === "furnitureCount")
+    return g.floors
+      .filter((f) => q.floor === undefined || f.index === q.floor)
+      .flatMap((f) => f.furniture)
+      .filter((o) => o.kind === q.kind && !o.destroyed).length;
   if (q.type === "environmentErrors") {
     try {
       assertDesignedEnvironment(g);

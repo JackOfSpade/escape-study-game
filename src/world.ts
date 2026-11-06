@@ -356,6 +356,9 @@ function generateFloor(
     ...(blueprint && index === 0
       ? { exteriorDesign: structuredClone(blueprint.exterior) }
       : {}),
+    ...(blueprint && "setting" in blueprint && blueprint.setting
+      ? { setting: structuredClone(blueprint.setting) }
+      : {}),
     index,
     tiles,
     stations: [],

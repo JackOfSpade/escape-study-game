@@ -28,10 +28,12 @@ test("the shared scene catalog covers physical furniture without inventing colli
   assert.deepEqual(
     [...SCENE_FURNITURE_KINDS].sort(),
     Object.keys(FURNITURE)
-      .filter((kind) => kind !== "gate" && kind !== "door")
+      // gate/door are engine-owned; "custom" is placed by a design's own
+      // composed object id rather than by name.
+      .filter((kind) => !["gate", "door", "custom"].includes(kind))
       .sort(),
   );
-  assert.equal(Object.keys(PROP_CATALOG).length, 12);
+  assert.equal(Object.keys(PROP_CATALOG).length, 15);
   for (const dimensions of Object.values(PROP_CATALOG)) {
     assert.deepEqual(Object.keys(dimensions).sort(), ["d", "h", "w"]);
     assert.ok(
@@ -101,7 +103,14 @@ test("version 2 scene owners, object properties and independent captions are pre
         r.furniture.flatMap((o) => o.props.map((p) => p.kind)),
       ),
     );
-    assert.deepEqual([...kinds].sort(), Object.keys(PROP_CATALOG).sort());
+    // The v2 fixtures predate the broadcast props.
+    const broadcast = ["cassette", "headphones", "record"];
+    assert.deepEqual(
+      [...kinds].sort(),
+      Object.keys(PROP_CATALOG)
+        .filter((kind) => !broadcast.includes(kind))
+        .sort(),
+    );
     const room = design.floors[0].scene!.rooms[0];
     assert.ok(design.roster.some((a) => a.name === room.owner));
     assert.ok(

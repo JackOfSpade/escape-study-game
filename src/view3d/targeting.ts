@@ -198,7 +198,7 @@ export function lookTargetPrompt(game: Game, target: LookTarget) {
   if (target.kind === "item")
     return `E · Take ${objectName(target.item.kind).toLowerCase()}`;
   if (target.kind === "grip")
-    return `E · Grip ${objectName(target.object.kind).toLowerCase()}`;
+    return `E · Grip ${objectName(target.object.kind, target.object.object).toLowerCase()}`;
   if (target.kind === "door") {
     if (target.object.field)
       return accessDoorPrompt(target.object, human(game));

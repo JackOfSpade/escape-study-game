@@ -81,6 +81,8 @@ export interface Check {
     | { type: "event"; event: string }
     | { type: "buildingLayoutErrors" }
     | { type: "environmentErrors" }
+    /** Intact furniture of one kind, on one floor or across the building. */
+    | { type: "furnitureCount"; kind: FurnitureKind; floor?: number }
     | { type: "soundConnected"; floor: number; a: Point; b: Point }
     /** Simulated world time in seconds. */
     | { type: "worldTime" }
@@ -543,6 +545,14 @@ export function parseScenario(value: string | unknown): Scenario {
       );
     else if (q.type === "event")
       requireThat(id(q.event), "Invalid event type.");
+    else if (q.type === "furnitureCount")
+      requireThat(
+        Object.keys(q).every((k) => ["type", "kind", "floor"].includes(k)) &&
+          typeof q.kind === "string" &&
+          Object.hasOwn(FURNITURE, q.kind) &&
+          (q.floor === undefined || floor(q.floor)),
+        "Furniture counts need a known furniture kind and an optional floor.",
+      );
     else if (
       q.type === "buildingLayoutErrors" ||
       q.type === "environmentErrors"

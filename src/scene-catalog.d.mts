@@ -10,7 +10,10 @@ export type ScenePropKind =
   | "phone"
   | "box"
   | "lamp"
-  | "trophy";
+  | "trophy"
+  | "headphones"
+  | "record"
+  | "cassette";
 export type SceneFurnitureKind = Exclude<
   import("./model").FurnitureKind,
   "gate" | "door"
@@ -23,7 +26,9 @@ export type SceneSurfaceKind =
   | "reception"
   | "cabinet"
   | "shelf"
-  | "drawers";
+  | "drawers"
+  | "mixingConsole"
+  | "recordShelf";
 export type SceneCondition = "intact" | "worn" | "damaged";
 export interface ScenePropDesign {
   id: string;

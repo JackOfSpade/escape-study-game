@@ -16,6 +16,7 @@ import { sceneSaveErrors } from "./authored-scene";
 import {
   assertDesignedEnvironment,
   bindDesignedEnvironment,
+  rebindComposedObjects,
 } from "./environment-save";
 const KEY = "dead-air-save-v1";
 interface Envelope {
@@ -56,6 +57,7 @@ export function decode(text: string): Game {
     throw Error("Unsupported save");
   if (g.design) {
     g.design = parseSavedRunDesign(g.design);
+    rebindComposedObjects(g);
     assertDesignedEnvironment(g);
     // Geometry and moved furniture remain authoritative. Immutable presentation
     // and collision descriptors must agree with the fingerprinted blueprint.
@@ -65,12 +67,17 @@ export function decode(text: string): Game {
       else delete floor.design;
       if (floor.index === 0) floor.exteriorDesign = g.design.design.exterior;
       else delete floor.exteriorDesign;
+      const setting = "setting" in g.design.design && g.design.design.setting;
+      if (setting) floor.setting = setting;
+      else delete floor.setting;
     }
-  } else if (g.floors.some((f) => f.design || f.exteriorDesign)) {
+  } else if (g.floors.some((f) => f.design || f.exteriorDesign || f.setting)) {
     throw Error(
       "Authored floor descriptors are missing their saved run design",
     );
   }
+  // A run without a design cannot own composed furniture.
+  if (!g.design) rebindComposedObjects(g);
   for (const floor of g.floors) {
     const errors = sceneSaveErrors(floor);
     if (errors.length)

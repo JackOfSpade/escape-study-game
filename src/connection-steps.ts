@@ -37,7 +37,8 @@ export function connectionSteps(status: BridgeStatus): {
       };
     default:
       return {
-        problem: "The game cannot reach its study relay, which talks to Claude.",
+        problem:
+          "The game cannot reach its study relay, which talks to Claude.",
         steps: [OPEN_TERMINAL, START_RELAY],
       };
   }

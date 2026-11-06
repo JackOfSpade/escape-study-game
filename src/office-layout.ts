@@ -2,6 +2,7 @@ import { clearFillerAroundDesks } from "./station-clearance";
 import {
   CONFIG,
   FURNITURE,
+  furnitureSpec,
   H,
   W,
   between,
@@ -14,11 +15,19 @@ import {
   type Point,
   type Rng,
 } from "./model";
-import { boxesOverlap } from "./furniture-geometry";
+import { boxesOverlap, normalizeAngle, turn } from "./furniture-geometry";
 import { canPlace, inFurniture, wall } from "./spatial";
 import { stairwellApproach } from "./stairwell";
 import { floorSectors, inRect, type Rect } from "./floor-plan";
 import { realizeAuthoredScene } from "./authored-scene";
+import { floorVenue } from "./venue";
+import {
+  furnitureRole,
+  type RunCustomObject,
+  type RunObjectRole,
+  type RunSetting,
+  type RunVenue,
+} from "./setting-catalog.mjs";
 
 /** Office rooms for freshly generated floors. Each room gets a function
  * (break room, open-plan cubicles, meeting room, storage, reception or
@@ -59,6 +68,63 @@ export const ROOM_CATALOG: Record<OfficeRoomType, FurnitureKind[]> = {
   manager: ["desk", "officeChair", "armchair", "shelf", "cabinet", "plant"],
 };
 
+/** Broadcast station rooms: the same six functions, built from studio, control
+ * room and library equipment instead of office filler. */
+const BROADCAST_CATALOG: Record<OfficeRoomType, FurnitureKind[]> = {
+  reception: [
+    "reception",
+    "officeChair",
+    "sofa",
+    "armchair",
+    "coffeeTable",
+    "plant",
+    "onAirLight",
+    "recordShelf",
+  ],
+  break: [
+    "sofa",
+    "armchair",
+    "coffeeTable",
+    "fridge",
+    "coffeeMaker",
+    "cafeTable",
+    "chair",
+    "plant",
+  ],
+  cubicles: [
+    "desk",
+    "officeChair",
+    "soundPanel",
+    "studioMonitor",
+    "recordShelf",
+    "cabinet",
+  ],
+  meeting: [
+    "table",
+    "officeChair",
+    "micStand",
+    "studioMonitor",
+    "soundPanel",
+    "onAirLight",
+    "plant",
+  ],
+  storage: ["recordShelf", "reelToReel", "box", "cabinet"],
+  manager: [
+    "mixingConsole",
+    "officeChair",
+    "equipmentRack",
+    "studioMonitor",
+    "turntable",
+    "plant",
+  ],
+};
+/** Which furniture each room function may hold, per fixed-catalog venue. A
+ * custom venue furnishes from setting.filler instead. */
+export const VENUE_ROOM_CATALOG: Record<
+  Exclude<RunVenue, "custom">,
+  Record<OfficeRoomType, FurnitureKind[]>
+> = { office: ROOM_CATALOG, broadcast: BROADCAST_CATALOG };
+
 export interface OfficeZone {
   id: string;
   x1: number;
@@ -84,6 +150,8 @@ interface Piece {
   angle: number;
   /** Length override, e.g. a short cubicle side panel. */
   w?: number;
+  /** Recipe of an AI-composed object (kind "custom"). */
+  object?: RunCustomObject;
 }
 interface Group {
   wall: boolean;
@@ -115,29 +183,25 @@ function seatsAround(
   perSide: number,
   ends: number,
   kind: FurnitureKind,
+  object?: RunCustomObject,
 ): Piece[] {
-  const seat = FURNITURE[kind],
+  const seat = furnitureSpec({ kind, object }),
     out: Piece[] = [],
     off = (n: number, i: number) =>
-      perSide === 1 ? 0 : -w / 2 + 0.55 + (i * (w - 1.1)) / (n - 1);
+      perSide === 1 ? 0 : -w / 2 + 0.55 + (i * (w - 1.1)) / (n - 1),
+    make = (x: number, y: number, angle: number): Piece => ({
+      kind,
+      x,
+      y,
+      angle,
+      ...(object ? { object } : {}),
+    });
   for (let i = 0; i < perSide; i++) {
-    out.push({
-      kind,
-      x: off(perSide, i),
-      y: -h / 2 - seat.h / 2 - 0.08,
-      angle: N,
-    });
-    out.push({
-      kind,
-      x: off(perSide, i),
-      y: h / 2 + seat.h / 2 + 0.08,
-      angle: S,
-    });
+    out.push(make(off(perSide, i), -h / 2 - seat.h / 2 - 0.08, N));
+    out.push(make(off(perSide, i), h / 2 + seat.h / 2 + 0.08, S));
   }
-  if (ends > 0)
-    out.push({ kind, x: -w / 2 - seat.h / 2 - 0.08, y: 0, angle: Wst });
-  if (ends > 1)
-    out.push({ kind, x: w / 2 + seat.h / 2 + 0.08, y: 0, angle: E });
+  if (ends > 0) out.push(make(-w / 2 - seat.h / 2 - 0.08, 0, Wst));
+  if (ends > 1) out.push(make(w / 2 + seat.h / 2 + 0.08, 0, E));
   return out;
 }
 
@@ -330,12 +394,445 @@ function plan(type: OfficeRoomType, r: Rng, small: boolean): Group[][] {
   }
   return groups;
 }
+/** A live-studio table: chairs and microphone stands ring it. */
+const studioTable = (
+  perSide: number,
+  ends: number,
+  oneSide = false,
+): Group => ({
+  wall: false,
+  pieces: (
+    [
+      { kind: "table", x: 0, y: 0, angle: N },
+      ...seatsAround(3, 1.4, perSide, ends, "officeChair"),
+      ...[-1, 1].flatMap((side) => [
+        { kind: "micStand" as const, x: side * 1.8, y: -0.68, angle: N },
+        { kind: "micStand" as const, x: side * 1.8, y: 0.68, angle: N },
+      ]),
+      ...(perSide === 2
+        ? [
+            { kind: "micStand" as const, x: 0, y: -1, angle: N },
+            { kind: "micStand" as const, x: 0, y: 1, angle: N },
+          ]
+        : []),
+    ] as Piece[]
+  ).filter((p) => !oneSide || p.y >= 0),
+});
+const newsPod: Group = {
+  wall: false,
+  pieces: [
+    { kind: "soundPanel", x: 0, y: -0.78, angle: N },
+    { kind: "soundPanel", x: -1.3, y: 0.1, angle: E },
+    { kind: "desk", x: 0, y: -0.1, angle: N },
+    { kind: "officeChair", x: 0.25, y: 0.82, angle: S },
+    { kind: "studioMonitor", x: 0.9, y: 0.72, angle: N },
+  ],
+};
+const newsWallPod: Group = {
+  wall: true,
+  pieces: [
+    { kind: "desk", x: 0, y: 0.53, angle: N },
+    { kind: "officeChair", x: 0.2, y: 1.45, angle: S },
+    { kind: "studioMonitor", x: 0.9, y: 1.4, angle: N },
+    { kind: "soundPanel", x: -1.3, y: 1.05, angle: E },
+  ],
+};
+/** The mixing desk with its operator and a monitor on each side. */
+const consoleGroup = (wall: boolean): Group => ({
+  wall,
+  pieces: [
+    { kind: "mixingConsole", x: 0, y: wall ? 0.48 : 0, angle: N },
+    { kind: "officeChair", x: 0, y: wall ? 1.4 : 0.95, angle: S },
+    { kind: "studioMonitor", x: -1.3, y: wall ? 0.28 : 0, angle: N },
+    { kind: "studioMonitor", x: 1.3, y: wall ? 0.28 : 0, angle: N },
+  ],
+});
+
+/** The broadcast counterpart of plan(): same functions, same priorities. */
+function planBroadcast(
+  type: OfficeRoomType,
+  r: Rng,
+  small: boolean,
+): Group[][] {
+  const groups: Group[][] = [];
+  const plants = (n: number) => {
+    for (let i = 0; i < n; i++)
+      groups.push([solo("plant", rand(r) < 0.6), solo("plant", false)]);
+  };
+  switch (type) {
+    case "break": {
+      const counter: FurnitureKind[] = rand(r) < 0.7 ? ["fridge"] : [];
+      groups.push([
+        wallRun(["coffeeMaker", ...counter]),
+        wallRun(["coffeeMaker"]),
+      ]);
+      groups.push([
+        {
+          wall: true,
+          pieces: [
+            { kind: "sofa", x: 0, y: 0.53, angle: N },
+            { kind: "coffeeTable", x: 0, y: 1.45, angle: N },
+            { kind: "armchair", x: -1.9, y: 0.48, angle: N },
+          ],
+        },
+        wallRun(["armchair", "sofa"], 0.1),
+        solo("sofa", true),
+      ]);
+      for (let i = between(r, small ? 0 : 1, small ? 1 : 2); i > 0; i--)
+        groups.push([cafe(3), cafe(2), cafe(1)]);
+      if (rand(r) < 0.5) groups.push([wallRun(["armchair", "armchair"], 0.15)]);
+      plants(between(r, 0, 2));
+      break;
+    }
+    case "cubicles":
+      for (let i = between(r, small ? 1 : 2, small ? 3 : 5); i > 0; i--)
+        groups.push([newsPod, newsWallPod]);
+      groups.push([wallRun(["recordShelf"]), wallRun(["cabinet"])]);
+      if (rand(r) < 0.7)
+        groups.push([wallRun(["cabinet", "cabinet"]), wallRun(["cabinet"])]);
+      break;
+    case "meeting": {
+      const perSide = between(r, 2, 3),
+        ends = between(r, 0, 2);
+      groups.push([
+        studioTable(perSide, ends),
+        studioTable(perSide, 0),
+        studioTable(perSide, ends, true),
+        studioTable(0, 2),
+      ]);
+      groups.push([
+        wallRun(["soundPanel", "soundPanel"]),
+        wallRun(["soundPanel"]),
+      ]);
+      groups.push([
+        wallRun(["studioMonitor", "studioMonitor"]),
+        wallRun(["studioMonitor"]),
+      ]);
+      groups.push([solo("onAirLight", true)]);
+      if (rand(r) < 0.6) groups.push([wallRun(["soundPanel"])]);
+      plants(between(r, 0, 1));
+      break;
+    }
+    case "storage": {
+      groups.push([
+        wallRun(
+          shuffle(r, [
+            "recordShelf",
+            "recordShelf",
+            "reelToReel",
+            "cabinet",
+          ] as FurnitureKind[]),
+        ),
+        wallRun(["recordShelf", "reelToReel"]),
+        wallRun(["recordShelf"]),
+      ]);
+      groups.push([
+        wallRun(["recordShelf", "recordShelf"]),
+        wallRun(["recordShelf"]),
+      ]);
+      if (rand(r) < 0.6) groups.push([wallRun(["reelToReel", "cabinet"])]);
+      for (let i = between(r, 2, 3); i > 0; i--)
+        groups.push([
+          {
+            wall: false,
+            pieces: [
+              { kind: "box", x: -0.33, y: 0, angle: N },
+              { kind: "box", x: 0.36, y: 0.05, angle: 0.2 },
+              { kind: "box", x: 0, y: 0.55, angle: -0.1 },
+            ],
+          },
+          solo("box", false),
+        ]);
+      break;
+    }
+    case "reception":
+      groups.push([
+        {
+          wall: false,
+          pieces: [
+            { kind: "reception", x: 0, y: 0, angle: N },
+            { kind: "officeChair", x: 0, y: 0.9, angle: S },
+          ],
+        },
+      ]);
+      groups.push([solo("onAirLight", true)]);
+      groups.push([
+        {
+          wall: true,
+          pieces: [
+            { kind: "sofa", x: 0, y: 0.53, angle: N },
+            { kind: "coffeeTable", x: 0, y: 1.45, angle: N },
+            { kind: "armchair", x: -1.9, y: 0.48, angle: N },
+          ],
+        },
+        wallRun(["armchair", "sofa"], 0.1),
+        solo("sofa", true),
+        wallRun(["armchair", "armchair"], 0.15),
+      ]);
+      groups.push([wallRun(["recordShelf"])]);
+      if (rand(r) < 0.5) groups.push([wallRun(["armchair", "armchair"], 0.15)]);
+      plants(between(r, 1, 3));
+      break;
+    case "manager":
+      groups.push([consoleGroup(false), consoleGroup(true)]);
+      groups.push([
+        wallRun(["equipmentRack", "equipmentRack", "equipmentRack"]),
+        wallRun(["equipmentRack", "equipmentRack"]),
+        wallRun(["equipmentRack"]),
+      ]);
+      groups.push([wallRun(["turntable"])]);
+      groups.push([wallRun(["studioMonitor", "studioMonitor"])]);
+      plants(between(r, 0, 1));
+      break;
+  }
+  return groups;
+}
+/** One furnishing name of a custom venue: a built-in kind or a composed object. */
+interface Item {
+  name: string;
+  kind: FurnitureKind;
+  object?: RunCustomObject;
+  /** What the piece is for: the planner arranges by role, never by name. */
+  role: RunObjectRole;
+  w: number;
+  h: number;
+}
+function fillerItem(setting: RunSetting, name: string): Item {
+  const object = setting.objects.find((o) => o.id === name);
+  if (object) {
+    const spec = furnitureSpec({ kind: "custom", object });
+    return {
+      name,
+      kind: "custom",
+      object,
+      role: object.role,
+      w: spec.w,
+      h: spec.h,
+    };
+  }
+  const kind = name as FurnitureKind,
+    spec = FURNITURE[kind];
+  return { name, kind, role: furnitureRole(kind), w: spec.w, h: spec.h };
+}
+const piece = (it: Item, x: number, y: number, angle = N): Piece => ({
+  kind: it.kind,
+  x,
+  y,
+  angle,
+  ...(it.object ? { object: it.object } : {}),
+});
+const soloItem = (it: Item, wall: boolean): Group => ({
+  wall,
+  pieces: [piece(it, 0, wall ? it.h / 2 + 0.03 : 0)],
+});
+function runItems(items: Item[], gap = 0.05): Group {
+  const width = items.reduce((n, it) => n + it.w + gap, -gap);
+  let x = -width / 2;
+  return {
+    wall: true,
+    pieces: items.map((it) => {
+      const out = piece(it, x + it.w / 2, it.h / 2 + 0.03);
+      x += it.w + gap;
+      return out;
+    }),
+  };
+}
+/** A main piece with a seat in front of its working side. */
+const seatedItem = (main: Item, seat: Item, wall: boolean): Group => ({
+  wall,
+  pieces: wall
+    ? [
+        piece(main, 0, main.h / 2 + 0.03),
+        piece(seat, 0, main.h + 0.03 + seat.h / 2 + 0.08, S),
+      ]
+    : [piece(main, 0, 0), piece(seat, 0, main.h / 2 + seat.h / 2 + 0.08, S)],
+});
+const tableItem = (
+  main: Item,
+  seat: Item,
+  perSide: number,
+  ends: number,
+  oneSide = false,
+): Group => ({
+  wall: false,
+  pieces: [
+    piece(main, 0, 0),
+    ...seatsAround(
+      main.w,
+      main.h,
+      main.w >= 1.7 ? perSide : Math.min(perSide, 1),
+      ends,
+      seat.kind,
+      seat.object,
+    ).filter((p) => !oneSide || p.y >= 0),
+  ],
+});
+/** Deepest a divider may be and still read as a panel between positions. */
+const DIVIDER_DEPTH = 0.6;
+/** Cubicle bays are split by the designer's first cubicles filler with the
+ * divider role (and a panel's depth). Without one a custom venue leaves its
+ * work positions open rather than borrowing office partitions. */
+function dividerOf(
+  setting: RunSetting,
+): Pick<Item, "kind" | "object"> | undefined {
+  return (setting.filler?.cubicles ?? [])
+    .map((n) => fillerItem(setting, n))
+    .find((it) => it.role === "divider" && it.h <= DIVIDER_DEPTH);
+}
+/** The room's signature piece: the first listed piece that is not a seat,
+ * divider or ornament, else simply the first listed. */
+const signatureOf = (items: Item[]) =>
+  items.find(
+    (it) => !["seat", "divider", "decor", "light"].includes(it.role),
+  ) ?? items[0];
+/** The signature piece and the seat that sits at its working side. */
+function pickRoles(items: Item[]) {
+  const sig = signatureOf(items),
+    rest = items.filter((it) => it !== sig);
+  return { sig, rest, seat: rest.find((it) => it.role === "seat") };
+}
+/** Which listed names a custom venue arranges as signature, seat and bay
+ * divider, for tests and tooling. */
+export function customFillerRoles(
+  setting: RunSetting,
+  roomFunction: OfficeRoomType,
+) {
+  const items = (setting.filler?.[roomFunction] ?? []).map((n) =>
+      fillerItem(setting, n),
+    ),
+    { sig, seat } = pickRoles(items),
+    divider = roomFunction === "cubicles" ? dividerOf(setting) : undefined;
+  return {
+    signature: sig?.name,
+    seat: seat?.name,
+    divider: divider && (divider.object?.id ?? divider.kind),
+  };
+}
+/** Pieces that line a wall, storage first. */
+const wallPieces = (items: Item[]) =>
+  [...items].sort(
+    (a, b) => Number(b.role === "storage") - Number(a.role === "storage"),
+  );
+/** The custom-venue counterpart of plan(): the same six functions and
+ * priorities, built from the designer's filler list. The first name is the
+ * room's signature piece; a seat among the rest sits at its working side. */
+function planCustom(
+  type: OfficeRoomType,
+  r: Rng,
+  small: boolean,
+  names: readonly string[],
+  setting: RunSetting,
+): Group[][] {
+  const items = names.map((n) => fillerItem(setting, n)),
+    { sig, rest, seat } = pickRoles(items),
+    // Dividers only split the work positions of cubicles.
+    others = wallPieces(
+      rest.filter(
+        (it) => it !== seat && !(type === "cubicles" && it.role === "divider"),
+      ),
+    ),
+    surfaces = [sig, ...others].filter((it) => it.role === "surface"),
+    groups: Group[][] = [];
+  const station = (wall: boolean) =>
+    seat ? seatedItem(sig, seat, wall) : soloItem(sig, wall);
+  const runs = (list: Item[], gap = 0.05): Group[] =>
+    list.length
+      ? [
+          runItems(list.slice(0, 3), gap),
+          runItems(list.slice(0, 2), gap),
+          runItems(list.slice(0, 1), gap),
+        ]
+      : [];
+  const seats = (): Group[] =>
+    seat ? [runItems([seat, seat], 0.15), soloItem(seat, true)] : [];
+  switch (type) {
+    case "cubicles":
+      for (let i = between(r, small ? 1 : 2, small ? 3 : 5); i > 0; i--)
+        groups.push([station(false), station(true)]);
+      if (others.length && rand(r) < 0.7) groups.push(runs(others));
+      break;
+    case "meeting": {
+      const perSide = between(r, 2, 3),
+        ends = between(r, 0, 2);
+      groups.push(
+        seat
+          ? [
+              tableItem(sig, seat, perSide, ends),
+              tableItem(sig, seat, perSide, 0),
+              tableItem(sig, seat, perSide, ends, true),
+              tableItem(sig, seat, 0, 2),
+            ]
+          : [soloItem(sig, false), soloItem(sig, true)],
+      );
+      if (others.length) groups.push(runs(others));
+      if (!small && seat && rand(r) < 0.5)
+        groups.push([tableItem(sig, seat, 2, 0), tableItem(sig, seat, 0, 2)]);
+      break;
+    }
+    case "storage": {
+      const stock = wallPieces([sig, ...others]);
+      groups.push([
+        runItems(shuffle(r, stock.concat(stock)).slice(0, 4)),
+        runItems(stock.slice(0, 2)),
+        runItems([sig]),
+      ]);
+      groups.push([runItems(stock.slice(0, 2)), runItems([sig])]);
+      const small1 = [...stock].sort((a, b) => a.w * a.h - b.w * b.h)[0];
+      for (let i = between(r, 2, 3); i > 0; i--)
+        groups.push([
+          {
+            wall: false,
+            pieces: [
+              piece(small1, -small1.w * 0.6, 0),
+              piece(small1, small1.w * 0.6, 0.05, 0.2),
+              piece(small1, 0, small1.h + 0.1, -0.1),
+            ],
+          },
+          soloItem(small1, false),
+        ]);
+      break;
+    }
+    case "break":
+      groups.push(runs([sig, ...others]));
+      for (let i = between(r, small ? 1 : 2, small ? 2 : 3); i > 0; i--) {
+        const main = surfaces.length
+          ? surfaces[i % surfaces.length]
+          : (others[i % Math.max(1, others.length)] ?? sig);
+        groups.push(
+          seat
+            ? [
+                tableItem(main, seat, 1, 2),
+                tableItem(main, seat, 1, 1),
+                tableItem(main, seat, 1, 0),
+                soloItem(main, false),
+              ]
+            : [soloItem(main, false), soloItem(main, true)],
+        );
+      }
+      if (seat && rand(r) < 0.5) groups.push(seats());
+      break;
+    case "reception":
+      groups.push([station(false), station(true)]);
+      if (others.length) groups.push(runs(others, 0.1));
+      if (seat) groups.push(seats());
+      if (rand(r) < 0.5 && others.length)
+        groups.push([soloItem(others[others.length - 1], true)]);
+      break;
+    case "manager":
+      groups.push([station(false), station(true)]);
+      if (others.length) groups.push(runs(others));
+      if (seat) groups.push(seats());
+      break;
+  }
+  return groups;
+}
 /** Open-plan terminals become cubicle desks: short panels between neighbours
  * along the wall, with the bay left open toward the room. */
 function terminalBays(
   f: Floor,
   zone: OfficeZone,
   entrances: Furniture[],
+  panel: Pick<Item, "kind" | "object"> = { kind: "partition" },
 ): Group[] {
   const out: Group[] = [];
   const seen = new Set<string>();
@@ -372,7 +869,18 @@ function terminalBays(
         seen.add(key);
         out.push({
           wall: true,
-          pieces: [{ kind: "partition", x: 0, y: 0.4, angle: E, w: 0.75 }],
+          pieces: [
+            {
+              kind: panel.kind,
+              x: 0,
+              // A composed divider keeps its own length, standing off the
+              // wall by half of it like the 0.75 m built-in panel does.
+              y: panel.object ? panel.object.size.w / 2 + 0.03 : 0.4,
+              angle: E,
+              w: panel.object ? panel.object.size.w : 0.75,
+              ...(panel.object ? { object: panel.object } : {}),
+            },
+          ],
           at: d.dx
             ? { x: face, y: along, angle: d.angle }
             : { x: along, y: face, angle: d.angle },
@@ -430,12 +938,14 @@ export function makeFurniture(
   kind: FurnitureKind,
   p: Point,
   angle = 0,
+  object?: RunCustomObject,
 ): Furniture {
-  const spec = FURNITURE[kind];
+  const spec = furnitureSpec({ kind, object });
   return {
     id,
     floor,
     kind,
+    ...(object ? { object: structuredClone(object) } : {}),
     x: p.x,
     y: p.y,
     w: spec.w,
@@ -452,7 +962,7 @@ export function makeFurniture(
     ...(angle ? { angle: normalize(angle) } : {}),
   };
 }
-const normalize = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+const normalize = normalizeAngle;
 
 /** Wall faces inside a zone: the point on the face and the into-room angle. */
 const FACES = [
@@ -518,6 +1028,9 @@ export function furnishOffice(
     return stations.every((s) => out[Math.floor(s.y) * W + Math.floor(s.x)]);
   };
   let before = reachable(grid, from);
+  const venue = floorVenue(f),
+    broadcast = venue === "broadcast",
+    custom = venue === "custom" && f.setting?.filler ? f.setting : undefined;
   f.office = [];
   // Distinct functions where possible: shuffle the shared pool, then give each
   // zone the first type it allows that is still unused.
@@ -547,17 +1060,17 @@ export function furnishOffice(
         ? [group.at]
         : anchors(f, zone, group, r).slice(0, 240);
       for (const a of options) {
-        const cos = Math.cos(a.angle),
-          sin = Math.sin(a.angle);
+        const { c: cos, s: sin } = turn(a.angle);
         const pieces = group.pieces.map((p, i) => {
           const o = makeFurniture(
-            `${id}-${p.kind}${i}`,
+            `${id}-${p.object?.id ?? p.kind}${i}`,
             f.index,
             p.kind,
             { x: a.x + p.x * cos - p.y * sin, y: a.y + p.x * sin + p.y * cos },
             a.angle + p.angle,
+            p.object,
           );
-          if (p.w) o.w = p.w;
+          if (p.w && !p.object) o.w = p.w;
           return o;
         });
         // Cheap tests first; collision against walls and earlier groups last.
@@ -606,20 +1119,32 @@ export function furnishOffice(
       }
       return false;
     };
-    if (type === "cubicles")
+    const divider = custom
+      ? dividerOf(custom)
+      : { kind: broadcast ? ("soundPanel" as const) : ("partition" as const) };
+    if (type === "cubicles" && divider)
       for (const bay of terminalBays(
         f,
         zone,
         sealed.filter(
           (o) => o.id === (zone.gate ?? `f${f.index}-${zone.id}-door`),
         ),
+        divider,
       ))
         tryPlace(bay);
-    let groups = plan(type, r, small);
+    const planner = custom
+      ? (t: OfficeRoomType, rr: Rng, sm: boolean) =>
+          planCustom(t, rr, sm, custom.filler![t], custom)
+      : broadcast
+        ? planBroadcast
+        : plan;
+    let groups = planner(type, r, small);
     if (f.design) {
       const wanted = Math.ceil(groups.length * f.design.furnitureDensity);
       if (wanted > groups.length)
-        groups.push(...plan(type, r, small).slice(0, wanted - groups.length));
+        groups.push(
+          ...planner(type, r, small).slice(0, wanted - groups.length),
+        );
       groups = groups.slice(0, wanted);
     }
     for (const variants of groups)

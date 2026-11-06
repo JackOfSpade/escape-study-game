@@ -5,6 +5,7 @@ import {
   footprintTiles,
 } from "../src/building-layout";
 import type { Floor } from "../src/model";
+import type { RunSetting } from "../src/setting-catalog.mjs";
 import {
   BufferGeometry,
   Color,
@@ -166,6 +167,7 @@ test("street dressing closes the actual south map edge across the arrival lane",
     solid: new MeshStandardMaterial(),
     glass: new MeshStandardMaterial(),
     warm: new MeshStandardMaterial(),
+    canopyMaterial: new MeshStandardMaterial(),
     emergency: new MeshStandardMaterial(),
     signMaterial: new MeshStandardMaterial(),
     entranceLight: new PointLight(),
@@ -433,4 +435,91 @@ test("sidewalk crossings, ambulance crosses and lamp joints contain only one vis
     "lamp arm starts above the pole instead of duplicating its side face",
   );
   (dressing as any).clear();
+});
+
+function broadcastSetting(
+  canopy: RunSetting["exterior"]["canopy"],
+): RunSetting {
+  return {
+    venue: "broadcast",
+    interior: {
+      roomFloor: "studioCarpet",
+      hallFloor: "terrazzo",
+      roomTint: "#6d7aa0",
+      hallTint: "#b9a98a",
+      wall: "#3b4350",
+      trim: "#c9a24a",
+    },
+    exterior: {
+      facade: "brick",
+      facadeColor: "#8a4b3a",
+      trimColor: "#d8d0b8",
+      windows: "ribbon",
+      canopy,
+      canopyGlow: "#ff4a3a",
+      roofFeatures: [],
+    },
+    terminal: {
+      style: "desk",
+      body: "#6b5036",
+      accent: "#2a2a2a",
+      screen: "#40e0d0",
+    },
+    objects: [],
+    filler: null,
+  };
+}
+
+test("the entrance canopy follows the setting while the sign slot and the undesigned look stay put", () => {
+  const plain = street(),
+    names = (setting?: RunSetting) => {
+      const dressing = syntheticDressing();
+      dressing.build({ ...plain, setting }, [{ ...plain, setting }]);
+      const world = (dressing as any).world as Group,
+        sign = world.getObjectByName("entrance-sign")!;
+      const info = {
+        canopy: world.getObjectByName("entrance-canopy") as Mesh | undefined,
+        lights: world.getObjectByName("entrance-canopy-lights") as
+          Mesh | undefined,
+        sign: sign.position.toArray(),
+      };
+      (dressing as any).clear();
+      return info;
+    };
+  const absent = names();
+  assert.equal(absent.canopy, undefined, "no setting keeps the original slab");
+  assert.equal(absent.lights, undefined);
+  const flat = names(broadcastSetting("flat")),
+    gabled = names(broadcastSetting("gabled")),
+    marquee = names(broadcastSetting("marquee")),
+    none = names(broadcastSetting("none"));
+  for (const designed of [flat, gabled, marquee, none])
+    assert.deepEqual(designed.sign, absent.sign, "sign slot never moves");
+  assert.ok(flat.canopy && flat.lights);
+  assert.ok(gabled.canopy && gabled.lights);
+  assert.ok(marquee.canopy && marquee.lights);
+  assert.equal(none.canopy, undefined);
+  assert.equal(none.lights, undefined);
+  const count = (m: Mesh) => m.geometry.getAttribute("position").count;
+  assert.ok(
+    count(marquee.lights!) > count(flat.lights!) * 8,
+    "the marquee carries rows of lit edge bulbs",
+  );
+  for (const designed of [flat, gabled, marquee]) {
+    designed.canopy!.geometry.computeBoundingBox();
+    assert.ok(
+      designed.canopy!.geometry.boundingBox!.max.y <= 2.85 + 0.1,
+      "a canopy never rises into the entrance sign",
+    );
+  }
+  const colors = marquee.lights!.geometry.getAttribute("color");
+  const glow = new Color("#ff4a3a");
+  let lit = 0;
+  for (let i = 0; i < colors.count; i++)
+    if (
+      Math.abs(colors.getX(i) - glow.r) < 1e-4 &&
+      Math.abs(colors.getY(i) - glow.g) < 1e-4
+    )
+      lit++;
+  assert.ok(lit > 0, "bulbs use the authored canopyGlow colour");
 });

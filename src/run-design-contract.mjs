@@ -1,5 +1,12 @@
 // Shared by the browser and the bridge server. Design replies are bounded JSON data only.
-import { parseSceneDesign, parseSceneStructure } from "./scene-catalog.mjs";
+import {
+  PROP_CATALOG,
+  SCENE_FURNITURE_KINDS,
+  SCENE_SURFACE_KINDS,
+  parseSceneDesign,
+  parseSceneStructure,
+} from "./scene-catalog.mjs";
+import { SETTING_GUIDANCE, parseSetting } from "./setting-catalog.mjs";
 import {
   parseQualityRequest,
   parseQualityReply,
@@ -168,6 +175,17 @@ function bounded(v, limit) {
     `packet exceeds ${limit} bytes`,
   );
 }
+/** Building silhouettes. Every shape keeps the shared stair and entrance
+ * columns and two-cell circulation; see createBuildingFootprint. */
+export const FOOTPRINT_SHAPES = Object.freeze([
+  "rectangle",
+  "chamfered",
+  "stepped",
+  "waisted",
+  "tapered",
+  "notched",
+  "tee",
+]);
 const roomTypes = [
   "break",
   "cubicles",
@@ -206,6 +224,7 @@ function parseBlueprint(v, provisional = false) {
       "pacing",
       ...(Object.hasOwn(v, "mainDoor") ? ["mainDoor"] : []),
       ...(Object.hasOwn(v, "titleCard") ? ["titleCard"] : []),
+      ...(v3 && Object.hasOwn(v, "setting") ? ["setting"] : []),
       ...(v3
         ? ["relationships", ...(!provisional ? ["environment"] : [])]
         : []),
@@ -214,6 +233,7 @@ function parseBlueprint(v, provisional = false) {
   );
   if (Object.hasOwn(v, "mainDoor")) parseDoorDesign(v.mainDoor, "mainDoor");
   if (Object.hasOwn(v, "titleCard")) parseTitleCard(v.titleCard, "titleCard");
+  if (v3 && Object.hasOwn(v, "setting")) parseSetting(v.setting);
   requireThat(
     v.version === 1 || v.version === 2 || v3,
     "unsupported design version",
@@ -227,9 +247,10 @@ function parseBlueprint(v, provisional = false) {
     ["shape", "width", "top", "inset", "mirrored", "shoulder"],
     "footprint",
   );
+  // Historical versions keep their original four silhouettes.
   choice(
     b.shape,
-    ["rectangle", "chamfered", "stepped", "waisted"],
+    v3 ? FOOTPRINT_SHAPES : FOOTPRINT_SHAPES.slice(0, 4),
     "footprint.shape",
   );
   choice(b.width, [36, 38, 40], "footprint.width");
@@ -319,11 +340,18 @@ function parseBlueprint(v, provisional = false) {
   );
   if (v.version >= 2)
     v.floors.forEach((floor, index) =>
-      (v3 ? parseSceneStructure : parseSceneDesign)(
-        floor.scene,
-        v.roster.map((a) => a.name),
-        `floors[${index}].scene`,
-      ),
+      v3
+        ? parseSceneStructure(
+            floor.scene,
+            v.roster.map((a) => a.name),
+            `floors[${index}].scene`,
+            v.setting?.objects ?? [],
+          )
+        : parseSceneDesign(
+            floor.scene,
+            v.roster.map((a) => a.name),
+            `floors[${index}].scene`,
+          ),
     );
   if (v3) {
     const pairs = new Set();
@@ -448,7 +476,9 @@ export function summarizeRunDesign(d) {
     b.top,
     b.shape === "rectangle" ? null : b.inset,
     b.shape === "stepped" ? b.mirrored : null,
-    b.shape === "stepped" || b.shape === "waisted" ? b.shoulder : null,
+    b.shape === "stepped" || b.shape === "waisted" || b.shape === "tee"
+      ? b.shoulder
+      : null,
   ];
   const atmosphere = [
     d.floors.map((f) => [f.roomTypes, f.furnitureDensity, f.power]),
@@ -462,6 +492,32 @@ export function summarizeRunDesign(d) {
     d.city.boulevardOffset,
     d.city.districtSize,
   ];
+  // Absent on older designs so their historical summaries stay byte-stable.
+  if (d.setting) {
+    const { roofFeatures, ...exterior } = d.setting.exterior;
+    spatial.push({
+      venue: d.setting.venue,
+      roof: roofFeatures.map((f) => [
+        f.kind,
+        Math.round(f.x * 5),
+        Math.round(f.y * 5),
+      ]),
+    });
+    atmosphere.push({
+      venue: d.setting.venue,
+      interior: d.setting.interior,
+      exterior,
+      // Composed objects by silhouette, so a renamed copy is not a new idea.
+      objects: d.setting.objects.map((o) => [
+        o.weight,
+        Math.round(o.size.w * 4),
+        Math.round(o.size.d * 4),
+        Math.round(o.size.h * 4),
+        o.parts.map((p) => p.shape).sort(),
+      ]),
+      filler: d.setting.filler,
+    });
+  }
   if (d.version >= 2) {
     const rooms = d.floors.flatMap((f) => f.scene.rooms),
       furniture = rooms.flatMap((r) => r.furniture),
@@ -775,14 +831,15 @@ export function parseSavedRunDesign(v) {
 }
 
 export const RUN_DESIGN_GUIDANCE = `${qualityGuidance()}\n\nThe exact captured request selects both version and phase. For request.version:2/designVersion:3/phase:structure, return exactly {requestId,structure:{version:3,...}}. The flattened structure uses the structural fields described below, but OMIT every floors[].stories and exterior.streetLabels. Include relationships:1..24 {from:exact roster name,to:another exact roster name,kind:colleague|friend|relative|mentor|rival,detail:1..120}; one relationship per person pair. Every floor scene has version:2 with the scene layout below, but OMIT furniture.label and prop.label/text. Room title/description and exterior names remain thematic context for later writing. This first phase creates geometry and cast only; never include environment or content. Structure≤100000 UTF-8 bytes. The engine constructs an isolated candidate, then requests content for its exact physical surfaces. For phase:content, follow the following separate content contract instead of returning any structural fields:\n${ENVIRONMENT_GUIDANCE}\n
-The remainder describes the shared structural schema and retained legacy requests. For retained request.version:1, return exactly {requestId:the captured requestId,design:{...}} following its designVersion; never upgrade that request. Design a distinctive fictional zombie-escape office building as JSON, not a study question. Do not output code, HTML, URLs, learner claims or mechanical rule changes. The engine realizes your choices as collision-tested geometry. Give every floor its own coherent purpose and story; tie signs and notes to this cast and premise. Vary actual spatial choices, furnishing, cast, atmosphere and tempo, not only names or random seeds. Recent fictional summaries identify designs to avoid. If repair is supplied, correct all listed failures while retaining the intended theme. Do not conceal an invalid plan or claim validation was performed.
+The remainder describes the shared structural schema and retained legacy requests. For retained request.version:1, return exactly {requestId:the captured requestId,design:{...}} following its designVersion; never upgrade that request. Design a distinctive fictional zombie-escape building as JSON, not a study question. The building is the specific place the premise is set in (a radio station, clinic, hotel, archive, office and so on): its venue, rooms, furniture, finishes, signage and exterior must all read as that place. Do not output code, HTML, URLs, learner claims or mechanical rule changes. The engine realizes your choices as collision-tested geometry. Give every floor its own coherent purpose and story; tie signs and notes to this cast and premise. Vary actual spatial choices, furnishing, cast, atmosphere and tempo, not only names or random seeds. Recent fictional summaries identify designs to avoid. If repair is supplied, correct all listed failures while retaining the intended theme. Do not conceal an invalid plan or claim validation was performed.
 
-For retained request.version:1 only: If payload.designVersion is 2, return design.version:2 and include the scene objects below. If designVersion is absent, return design.version:1 and OMIT scene on every floor. Never upgrade a retained request or downgrade a version 2 request. Version3 structure requests use the exceptions stated above.
+For retained request.version:1 only: If payload.designVersion is 2, return design.version:2 and include the scene objects below. If designVersion is absent, return design.version:1 and OMIT scene on every floor. Never upgrade a retained request or downgrade a version 2 request. Version3 structure requests use the exceptions stated above. setting and the tapered, notched and tee silhouettes belong to version 3 structures only: retained version 1 and 2 designs must omit setting and use rectangle, chamfered, stepped or waisted.
 
 The common required design fields and bounds are:
 version:as requested above; title(1-64 characters), premise(1-240), opening(1-200), roofName(1-48).
-footprint:{shape:rectangle|chamfered|stepped|waisted,width:36|38|40,top:integer2..4,inset:integer2..4,mirrored:boolean,shoulder:integer top+8..top+14}.
-floors:exactly4 entries in ascending order, each {name(1-48),family:stack|columns|serpentine,roomOrder:permutation[0,1,3],layoutSeed:uint32,roomTypes:4 entries indexed rooms0..3 each break|cubicles|meeting|storage|reception|manager,subroomKinds:1..4 unique entries office|meeting|storage|break,furnitureDensity:0.5..1.5,fieldQuotas:4 integers2..6 indexed rooms0..3 (the public entrance to room2 is always free; its outgoing field uses quota2),power:4 entries lit|dim|outage indexed rooms0..3 with room2 lit,stories:exactly6 {title(1-36),lines:1..4 strings each1-50},brokenGuard:{segment:3|4,bay:1|2}}. The six story cards are three wall posters, a whiteboard, a desk photo caption and a desk note. These are actual visible words, not instructions to a renderer. layoutSeed fills smaller geometrical details; family/order are your direct choices. Each ordinary floor keeps all four study rooms along the route; no bypasses. Free hall and entry remain readable.
+footprint:{shape:${FOOTPRINT_SHAPES.join("|")},width:36|38|40,top:integer2..4,inset:integer2..4,mirrored:boolean,shoulder:integer top+8..top+14}. The footprint is the building's silhouette seen from above and from the street: rectangle is a plain block; chamfered cuts all four corners by inset; stepped narrows one side by inset beyond the shoulder row (mirrored picks the side); waisted pinches both sides by inset around the shoulder row; tapered narrows steadily from the full-width entrance front to a back narrower by inset on each side; notched cuts square inset notches into all four corners; tee keeps a full-width back block and a front wing narrower by inset on each side from the shoulder row. Choose the silhouette that suits this building.
+${SETTING_GUIDANCE}
+floors:exactly4 entries in ascending order, each {name(1-48),family:stack|columns|serpentine,roomOrder:permutation[0,1,3],layoutSeed:uint32,roomTypes:4 entries indexed rooms0..3 each break|cubicles|meeting|storage|reception|manager (their meaning follows setting.venue),subroomKinds:1..4 unique entries office|meeting|storage|break,furnitureDensity:0.5..1.5,fieldQuotas:4 integers2..6 indexed rooms0..3 (the public entrance to room2 is always free; its outgoing field uses quota2),power:4 entries lit|dim|outage indexed rooms0..3 with room2 lit,stories:exactly6 {title(1-36),lines:1..4 strings each1-50},brokenGuard:{segment:3|4,bay:1|2}}. The six story cards are three wall posters, a whiteboard, a desk photo caption and a desk note. These are actual visible words, not instructions to a renderer. layoutSeed fills smaller geometrical details; family/order are your direct choices. Each ordinary floor keeps all four study rooms along the route; no bypasses. Free hall and entry remain readable.
 Optional doors, on any floor: doors:exactly4 DoorDesign where doors[r] is the door leading out of room r and doors[2] also covers the hall entrance, and mainDoor:DoorDesign at the top level for the building's main entrance. DoorDesign:{material:wood|steel|glass|fire|security,color:hex,accent:hex,window:none|slit|half|full,label:1..32 short name shown to the player,health:integer400..2400 starting hit points}. Vary doors so they fit each room and the premise. Glass, half and full windows can be seen through when closed, and doors close themselves when zombies come near. The engine always keeps door access rules and can raise the hall entrance's health to protect study time.
 Include titleCard at the top level of every new design (it is optional only so older designs stay valid): {title:TitleStyle,story:TitleStyle}. The game opens on a pure black screen showing the run's title in the title style, then the premise and opening as the scene-setting backstory in the story style, with a Start button beneath. TitleStyle:{font:one of ${Object.keys(TITLE_CARD_FONTS).join("|")},color:six-digit hex readable on pure black (WCAG contrast at least 3 for title and 4.5 for story),size:integer pixels (title ${TITLE_CARD_SIZES.title[0]}..${TITLE_CARD_SIZES.title[1]}, story ${TITLE_CARD_SIZES.story[0]}..${TITLE_CARD_SIZES.story[1]})}. Choose the font, color and size of each so the card sets this premise's particular mood; vary them between runs instead of always choosing the same look, and keep the story readable as several sentences of body text.
 roster:exactly19 {name:unique1-20 characters distinct from You,role:builder|analyst|rusher|medic|skeptic,skill:0.4..0.9,risk:0.2..0.8,social:0.2..0.8}. Build a varied ensemble; names referenced in stories must belong to it.
@@ -791,7 +848,7 @@ exterior:{buildingName,buildingSubtitle,quarantineTitle,quarantineSubtitle:each1
 pacing:{swarmInterval:2.5..4,swarmBatch:integer1..2,swarmCap:integer120..220,npcThinkingScale:0.2..0.35,firstHelicopter:420..600,helicopterInterval:150..210}. Times are seconds.
 
 Version 2 additionally requires scene:{version:1,rooms:[exactly4 RoomScene objects]} on EVERY floor. Author distinct, coherent room scenes connected to the premise and survivors. These are actual placed objects, not prose instructions. RoomScene:{room:integer0..3 unique,title:1..40,description:1..160,owner:exact roster name|null,palette:{surface,metal,accent:each six-digit hex color},condition:kept|worn|ransacked,furniture:1..6 SceneFurniture}. Room conditions are visual atmosphere, not permission to invent hazards or mechanical rules. Across each floor allow at most16 authored furniture items and48 props, and every room needs at least one prop.
-SceneFurniture:{id:lowercase slug1..24 unique within its floor,kind:chair|desk|sofa|fridge|shelf|officeChair|table|cabinet|cooler|plant|printer|whiteboard|partition|coffeeMaker|microwave|vending|cafeTable|coffeeTable|reception|screen|box|drawers|armchair,at:{x:0..1,y:0..1},angle:-180..180 degrees,color:hex,condition:intact|worn|damaged,owner:exact roster name|null,label:0..40,props:0..8 SceneProp}. Furniture at is the intended normalized point within its study room. The engine finds the nearest valid room position with your angle, keeping terminals, doorways, stairs and credentialed egress clear. It rejects impossible scenes for repair; it never silently removes an authored item. Intact furniture starts at full health, worn at85%, damaged at45%; dimensions, weight and behavior come from the engine's catalog. Use modest groups of meaningful furniture, varying real arrangements and routes as well as their stories.
-SceneProp:{id:lowercase slug1..24 unique within its floor,kind:mug|book|papers|pen|photo|note|plant|bottle|phone|box|lamp|trophy,at:{x:-1..1,y:-1..1},angle:-180..180 degrees,scale:0.65..1.25,color:hex,accent:hex,condition:intact|worn|damaged,owner:exact roster name|null,label:0..32,text:0..160}. Labels and text are printed on the object; do not repeat the same caption everywhere. Match objects and notes to their owner and room story. Props may only be hosted by desk,table,cafeTable,coffeeTable,reception,cabinet,shelf,drawers; all other furniture must have props:[]. Prop at is relative to its host's top:0 is centered,-1/+1 approach the edges. The engine fits the complete rotated object on that surface and performs bounded nearby packing if needed. Small props are attached cosmetic details; they move with the furniture and do not create separate invisible collision boxes. Their conditions are visual. Every furniture and prop id shares one floor-local namespace. IDs start with a letter and otherwise use lowercase letters,digits,hyphens. Owners must match the supplied roster exactly, or be null. Palette and object colors must be six-digit hex values.
+SceneFurniture:{id:lowercase slug1..24 unique within its floor,kind:${SCENE_FURNITURE_KINDS.join("|")},at:{x:0..1,y:0..1},angle:-180..180 degrees,color:hex,condition:intact|worn|damaged,owner:exact roster name|null,label:0..40,props:0..8 SceneProp}. Furniture at is the intended normalized point within its study room. The engine finds the nearest valid room position with your angle, keeping terminals, doorways, stairs and credentialed egress clear. It rejects impossible scenes for repair; it never silently removes an authored item. Intact furniture starts at full health, worn at85%, damaged at45%; dimensions, weight and behavior come from the engine's catalog. Use modest groups of meaningful furniture, varying real arrangements and routes as well as their stories. Furnish from the venue and your own setting.objects: a broadcast building (the ready-made venue for radio, television and recording premises) needs mixingConsole, micStand, recordShelf, turntable, studioMonitor, equipmentRack, soundPanel, onAirLight and reelToReel where they belong (an onAirLight is a lit sign on a floor stand; the words it shows are written later with the other surface text, so never include label in the structure), with headphones, record and cassette props, not printers, cubicles and vending machines; any other kind of place, real or fantastical, should get composed objects that only it would have.
+SceneProp:{id:lowercase slug1..24 unique within its floor,kind:${Object.keys(PROP_CATALOG).join("|")},at:{x:-1..1,y:-1..1},angle:-180..180 degrees,scale:0.65..1.25,color:hex,accent:hex,condition:intact|worn|damaged,owner:exact roster name|null,label:0..32,text:0..160}. Labels and text are printed on the object; do not repeat the same caption everywhere. Match objects and notes to their owner and room story. Props may only be hosted by ${SCENE_SURFACE_KINDS.join(",")}; all other furniture must have props:[]. Prop at is relative to its host's top:0 is centered,-1/+1 approach the edges. The engine fits the complete rotated object on that surface and performs bounded nearby packing if needed. Small props are attached cosmetic details; they move with the furniture and do not create separate invisible collision boxes. Their conditions are visual. Every furniture and prop id shares one floor-local namespace. IDs start with a letter and otherwise use lowercase letters,digits,hyphens. Owners must match the supplied roster exactly, or be null. Palette and object colors must be six-digit hex values.
 
 The engine always preserves the 180-second opening, safe terminal capacity, door access, climb credentials, real physics and curriculum rules. Avoid signs that contradict these rules. No additional fields. Strings must be printable single lines. Version 1 design must be below24000 UTF-8 bytes; version 2 below100000. Vary physical furniture kinds and visibly different normalized arrangements, not merely ids, colors, tiny position/angle nudges or tabletop props, when a recent spatial plan needs to change.`;

@@ -127,7 +127,7 @@ test("aiming selects and grips a different reachable prop from nearest fallback;
   const target = lookTarget(game, 0);
   assert.equal(target?.kind, "grip");
   assert.equal(target && "object" in target && target.object.id, "aimed-desk");
-  assert.equal(interactionPrompt(game), "E · Grip chair");
+  assert.equal(interactionPrompt(game), "");
   assert.equal(interactionPrompt(game, 0), "E · Grip desk");
   assert.equal(
     toggleGrip(
@@ -144,7 +144,7 @@ test("look targeting obeys real furniture reach and walls, with nearest prompt f
     f = game.floors[0];
   f.furniture[1].x = 15;
   assert.equal(lookTarget(game, 0), undefined);
-  assert.equal(interactionPrompt(game, 0), "E · Grip chair");
+  assert.equal(interactionPrompt(game, 0), "");
   assert.equal(interactionPrompt(game, 0), interactionPrompt(game));
   f.tiles[12][13] = 1;
   assert.equal(lookTarget(game, 0), undefined);

@@ -6,7 +6,10 @@ import {
 import { floorSectors, inRect } from "./floor-plan";
 import { cityWall, type CityObstacle } from "./city-layout";
 import { CONFIG, type Floor, type Furniture, type Game } from "./model";
-import { furnitureHeight } from "./view3d/furniture-height";
+import {
+  furnitureHeightOf,
+  furnitureSurfaceHeightOf,
+} from "./view3d/furniture-height";
 import { streetLayout } from "./view3d/exterior-layout";
 import {
   furnitureBoardFace,
@@ -23,6 +26,16 @@ import { parseEnvironmentSurfaces } from "./environment-contract.mjs";
 /** This inventory is generated once, before writing is requested. It uses no
  * rendering state, browser APIs or simulation RNG. Saved inventories are never
  * selected again after furniture moves or disappears. */
+/** An ON AIR lightbox's label is the lit text itself, painted as a glowing sign. */
+/** Height of seeded paper, mug and photo dressing on a desk-like host. Desks
+ * keep their historical value; a mixing console's dressing sits on its deck. */
+export function dressingTop(host: Furniture) {
+  return host.kind === "mixingConsole"
+    ? furnitureSurfaceHeightOf(host) + 0.005
+    : furnitureHeightOf(host) + 0.055;
+}
+export const ON_AIR_LABEL_CONTEXT =
+  "onAirLight lit sign: the few words it shows while a broadcast is live, such as ON AIR.";
 export const ENVIRONMENT_BUILDER_VERSION = "environment-v1";
 
 export interface SurfacePose {
@@ -256,7 +269,7 @@ export function buildEnvironmentSurfaces(
     const { desks, boards } = seededDressingHosts(floor, game.seed);
     for (const host of desks) {
       const roll = interiorHash(game.seed, floor.index, host.id),
-        top = furnitureHeight(host.kind) + 0.055,
+        top = dressingTop(host),
         x = host.w * 0.22,
         y = -host.h * 0.19,
         pageW = Math.min(0.25, host.w * 0.32),
@@ -373,7 +386,11 @@ export function buildEnvironmentSurfaces(
           yaw: 0,
           pitch: 0,
         },
-        `${host.kind} ownership or purpose tag.`,
+        host.kind === "onAirLight"
+          ? ON_AIR_LABEL_CONTEXT
+          : host.kind === "custom" && host.object
+            ? `${host.object.name} ownership or purpose tag.`
+            : `${host.kind} ownership or purpose tag.`,
         item.room,
         24,
         0,

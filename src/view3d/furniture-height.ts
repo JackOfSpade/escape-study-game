@@ -1,4 +1,6 @@
-import type { FurnitureKind } from "../model";
+import type { Furniture, FurnitureKind } from "../model";
+import type { RunCustomObject } from "../setting-catalog.mjs";
+import { surfaceTop } from "../setting-catalog.mjs";
 
 const HEIGHT: Partial<Record<FurnitureKind, number>> = {
   chair: 0.48,
@@ -26,6 +28,15 @@ const HEIGHT: Partial<Record<FurnitureKind, number>> = {
   microwave: 0.8,
   plant: 0.42,
   box: 0.45,
+  mixingConsole: 0.95,
+  micStand: 1.55,
+  recordShelf: 1.75,
+  turntable: 0.95,
+  studioMonitor: 1.3,
+  equipmentRack: 1.95,
+  soundPanel: 1.85,
+  onAirLight: 2.1,
+  reelToReel: 1.15,
 };
 
 /** Visible furniture height shared by meshes and target placement. */
@@ -37,6 +48,9 @@ export function furnitureHeight(kind: FurnitureKind) {
 export function furnitureSurfaceHeight(kind: FurnitureKind) {
   const height = furnitureHeight(kind);
   if (kind === "shelf") return height + 0.115;
+  // Prop hosts: the flat fader deck and the top board between the side panels.
+  if (kind === "mixingConsole") return 0.7;
+  if (kind === "recordShelf") return height;
   if (["desk", "table", "cafeTable", "coffeeTable", "reception"].includes(kind))
     return height + 0.05;
   return height;
@@ -48,5 +62,45 @@ export function furnitureSurfaceBounds(
   w: number,
   d: number,
 ) {
+  if (kind === "mixingConsole") return { w: w * 0.96, d: d * 0.6 };
+  if (kind === "recordShelf") return { w: w - 0.09, d };
   return { w: kind === "shelf" ? w * 0.84 : w, d };
+}
+
+type Instance = Pick<Furniture, "kind" | "object">;
+
+/** Height of one placed object; a composed object carries its own envelope. */
+export function furnitureHeightOf(o: Instance) {
+  return o.kind === "custom" && o.object
+    ? o.object.size.h
+    : furnitureHeight(o.kind);
+}
+
+/** The prop-hosting part of a composed object: the widest flat top. */
+export function surfacePart(object: RunCustomObject) {
+  const top = surfaceTop(object);
+  if (top === null) return undefined;
+  let best: RunCustomObject["parts"][number] | undefined;
+  for (const part of object.parts)
+    if (
+      (part.shape === "box" || part.shape === "cylinder") &&
+      Math.abs(part.z + part.h - top) < 1e-6 &&
+      (!best || part.w * part.d > best.w * best.d)
+    )
+      best = part;
+  return best;
+}
+
+/** Instance-aware counterpart of furnitureSurfaceHeight. */
+export function furnitureSurfaceHeightOf(o: Instance) {
+  if (o.kind !== "custom" || !o.object) return furnitureSurfaceHeight(o.kind);
+  return surfaceTop(o.object) ?? o.object.size.h;
+}
+
+/** Instance-aware counterpart of furnitureSurfaceBounds. */
+export function furnitureSurfaceBoundsOf(o: Instance, w: number, d: number) {
+  if (o.kind !== "custom" || !o.object)
+    return furnitureSurfaceBounds(o.kind, w, d);
+  const part = surfacePart(o.object);
+  return part ? { w: part.w, d: part.d } : { w, d };
 }

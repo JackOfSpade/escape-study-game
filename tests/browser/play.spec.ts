@@ -150,7 +150,9 @@ test("physical station access respects occlusion while an issued Claude question
     relay.calls.filter((call) => call.payload?.encounterId !== "prepared"),
   ).toHaveLength(0);
   expect(
-    relay.calls.filter((call) => call.payload?.encounterId === stationEncounter),
+    relay.calls.filter(
+      (call) => call.payload?.encounterId === stationEncounter,
+    ),
   ).toHaveLength(0);
   await expect(page.locator("#terminal")).toBeHidden();
   await expect(page.locator("#terminal-connect")).toBeHidden();

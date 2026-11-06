@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { Box3, Raycaster, Vector3 } from "three";
+import { CONFIG } from "../src/model";
 import type { Roadmap } from "../src/model";
 import {
   exteriorStructure,
@@ -9,7 +10,8 @@ import {
   slabTop,
 } from "../src/exterior-structure";
 import { buildStairRoute, FLOOR_HEIGHT } from "../src/stair-route";
-import { BuildingShell } from "../src/view3d/building";
+import { BuildingShell, perimeterWindows } from "../src/view3d/building";
+import type { RunSetting } from "../src/setting-catalog.mjs";
 import { StairGallery } from "../src/view3d/stair-gallery";
 import { createPlayableGame } from "../src/world";
 
@@ -227,4 +229,239 @@ test("stair access fields visibly cover the shared one-way portal and follow per
     true,
   );
   gallery.dispose();
+});
+
+function designed(
+  facade: RunSetting["exterior"]["facade"],
+  windows: RunSetting["exterior"]["windows"],
+  roofFeatures: RunSetting["exterior"]["roofFeatures"] = [],
+): RunSetting {
+  return {
+    venue: "broadcast",
+    interior: {
+      roomFloor: "studioCarpet",
+      hallFloor: "terrazzo",
+      roomTint: "#6d7aa0",
+      hallTint: "#b9a98a",
+      wall: "#3b4350",
+      trim: "#c9a24a",
+    },
+    exterior: {
+      facade,
+      facadeColor: "#8a4b3a",
+      trimColor: "#d8d0b8",
+      windows,
+      canopy: "marquee",
+      canopyGlow: "#ff4a3a",
+      roofFeatures,
+    },
+    terminal: {
+      style: "desk",
+      body: "#6b5036",
+      accent: "#2a2a2a",
+      screen: "#40e0d0",
+    },
+    objects: [],
+    filler: null,
+  };
+}
+
+function shellOf(setting?: RunSetting) {
+  const game = createPlayableGame(42, roadmap),
+    shell = new BuildingShell();
+  for (const floor of game.floors) floor.setting = setting;
+  shell.build(game.floors);
+  return { game, shell };
+}
+
+const vertices = (shell: BuildingShell, name: string) =>
+  (shell.group.getObjectByName(name) as any)?.geometry.getAttribute("position")
+    .count as number | undefined;
+
+test("an undesigned shell is the original three meshes with no roof dressing", () => {
+  const { shell } = shellOf();
+  assert.deepEqual(
+    shell.group.children.map((c) => c.name),
+    ["facade-structure", "facade-window-frames", "facade-glazing"],
+  );
+  assert.deepEqual(shell.group.userData, {});
+  shell.dispose();
+});
+
+test("each facade finish restyles the shell without changing which walls open", () => {
+  const baseline = shellOf();
+  const windows = vertices(baseline.shell, "facade-glazing");
+  for (const facade of [
+    "concrete",
+    "brick",
+    "glass",
+    "stucco",
+    "metal",
+    "clapboard",
+  ] as const)
+    for (const style of ["punched", "strip", "ribbon", "slit"] as const) {
+      const { shell } = shellOf(designed(facade, style));
+      assert.equal(
+        vertices(shell, "facade-glazing"),
+        windows,
+        `${facade}/${style} keeps exactly the same window openings`,
+      );
+      assert.equal(shell.group.userData.facade, facade);
+      assert.ok(
+        vertices(shell, "facade-structure")! >=
+          vertices(baseline.shell, "facade-structure")!,
+      );
+      shell.dispose();
+    }
+  const brick = shellOf(designed("brick", "punched")).shell;
+  assert.ok(
+    vertices(brick, "facade-structure")! >
+      vertices(baseline.shell, "facade-structure")! * 3,
+    "brick is laid in courses rather than one block per wall",
+  );
+  brick.dispose();
+  const game = baseline.game;
+  assert.ok(game.floors.some((f) => perimeterWindows(f).length > 0));
+  baseline.shell.dispose();
+});
+
+test("broadcast roof features stand on the roof edge as visual-only meshes", () => {
+  const setting = designed("brick", "ribbon", [
+    { kind: "mast", x: 0.1, y: 0.1 },
+    { kind: "dish", x: 0.9, y: 0.1 },
+    { kind: "beacon", x: 0.5, y: 0.05 },
+    { kind: "watertank", x: 0.1, y: 0.9 },
+    { kind: "chimney", x: 0.9, y: 0.9 },
+    { kind: "solar", x: 0.5, y: 0.95 },
+  ]);
+  const { game, shell } = shellOf(setting),
+    roof = game.floors[CONFIG.floors],
+    base = CONFIG.floors * FLOOR_HEIGHT;
+  const kinds = shell.group.userData.roofFeatures as string[];
+  assert.equal(kinds.length, 6, "every authored roof feature is placed");
+  const structure = shell.group.getObjectByName("roof-feature-structure")!,
+    lamps = shell.group.getObjectByName("roof-feature-lamps")!;
+  assert.ok(structure && lamps);
+  const bounds = new Box3().setFromObject(structure);
+  assert.ok(bounds.min.y >= base - 0.05, "nothing sinks below the roof");
+  assert.ok(bounds.max.y > base + 8, "a lattice mast rises several metres");
+  const rows = roof.boundary!.rows,
+    minX = Math.min(...rows.map((r) => r.left)),
+    maxX = Math.max(...rows.map((r) => r.right));
+  assert.ok(bounds.min.x > minX - 1.5 && bounds.max.x < maxX + 1.5);
+  assert.ok(
+    bounds.min.z > roof.boundary!.top - 1.5 &&
+      bounds.max.z < roof.boundary!.bottom + 1.5,
+  );
+  assert.ok(new Box3().setFromObject(lamps).max.y > base + 9, "aviation light");
+  const before = JSON.stringify(game.floors.map((f) => f.tiles));
+  shell.build(game.floors);
+  assert.equal(JSON.stringify(game.floors.map((f) => f.tiles)), before);
+  shell.dispose();
+});
+
+test("every roof feature kind builds geometry", () => {
+  for (const kind of [
+    "mast",
+    "dish",
+    "beacon",
+    "watertank",
+    "chimney",
+    "solar",
+    "vent",
+    "billboard",
+  ] as const) {
+    const { shell } = shellOf(
+      designed("stucco", "slit", [{ kind, x: 0.3, y: 0.1 }]),
+    );
+    assert.deepEqual(shell.group.userData.roofFeatures, [kind]);
+    assert.ok(vertices(shell, "roof-feature-structure"), kind);
+    shell.dispose();
+  }
+});
+
+test("a roof feature may be a composed object drawn from its parts", () => {
+  const object: RunSetting["objects"][number] = {
+    id: "lantern-room",
+    name: "Lantern room",
+    role: "light",
+    weight: "heavy",
+    size: { w: 1.4, d: 1.4, h: 3 },
+    surface: false,
+    parts: [
+      {
+        shape: "cylinder",
+        axis: "up",
+        x: 0,
+        y: 0,
+        z: 0,
+        w: 1.2,
+        d: 1.2,
+        h: 2,
+        color: "#f2efe6",
+        finish: "matte",
+      },
+      {
+        shape: "cone",
+        axis: "up",
+        x: 0,
+        y: 0,
+        z: 2.4,
+        w: 1.4,
+        d: 1.4,
+        h: 0.6,
+        color: "#8a2f2a",
+        finish: "metal",
+      },
+      {
+        shape: "torus",
+        axis: "up",
+        x: 0,
+        y: 0,
+        z: 2,
+        w: 1.4,
+        d: 1.4,
+        h: 0.1,
+        color: "#2b2b2b",
+        finish: "metal",
+      },
+      {
+        shape: "sphere",
+        axis: "up",
+        x: 0,
+        y: 0,
+        z: 2,
+        w: 0.4,
+        d: 0.4,
+        h: 0.4,
+        color: "#fff2a0",
+        finish: "glow",
+      },
+    ],
+  };
+  const setting = {
+    ...designed("stucco", "slit", [
+      { kind: "lantern-room", x: 0.3, y: 0.1 },
+      { kind: "mast", x: 0.9, y: 0.1 },
+    ]),
+    objects: [object],
+  };
+  const { game, shell } = shellOf(setting),
+    base = CONFIG.floors * FLOOR_HEIGHT;
+  assert.deepEqual(shell.group.userData.roofFeatures, ["lantern-room", "mast"]);
+  const lamps = shell.group.getObjectByName("roof-feature-lamps")!;
+  assert.ok(
+    new Box3().setFromObject(lamps).max.y > base + 2,
+    "the glow part is a lamp",
+  );
+  // An id with no object draws nothing but does not break the shell.
+  const missing = shellOf(
+    designed("stucco", "slit", [{ kind: "ghost-statue", x: 0.3, y: 0.1 }]),
+  );
+  assert.equal(vertices(missing.shell, "roof-feature-structure"), undefined);
+  missing.shell.dispose();
+  const before = JSON.stringify(game.floors.map((f) => f.tiles));
+  shell.build(game.floors);
+  assert.equal(JSON.stringify(game.floors.map((f) => f.tiles)), before);
+  shell.dispose();
 });

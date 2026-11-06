@@ -15,6 +15,11 @@ export const PROP_CATALOG = Object.freeze(
       box: { w: 0.24, d: 0.2, h: 0.16 },
       lamp: { w: 0.2, d: 0.2, h: 0.32 },
       trophy: { w: 0.14, d: 0.14, h: 0.25 },
+      // Broadcast props: studio headphones, a vinyl record in its sleeve and
+      // a broadcast tape cartridge.
+      headphones: { w: 0.2, d: 0.18, h: 0.09 },
+      record: { w: 0.31, d: 0.31, h: 0.006 },
+      cassette: { w: 0.15, d: 0.1, h: 0.025 },
     }).map(([kind, size]) => [kind, Object.freeze(size)]),
   ),
 );
@@ -42,6 +47,15 @@ export const SCENE_FURNITURE_KINDS = Object.freeze([
   "box",
   "drawers",
   "armchair",
+  "mixingConsole",
+  "micStand",
+  "recordShelf",
+  "turntable",
+  "studioMonitor",
+  "equipmentRack",
+  "soundPanel",
+  "onAirLight",
+  "reelToReel",
 ]);
 export const SCENE_SURFACE_KINDS = Object.freeze([
   "desk",
@@ -52,6 +66,8 @@ export const SCENE_SURFACE_KINDS = Object.freeze([
   "cabinet",
   "shelf",
   "drawers",
+  "mixingConsole",
+  "recordShelf",
 ]);
 export const SCENE_LIMITS = Object.freeze({ furniture: 16, props: 48 });
 
@@ -116,7 +132,10 @@ export function parseSceneDesign(
   rosterNames,
   path = "scene",
   structural = false,
+  objects = [],
 ) {
+  // A design's own composed objects are placeable by their id.
+  const custom = new Map(objects.map((o) => [o.id, o]));
   object(value, ["version", "rooms"], path);
   fail(
     value.version === (structural ? 2 : 1),
@@ -186,7 +205,10 @@ export function parseSceneDesign(
         q,
       );
       id(item.id, `${q}.id`);
-      choice(item.kind, SCENE_FURNITURE_KINDS, `${q}.kind`);
+      fail(
+        SCENE_FURNITURE_KINDS.includes(item.kind) || custom.has(item.kind),
+        `${q}.kind must be one of ${SCENE_FURNITURE_KINDS.join(", ")} or an id from setting.objects`,
+      );
       position(item.at, 0, `${q}.at`);
       number(item.angle, -180, 180, `${q}.angle`);
       color(item.color, `${q}.color`);
@@ -195,7 +217,9 @@ export function parseSceneDesign(
       if (!structural) text(item.label, 0, 40, `${q}.label`);
       array(item.props, 0, 8, `${q}.props`);
       fail(
-        !item.props.length || SCENE_SURFACE_KINDS.includes(item.kind),
+        !item.props.length ||
+          SCENE_SURFACE_KINDS.includes(item.kind) ||
+          custom.get(item.kind)?.surface === true,
         `${q}.props need a supported furniture surface`,
       );
       roomProps += item.props.length;
@@ -246,6 +270,11 @@ export function parseSceneDesign(
   return JSON.parse(JSON.stringify(value));
 }
 
-export function parseSceneStructure(value, rosterNames, path = "scene") {
-  return parseSceneDesign(value, rosterNames, path, true);
+export function parseSceneStructure(
+  value,
+  rosterNames,
+  path = "scene",
+  objects = [],
+) {
+  return parseSceneDesign(value, rosterNames, path, true, objects);
 }

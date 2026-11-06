@@ -234,9 +234,14 @@ export function buildInteriorLighting(
 export function hasDeskStory(o: Furniture) {
   return (
     !o.destroyed &&
-    ["desk", "table", "cafeTable", "coffeeTable", "reception"].includes(
-      o.kind,
-    ) &&
+    [
+      "desk",
+      "table",
+      "cafeTable",
+      "coffeeTable",
+      "reception",
+      "mixingConsole",
+    ].includes(o.kind) &&
     o.w >= 0.58 &&
     o.h >= 0.48
   );

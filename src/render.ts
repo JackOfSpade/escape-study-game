@@ -3,11 +3,14 @@ import { fieldAllows } from "./force-fields";
 import { drawBlood } from "./blood";
 import { camera } from "./camera";
 import { displayScale } from "./display-scale";
-import { human, nearestGrip } from "./engine";
+import { human } from "./engine";
+import { localPoint } from "./furniture-geometry";
+import { HoverLabel } from "./hover-label";
 import {
   CONFIG,
   HELIPAD,
   distance,
+  type Furniture,
   type Game,
   H,
   type Point,
@@ -18,6 +21,7 @@ import { wall } from "./spatial";
 import {
   drawDebris,
   drawFurniture,
+  drawTerminal,
   drawWorkstation,
   terrainCanvas,
 } from "./office-art";
@@ -116,8 +120,10 @@ export function rememberVisibleTiles(g: Game) {
   }
   memory.length = a.seen.length;
 }
-/** In-world object names: the furniture kind, spaced and upper-cased. */
-export function objectName(kind: string) {
+/** In-world object names: the furniture kind, spaced and upper-cased; a
+ * composed object shows the name its designer gave it. */
+export function objectName(kind: string, object?: { name?: string }) {
+  if (object?.name?.trim()) return object.name.trim().toUpperCase();
   return kind.replace(/([a-z])([A-Z])/g, "$1 $2").toUpperCase();
 }
 export const normal = {
@@ -217,6 +223,14 @@ export function renderMinimap(canvas: HTMLCanvasElement, g: Game) {
 }
 /** Draw the player's view, or, with a spectator view after the run ends, the
  * whole of one floor: no fog, no light mask, no interaction prompts. */
+const HOVER_RANGE = 1.6;
+const hoverLabel = new HoverLabel();
+let pointer: Point | undefined;
+/** Pointer position in canvas CSS pixels, or undefined once it leaves. */
+export function setPointer(x?: number, y?: number) {
+  pointer = x === undefined || y === undefined ? undefined : { x, y };
+}
+
 export function render(
   canvas: HTMLCanvasElement,
   g: Game,
@@ -406,16 +420,28 @@ export function render(
   for (const s of f.stations) {
     if (!visible(s)) continue;
     const e = g.encounters[s.encounter];
-    drawWorkstation(ctx, s.x, s.y, theme);
-    ctx.fillStyle = "#101b20";
-    ctx.fillRect(s.x - 0.4, s.y - 0.35, 0.8, 0.5);
-    ctx.fillStyle = e.state === "consumed" ? p.edge : p.terminal;
-    ctx.shadowColor = p.terminal;
-    ctx.shadowBlur = e.state === "consumed" ? 0 : 8;
-    ctx.fillRect(s.x - 0.32, s.y - 0.3, 0.64, 0.35);
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = p.furniture;
-    ctx.fillRect(s.x - 0.48, s.y + 0.25, 0.96, 0.14);
+    const terminal = f.setting?.terminal;
+    if (terminal)
+      drawTerminal(
+        ctx,
+        s.x,
+        s.y,
+        terminal,
+        e.state === "consumed" ? p.edge : terminal.screen,
+        e.state !== "consumed",
+      );
+    else {
+      drawWorkstation(ctx, s.x, s.y, theme);
+      ctx.fillStyle = "#101b20";
+      ctx.fillRect(s.x - 0.4, s.y - 0.35, 0.8, 0.5);
+      ctx.fillStyle = e.state === "consumed" ? p.edge : p.terminal;
+      ctx.shadowColor = p.terminal;
+      ctx.shadowBlur = e.state === "consumed" ? 0 : 8;
+      ctx.fillRect(s.x - 0.32, s.y - 0.3, 0.64, 0.35);
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = p.furniture;
+      ctx.fillRect(s.x - 0.48, s.y + 0.25, 0.96, 0.14);
+    }
     if (!spectator && distance(a, s) < 2)
       label(
         e.state === "consumed"
@@ -597,13 +623,41 @@ export function render(
     }
     ctx.globalAlpha = 1;
   }
+  if (spectator) hoverLabel.reset();
   if (!spectator) {
     drawLight();
-    // The held or nearest reachable object shows only its name.
-    const ob =
-      f.furniture.find((o) => o.id === a.grip?.object) ?? nearestGrip(g, a);
-    if (ob && distance(a, ob) < 2.8 && playerCanSee(f, a, ob, radius))
-      label(objectName(ob.kind), ob.x, ob.y - ob.h / 2 - 0.4, p.ink, 0.38);
+    // An object's name shows briefly while the pointer is on it up close.
+    let ob: Furniture | undefined;
+    if (pointer) {
+      const w = {
+        x: (pointer.x - ox) / scale,
+        y: (pointer.y - oy) / scale,
+      };
+      let best = Infinity;
+      for (const o of f.furniture) {
+        if (o.destroyed || o.kind === "gate") continue;
+        const l = localPoint(w, o);
+        if (Math.abs(l.x) > o.w / 2 || Math.abs(l.y) > o.h / 2) continue;
+        const d = distance(a, o);
+        if (d < best) {
+          best = d;
+          ob = o;
+        }
+      }
+      if (
+        ob &&
+        (distance(a, ob) >= HOVER_RANGE || !playerCanSee(f, a, ob, radius))
+      )
+        ob = undefined;
+    }
+    if (hoverLabel.update(ob?.id, performance.now()) && ob)
+      label(
+        objectName(ob.kind, ob.object),
+        ob.x,
+        ob.y - ob.h / 2 - 0.4,
+        p.ink,
+        0.38,
+      );
   }
   ctx.restore();
   // Visibility was checked at each source before queuing. Only text extends

@@ -16,7 +16,10 @@ import {
   type SurfaceContent,
   type SurfaceSlot,
 } from "../environment-contract.mjs";
-import { surfaceWorldPose } from "../environment-surfaces";
+import {
+  ON_AIR_LABEL_CONTEXT,
+  surfaceWorldPose,
+} from "../environment-surfaces";
 import { InstancePool } from "./instances";
 import type { InteriorLightmap } from "./interior-lightmap";
 
@@ -239,6 +242,9 @@ export function paintEnvironmentSurface(
     body = expandContentText(content.body, fragments),
     graffiti = slot.role === "graffiti",
     board = slot.role.includes("whiteboard"),
+    litSign =
+      slot.role === "furniture-label" &&
+      slot.context.includes(ON_AIR_LABEL_CONTEXT),
     exterior = slot.scope === "exterior",
     margin = Math.min(width, height) * 0.055,
     innerWidth = width - margin * 2,
@@ -247,7 +253,20 @@ export function paintEnvironmentSurface(
   ctx.beginPath();
   ctx.rect(0, 0, width, height);
   ctx.clip();
-  if (!graffiti) {
+  if (litSign) {
+    const glow = ctx.createRadialGradient(
+      width / 2,
+      height / 2,
+      0,
+      width / 2,
+      height / 2,
+      Math.max(width, height) * 0.6,
+    );
+    glow.addColorStop(0, "#ff4a32");
+    glow.addColorStop(1, "#b3140c");
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, width, height);
+  } else if (!graffiti) {
     ctx.fillStyle = board ? "#dce6de" : exterior ? "#2c403d" : "#e6dfc7";
     ctx.fillRect(0, 0, width, height);
     ctx.strokeStyle = exterior ? "#bac8a1" : "#738379";
@@ -279,7 +298,7 @@ export function paintEnvironmentSurface(
       body,
       sideBySide ? innerWidth * 0.5 : innerWidth,
       hasArt && !sideBySide ? innerHeight - artHeight - margin : innerHeight,
-      exterior || graffiti ? "#f0ebd1" : "#263a38",
+      litSign ? "#fff4e2" : exterior || graffiti ? "#f0ebd1" : "#263a38",
       graffiti,
     );
   }

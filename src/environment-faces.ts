@@ -1,7 +1,7 @@
 import type { Furniture } from "./model";
 import type { ResolvedSceneProp } from "./authored-scene";
 import type { ScenePropKind } from "./scene-catalog.mjs";
-import { furnitureHeight } from "./view3d/furniture-height";
+import { furnitureHeightOf } from "./view3d/furniture-height";
 
 /** Fractions of the catalog envelope, shared by visible labels and saved slots. */
 export const PROP_LABEL_FACES: Partial<
@@ -12,19 +12,51 @@ export const PROP_LABEL_FACES: Partial<
   plant: { y: 0.19, z: 0.335, w: 0.5, h: 0.24 },
   lamp: { y: 0.04, z: 0.451, w: 0.6, h: 0.065 },
   trophy: { y: 0.08, z: 0.451, w: 0.7, h: 0.12 },
+  headphones: { y: 0.9, z: 0.152, w: 0.25, h: 0.1 },
   photo: { y: 0.5, z: 0.39, w: 0.82, h: 0.79 },
 };
 
 /** Existing renderer convention: y is elevation and z is depth. */
 export function furnitureLabelFace(host: Furniture) {
-  const height = furnitureHeight(host.kind),
+  const height = furnitureHeightOf(host),
     face = {
       y: height * 0.6,
       z: host.h / 2 + 0.004,
       w: Math.min(host.w * 0.7, 0.5),
       h: Math.min(height * 0.22, 0.15),
     };
-  if (
+  if (host.kind === "custom") {
+    // On the front (+y) face of the frontmost solid box part, so the tag
+    // sits on the object instead of floating before round or glass parts.
+    const solid = (host.object?.parts ?? [])
+      // Tags are centred across the object, so the part must span x = 0.
+      .filter(
+        (p) =>
+          p.shape === "box" &&
+          p.finish !== "glass" &&
+          p.h >= 0.06 &&
+          Math.abs(p.x) <= p.w / 2 - 0.05,
+      )
+      .sort((a, b) => b.y + b.d / 2 - (a.y + a.d / 2) || b.w - a.w)[0];
+    if (solid) {
+      face.y = solid.z + solid.h / 2;
+      face.z = solid.y + solid.d / 2 + 0.004;
+      face.w = Math.max(
+        0.08,
+        Math.min((solid.w / 2 - Math.abs(solid.x)) * 1.4, 0.5),
+      );
+      face.h = Math.max(0.03, Math.min(solid.h * 0.6, 0.15));
+    } else {
+      const depth = host.object?.size.d ?? host.h;
+      face.y = Math.min(
+        Math.max(height * 0.6, 0.1),
+        Math.max(height - 0.06, 0.1),
+      );
+      face.z = depth / 2 + 0.004;
+      face.w = Math.max(0.1, Math.min(host.w * 0.6, 0.5));
+      face.h = Math.max(0.04, Math.min(height * 0.2, 0.15));
+    }
+  } else if (
     [
       "desk",
       "table",
@@ -62,6 +94,45 @@ export function furnitureLabelFace(host: Furniture) {
   } else if (host.kind === "box") {
     face.y = height * 0.55;
     face.z = host.h * 0.51 + 0.018;
+  } else if (host.kind === "mixingConsole" || host.kind === "turntable") {
+    // Turntable pull handles sit at 0.4 m, so its label rides above them.
+    face.y = host.kind === "turntable" ? 0.58 : 0.35;
+    face.h = 0.1;
+  } else if (host.kind === "micStand") {
+    face.y = 0.03;
+    face.z = Math.min(host.w, host.h) * 0.4 + 0.004;
+    face.w = Math.min(host.w, host.h) * 0.5;
+    face.h = 0.045;
+  } else if (host.kind === "recordShelf") {
+    face.y = height - 0.02;
+    face.h = 0.035;
+  } else if (host.kind === "studioMonitor") {
+    // The woofer plates stand proud of the cabinet, so the label sits on them.
+    face.y = 1.1;
+    face.z = host.h * 0.4 + 0.032;
+    face.w = Math.min(host.w * 0.32, 0.17);
+    face.h = 0.05;
+  } else if (host.kind === "equipmentRack") {
+    face.y = 1.88;
+    face.z = host.h / 2 + 0.014;
+    face.w = Math.min(host.w * 0.6, 0.5);
+    face.h = 0.07;
+  } else if (host.kind === "soundPanel") {
+    face.y = height * 0.55;
+    face.z = Math.min(host.h * 0.45, 0.1) / 2 + 0.016;
+    face.h = 0.15;
+  } else if (host.kind === "onAirLight") {
+    // The glowing lightbox face carries the authored text.
+    face.y = 1.95;
+    face.z = host.h * 0.275 + 0.016;
+    face.w = host.w * 0.8;
+    face.h = 0.16;
+  } else if (host.kind === "reelToReel") {
+    // Below and between the cabinet's two front pulls (at 0.4 m, ±0.12..0.28).
+    face.y = 0.2;
+    face.z = host.h * 0.45 + 0.004;
+    face.w = 0.22;
+    face.h = 0.1;
   }
   return face;
 }
@@ -82,7 +153,7 @@ export function propSurfaceFace(prop: ResolvedSceneProp) {
 
 /** Actual writing face above the ownership tag, local to its movable board. */
 export function furnitureBoardFace(host: Furniture) {
-  const height = furnitureHeight(host.kind);
+  const height = furnitureHeightOf(host);
   return {
     x: 0,
     y: host.h * 0.52 + 0.045,

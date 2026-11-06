@@ -1,4 +1,4 @@
-import type { Game, Floor } from "./model";
+import { furnitureSpec, type Game, type Floor } from "./model";
 import type {
   EnvironmentManifest,
   SurfaceSlot,
@@ -227,6 +227,37 @@ export function bindDesignedEnvironment(game: Game) {
     floor.environment = floorManifest(environment, floor.index);
     if (design.floors[floor.index]) floor.design = design.floors[floor.index];
     if (floor.index === 0) floor.exteriorDesign = design.exterior;
+    if (design.setting) floor.setting = design.setting;
+    else delete floor.setting;
   }
+  rebindComposedObjects(game);
   assertDesignedEnvironment(game);
+}
+
+/** A composed object's recipe always comes from the accepted design: the save
+ * only names which one it is. Replaces a tampered recipe with the canonical
+ * one, restores its engine-owned size, and rejects an unknown id. */
+export function rebindComposedObjects(game: Game) {
+  const design = game.design?.design,
+    objects = (design && "setting" in design && design.setting?.objects) || [];
+  for (const floor of game.floors)
+    for (const o of floor.furniture) {
+      if (o.kind !== "custom") {
+        delete o.object;
+        continue;
+      }
+      const recipe = objects.find(
+        (r) => r.id === (o.object as { id?: unknown } | undefined)?.id,
+      );
+      if (!recipe)
+        throw Error(
+          `Saved furniture ${o.id} names an object that is not in the run design`,
+        );
+      o.object = structuredClone(recipe);
+      const spec = furnitureSpec(o);
+      o.w = spec.w;
+      o.h = spec.h;
+      o.maxHp = spec.hp;
+      o.hp = Math.min(o.hp, spec.hp);
+    }
 }
