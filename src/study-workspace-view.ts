@@ -5,6 +5,11 @@ import {
   workspaceQuestion,
   workspaceSelectedQuestion,
 } from "./study-workspace";
+import {
+  playProgressReveal,
+  readMapSnapshot,
+  type MapSnapshot,
+} from "./study-progress-reveal";
 import { latestTopicAssessment } from "./topic-assessment";
 
 interface WorkspaceViewState {
@@ -37,6 +42,14 @@ export function createStudyWorkspaceView(
   let writtenHtml = "";
   let topics: HTMLElement[] = [];
   let tabStop: string | undefined;
+  // Pre-question map state, kept until that question's assessment is applied.
+  let baseline: { id: string; snapshot: MapSnapshot } | undefined;
+  let reveal: { cancel(): void } | undefined;
+  let scrolledFor: string | undefined;
+  // Bumped by a reveal so a pending terminal alignment never pulls back down.
+  let alignToken = 0;
+  const reducedMotion = () =>
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // Header height changes only on reflow. Measuring it on each UI tick caused
   // a read/write layout cycle for every topic even when the world was paused.
@@ -164,7 +177,16 @@ export function createStudyWorkspaceView(
     const { game, starting, saving, saveError, terminalOpen } = readState();
     if (!game.studyWorkspace?.enabled) return;
     const html = workspaceProgressHtml(game, roadmap);
+    const open = workspaceQuestion(game);
+    const needBaseline = !!open && baseline?.id !== open.id;
+    // Take the baseline from the DOM before any rewrite, so it reflects the
+    // state the learner saw when the question began.
+    if (needBaseline && progress.querySelector(".study-map-topic"))
+      baseline = { id: open.id, snapshot: readMapSnapshot(progress) };
     if (writtenHtml !== html) {
+      // The rewritten DOM already holds the final state.
+      reveal?.cancel();
+      reveal = undefined;
       const previousMarker =
         progress.querySelector<HTMLElement>(".study-skill-map")?.dataset
           .currentMarker;
@@ -214,9 +236,60 @@ export function createStudyWorkspaceView(
           scroller.getBoundingClientRect().top -
           24;
     } else renderAssessments();
+    if (needBaseline && baseline?.id !== open.id)
+      baseline = { id: open.id, snapshot: readMapSnapshot(progress) };
 
     const current = workspaceQuestion(game);
     const assessment = workspaceAssessment(game);
+    if (
+      baseline &&
+      workspaceSelectedQuestion(game)?.id === baseline.id &&
+      assessment?.status === "applied"
+    ) {
+      const { snapshot } = baseline;
+      baseline = undefined;
+      alignToken++;
+      reveal?.cancel();
+      reveal = playProgressReveal(progress, snapshot, {
+        reducedMotion: reducedMotion(),
+        // Deferred so the button is already re-enabled by this render.
+        onDone: () => queueMicrotask(() => next.focus({ preventScroll: true })),
+      });
+    }
+    // Bring the question terminal to its own screen once it is ready; a
+    // resumed question scrolls again.
+    if (!terminalOpen) scrolledFor = undefined;
+    else if (current?.problem && scrolledFor !== current.id) {
+      const slot = root.querySelector<HTMLElement>("#study-terminal-slot");
+      if (slot) {
+        scrolledFor = current.id;
+        const token = ++alignToken;
+        // Status lines above the slot can change in this same tick, so align
+        // after layout settles, and once more when a smooth scroll lands.
+        const align = (behavior: ScrollBehavior) =>
+          window.scrollTo({
+            top: slot.getBoundingClientRect().top + window.scrollY,
+            behavior,
+          });
+        requestAnimationFrame(() => {
+          if (scrolledFor !== current.id || token !== alignToken) return;
+          if (reducedMotion()) return align("auto");
+          window.addEventListener(
+            "scrollend",
+            () => {
+              if (
+                scrolledFor === current.id &&
+                token === alignToken &&
+                Math.abs(slot.getBoundingClientRect().top) > 2
+              )
+                align("auto");
+            },
+            { once: true },
+          );
+          align("smooth");
+        });
+      }
+    }
     // An unfinished question whose terminal was closed is resumed here, so
     // the learner can never be left without a way back to it.
     const resumable = !!current && !terminalOpen;

@@ -541,3 +541,139 @@ header[aria-label="Game controls"] {
     gap: 7px;
   }
 }
+
+/* Level-up reveal after a question's progress assessment is saved. */
+.study-reveal-banner {
+  padding: 12px 20px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--study-success);
+  background: color-mix(in srgb, var(--study-success) 12%, var(--panel));
+  border-bottom: 1px solid var(--line);
+  animation: study-reveal-banner 4.5s ease-out forwards;
+}
+@keyframes study-reveal-banner {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  8% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.study-map-root.is-rising::after {
+  content: "";
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 18px;
+  height: 6px;
+  border-radius: 3px;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgb(255 255 255 / 0.65) 50%,
+    transparent 100%
+  );
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  animation: study-reveal-shimmer 0.9s linear infinite;
+}
+@keyframes study-reveal-shimmer {
+  from {
+    background-position: -50% 0;
+  }
+  to {
+    background-position: 150% 0;
+  }
+}
+.study-map-root.is-rising .study-map-total strong {
+  color: var(--study-success);
+  text-shadow: 0 0 14px
+    color-mix(in srgb, var(--study-success) 70%, transparent);
+}
+.study-map-topic.is-leveling {
+  animation: study-reveal-pop 0.7s ease-out;
+}
+@keyframes study-reveal-pop {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent);
+  }
+  35% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 18px color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+}
+.study-map-topic.is-completed-burst {
+  animation:
+    study-reveal-pop 0.7s ease-out,
+    study-reveal-shine 1.1s ease-out;
+}
+@keyframes study-reveal-shine {
+  0% {
+    background: color-mix(in srgb, #f7e08a 40%, var(--panel));
+  }
+  100% {
+    background: var(--panel);
+  }
+}
+.study-map-topic.is-leveling .study-node-status {
+  backface-visibility: hidden;
+}
+.study-reveal-chip {
+  position: absolute;
+  top: 4px;
+  right: 10px;
+  z-index: 2;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #10261a;
+  background: var(--study-success);
+  pointer-events: none;
+}
+.study-reveal-chip.is-loss {
+  color: #2a1f08;
+  background: #f2c46d;
+}
+.study-reveal-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  overflow: hidden;
+  pointer-events: none;
+}
+.study-reveal-particle {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .study-reveal-banner,
+  .study-map-root.is-rising::after,
+  .study-map-topic.is-leveling,
+  .study-map-topic.is-completed-burst {
+    animation: none;
+  }
+  .study-reveal-chip,
+  .study-reveal-layer,
+  .study-reveal-particle {
+    display: none;
+  }
+}
