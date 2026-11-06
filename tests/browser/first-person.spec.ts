@@ -358,9 +358,9 @@ test("crosshair E selects the aimed furniture over a nearer off-axis object and 
   expect((await pose(page)).heading.y).toBeCloseTo(0, 5);
   await page.keyboard.press("e");
   await page.evaluate(() => (window as any).__deadAir.setLook(Math.PI, 0));
-  await expect(page.locator("#interaction-prompt")).toHaveText(
-    "E · Grip chair",
-  );
+  // Names appear only for the object under the crosshair; E still reaches
+  // the nearest object on a miss.
+  await expect(page.locator("#interaction-prompt")).toHaveText("");
   await page.keyboard.press("e");
   await expect
     .poll(() =>

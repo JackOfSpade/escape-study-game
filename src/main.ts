@@ -102,7 +102,12 @@ import {
   save,
 } from "./persistence";
 import { camera } from "./camera";
-import { rememberVisibleTiles, render, renderMinimap } from "./render";
+import {
+  rememberVisibleTiles,
+  render,
+  renderMinimap,
+  setPointer,
+} from "./render";
 import { canLookInGame, FirstPersonControls } from "./view3d/controls";
 import { FirstPersonHud } from "./view3d/hud";
 import {
@@ -1193,6 +1198,8 @@ canvas.addEventListener("pointerdown", (ev) => {
   canvas.classList.add("dragging");
 });
 canvas.addEventListener("pointermove", (ev) => {
+  const box = canvas.getBoundingClientRect();
+  setPointer(ev.clientX - box.left, ev.clientY - box.top);
   if (dragging !== ev.pointerId || !view) return;
   const rect = canvas.getBoundingClientRect(),
     { scale } = camera(
@@ -1209,6 +1216,7 @@ canvas.addEventListener("pointermove", (ev) => {
     },
   });
 });
+canvas.addEventListener("pointerleave", () => setPointer());
 for (const type of ["pointerup", "pointercancel"] as const)
   canvas.addEventListener(type, (ev) => {
     if (dragging !== ev.pointerId) return;

@@ -14,7 +14,7 @@ import {
 } from "planck";
 import { DOOR_SWING, doorPose, ensureDoor, latchDoor } from "./doors";
 import {
-  FURNITURE,
+  furnitureSpec,
   H,
   W,
   distance,
@@ -39,7 +39,7 @@ export const ZOMBIE_PUSH = 30;
 export const SURVIVOR_PUSH = 100;
 /** Static floor friction of an unheld object. Unknown kinds keep the old mass rule. */
 const floorResist = (o: Furniture) =>
-  FURNITURE[o.kind]?.resist ?? (20 / Math.max(0.05, o.speed)) * 6;
+  furnitureSpec(o)?.resist ?? (20 / Math.max(0.05, o.speed)) * 6;
 /** Friction spread over the footprint resists turning in proportion to its size,
  * so a long desk cannot be swung open by one zombie at its end. */
 const floorTorque = (o: Furniture) =>
@@ -252,7 +252,8 @@ class PhysicsLayer {
           b = bodyB.getUserData() as Entity | undefined;
         // Desks stop the player. Everyone else routes around them, but a crowd
         // shoved against one must slip past rather than jam a study row.
-        const other = bodyA === p!.desks ? b : bodyB === p!.desks ? a : undefined;
+        const other =
+          bodyA === p!.desks ? b : bodyB === p!.desks ? a : undefined;
         if (other && other !== this.g.survivors[0]) contact.setEnabled(false);
         if (!a || !b) return;
         this.preSolvePair(contact, a, b);

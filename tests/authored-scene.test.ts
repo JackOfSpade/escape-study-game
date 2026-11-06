@@ -56,7 +56,12 @@ test("AI scene fixtures create every requested physical item and individually au
       );
       assert.deepEqual(
         new Set(scene.props.map((p) => p.kind)),
-        new Set(Object.keys(PROP_CATALOG)),
+        // The v2 fixtures predate the broadcast props.
+        new Set(
+          Object.keys(PROP_CATALOG).filter(
+            (kind) => !["headphones", "record", "cassette"].includes(kind),
+          ),
+        ),
       );
       for (const binding of scene.furniture) {
         const item = source.rooms

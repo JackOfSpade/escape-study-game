@@ -85,7 +85,9 @@ test("tutor instructions request topic assessments only on completion, without C
       "In the reply that sets complete:true, include topicAssessments:[{topicId,text}]",
     ),
   );
-  assert.ok(system.includes("replies with complete:false omit topicAssessments"));
+  assert.ok(
+    system.includes("replies with complete:false omit topicAssessments"),
+  );
   assert.ok(!system.includes("finish_study_question"));
   assert.ok(!/chatgpt/i.test(system));
 });
@@ -437,4 +439,89 @@ test("streamed text arrives before the answer, and a correction clears it", asyn
   const answer = await g.run("tutor", {}, { onText: (t) => seen.push(t) });
   assert.equal(answer.text, "Hello");
   assert.deepEqual(seen, ["Hel", "Hello", "", "Hel", "Hello"]);
+});
+
+test("quality design stages require schema-validated structured output", async () => {
+  const calls = [];
+  const g = gateway(
+    [
+      {
+        result: {
+          type: "result",
+          subtype: "success",
+          is_error: false,
+          result: "",
+          structured_output: {
+            requestId: "s1",
+            selectedId: "a",
+            rationale: "r",
+          },
+        },
+      },
+      '{"ok":1}',
+      '{"ok":2}',
+    ],
+    calls,
+  );
+  const reply = await g.run("design-run", {
+    version: 3,
+    phase: "selection",
+    requestId: "s1",
+    generationId: "design-schema",
+  });
+  assert.deepEqual(reply, { requestId: "s1", selectedId: "a", rationale: "r" });
+  const schema = JSON.parse(
+    calls[0].args[calls[0].args.indexOf("--json-schema") + 1],
+  );
+  assert.deepEqual(schema.properties.requestId, { const: "s1" });
+  assert.deepEqual(schema.required, ["requestId", "selectedId", "rationale"]);
+  // Retained legacy design requests and live tasks keep free-form replies.
+  await g.run("design-run", { version: 1, requestId: "old" });
+  await g.run("complete", {});
+  assert.equal(calls[1].args.includes("--json-schema"), false);
+  assert.equal(calls[2].args.includes("--json-schema"), false);
+});
+
+test("a reply the CLI cannot fit to the schema gets one correction turn", async () => {
+  const calls = [];
+  const g = gateway(
+    [
+      {
+        result: {
+          type: "result",
+          subtype: "error_max_structured_output_retries",
+          is_error: true,
+          errors: ["concepts: must have 3 items"],
+        },
+      },
+      {
+        result: {
+          type: "result",
+          subtype: "success",
+          is_error: false,
+          result: "",
+          structured_output: {
+            requestId: "c1",
+            selectedId: "b",
+            rationale: "r",
+          },
+        },
+      },
+    ],
+    calls,
+  );
+  const payload = { version: 3, phase: "selection", requestId: "c1" };
+  assert.deepEqual(await g.run("design-run", payload), {
+    requestId: "c1",
+    selectedId: "b",
+    rationale: "r",
+  });
+  assert.equal(calls.length, 2);
+  assert.match(calls[1].input, /previous answer was rejected/);
+  assert.match(calls[1].input, /must have 3 items/);
+  // Schema-backed stages ask for the StructuredOutput tool, not free text.
+  const { system } = buildPrompt("design-run", payload);
+  assert.match(system, /StructuredOutput tool/);
+  assert.doesNotMatch(system, /no markdown fence/);
+  assert.match(buildPrompt("complete", {}).system, /no markdown fence/);
 });

@@ -5,6 +5,7 @@ import {
   DynamicDrawUsage,
   InstancedMesh,
   Matrix4,
+  MeshBasicMaterial,
   MeshStandardMaterial,
   Object3D,
 } from "three";
@@ -12,7 +13,10 @@ import {
 /** Stable slots keep world objects in a handful of draw calls. Freed slots are
  * reused and hidden objects retain their slot until they leave the floor. */
 export class InstancePool {
-  readonly mesh: InstancedMesh<BufferGeometry, MeshStandardMaterial>;
+  readonly mesh: InstancedMesh<
+    BufferGeometry,
+    MeshStandardMaterial | MeshBasicMaterial
+  >;
   private free: number[] = [];
   private transform = new Object3D();
   private hidden = new Matrix4().makeScale(0, 0, 0);
@@ -30,7 +34,7 @@ export class InstancePool {
   constructor(
     scene: Object3D,
     geometry: BufferGeometry,
-    material: MeshStandardMaterial,
+    material: MeshStandardMaterial | MeshBasicMaterial,
     capacity: number,
     shadow = true,
   ) {

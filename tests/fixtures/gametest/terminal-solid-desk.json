@@ -10,14 +10,10 @@
   "maxTicks": 150,
   "startTime": 0,
   "naturalSpawns": false,
-  "entities": [
-    { "id": "human", "kind": "player", "x": 7.5, "y": 10 }
-  ],
+  "entities": [{ "id": "human", "kind": "player", "x": 7.5, "y": 10 }],
   "deleted": [],
   "maps": [],
-  "actions": [
-    { "tick": 1, "type": "move", "id": "human", "x": 0, "y": -1 }
-  ],
+  "actions": [{ "tick": 1, "type": "move", "id": "human", "x": 0, "y": -1 }],
   "checks": [
     {
       "name": "The player reaches the desk",

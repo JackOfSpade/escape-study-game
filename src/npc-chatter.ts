@@ -10,6 +10,7 @@ import {
   type Point,
   CONFIG,
   distance,
+  furnitureName,
 } from "./model";
 import { npcProfile } from "./npc-cognition";
 import { npcCanHearSpeech } from "./npc-hearing";
@@ -217,6 +218,16 @@ export interface NpcChatterReply {
 }
 
 const bounded = (text: string, length: number) => text.slice(0, length);
+/** What the survivors are climbing: the authored venue and building name when
+ * the run has a setting, otherwise the historical office building. */
+function buildingPhrase(g: Game) {
+  const floor = g.floors[0];
+  const name = floor?.exteriorDesign?.buildingName;
+  if (floor?.setting?.venue === "custom")
+    return name ? `a building called ${bounded(name, 60)}` : "a building";
+  if (floor?.setting?.venue !== "broadcast") return "an office building";
+  return `a broadcast station${name ? ` (${bounded(name, 60)})` : ""}`;
+}
 const round = (n: number) => Math.round(n * 10) / 10;
 const health = (ratio: number): HealthBand =>
   ratio <= 0.3 ? "critical" : ratio < 0.75 ? "hurt" : "healthy";
@@ -510,7 +521,7 @@ function lightingObservation(g: Game, a: Actor) {
   if (outside || floor.index >= CONFIG.floors)
     return {
       key: "exterior",
-      text: "You are outside the office ceiling-light circuits.",
+      text: "You are outside the building's ceiling-light circuits.",
     };
   let cached = lightingPlans.get(floor);
   if (
@@ -906,8 +917,7 @@ export function buildNpcChatterContext(
     runId: g.id,
     actorId: a.id,
     capturedAt: g.time,
-    setting:
-      "A zombie outbreak has overrun the surrounding city. Survivors are climbing an office building toward rooftop extraction.",
+    setting: `A zombie outbreak has overrun the surrounding city. Survivors are climbing ${buildingPhrase(g)} toward rooftop extraction.`,
     self: {
       id: a.id,
       name: bounded(a.name, 80),
@@ -973,7 +983,8 @@ export function buildNpcChatterContext(
         .slice(0, 8)
         .map((o) => ({
           id: o.id,
-          kind: o.kind,
+          // A composed object is described by its own name, never "custom".
+          kind: furnitureName(o),
           healthBand: health(o.hp / Math.max(1, o.maxHp)),
           position: relative(a, o),
           destroyed: o.destroyed,

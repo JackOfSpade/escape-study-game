@@ -1,10 +1,7 @@
 import { isRecord } from "./records";
 /** Provider transport only; gameplay and learning remain in their owning modules. */
 export type DisconnectReason =
-  | "relay-unreachable"
-  | "gateway-off"
-  | "cli-missing"
-  | "signed-out";
+  "relay-unreachable" | "gateway-off" | "cli-missing" | "signed-out";
 const REASONS: readonly unknown[] = [
   "relay-unreachable",
   "gateway-off",

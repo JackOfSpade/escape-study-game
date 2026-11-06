@@ -8,9 +8,7 @@ import {
   buildNpcChatterContext,
   npcDialogueFactsStillRelevant,
 } from "../src/npc-chatter";
-import {
-  observableSceneDetails,
-} from "../src/scene-observations";
+import { observableSceneDetails } from "../src/scene-observations";
 import { createGame } from "../src/world";
 import { createPlayableGame } from "../src/world";
 import { environmentDesignFixture } from "./helpers/environment-design";

@@ -1,13 +1,15 @@
 import { floorSectors, inRect, type Sector } from "./floor-plan";
 import { boxBounds, boxesOverlap, worldPoint } from "./furniture-geometry";
 import {
-  FURNITURE,
   H,
   W,
+  furnitureSpec,
   type Floor,
   type Furniture,
+  type FurnitureKind,
   type Point,
 } from "./model";
+import { surfaceTop, type RunCustomObject } from "./setting-catalog.mjs";
 import {
   blockedGrid,
   makeFurniture,
@@ -68,6 +70,44 @@ const radians = (angle: number) => (angle * Math.PI) / 180;
 const CONDITION_HP = { intact: 1, worn: 0.85, damaged: 0.45 } as const;
 const SURFACE_MARGIN = 0.025;
 const PROP_GAP = 0.014;
+
+/** A scene furniture name is a built-in kind or one of the design's composed
+ * objects; this resolves it to what the engine builds. */
+function sceneKind(
+  floor: Floor,
+  name: string,
+): { kind: FurnitureKind; object?: RunCustomObject } {
+  const object = floor.setting?.objects.find((o) => o.id === name);
+  return object ? { kind: "custom", object } : { kind: name as FurnitureKind };
+}
+/** Largest centred tabletop of a surface object, or of a built-in kind. */
+function supportSurface(
+  object: Pick<Furniture, "kind" | "object" | "w" | "h">,
+) {
+  const recipe = object.object;
+  if (object.kind !== "custom" || !recipe)
+    return {
+      top: furnitureSurfaceHeight(object.kind),
+      ...furnitureSurfaceBounds(object.kind, object.w, object.h),
+    };
+  const top = surfaceTop(recipe);
+  const part = recipe.parts
+    .filter(
+      (p) =>
+        (p.shape === "box" ||
+          (p.shape === "cylinder" && (p.axis ?? "up") === "up")) &&
+        Math.abs(p.z + p.h - (top ?? NaN)) < 1e-9,
+    )
+    .sort((a, b) => b.w * b.d - a.w * a.d)[0];
+  // A round top only holds what fits in its inscribed rectangle, so a prop's
+  // corners never hang past the rim.
+  const inset = part?.shape === "cylinder" ? Math.SQRT1_2 : 1;
+  return {
+    top: top ?? 0,
+    w: part ? Math.max(0, part.w * inset - 2 * Math.abs(part.x)) : 0,
+    d: part ? Math.max(0, part.d * inset - 2 * Math.abs(part.y)) : 0,
+  };
+}
 
 function failure(
   floor: Floor,
@@ -263,12 +303,14 @@ function placeFurniture(
   sealed: Furniture[],
 ) {
   const id = furnitureId(floor, sector.room!, item.id),
+    resolved = sceneKind(floor, item.kind),
     object = makeFurniture(
       id,
       floor.index,
-      item.kind,
+      resolved.kind,
       { x: 0, y: 0 },
       radians(item.angle),
+      resolved.object,
     ),
     grid = blockedGrid(floor),
     before = reachable(grid, from),
@@ -309,11 +351,20 @@ function placeFurniture(
     floor.furniture.push(object);
     return object;
   }
+  const biggest = sector.blocks.reduce((best, b) =>
+      (b.x2 - b.x1 + 1) * (b.y2 - b.y1 + 1) >
+      (best.x2 - best.x1 + 1) * (best.y2 - best.y1 + 1)
+        ? b
+        : best,
+    ),
+    terminals = floor.stations.filter((s) =>
+      sector.blocks.some((b) => inRect(b, s.x, s.y)),
+    ).length;
   return failure(
     floor,
     sector.room!,
     item.id,
-    `cannot place ${item.kind} at angle ${item.angle} while preserving terminals, passages and egress; choose a smaller piece, another angle or a wider plan`,
+    `cannot place ${item.kind} (${object.w.toFixed(2)}×${object.h.toFixed(2)} m) at angle ${item.angle} while preserving terminals, passages and egress. This room's largest open block is about ${biggest.x2 - biggest.x1 + 1}×${biggest.y2 - biggest.y1 + 1} m and holds ${terminals} terminal(s) that need 0.8 m clearance plus 1.6 m around doorways and stairs. Choose a smaller piece, another angle or anchor nearer a wall, or move it to a roomier room`,
   );
 }
 
@@ -327,6 +378,7 @@ function propFits(
   width: number,
   depth: number,
   siblings: ResolvedSceneProp[],
+  blockers: { x: number; y: number; w: number; h: number }[] = [],
 ) {
   const bounds = boxBounds(propBox(prop));
   return (
@@ -335,8 +387,16 @@ function propFits(
     prop.top + prop.h <= 2.75 &&
     siblings.every(
       (other) => !boxesOverlap(propBox(prop), propBox(other), PROP_GAP),
-    )
+    ) &&
+    blockers.every((part) => !boxesOverlap(propBox(prop), part, PROP_GAP))
   );
+}
+/** Parts of a composed host that rise above its prop surface, as boxes in the
+ * host's frame; props pack around them (a lectern's book rest, a hood). */
+function raisedParts(object: Furniture, top: number) {
+  return (object.object?.parts ?? [])
+    .filter((p) => p.z + p.h > top + 0.005)
+    .map((p) => ({ x: p.x, y: p.y, w: p.w, h: p.d }));
 }
 function resolveProp(
   floor: Floor,
@@ -346,6 +406,7 @@ function resolveProp(
   siblings: ResolvedSceneProp[],
 ) {
   const catalog = PROP_CATALOG[item.kind],
+    support = supportSurface(object),
     { at, angle, ...details } = item,
     prop: ResolvedSceneProp = {
       ...details,
@@ -355,14 +416,14 @@ function resolveProp(
       room,
       x: 0,
       y: 0,
-      top: furnitureSurfaceHeight(object.kind) + 0.002,
+      top: support.top + 0.002,
       w: catalog.w * item.scale,
       d: catalog.d * item.scale,
       h: catalog.h * item.scale,
       angle: radians(angle),
     },
     bounds = boxBounds(propBox(prop)),
-    surface = furnitureSurfaceBounds(object.kind, object.w, object.h),
+    surface = support,
     halfX = (surface.w - bounds.w) / 2 - SURFACE_MARGIN,
     halfY = (surface.d - bounds.h) / 2 - SURFACE_MARGIN;
   if (halfX < 0 || halfY < 0)
@@ -389,7 +450,16 @@ function resolveProp(
   );
   for (const candidate of candidates) {
     Object.assign(prop, candidate);
-    if (propFits(prop, surface.w, surface.d, siblings)) return prop;
+    if (
+      propFits(
+        prop,
+        surface.w,
+        surface.d,
+        siblings,
+        raisedParts(object, support.top),
+      )
+    )
+      return prop;
   }
   return failure(
     floor,
@@ -417,6 +487,7 @@ export function realizeAuthoredScene(
     furniture: [],
     props: [],
   };
+  const problems: string[] = [];
   for (const room of design.rooms) {
     const sector = floorSectors(floor).find((s) => s.room === room.room);
     if (!sector) failure(floor, room.room, "room", "study room is missing");
@@ -426,14 +497,14 @@ export function realizeAuthoredScene(
       plaque: roomPlaque(floor, sector),
     });
     for (const item of furniture) {
-      const object = placeFurniture(
-        floor,
-        sector,
-        item,
-        keepClear,
-        from,
-        sealed,
-      );
+      // Report every problem in one pass so a repair round can fix them all.
+      let object: Furniture;
+      try {
+        object = placeFurniture(floor, sector, item, keepClear, from, sealed);
+      } catch (error) {
+        problems.push(String((error as Error).message));
+        continue;
+      }
       scene.furniture.push({
         id: object.id,
         designId: item.id,
@@ -442,10 +513,15 @@ export function realizeAuthoredScene(
       });
       const siblings: ResolvedSceneProp[] = [];
       for (const prop of item.props)
-        siblings.push(resolveProp(floor, room.room, object, prop, siblings));
+        try {
+          siblings.push(resolveProp(floor, room.room, object, prop, siblings));
+        } catch (error) {
+          problems.push(String((error as Error).message));
+        }
       scene.props.push(...siblings);
     }
   }
+  if (problems.length) throw Error(problems.join("; "));
   floor.scene = scene;
 }
 
@@ -533,8 +609,19 @@ export function sceneSaveErrors(floor: Floor): string[] {
   for (const { room, item, id } of expectedFurniture) {
     const bindings = scene.furniture.filter((o) => o?.id === id),
       objects = floor.furniture.filter((o) => o.id === id),
-      size = FURNITURE[item.kind],
-      surface = furnitureSurfaceBounds(item.kind, size.w, size.h);
+      resolved = sceneKind(floor, item.kind),
+      size = furnitureSpec(resolved),
+      support = supportSurface({
+        kind: resolved.kind,
+        object: resolved.object,
+        w: size.w,
+        h: size.h,
+      }),
+      surface = support;
+    if (resolved.kind === "custom" && !resolved.object) {
+      errors.push(`Scene furniture ${id} names an unknown object`);
+      continue;
+    }
     if (
       bindings.length !== 1 ||
       !hasKeys(bindings[0], ["id", "designId", "room", "kind"]) ||
@@ -547,7 +634,9 @@ export function sceneSaveErrors(floor: Floor): string[] {
       objects.length > 1 ||
       objects.some(
         (o) =>
-          o.kind !== item.kind ||
+          o.kind !== resolved.kind ||
+          (resolved.object &&
+            JSON.stringify(o.object) !== JSON.stringify(resolved.object)) ||
           o.w !== size.w ||
           o.h !== size.h ||
           !Number.isFinite(o.x) ||
@@ -611,7 +700,7 @@ export function sceneSaveErrors(floor: Floor): string[] {
         actual.w !== catalog.w * prop.scale ||
         actual.d !== catalog.d * prop.scale ||
         actual.h !== catalog.h * prop.scale ||
-        actual.top !== furnitureSurfaceHeight(item.kind) + 0.002 ||
+        actual.top !== support.top + 0.002 ||
         !Number.isFinite(actual.x) ||
         !Number.isFinite(actual.y) ||
         !propFits(actual, surface.w, surface.d, checked)

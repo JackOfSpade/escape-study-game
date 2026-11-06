@@ -48,7 +48,8 @@ import {
   type Point,
   type Zombie,
   CONFIG,
-  FURNITURE,
+  furnitureName,
+  furnitureSpec,
   HELIPAD,
   HELIPAD_RADIUS,
   distance,
@@ -418,7 +419,13 @@ export function vault(g: Game, a: Actor, obstacleId?: string): boolean {
     obstacle: o.id,
     obstacles,
   };
-  event(g, "vault", `${a.name} climbed over ${o.kind}.`, a.floor, a.id);
+  event(
+    g,
+    "vault",
+    `${a.name} climbed over ${furnitureName(o)}.`,
+    a.floor,
+    a.id,
+  );
   return true;
 }
 function advanceVault(a: Actor, dt: number) {
@@ -465,7 +472,7 @@ export function rotate(g: Game, a: Actor) {
   [o.w, o.h] = [o.h, o.w];
   o.rotation = (o.rotation + 1) % 2;
   o.turning = 1.2;
-  event(g, "rotate", `${a.name} rotated a ${o.kind}.`, a.floor, a.id);
+  event(g, "rotate", `${a.name} rotated a ${furnitureName(o)}.`, a.floor, a.id);
   if (!physicsActive(g)) defenseCredit(g, a, o);
   return true;
 }
@@ -525,7 +532,7 @@ function defenseCredit(g: Game, a: Actor, o: Furniture) {
       const ev = event(
         g,
         "defense",
-        `${participant.name} helped seal an approach with a ${o.kind}.`,
+        `${participant.name} helped seal an approach with a ${furnitureName(o)}.`,
         a.floor,
         participant.id,
         e.id,
@@ -2406,7 +2413,7 @@ function zombie(
           shove =
             obstacle.speed > 0 &&
             !obstacle.field &&
-            FURNITURE[obstacle.kind].resist < ZOMBIE_PUSH;
+            furnitureSpec(obstacle).resist < ZOMBIE_PUSH;
         if (close && !shove) {
           contactFurniture(g, z, obstacle, contacts);
           return;
@@ -2472,7 +2479,7 @@ function zombie(
       // Objects lighter than one zombie's push (chairs, plants) are shoved
       // aside while being struck; heavier ones stop the zombie to attack.
       const shove =
-        ob.speed > 0 && !ob.field && FURNITURE[ob.kind].resist < ZOMBIE_PUSH;
+        ob.speed > 0 && !ob.field && furnitureSpec(ob).resist < ZOMBIE_PUSH;
       if (shove && distance(z, surface) <= 0.42 && z.cooldown <= 0)
         strikeFurniture(g, z, ob, z.floor, z);
       if (shove || distance(z, surface) > 0.42) {

@@ -131,7 +131,8 @@ export function walkTo(g: Game, destination: Point) {
   if (a.grip) toggleGrip(g, a);
   if (g.status !== "playing")
     throw Error(`Human lost during preparation at ${g.time.toFixed(1)}s`);
-  if (distance(a, target) > 0.06) throw Error(
+  if (distance(a, target) > 0.06)
+    throw Error(
       `Walking budget exceeded at ${a.x},${a.y} for ${target.x},${target.y}`,
     );
 }

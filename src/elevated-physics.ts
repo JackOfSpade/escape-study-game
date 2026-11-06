@@ -18,7 +18,7 @@ import {
 import { floorZone } from "./office-art";
 import { BODY_RADIUS } from "./physics";
 import { FLOOR_HEIGHT } from "./stair-route";
-import { furnitureHeight } from "./view3d/furniture-height";
+import { furnitureHeightOf } from "./view3d/furniture-height";
 
 export const ELEVATED_HEIGHT = 1.7;
 export const ELEVATED_STEP = 0.3;
@@ -300,7 +300,7 @@ function intervals(
         result.push({
           kind: "furniture",
           bottom: base,
-          height: base + (o.field ? FLOOR_HEIGHT : furnitureHeight(o.kind)),
+          height: base + (o.field ? FLOOR_HEIGHT : furnitureHeightOf(o)),
           floor: f.index,
           inside: insideFootprint(f, p),
         });

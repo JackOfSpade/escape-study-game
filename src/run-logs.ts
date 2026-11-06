@@ -498,9 +498,7 @@ function restoredMarks(value: unknown, run: RunLog): RunLog["marks"] {
       ? [e.data.seq]
       : [],
   );
-  return seqs.length
-    ? { world: Math.max(...seqs), transport: {} }
-    : undefined;
+  return seqs.length ? { world: Math.max(...seqs), transport: {} } : undefined;
 }
 
 function restoredRun(value: unknown): RunLog | undefined {

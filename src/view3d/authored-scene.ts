@@ -20,8 +20,9 @@ import {
 } from "../scene-catalog.mjs";
 import type { ResolvedSceneProp } from "../authored-scene";
 import {
-  furnitureSurfaceHeight,
-  furnitureSurfaceBounds,
+  furnitureSurfaceHeightOf,
+  furnitureSurfaceBoundsOf,
+  surfacePart,
 } from "./furniture-height";
 import { InstancePool } from "./instances";
 import {
@@ -163,12 +164,56 @@ export function authoredPropParts(prop: PropAppearance): PropPart[] {
       part("cylinder", 0, 0.38, 0, 0.14, 0.48, 0.14);
       part("sphere", 0, 0.76, 0, 0.92, 0.46, 0.92);
       break;
+    case "headphones": {
+      // Upright studio cans: a box-segment headband arc between two cups.
+      for (let k = 0; k <= 6; k++) {
+        const t = (k * Math.PI) / 6;
+        part(
+          "box",
+          0.36 * Math.cos(t),
+          0.5 + 0.38 * Math.sin(t),
+          0,
+          0.15,
+          0.17,
+          0.3,
+          k === 3 ? accent : "#2b2f33",
+        );
+      }
+      for (const side of [-1, 1]) {
+        part("sphere", side * 0.4, 0.3, 0, 0.18, 0.5, 0.82, color);
+        part("sphere", side * 0.33, 0.3, 0, 0.1, 0.38, 0.66, accent);
+        part("box", side * 0.4, 0.55, 0, 0.08, 0.1, 0.2, "#2b2f33");
+      }
+      break;
+    }
+    case "record":
+      // The disc slides out from under the printed sleeve; the sleeve top
+      // stays below the label plane so authored text is not buried.
+      part("cylinder", 0.2, 0.2, 0, 0.6, 0.4, 0.6, "#14151a");
+      part("cylinder", 0.2, 0.41, 0, 0.22, 0.02, 0.22, accent);
+      part("box", -0.175, 0.69, 0, 0.59, 0.58, 1);
+      part("box", -0.485, 0.69, 0, 0.03, 0.58, 1, accent);
+      break;
+    case "cassette":
+      part("box", 0, 0.485, 0, 1, 0.97, 1);
+      part("box", 0, 0.985, -0.44, 0.9, 0.03, 0.1, accent);
+      part("box", 0, 0.98, 0.44, 0.52, 0.02, 0.12, ink);
+      for (const side of [-1, 1])
+        part("cylinder", side * 0.14, 0.985, 0.44, 0.14, 0.03, 0.1, "#d9d4c4");
+      break;
   }
   if (prop.condition !== "intact") {
     // Scrapes sit on the top-facing envelope and cannot change collision shape.
-    const flat = ["book", "papers", "pen", "note", "phone", "box"].includes(
-      prop.kind,
-    );
+    const flat = [
+      "book",
+      "papers",
+      "pen",
+      "note",
+      "phone",
+      "box",
+      "record",
+      "cassette",
+    ].includes(prop.kind);
     if (flat) {
       part("box", -0.17, 0.993, 0.08, 0.29, 0.006, 0.025, ink);
       part("box", -0.07, 0.993, -0.05, 0.18, 0.006, 0.025, accent);
@@ -419,17 +464,27 @@ export class AuthoredScene {
             color: "#ffffff",
           },
         );
-      if (appearance.condition !== "intact" || room.condition !== "kept") {
-        const surface = furnitureSurfaceBounds(host.kind, host.w, host.h);
+      // A composed host is scuffed on its real top part, if it has one.
+      const top =
+        host.kind === "custom" && host.object
+          ? surfacePart(host.object)
+          : undefined;
+      if (
+        (appearance.condition !== "intact" || room.condition !== "kept") &&
+        (host.kind !== "custom" || top)
+      ) {
+        const surface = furnitureSurfaceBoundsOf(host, host.w, host.h),
+          offsetX = top?.x ?? 0,
+          offsetZ = top?.y ?? 0;
         for (let n = 0; n < (room.condition === "ransacked" ? 5 : 2); n++) {
           const pool = pools.box;
           this.parts.push({
             pool,
             slot: pool.allocate(),
             furniture: host,
-            x: surface.w * (-0.25 + n * 0.1),
-            y: furnitureSurfaceHeight(host.kind) + 0.003,
-            z: surface.d * (-0.2 + (n % 2) * 0.12),
+            x: offsetX + surface.w * (-0.25 + n * 0.1),
+            y: furnitureSurfaceHeightOf(host) + 0.003,
+            z: offsetZ + surface.d * (-0.2 + (n % 2) * 0.12),
             w: Math.min(0.13, surface.w * 0.11),
             h: 0.002,
             d: 0.009,

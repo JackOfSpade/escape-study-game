@@ -1,3 +1,4 @@
+import { settingErrors } from "./venue";
 import { moveBlockingDesks } from "./station-clearance";
 import { presetDoorStyle } from "./door-style";
 import { pursuitLayout, pursuitLayoutErrors } from "./pursuit-layout";
@@ -204,8 +205,9 @@ export function redesign(
       pursuitLayout(g, floor);
       if (!floor.design)
         moveBlockingDesks(floor, () => !pursuitLayoutErrors(g, floor).length);
-      // Fresh runs are furnished as an office: a few movable physical pieces
-      // per room, kept clear of every field opening and terminal.
+      // Fresh runs are furnished from their venue (an office unless the design
+      // chose otherwise): a few movable physical pieces per room, kept clear
+      // of every field opening and terminal.
       furnishOffice(
         floor,
         pursuitOfficeZones(floor),
@@ -232,6 +234,10 @@ export function redesign(
     }
   if (options.randomized) {
     const errors = buildingLayoutErrors(g);
+    if (errors.length) throw Error(`Invalid building: ${errors.join("; ")}`);
+  }
+  if (g.design || options.blueprint) {
+    const errors = settingErrors(g.floors[0]?.setting, g.floors[0]?.boundary);
     if (errors.length) throw Error(`Invalid building: ${errors.join("; ")}`);
   }
   const used = new Set(

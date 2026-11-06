@@ -138,8 +138,7 @@ export async function compileRoadmapAdoption(
     throw Error("Invalid roadmap reconciliation identity or shape");
   if (
     (await sha256(JSON.stringify(payload))) !== job.requestHash ||
-    (payload.provider !== undefined &&
-      !PROVIDERS.includes(payload.provider)) ||
+    (payload.provider !== undefined && !PROVIDERS.includes(payload.provider)) ||
     (await sha256(JSON.stringify(p))) !== job.proposalHash ||
     (await sha256(payload.local)) !== payload.localHash ||
     (await sha256(payload.candidate)) !== payload.candidateHash

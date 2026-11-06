@@ -24,6 +24,8 @@ export function createBuildingFootprint(
   design?: RunDesign["footprint"],
 ): BuildingFootprint {
   const random = layoutRandom(seed, 0x7368656c);
+  // The seeded fallback keeps its historical four shapes so undesigned runs
+  // and old seeds build exactly the same shell.
   const shapes = ["rectangle", "chamfered", "stepped", "waisted"] as const;
   const shape =
     design?.shape ?? shapes[Math.floor(rand(random) * shapes.length)];
@@ -50,6 +52,20 @@ export function createBuildingFootprint(
       if (mirrored) l += inset;
       else r -= inset;
     } else if (shape === "waisted" && y >= shoulder - 3 && y < shoulder + 3) {
+      l += inset;
+      r -= inset;
+    } else if (shape === "tapered") {
+      // Full width at the entrance front, narrowing by inset toward the back.
+      const cut = Math.round((inset * (bottom - 1 - y)) / (bottom - 1 - top));
+      l += cut;
+      r -= cut;
+    } else if (
+      shape === "notched" &&
+      (y < top + inset || y >= bottom - inset)
+    ) {
+      l += inset;
+      r -= inset;
+    } else if (shape === "tee" && y >= shoulder) {
       l += inset;
       r -= inset;
     }

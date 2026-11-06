@@ -3,6 +3,16 @@ import type {
   QualityRunDesignReply,
 } from "./run-quality-contract.mjs";
 export * from "./run-quality-contract.mjs";
+export type { RunSetting } from "./setting-catalog.mjs";
+export type RunFootprintShape =
+  | "rectangle"
+  | "chamfered"
+  | "stepped"
+  | "waisted"
+  | "tapered"
+  | "notched"
+  | "tee";
+export declare const FOOTPRINT_SHAPES: readonly RunFootprintShape[];
 export type RunRoomType =
   "break" | "cubicles" | "meeting" | "storage" | "reception" | "manager";
 export type RunPower = "lit" | "dim" | "outage";
@@ -84,7 +94,7 @@ export interface LegacyRunDesign {
   premise: string;
   opening: string;
   footprint: {
-    shape: "rectangle" | "chamfered" | "stepped" | "waisted";
+    shape: RunFootprintShape;
     width: 36 | 38 | 40;
     top: number;
     inset: number;
@@ -143,6 +153,8 @@ export interface RunStructureV3 extends Omit<
   "version" | "floors" | "exterior"
 > {
   mainDoor?: RunDoorDesign;
+  /** Venue, finishes and exterior style; absent on designs made before it. */
+  setting?: import("./setting-catalog.mjs").RunSetting;
   version: 3;
   floors: RunFloorStructureV3[];
   exterior: RunExteriorStructureV3;

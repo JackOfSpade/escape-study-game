@@ -21,8 +21,8 @@ test("office art: every furniture kind, textured floors and bounded render cost"
       ...kinds.map((kind, i) => ({
         id: `art-${kind}`,
         kind,
-        x: 7 + (i % 5) * 3,
-        y: 8 + Math.floor(i / 5) * 3,
+        x: 3 + (i % 8) * 2.6,
+        y: 7 + Math.floor(i / 8) * 3,
       })),
     ];
     const runner = new TestRunner(s, roadmap),
@@ -63,8 +63,8 @@ test("office art: every furniture kind, textured floors and bounded render cost"
     );
     const sprites = new Set(
       kinds.map((_, i) => {
-        const x = 7 + (i % 5) * 3,
-          y = 8 + Math.floor(i / 5) * 3;
+        const x = 3 + (i % 8) * 2.6,
+          y = 7 + Math.floor(i / 8) * 3;
         return [-0.2, 0, 0.2].map((d) => sample(x + d, y + d * 0.5)).join("|");
       }),
     );

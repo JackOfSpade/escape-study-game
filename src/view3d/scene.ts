@@ -8,6 +8,7 @@ import {
   Group,
   HemisphereLight,
   Mesh,
+  MeshBasicMaterial,
   MeshStandardMaterial,
   OctahedronGeometry,
   PerspectiveCamera,
@@ -43,6 +44,12 @@ import {
   type Zombie,
 } from "../model";
 import { floorZone } from "../office-art";
+import type {
+  RunObjectAxis,
+  RunObjectFinish,
+  RunObjectShape,
+  RunTerminal,
+} from "../setting-catalog.mjs";
 import { mutation, normal } from "../render";
 import { stairwell } from "../stairwell";
 import { npcSpeechBubble, speechLines } from "../speech-bubbles";
@@ -53,7 +60,8 @@ import {
   wallRectangles,
 } from "./geometry";
 import { InstancePool } from "./instances";
-import { furnitureHeight } from "./furniture-height";
+import { AXIS_SHAPES, objectGeometry } from "./object-shapes";
+import { furnitureHeightOf } from "./furniture-height";
 import { lootSlot } from "./targeting";
 import { AdaptiveResolution } from "./resolution";
 import { GpuTimer } from "./gpu-timer";
@@ -65,7 +73,11 @@ import {
   zombieStrike,
   type Motion,
 } from "./animation";
-import { floorTexture, type FloorFinish } from "./textures";
+import {
+  floorMaterialParams,
+  floorTexture,
+  type FloorFinish,
+} from "./textures";
 import { BuildingShell, isPerimeterWall } from "./building";
 import { StairGallery } from "./stair-gallery";
 import { InteriorAtmosphere } from "./interior-atmosphere";
@@ -76,7 +88,8 @@ import {
   outsideBuilding,
 } from "./exterior";
 
-type Tint = "body" | "edge" | "dark" | "metal" | "screen" | "skin" | "leaf";
+type Tint =
+  "body" | "edge" | "dark" | "metal" | "screen" | "signal" | "skin" | "leaf";
 function parsedPalette(palette: typeof normal) {
   return {
     wall: new Color(palette.wall),
@@ -90,6 +103,7 @@ function parsedPalette(palette: typeof normal) {
     dim: new Color(palette.dim),
     metal: new Color("#a3afb1"),
     leaf: new Color("#6c8d59"),
+    signal: new Color("#ff2a1c"),
     skin: new Color("#c2c5ac"),
     zombieSkin: new Color("#91a86b"),
     zombieBody: new Color("#3f5141"),
@@ -111,9 +125,43 @@ const PALETTES = {
 };
 type Palette = ReturnType<typeof parsedPalette>;
 const DOOR_OPEN_ANGLE = Math.PI * 0.55;
-type Batch = "box" | "head" | "screen" | "field" | "panel" | "eye";
+type BaseBatch =
+  "box" | "head" | "screen" | "signal" | "field" | "panel" | "eye";
+/** AI-composed object parts: one lazily created pool per shape and finish.
+ * Matte boxes share the plain "box" pool. */
+type ObjectBatch = `obj:${RunObjectShape}:${RunObjectFinish}:${RunObjectAxis}`;
+type Batch = BaseBatch | ObjectBatch;
+/** Per-part instance cap by finish; bounded like the other pools. */
+const OBJECT_POOL_CAPACITY: Record<RunObjectFinish, number> = {
+  matte: 4096,
+  metal: 4096,
+  glass: 2048,
+  glow: 2048,
+};
+/** Boxes and spheres are symmetric, so only the other shapes keep an axis. */
+const objectBatch = (
+  shape: RunObjectShape,
+  finish: RunObjectFinish,
+  axis: RunObjectAxis = "up",
+): Batch =>
+  shape === "box" && finish === "matte"
+    ? "box"
+    : `obj:${shape}:${finish}:${AXIS_SHAPES.includes(shape) ? axis : "up"}`;
+/** Composed parts keep their colour, but a near-black body is lifted just
+ * enough to show its silhouette in a dim room; glow parts are left alone. */
+function readableColor(color: string, finish?: RunObjectFinish) {
+  const value = new Color(color);
+  if (finish === "glow") return value;
+  const hsl = { h: 0, s: 0, l: 0 };
+  value.getHSL(hsl);
+  if (hsl.l < 0.16) value.setHSL(hsl.h, hsl.s, 0.16);
+  return value;
+}
 interface Part {
   batch: Batch;
+  /** A composed object's own colour; replaces the palette tint. */
+  fixed?: Color;
+  finish?: RunObjectFinish;
   slot: number;
   x: number;
   y: number;
@@ -301,6 +349,11 @@ const FINISHES: FloorFinish[] = [
   "lino",
   "concrete",
   "roof",
+  "studioCarpet",
+  "parquet",
+  "terrazzo",
+  "rubber",
+  "polished",
 ];
 const WHITE = new Color(0xffffff);
 
@@ -364,6 +417,13 @@ export class FirstPersonView {
       emissiveIntensity: 0.5,
       roughness: 0.5,
     }),
+    // Fixed warm red: on-air lamps ignore the theme and authored colours.
+    signal: new MeshStandardMaterial({
+      color: "white",
+      emissive: "#ff2a1c",
+      emissiveIntensity: 1.1,
+      roughness: 0.45,
+    }),
     field: new MeshStandardMaterial({
       color: "white",
       emissive: "#203a31",
@@ -384,14 +444,33 @@ export class FirstPersonView {
       emissiveIntensity: 0.4,
       roughness: 1,
     }),
+    // Composed-object finishes. Matte reuses `box`; glow is unlit so it shows
+    // each part's own colour (emissive cannot follow instance colour).
+    objMetal: new MeshStandardMaterial({
+      color: "white",
+      roughness: 0.3,
+      metalness: 0.55,
+    }),
+    objGlass: new MeshStandardMaterial({
+      color: "white",
+      roughness: 0.08,
+      metalness: 0.1,
+      transparent: true,
+      opacity: 0.38,
+      depthWrite: false,
+    }),
+    objGlow: new MeshBasicMaterial({ color: "white" }),
     wall: new MeshStandardMaterial({ color: normal.edge, roughness: 0.92 }),
     ceiling: new MeshStandardMaterial({ color: "#929b93", roughness: 1 }),
     stairs: new MeshStandardMaterial({ color: normal.edge, roughness: 0.8 }),
   };
   private floorMaterials = new Map<FloorFinish, MeshStandardMaterial>();
+  // Designed venues blend their room/hall tint into a finish; built lazily.
+  private tintedFloors = new Map<string, MeshStandardMaterial>();
   private geometry = new GeometryChangeCache();
   private run?: Game;
   private theme = "";
+  private wallKey = "";
   private architectureKey = "";
   private shellKey = "";
   private frame = 0;
@@ -442,6 +521,7 @@ export class FirstPersonView {
       this.materials.box,
       this.materials.head,
       this.materials.screen,
+      this.materials.objMetal,
       this.materials.wall,
       this.materials.ceiling,
       this.materials.stairs,
@@ -456,9 +536,8 @@ export class FirstPersonView {
       this.floorMaterials.set(
         finish,
         new MeshStandardMaterial({
-          color: finish === "lino" ? "#969b8d" : "#89939b",
+          ...floorMaterialParams(finish),
           map: floorTexture(finish),
-          roughness: 0.98,
         }),
       );
     for (const material of this.floorMaterials.values())
@@ -488,7 +567,21 @@ export class FirstPersonView {
       (this.scene.fog as Fog).color.copy(palette.sky);
       this.materials.wall.color.copy(palette.edge);
       this.materials.stairs.color.copy(palette.edge);
+      this.wallKey = "";
       this.materials.screen.emissive.copy(palette.terminal);
+    }
+    // A designed venue paints its own walls; the surge still pulls them toward
+    // the mutation palette. Undesigned floors keep the palette edge untouched.
+    const wallHex = floor.setting?.interior.wall,
+      wallKey = `${theme}|${wallHex ?? ""}`;
+    if (wallKey !== this.wallKey) {
+      this.wallKey = wallKey;
+      this.materials.wall.color.copy(palette.edge);
+      if (wallHex) {
+        this.materials.wall.color.set(wallHex);
+        if (theme === "mutation")
+          this.materials.wall.color.lerp(palette.edge, 0.45);
+      }
     }
     const fog = this.scene.fog as Fog,
       outside = this.exterior.enabled && outsideBuilding(floor, a.x, a.y);
@@ -635,6 +728,7 @@ export class FirstPersonView {
   }
 
   private createPools() {
+    // Composed-object pools are added on demand by pool().
     this.pools = {
       box: new InstancePool(
         this.floorRoot,
@@ -653,6 +747,13 @@ export class FirstPersonView {
         new BoxGeometry(1, 1, 1),
         this.materials.screen,
         1024,
+        false,
+      ),
+      signal: new InstancePool(
+        this.floorRoot,
+        new BoxGeometry(1, 1, 1),
+        this.materials.signal,
+        256,
         false,
       ),
       field: new InstancePool(
@@ -676,8 +777,38 @@ export class FirstPersonView {
         1024,
         false,
       ),
-    };
+    } as Record<Batch, InstancePool>;
     this.poolList = Object.values(this.pools);
+  }
+
+  /** The pool for a batch, creating a composed-object pool on first use. */
+  private pool(batch: Batch) {
+    let pool = this.pools[batch];
+    if (pool) return pool;
+    const [, shape, finish, axis = "up"] = batch.split(":") as [
+      string,
+      RunObjectShape,
+      RunObjectFinish,
+      RunObjectAxis?,
+    ];
+    const material =
+      finish === "metal"
+        ? this.materials.objMetal
+        : finish === "glass"
+          ? this.materials.objGlass
+          : finish === "glow"
+            ? this.materials.objGlow
+            : this.materials.box;
+    pool = new InstancePool(
+      this.floorRoot,
+      objectGeometry(shape, axis),
+      material,
+      OBJECT_POOL_CAPACITY[finish],
+      finish === "matte" || finish === "metal",
+    );
+    this.pools[batch] = pool;
+    this.poolList.push(pool);
+    return pool;
   }
 
   private updateArchitecture(game: Game) {
@@ -688,6 +819,7 @@ export class FirstPersonView {
         f.stairs,
         f.entry,
         f.city && [f.city.version, f.city.seed, f.city.bounds],
+        f.setting,
       ]),
     );
     if (key !== this.architectureKey) {
@@ -758,7 +890,16 @@ export class FirstPersonView {
       );
     }
     this.addMerged(boxes, this.materials.wall, "walls", true);
-    const surfaces = new Map<FloorFinish, BufferGeometry[]>();
+    const surfaces = new Map<string, BufferGeometry[]>();
+    // A designed venue tints room and hall floors differently. The legacy zone
+    // (no setting) says which tiles are halls, since finishes may coincide.
+    const tints = floor.setting?.interior,
+      legacy = tints ? { ...floor, setting: undefined } : floor;
+    const surfaceKey = (finish: FloorFinish, x: number, y: number) => {
+      if (!tints || finish === "concrete" || finish === "roof") return finish;
+      const hall = floorZone(legacy, x, y) === "lino";
+      return `${finish}|${hall ? tints.hallTint : tints.roomTint}`;
+    };
     const ceilings: BufferGeometry[] = [];
     // The city owns all ground-level outdoor asphalt. Upper-floor well
     // approaches still need their local floor finish beside the stair deck.
@@ -767,7 +908,12 @@ export class FirstPersonView {
       !floor.boundary ||
       !outsideBuilding(floor, x + 0.5, y + 0.5) ||
       (floor.index > 0 && floor.tiles[y][x] === 0);
-    for (const finish of FINISHES) surfaces.set(finish, []);
+    const surfaceList = (key: string) => {
+      let list = surfaces.get(key);
+      if (!list) surfaces.set(key, (list = []));
+      return list;
+    };
+    for (const finish of FINISHES) surfaceList(finish);
     for (let y = 0; y < H; y++) {
       let x = 0;
       while (x < W) {
@@ -776,8 +922,14 @@ export class FirstPersonView {
           continue;
         }
         const finish = floorZone(floor, x, y),
+          key = surfaceKey(finish, x, y),
           start = x;
-        while (x < W && floorZone(floor, x, y) === finish && ownsFinish(x, y))
+        while (
+          x < W &&
+          floorZone(floor, x, y) === finish &&
+          surfaceKey(finish, x, y) === key &&
+          ownsFinish(x, y)
+        )
           x++;
         const plane = new PlaneGeometry(x - start, 1)
           .rotateX(-Math.PI / 2)
@@ -786,7 +938,7 @@ export class FirstPersonView {
           position = plane.getAttribute("position");
         for (let i = 0; i < uv.count; i++)
           uv.setXY(i, position.getX(i), position.getZ(i));
-        surfaces.get(finish)!.push(plane);
+        surfaceList(key).push(plane);
         if (
           floor.index < CONFIG.floors &&
           finish !== "concrete" &&
@@ -799,13 +951,8 @@ export class FirstPersonView {
           );
       }
     }
-    for (const finish of FINISHES)
-      this.addMerged(
-        surfaces.get(finish)!,
-        this.floorMaterials.get(finish)!,
-        "floor",
-        false,
-      );
+    for (const [key, planes] of surfaces)
+      this.addMerged(planes, this.floorMaterial(key), "floor", false);
     this.addMerged(ceilings, this.materials.ceiling, "ceiling", false);
     const treads: BufferGeometry[] = [];
     for (const kind of ["up", "down"] as const) {
@@ -836,6 +983,25 @@ export class FirstPersonView {
     if (floor.boundary) this.atmosphere.build(floor, this.run?.seed ?? 0);
     else if (floor.index < CONFIG.floors) this.buildPanels(floor);
     this.theme = "";
+  }
+
+  /** A finish's shared material, or its tinted variant for "finish|#hex". */
+  private floorMaterial(key: string) {
+    const [name, tint] = key.split("|"),
+      base = this.floorMaterials.get(name as FloorFinish)!;
+    if (!tint) return base;
+    let material = this.tintedFloors.get(key);
+    if (!material) {
+      const params = floorMaterialParams(name as FloorFinish);
+      material = new MeshStandardMaterial({
+        ...params,
+        color: new Color(params.color).lerp(new Color(tint), 0.4),
+        map: base.map,
+      });
+      this.atmosphere.lightmap.patch(material);
+      this.tintedFloors.set(key, material);
+    }
+    return material;
   }
 
   private addMerged(
@@ -963,10 +1129,14 @@ export class FirstPersonView {
     batch: Batch = "box",
     role?: Part["role"],
     anchor?: Part["anchor"],
+    color?: string,
+    finish?: RunObjectFinish,
   ) {
     parts.push({
+      fixed: color ? readableColor(color, finish) : undefined,
+      finish,
       batch,
-      slot: this.pools[batch].allocate(),
+      slot: this.pool(batch).allocate(),
       x,
       y,
       z,
@@ -1009,7 +1179,13 @@ export class FirstPersonView {
       for (const station of floor.stations) {
         this.markPresent(station);
         if (Math.hypot(station.x - a.x, station.y - a.y) <= fogDistance + 0.6)
-          this.station(station, game, palette, stationFacing(floor, station));
+          this.station(
+            station,
+            game,
+            palette,
+            stationFacing(floor, station),
+            floor.setting?.terminal,
+          );
         const encounter = game.encounters[station.encounter];
         if (encounter?.state === "consumed" && encounter.reward === "loot")
           for (let i = 0; i < encounter.loot.length; i++) {
@@ -1165,7 +1341,8 @@ export class FirstPersonView {
             : p.role === "pane"
               ? "#a9d3df"
               : undefined;
-      if (authoredColor) this.tint.set(authoredColor);
+      if (p.fixed) this.tint.copy(p.fixed);
+      else if (authoredColor) this.tint.set(authoredColor);
       else if (doorColor) this.tint.set(doorColor);
       else
         this.tint.copy(
@@ -1173,7 +1350,11 @@ export class FirstPersonView {
             ? fieldColor
             : this.color(p.tint, palette, o.kind),
         );
-      if (p.role === "door" || (p.tint === "body" && !o.field))
+      if (
+        p.role === "door" ||
+        (p.tint === "body" && !o.field) ||
+        (p.fixed && p.finish !== "glow")
+      )
         this.tint.multiplyScalar(0.45 + 0.55 * health);
       this.pools[p.batch].set(
         p.slot,
@@ -1192,7 +1373,7 @@ export class FirstPersonView {
 
   private furnitureParts(parts: Part[], o: Furniture) {
     const { w, h: d } = o,
-      height = furnitureHeight(o.kind);
+      height = furnitureHeightOf(o);
     const part = (
       x: number,
       y: number,
@@ -1204,7 +1385,24 @@ export class FirstPersonView {
       batch: Batch = "box",
       role?: Part["role"],
       anchor?: Part["anchor"],
-    ) => this.part(parts, x, y, z, width, h, depth, tint, batch, role, anchor);
+      color?: string,
+      finish?: RunObjectFinish,
+    ) =>
+      this.part(
+        parts,
+        x,
+        y,
+        z,
+        width,
+        h,
+        depth,
+        tint,
+        batch,
+        role,
+        anchor,
+        color,
+        finish,
+      );
     if (o.destroyed) {
       part(
         -w * 0.2,
@@ -1246,13 +1444,30 @@ export class FirstPersonView {
       return;
     }
     const health = o.hp / Math.max(1, o.maxHp);
-    if (health < 0.65) {
+    // A composed object cracks on the front of its bulkiest box part; one
+    // without a solid box (a lamp post, a ring) shows no floating cracks.
+    const body =
+      o.kind === "custom"
+        ? [...(o.object?.parts ?? [])]
+            .filter((p) => p.shape === "box" && p.finish !== "glass")
+            .sort((a, b) => b.w * b.d * b.h - a.w * a.d * a.h)[0]
+        : undefined;
+    if (health < 0.65 && (o.kind !== "custom" || body)) {
       // Dark diagonal fractures and a dropped panel stay readable under the room lighting.
+      const face = body
+        ? {
+            x: body.x,
+            w: body.w,
+            y0: body.z,
+            h: body.h,
+            z: body.y + body.d / 2 + 0.015,
+          }
+        : { x: 0, w, y0: 0, h: height, z: d * 0.515 };
       part(
-        -w * 0.12,
-        height * 0.58,
-        d * 0.515,
-        w * 0.46,
+        face.x - face.w * 0.12,
+        face.y0 + face.h * 0.58,
+        face.z,
+        face.w * 0.46,
         0.035,
         0.025,
         "dark",
@@ -1260,10 +1475,10 @@ export class FirstPersonView {
         "damage",
       );
       part(
-        w * 0.15,
-        height * 0.4,
-        d * 0.515,
-        w * 0.34,
+        face.x + face.w * 0.15,
+        face.y0 + face.h * 0.4,
+        face.z,
+        face.w * 0.34,
         0.03,
         0.025,
         "dark",
@@ -1652,6 +1867,279 @@ export class FirstPersonView {
           "skin",
         );
         break;
+      case "mixingConsole": {
+        // Cabinet, flat fader deck, raised rear step and a lit meter bridge.
+        part(0, 0.04, 0, w * 0.92, 0.08, d * 0.86, "dark");
+        part(0, 0.35, 0, w, 0.54, d);
+        part(0, 0.66, 0, w * 0.96, 0.08, d * 0.6, "dark");
+        part(0, 0.74, -d * 0.4, w * 0.96, 0.24, d * 0.2);
+        part(0, 0.915, -d * 0.4 + 0.015, w * 0.96, 0.11, d * 0.2 - 0.0, "dark");
+        const channels = Math.max(4, Math.floor((w * 0.9) / 0.15)),
+          pitch = (w * 0.9) / channels;
+        for (let i = 0; i < channels; i++) {
+          const x = (i - (channels - 1) / 2) * pitch;
+          part(x, 0.704, d * 0.06, 0.022, 0.008, d * 0.28, "metal");
+          part(
+            x,
+            0.724,
+            d * (-0.02 + (i % 3) * 0.08),
+            0.045,
+            0.04,
+            0.06,
+            i % 4 === 0 ? "edge" : "metal",
+          );
+          part(x, 0.718, -d * 0.2, 0.05, 0.028, 0.05, i % 2 ? "edge" : "dark");
+          part(x, 0.72, d * 0.22, 0.04, 0.025, 0.04, "edge");
+        }
+        const meters = Math.min(8, channels);
+        for (let i = 0; i < meters; i++)
+          part(
+            (i - (meters - 1) / 2) * ((w * 0.84) / meters),
+            0.915,
+            -d * 0.4 + 0.015 + (d * 0.2) / 2 + 0.004,
+            (w * 0.84) / meters - 0.03,
+            0.07,
+            0.02,
+            "screen",
+            "screen",
+          );
+        break;
+      }
+      case "micStand": {
+        const base = Math.min(w, d) * 0.8;
+        part(0, 0.03, 0, base, 0.06, base, "dark");
+        part(0, 0.075, 0, base * 0.6, 0.03, base * 0.6, "metal");
+        part(0, 0.745, 0, 0.026, 1.31, 0.026, "metal");
+        part(0, 1.41, 0, 0.055, 0.06, 0.055, "dark");
+        part(0, 1.425, d * 0.13, 0.02, 0.02, d * 0.52, "metal");
+        part(0, 1.43, d * 0.34, 0.05, 0.075, 0.13, "dark");
+        part(0, 1.43, d * 0.34 + 0.075, 0.045, 0.06, 0.03, "metal");
+        part(0, 1.435, d * 0.34 + 0.12, 0.15, 0.15, 0.01, "dark");
+        break;
+      }
+      case "recordShelf": {
+        const inner = w - 0.084,
+          rows = 4,
+          cubbies = 3,
+          step = (height - 0.1) / rows,
+          tints: Tint[] = ["metal", "dark", "leaf", "skin", "body"];
+        part(
+          0,
+          height / 2,
+          -d * 0.44,
+          w - 0.09,
+          height - 0.03,
+          d * 0.1,
+          "dark",
+        );
+        for (const sign of [-1, 1])
+          part(sign * (w / 2 - 0.02), height / 2, 0, 0.04, height, d);
+        for (let i = 0; i <= rows; i++)
+          part(
+            0,
+            i === rows ? height - 0.02 : 0.04 + i * step,
+            0,
+            inner,
+            0.04,
+            d,
+          );
+        for (let c = 1; c < cubbies; c++)
+          part(
+            (c - cubbies / 2) * (inner / cubbies),
+            height / 2,
+            0,
+            0.03,
+            height - 0.08,
+            d * 0.96,
+          );
+        for (let r = 0; r < rows; r++)
+          for (let c = 0; c < cubbies; c++) {
+            const left = -inner / 2 + (c * inner) / cubbies + 0.04,
+              count = 9 + ((r + c) % 3);
+            for (let n = 0; n < count; n++) {
+              const tall = 0.3 + ((n * 7 + r * 3 + c) % 4) * 0.012;
+              part(
+                left + n * 0.022 + 0.01,
+                0.06 + r * step + tall / 2,
+                d * 0.04,
+                0.018,
+                tall,
+                d * 0.66,
+                tints[(n * 5 + r * 2 + c) % tints.length],
+              );
+            }
+          }
+        break;
+      }
+      case "turntable": {
+        const s = Math.min(w * 0.38, d * 0.6);
+        part(0, 0.39, 0, w, 0.78, d);
+        part(0, 0.82, 0, w * 0.96, 0.08, d * 0.9, "dark");
+        for (const side of [-1, 1]) {
+          const x = side * w * 0.28;
+          part(x, 0.875, -d * 0.05, s, 0.03, s, "metal");
+          part(x, 0.895, -d * 0.05, s * 0.9, 0.01, s * 0.9, "edge");
+          part(x, 0.915, -d * 0.05, 0.016, 0.03, 0.016, "metal");
+          part(x + side * s * 0.62, 0.88, -d * 0.3, 0.04, 0.04, 0.04, "metal");
+          part(
+            x + side * s * 0.62,
+            0.91,
+            -d * 0.04,
+            0.014,
+            0.014,
+            d * 0.5,
+            "metal",
+          );
+          part(x + side * s * 0.62, 0.91, d * 0.23, 0.03, 0.02, 0.05, "dark");
+        }
+        part(0, 0.865, d * 0.2, 0.07, 0.01, 0.1, "screen", "screen");
+        for (const side of [-1, 1])
+          part(side * w * 0.2, 0.4, d * 0.51, w * 0.12, 0.03, 0.025, "metal");
+        break;
+      }
+      case "studioMonitor": {
+        part(0, 0.025, 0, w * 0.8, 0.05, d * 0.8, "dark");
+        part(0, 0.5, 0, 0.05, 0.9, 0.05, "metal");
+        part(0, 0.96, 0, w * 0.55, 0.02, d * 0.55, "metal");
+        part(0, 1.14, 0, w * 0.8, 0.32, d * 0.8, "dark");
+        part(0, 1.1, d * 0.4 + 0.01, 0.2, 0.2, 0.02, "metal");
+        part(0, 1.1, d * 0.4 + 0.022, 0.1, 0.1, 0.012, "dark");
+        part(0, 1.245, d * 0.4 + 0.01, 0.07, 0.07, 0.02, "metal");
+        part(
+          w * 0.3,
+          1.0,
+          d * 0.4 + 0.006,
+          0.025,
+          0.012,
+          0.012,
+          "screen",
+          "screen",
+        );
+        break;
+      }
+      case "equipmentRack": {
+        part(0, height / 2, 0, w, height, d, "dark");
+        part(0, height + 0.006, 0, w * 0.7, 0.012, d * 0.5, "metal");
+        for (let i = 0; i < 8; i++) {
+          const y = 0.22 + i * 0.21,
+            front = d / 2 + 0.01;
+          part(0, y, d / 2, w * 0.82, 0.075, 0.02, "metal");
+          if (i % 3 === 0)
+            part(0, y, front + 0.006, w * 0.6, 0.02, 0.01, "screen", "screen");
+          else
+            for (let j = 0; j < 4; j++)
+              part(
+                (j - 1.5) * w * 0.14,
+                y,
+                front + 0.006,
+                0.025,
+                0.02,
+                0.01,
+                i === 5 && j === 3 ? "signal" : "screen",
+                i === 5 && j === 3 ? "signal" : "screen",
+              );
+          part(w * 0.34, y, front + 0.012, 0.035, 0.035, 0.012, "dark");
+        }
+        part(0, 1.88, d / 2, w * 0.82, 0.1, 0.02, "metal");
+        break;
+      }
+      case "soundPanel": {
+        const frame = Math.min(d * 0.45, 0.1),
+          panel = height - 0.22,
+          mid = 0.2 + panel / 2;
+        part(0, mid, 0, w, panel, frame, "dark");
+        for (const sign of [-1, 1])
+          part(0, mid, sign * (frame / 2 + 0.002), w - 0.1, panel - 0.1, 0.02);
+        for (const sign of [-1, 1]) {
+          part(sign * w * 0.38, 0.02, 0, 0.08, 0.04, d * 0.9, "metal");
+          part(sign * w * 0.38, 0.12, 0, 0.05, 0.2, 0.05, "metal");
+        }
+        break;
+      }
+      case "onAirLight": {
+        part(0, 0.03, 0, w * 0.8, 0.06, d * 0.9, "dark");
+        part(0, 0.93, 0, 0.05, 1.74, 0.05, "metal");
+        part(0, 1.77, 0, 0.14, 0.04, 0.12, "metal");
+        part(0, 1.95, 0, w * 0.96, 0.3, d * 0.55, "dark");
+        part(
+          0,
+          1.95,
+          d * 0.275 + 0.002,
+          w * 0.96 - 0.06,
+          0.24,
+          0.02,
+          "signal",
+          "signal",
+        );
+        break;
+      }
+      case "reelToReel": {
+        part(0, 0.35, 0, w * 0.9, 0.7, d * 0.9);
+        part(0, 0.92, -d * 0.15, w * 0.9, 0.44, d * 0.55, "metal");
+        const front = d * 0.125;
+        for (const side of [-1, 1]) {
+          const x = side * w * 0.22;
+          part(x, 0.99, front + 0.015, 0.26, 0.26, 0.024, "edge");
+          part(x, 0.99, front + 0.033, 0.2, 0.2, 0.012, "dark");
+          part(x, 0.99, front + 0.043, 0.06, 0.06, 0.014, "metal");
+        }
+        part(0, 0.93, front + 0.015, 0.12, 0.08, 0.03, "dark");
+        part(0, 0.99, front + 0.008, w * 0.3, 0.012, 0.016, "dark");
+        for (let i = 0; i < 4; i++)
+          part(
+            (i - 1.5) * 0.08,
+            0.78,
+            front + 0.008,
+            0.05,
+            0.025,
+            0.016,
+            i === 3 ? "signal" : "edge",
+            i === 3 ? "signal" : "box",
+          );
+        part(
+          w * 0.3,
+          0.86,
+          front + 0.006,
+          0.07,
+          0.025,
+          0.012,
+          "screen",
+          "screen",
+        );
+        for (const sign of [-1, 1])
+          part(sign * w * 0.25, 0.4, d * 0.46, w * 0.2, 0.03, 0.025, "metal");
+        break;
+      }
+      case "custom": {
+        // Axis-aligned recipe parts in the object's local frame: x across the
+        // width, recipe y back-to-front maps to the local z, z is the part's
+        // bottom. The whole body already yaws by o.angle. Later parts grow a
+        // hair so coincident faces of touching parts never z-fight.
+        const recipe = o.object;
+        if (!recipe) {
+          // A saved object whose recipe is missing still reads as a crate.
+          part(0, height / 2, 0, w, height, d);
+          break;
+        }
+        recipe.parts.forEach((p, i) => {
+          const grow = 0.0004 * (i + 1);
+          part(
+            p.x,
+            p.z + p.h / 2,
+            p.y,
+            p.w + grow,
+            p.h + grow,
+            p.d + grow,
+            "dark",
+            objectBatch(p.shape, p.finish, p.axis),
+            undefined,
+            undefined,
+            p.color,
+            p.finish,
+          );
+        });
+        break;
+      }
     }
   }
 
@@ -1660,8 +2148,101 @@ export class FirstPersonView {
     game: Game,
     palette: Palette,
     facing: 1 | -1 = 1,
+    terminal?: RunTerminal,
   ) {
-    const visual = this.visual(station, "station");
+    const visual = this.visual(
+      station,
+      terminal ? `station:${terminal.style}` : "station",
+    );
+    if (!visual.parts.length && terminal) {
+      // The place's own work station inside the desk footprint (0.98 x 0.65).
+      // The glowing face is an unlit glow part, so its own colour shows (the
+      // shared screen material is emissive teal) and a consumed terminal
+      // greys it out; it faces +z where the player stands.
+      const put = (
+        role: "body" | "accent" | "screen",
+        x: number,
+        y: number,
+        z: number,
+        w: number,
+        h: number,
+        d: number,
+      ) =>
+        this.part(
+          visual.parts,
+          x,
+          y,
+          z,
+          w,
+          h,
+          d,
+          role === "screen" ? "screen" : "body",
+          role === "screen" ? objectBatch("box", "glow") : "box",
+          undefined,
+          undefined,
+          terminal[role],
+          role === "screen" ? "glow" : "matte",
+        );
+      switch (terminal.style) {
+        case "console":
+          put("body", 0, 0.4, 0, 0.98, 0.8, 0.65);
+          put("accent", 0, 0.83, 0.1, 0.9, 0.06, 0.4);
+          for (const x of [-0.25, 0, 0.25])
+            put("accent", x, 0.885, 0.2, 0.12, 0.05, 0.08);
+          put("body", 0, 1.075, -0.2, 0.9, 0.55, 0.2);
+          put("screen", 0, 1.1, -0.09, 0.7, 0.36, 0.02);
+          break;
+        case "lectern":
+          put("body", 0, 0.06, 0, 0.6, 0.12, 0.5);
+          put("body", 0, 0.5, 0, 0.3, 0.76, 0.3);
+          put("body", 0, 0.96, 0, 0.7, 0.08, 0.5);
+          put("accent", 0, 1.0, 0.22, 0.72, 0.06, 0.04);
+          put("accent", 0, 1.22, -0.2, 0.7, 0.4, 0.05);
+          put("screen", 0, 1.22, -0.165, 0.56, 0.3, 0.02);
+          break;
+        case "pedestal":
+          put("body", 0, 0.08, 0, 0.7, 0.16, 0.55);
+          put("body", 0, 0.58, 0, 0.4, 0.84, 0.4);
+          put("accent", 0, 0.3, 0, 0.46, 0.04, 0.46);
+          put("accent", 0, 1.05, 0, 0.62, 0.1, 0.5);
+          put("screen", 0, 1.25, -0.05, 0.5, 0.3, 0.06);
+          break;
+        case "kiosk":
+          put("accent", 0, 0.05, 0, 0.72, 0.1, 0.52);
+          put("body", 0, 0.8, -0.03, 0.64, 1.4, 0.46);
+          put("accent", 0, 1.54, -0.03, 0.7, 0.08, 0.5);
+          put("screen", 0, 1.18, 0.212, 0.5, 0.36, 0.02);
+          put("accent", 0, 0.88, 0.215, 0.36, 0.14, 0.03);
+          put("accent", 0, 0.7, 0.225, 0.2, 0.04, 0.05);
+          break;
+        case "altar":
+          put("body", 0, 0.1, 0, 0.98, 0.2, 0.65);
+          put("body", 0, 0.5, 0, 0.86, 0.6, 0.52);
+          put("accent", 0, 0.87, 0, 0.98, 0.14, 0.65);
+          put("screen", 0, 0.95, 0.03, 0.7, 0.02, 0.4);
+          put("accent", 0, 1.15, -0.22, 0.56, 0.42, 0.08);
+          put("screen", 0, 1.15, -0.17, 0.44, 0.3, 0.02);
+          break;
+        case "cabinet":
+          put("body", 0, 0.5, 0, 0.9, 1, 0.6);
+          put("accent", 0, 1.03, 0, 0.98, 0.06, 0.65);
+          put("accent", 0, 0.5, 0.305, 0.03, 0.9, 0.01);
+          for (const x of [-0.08, 0.08])
+            put("accent", x, 0.6, 0.31, 0.03, 0.2, 0.03);
+          put("accent", 0, 1.12, -0.2, 0.1, 0.12, 0.08);
+          put("body", 0, 1.33, -0.2, 0.7, 0.3, 0.08);
+          put("screen", 0, 1.33, -0.155, 0.56, 0.22, 0.02);
+          break;
+        default:
+          put("body", 0, 0.76, 0, 0.98, 0.1, 0.65);
+          for (const sign of [-1, 1])
+            put("accent", sign * 0.38, 0.38, 0, 0.06, 0.76, 0.5);
+          put("accent", 0, 0.93, -0.17, 0.08, 0.3, 0.08);
+          put("accent", 0, 1.18, -0.17, 0.7, 0.45, 0.1);
+          put("screen", 0, 1.18, -0.112, 0.61, 0.36, 0.025);
+          put("accent", 0, 0.83, 0.15, 0.55, 0.04, 0.2);
+      }
+    }
     if (!visual.parts.length) {
       this.part(visual.parts, 0, 0.76, 0, 0.98, 0.1, 0.65);
       for (const sign of [-1, 1])
@@ -1692,9 +2273,9 @@ export class FirstPersonView {
         p.h,
         p.d,
         0,
-        consumed && p.batch === "screen"
+        consumed && (p.batch === "screen" || p.finish === "glow")
           ? palette.edge
-          : this.color(p.tint, palette),
+          : (p.fixed ?? this.color(p.tint, palette)),
       );
   }
 
@@ -2005,6 +2586,8 @@ export class FirstPersonView {
         return palette.metal;
       case "screen":
         return palette.terminal;
+      case "signal":
+        return palette.signal;
       case "skin":
         return palette.ink;
       case "leaf":
@@ -2019,6 +2602,9 @@ export class FirstPersonView {
           case "chair":
           case "shelf":
           case "box":
+          case "recordShelf":
+          case "turntable":
+          case "reelToReel":
             return palette.wood;
           case "sofa":
           case "armchair":
@@ -2062,6 +2648,9 @@ export class FirstPersonView {
   }
 
   private clearFloor() {
+    // Tints belong to one run's setting; never carry them to the next run.
+    for (const material of this.tintedFloors.values()) material.dispose();
+    this.tintedFloors.clear();
     this.atmosphere.reset();
     for (const context of this.floorScenes.values()) {
       for (const visual of context.visuals.values()) this.clearSpeech(visual);
@@ -2093,6 +2682,7 @@ export class FirstPersonView {
       material.map?.dispose();
       material.dispose();
     }
+    for (const material of this.tintedFloors.values()) material.dispose();
     for (const material of this.labels.values()) {
       material.map?.dispose();
       material.dispose();

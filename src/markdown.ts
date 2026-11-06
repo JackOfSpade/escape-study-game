@@ -67,8 +67,7 @@ const indentWidth = (line: string) =>
 function paragraphLines(lines: string[]) {
   const base = Math.min(...lines.map(indentWidth));
   return lines.map(
-    (line) =>
-      "&nbsp;".repeat(indentWidth(line) - base) + inline(line.trim()),
+    (line) => "&nbsp;".repeat(indentWidth(line) - base) + inline(line.trim()),
   );
 }
 
