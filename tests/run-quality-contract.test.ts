@@ -480,6 +480,28 @@ test("incremental writes retain global duplicate, mechanics, drawing and readabl
   assert.throws(
     () =>
       parseQualityReply(
+        {
+          requestId: base.requestId,
+          entries: [
+            { ...entries[2], body: [{ text: "q".repeat(161) }] },
+            entries[3],
+          ],
+        },
+        next,
+      ),
+    (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      return [
+        `surface ${entries[2].surfaceId}`,
+        "has 161 characters",
+        "readable budget of 160",
+      ].every((part) => message.includes(part));
+    },
+    "the budget error names the surface, the actual length and the limit",
+  );
+  assert.throws(
+    () =>
+      parseQualityReply(
         { requestId: base.requestId, entries: [entries[0], entries[3]] },
         next,
       ),
