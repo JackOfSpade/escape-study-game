@@ -1264,3 +1264,67 @@ test("unsupported and duplicate references fail closed while a stable captured f
     true,
   );
 });
+
+test("accepted run-design backstory becomes grounded premise, relationship and opening facts in a bounded context", () => {
+  const premise = "A hospital laundry crew works through the outbreak.",
+    opening = "The lights failed at 3am and the crew kept folding.",
+    { g, npc } = fixture(),
+    plain = buildNpcChatterContext(g, npc, "no-backstory", []);
+  g.design = {
+    version: 1,
+    source: "fixture",
+    requestId: "r",
+    generationId: "g",
+    fingerprint: "f",
+    design: {
+      title: "Night Shift",
+      premise,
+      opening,
+      relationships: [
+        {
+          from: "Maya",
+          to: "Ravi",
+          kind: "rival",
+          detail: "they compete for the night supervisor job",
+        },
+        { from: "Ann", to: "Bo", kind: "friend", detail: "unrelated" },
+      ],
+    },
+  } as unknown as Game["design"];
+  const captured = buildNpcChatterContext(g, npc, "backstory", []),
+    facts = captured.dialogue!.facts,
+    fact = (id: string) => facts.find((candidate) => candidate.id === id);
+  assert.deepEqual(
+    facts.slice(0, 3).map((candidate) => candidate.id),
+    ["setting.outbreak", "setting.premise", "relationship:0"],
+    "shared backstory follows the outbreak setting and precedes situational facts",
+  );
+  const premiseFact = fact("setting.premise")!;
+  assert.equal(premiseFact.kind, "setting");
+  assert.equal(premiseFact.text, `This escape, "Night Shift": ${premise}`);
+  const relationship = fact("relationship:0")!;
+  assert.equal(relationship.kind, "person");
+  assert.equal(
+    relationship.text,
+    "Ravi is your rival: they compete for the night supervisor job",
+  );
+  assert.equal(fact("relationship:1"), undefined);
+  const openingFact = fact("setting.opening")!;
+  assert.equal(openingFact.text, opening);
+  assert.equal(
+    facts[facts.length - 1].id,
+    "setting.opening",
+    "the opening is the last fact so a full budget never displaces the situation",
+  );
+  assert.equal(isNpcDialogueContext(captured), true);
+  assert.ok(
+    plain.dialogue!.facts.every(
+      (candidate) =>
+        !candidate.id.startsWith("setting.premise") &&
+        !candidate.id.startsWith("relationship:") &&
+        candidate.id !== "setting.opening",
+    ),
+    "a game without a run design gains no backstory facts",
+  );
+  assert.equal(isNpcDialogueContext(plain), true);
+});
