@@ -37,6 +37,7 @@
     "test:dialogue": "tsx --test tests/npc-chatter.test.ts tests/npc-voice.test.ts tests/npc-dialogue-realism.test.ts tests/npc-voice-bridge.test.mjs",
     "eval:dialogue": "tsx scripts/evaluate-npc-dialogue.ts",
     "bridge:start": "node scripts/bridge-service.mjs start",
+    "ai:usage": "node scripts/ai-usage-report.mjs",
     "bridge:status": "node scripts/bridge-service.mjs status",
     "bridge:stop": "node scripts/bridge-service.mjs stop"
   },

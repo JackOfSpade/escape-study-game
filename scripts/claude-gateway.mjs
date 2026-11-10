@@ -1,9 +1,18 @@
 import { spawn as spawnChild } from "node:child_process";
 import { createHash } from "node:crypto";
-import { accessSync, constants, mkdirSync, statSync } from "node:fs";
+import {
+  accessSync,
+  appendFileSync,
+  constants,
+  mkdirSync,
+  renameSync,
+  rmSync,
+  statSync,
+} from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { taskInstructions, validateAnswer } from "./lib/ai-contracts.mjs";
+import { privateDirectory } from "./lib/private-fs.mjs";
 import { designReplySchema } from "../src/run-design-schema.mjs";
 
 /** Every AI task's model and effort, chosen by blind quality scoring against
@@ -323,6 +332,96 @@ const conversationKey = (operation, payload) =>
     : undefined;
 const AMBIENT = new Set(["npc-chatter", "npc-chatter-review"]);
 
+const USAGE_LOG_MAX_BYTES = 5 * 1024 * 1024;
+const usageNumber = (value) =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+/** The log is private and never grows without bound; an old `.1` is replaced. */
+function rotateUsageLog(target, maxBytes) {
+  let size;
+  try {
+    size = statSync(target).size;
+  } catch {
+    return;
+  }
+  if (size <= maxBytes) return;
+  try {
+    renameSync(target, `${target}.1`);
+  } catch {
+    rmSync(`${target}.1`, { force: true });
+    renameSync(target, `${target}.1`);
+  }
+}
+/** Rows carry counts, timings and outcomes only: never prompt, reply, stderr,
+ * validator text or a request id. A failing sink never breaks or delays a call. */
+function usageSink(target, maxBytes = USAGE_LOG_MAX_BYTES) {
+  if (!target) return undefined;
+  let warned = false,
+    ready = false;
+  const warn = (error) => {
+    if (warned) return;
+    warned = true;
+    console.warn(
+      `Claude usage log failed: ${error?.message ?? error ?? "unknown error"}`,
+    );
+  };
+  if (typeof target === "function")
+    return (row) => {
+      try {
+        target(row);
+      } catch (error) {
+        warn(error);
+      }
+    };
+  return (row) => {
+    try {
+      if (!ready) {
+        privateDirectory(dirname(target));
+        ready = true;
+      }
+      rotateUsageLog(target, maxBytes);
+      appendFileSync(target, `${JSON.stringify(row)}\n`, { mode: 0o600 });
+    } catch (error) {
+      warn(error);
+    }
+  };
+}
+/** What one CLI invocation measured. Missing result fields stay null, never 0. */
+function callMeta({
+  at,
+  started,
+  finished,
+  result,
+  model,
+  firstTextAt,
+  timedOut,
+}) {
+  const usage = result?.usage ?? {};
+  return {
+    at,
+    model: typeof model === "string" ? model : null,
+    costUsd: usageNumber(result?.total_cost_usd),
+    inputTokens: usageNumber(usage.input_tokens),
+    outputTokens: usageNumber(usage.output_tokens),
+    cacheReadTokens: usageNumber(usage.cache_read_input_tokens),
+    cacheWriteTokens: usageNumber(usage.cache_creation_input_tokens),
+    numTurns: usageNumber(result?.num_turns),
+    durationMs: finished - started,
+    apiDurationMs: usageNumber(result?.duration_api_ms),
+    firstTextMs: firstTextAt === undefined ? null : firstTextAt - started,
+    timedOut,
+  };
+}
+/** The failure's own code in lower-kebab form; a killed timer reads as timeout. */
+function failureOutcome(error) {
+  if (error?.meta?.timedOut) return "timeout";
+  return (
+    String(error?.code ?? "")
+      .replace(/^CLAUDE_/, "")
+      .toLowerCase()
+      .replace(/_/g, "-") || "error"
+  );
+}
+
 const CONNECTION_CACHE_MS = 2000;
 // Well under the browser's 5 s status timeout, so a slow check never reads as a dead relay.
 const CONNECTION_TIMEOUT_MS = 3000;
@@ -333,8 +432,11 @@ export function createClaudeGateway({
   maxRunning = 3,
   validate = validateAnswer,
   now = Date.now,
+  usageLog,
+  usageLogMaxBytes = USAGE_LOG_MAX_BYTES,
 } = {}) {
   mkdirSync(cwd, { recursive: true });
+  const logUsage = usageSink(usageLog, usageLogMaxBytes);
   const waiting = [];
   const inFlight = new Map();
   const finished = new Map();
@@ -383,18 +485,25 @@ export function createClaudeGateway({
         },
       );
       const readText = onText && textFieldReader();
+      const started = now();
+      const at = new Date(started).toISOString();
       let buffer = "",
         shown = "",
         stderr = "",
         result,
         model,
+        firstTextAt,
+        timedOut = false,
         settled = false,
         killer;
       const stop = () => {
         child.kill("SIGTERM");
         killer ??= setTimeout(() => child.kill("SIGKILL"), 5000);
       };
-      const timer = setTimeout(stop, profile.timeoutMs);
+      const timer = setTimeout(() => {
+        timedOut = true;
+        stop();
+      }, profile.timeoutMs);
       const onAbort = () => stop();
       signal?.addEventListener("abort", onAbort, { once: true });
       const finish = (error, value) => {
@@ -403,8 +512,17 @@ export function createClaudeGateway({
         clearTimeout(timer);
         clearTimeout(killer);
         signal?.removeEventListener("abort", onAbort);
-        if (error) reject(error);
-        else resolve(value);
+        const meta = callMeta({
+          at,
+          started,
+          finished: now(),
+          result,
+          model,
+          firstTextAt,
+          timedOut,
+        });
+        if (error) reject(Object.assign(error, { meta }));
+        else resolve({ text: value, meta });
       };
       // Decoding per chunk would garble a character split across chunks.
       child.stdout.setEncoding("utf8");
@@ -427,7 +545,10 @@ export function createClaudeGateway({
           const delta = event.event?.delta;
           if (readText && delta?.type === "text_delta") {
             const text = readText(delta.text);
-            if (text !== shown) onText((shown = text));
+            if (text !== shown) {
+              firstTextAt ??= now();
+              onText((shown = text));
+            }
           }
         }
       });
@@ -483,16 +604,50 @@ export function createClaudeGateway({
       const cancelled = () =>
         new ClaudeGatewayError("CLAUDE_CANCELLED", "Request cancelled", 499);
       const job = { operation, payload };
+      const phase = typeof payload?.phase === "string" ? payload.phase : null;
+      const conversationTurn = Number.isInteger(payload?.conversation?.turn)
+        ? payload.conversation.turn
+        : null;
+      const logCall = (call, meta, outcome) => {
+        if (!logUsage) return;
+        const measured = meta ?? {};
+        logUsage({
+          v: 1,
+          at: measured.at ?? new Date(now()).toISOString(),
+          operation,
+          phase,
+          conversationTurn,
+          attempt: call.attempt,
+          sessionResume: call.sessionResume,
+          alias: profile.model,
+          effort: profile.effort,
+          model: measured.model ?? null,
+          costUsd: measured.costUsd ?? null,
+          inputTokens: measured.inputTokens ?? null,
+          outputTokens: measured.outputTokens ?? null,
+          cacheReadTokens: measured.cacheReadTokens ?? null,
+          cacheWriteTokens: measured.cacheWriteTokens ?? null,
+          numTurns: measured.numTurns ?? null,
+          durationMs: measured.durationMs ?? null,
+          apiDurationMs: measured.apiDurationMs ?? null,
+          firstTextMs: measured.firstTextMs ?? null,
+          outcome,
+        });
+      };
       let prompt = user,
         problem;
       // A rejected answer gets one correction, as the worker chat's retry did.
       for (let attempt = 0; attempt < 2; attempt++) {
         if (signal?.aborted) throw cancelled();
-        let text;
+        let text, measured, opening, logged;
         for (let sessionTries = 0; ; sessionTries++) {
           const session = id ? { id, resume: started.has(id) } : undefined;
+          const call = {
+            attempt,
+            sessionResume: session ? !!session.resume : null,
+          };
           try {
-            text = await runOnce({
+            const done = await runOnce({
               profile,
               system,
               user: prompt,
@@ -501,14 +656,24 @@ export function createClaudeGateway({
               onText,
               schema,
             });
+            text = done.text;
+            measured = done.meta;
+            opening = call;
+            // A failed earlier session try logged its own row; this one has not.
+            logged = false;
             break;
           } catch (error) {
+            // This invocation's row is written before any retry is decided.
+            logCall(call, error.meta, failureOutcome(error));
+            logged = true;
             // Which turn a conversation is on is only remembered in memory, so
             // a restart or a failed first turn must correct itself here.
             // A reply the CLI could not fit to the schema gets the same
             // single correction turn as one our validator rejects.
             if (error.code === "CLAUDE_SCHEMA_REJECTED") {
               text = undefined;
+              measured = error.meta;
+              opening = call;
               problem = error.message;
               break;
             }
@@ -527,9 +692,12 @@ export function createClaudeGateway({
               text === undefined ? problem : "The reply held no JSON object",
             );
           validate(job, answer);
+          logCall(opening, measured, "accepted");
           return answer;
         } catch (error) {
           problem = String(error?.message ?? error);
+          // A failed invocation already logged its own row.
+          if (!logged) logCall(opening, measured, "rejected");
           // The correction restarts the reply, so the partial text is dropped.
           onText?.("");
           prompt = `${user}\n\nYour previous answer was rejected: ${problem}\nReturn the complete corrected JSON object.`;
