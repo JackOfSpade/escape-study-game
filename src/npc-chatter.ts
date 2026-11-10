@@ -669,6 +669,46 @@ function dialogueFacts(
     request.setting,
     "outbreak-rooftop-evacuation-v1",
   );
+  // The accepted run design is real shared history for this crew, so it is
+  // grounded knowledge rather than something the speaker has to invent.
+  const design = g.design?.design;
+  if (design) {
+    const { title, premise } = design;
+    if (title && premise)
+      add("setting.premise", "setting", `This escape, "${title}": ${premise}`, [
+        "premise",
+        title,
+        premise,
+      ]);
+    const relationships =
+      "relationships" in design && Array.isArray(design.relationships)
+        ? design.relationships
+        : [];
+    relationships
+      .map((relationship, index) => ({ relationship, index }))
+      .filter(
+        ({ relationship }) =>
+          relationship &&
+          (relationship.from === a.name || relationship.to === a.name),
+      )
+      .slice(0, 3)
+      .forEach(({ relationship, index }) => {
+        const other =
+          relationship.from === a.name ? relationship.to : relationship.from;
+        if (!other || !relationship.kind || !relationship.detail) return;
+        add(
+          `relationship:${index}`,
+          "person",
+          `${other} is your ${relationship.kind}: ${relationship.detail}`,
+          [
+            relationship.from,
+            relationship.to,
+            relationship.kind,
+            relationship.detail,
+          ],
+        );
+      });
+  }
   add(
     "self.health",
     "self",
@@ -842,6 +882,10 @@ function dialogueFacts(
       `You can currently read "${detail.title}": ${detail.text}`,
       [request.location.floor, detail.title, detail.text],
     );
+  // The opening scene is shared history too, but it is added last so a full
+  // fact budget is spent on the immediate situation instead.
+  const opening = design?.opening;
+  if (opening) add("setting.opening", "setting", opening, ["opening", opening]);
   return facts;
 }
 

@@ -171,11 +171,71 @@ export const npcVoiceTransport: NpcVoiceTransport = {
     }).catch(() => {});
   },
 };
-export function npcVoiceFor(actorId: string) {
-  let hash = 0;
-  for (const char of actorId)
-    hash = (Math.imul(hash, 31) + char.charCodeAt(0)) | 0;
-  return ["steady", "bright", "warm", "low"][(hash >>> 0) & 3];
+/** The fifteen narrator slots, in the same order as the speech service's map. */
+export const NPC_VOICE_SLOTS = Object.freeze([
+  "steady",
+  "bright",
+  "warm",
+  "low",
+  "crisp",
+  "gruff",
+  "soft",
+  "lively",
+  "clear",
+  "keen",
+  "calm",
+  "even",
+  "quick",
+  "poised",
+  "dry",
+] as const);
+/**
+ * The same fifteen slots, split by the gender of their mapped Kokoro voice.
+ * A run picks a group with even odds, then a slot inside it uniformly.
+ */
+export const NPC_VOICE_GROUPS = Object.freeze({
+  male: Object.freeze(["steady", "low", "gruff", "lively", "dry"] as const),
+  female: Object.freeze([
+    "bright",
+    "warm",
+    "crisp",
+    "soft",
+    "clear",
+    "keen",
+    "calm",
+    "even",
+    "quick",
+    "poised",
+  ] as const),
+});
+export type NpcVoiceSlot = (typeof NPC_VOICE_SLOTS)[number];
+export type NpcVoiceGender = keyof typeof NPC_VOICE_GROUPS;
+/** 32-bit FNV-1a over the run/actor seed, independent of locale and host. */
+function npcVoiceSeed(runId: string, actorId: string) {
+  let hash = 0x811c9dc5;
+  for (const char of `${runId}\u0000${actorId}`) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+/** mulberry32, returning successive floats in [0, 1). */
+function npcVoiceRandom(seed: number) {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+/** One narrator slot per run and actor: stable within a run, fresh next run. */
+export function npcVoiceFor(runId: string, actorId: string): NpcVoiceSlot {
+  const random = npcVoiceRandom(npcVoiceSeed(runId, actorId));
+  const group =
+    random() < 0.5 ? NPC_VOICE_GROUPS.male : NPC_VOICE_GROUPS.female;
+  return group[Math.floor(random() * group.length)]!;
 }
 type VoiceAudio = Pick<
   AudioDirector,
@@ -509,7 +569,7 @@ export class NpcVoiceDirector {
         return;
       ticket = await this.transport.synthesize(
         reply,
-        npcVoiceFor(reply.actorId),
+        npcVoiceFor(this.runId || game.id, reply.actorId),
         signal,
       );
       if (!validTicket(ticket, reply) || !live()) return;

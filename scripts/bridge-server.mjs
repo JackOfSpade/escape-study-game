@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import { createClaudeGateway } from "./claude-gateway.mjs";
 import { createStudyBridgeServer } from "./study-bridge-server.mjs";
 import { createNpcSpeechService } from "./npc-speech-service.mjs";
+import { createKokoroRenderer } from "./npc-kokoro-renderer.mjs";
 import { privateDirectory, writePrivate } from "./lib/private-fs.mjs";
 
 /** This process owns AI calls, speech and code execution. Game launchers may
@@ -27,7 +28,12 @@ export async function startBridgeService(boot, options = {}) {
     instance: boot.instance,
   };
   let closing = false;
-  const speech = createNpcSpeechService();
+  // macOS gets the local neural narrator with `say` as its instant fallback;
+  // other platforms keep the previous behavior.
+  const speech =
+    process.platform === "darwin"
+      ? createNpcSpeechService({ render: createKokoroRenderer() })
+      : createNpcSpeechService();
   const server = createStudyBridgeServer({
     speech,
     claude: options.claude ?? createClaudeGateway(),

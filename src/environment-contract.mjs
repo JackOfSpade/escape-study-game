@@ -615,12 +615,14 @@ function parseContent(
             if (f) usage.get(f.id).add(e.surfaceId);
           }
         });
-        fail(
-          repair ||
-            expandContentText(e[field], value.fragments).length <=
-              slot[field === "title" ? "maxTitle" : "maxBody"],
-          `${p}.${field} exceeds the surface's readable budget`,
-        );
+        if (!repair) {
+          const length = expandContentText(e[field], value.fragments).length;
+          const limit = slot[field === "title" ? "maxTitle" : "maxBody"];
+          fail(
+            length <= limit,
+            `${p}.${field} for surface ${e.surfaceId} has ${length} characters and exceeds the surface's readable budget of ${limit}; shorten it to at most ${limit} characters`,
+          );
+        }
       }
       const hasText = !!normalizeEnvironmentText(
         expandContentText(e.title, value.fragments) +

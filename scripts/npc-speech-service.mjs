@@ -23,7 +23,74 @@ export const NPC_SPEECH_VOICES = Object.freeze({
   bright: "Karen",
   warm: "Moira",
   low: "Rishi",
+  crisp: "Daniel",
+  gruff: "Rishi",
+  soft: "Karen",
+  lively: "Moira",
+  clear: "Karen",
+  keen: "Moira",
+  calm: "Karen",
+  even: "Moira",
+  quick: "Karen",
+  poised: "Moira",
+  dry: "Daniel",
 });
+/** Kokoro-82M voice per slot; the same keys as NPC_SPEECH_VOICES. */
+export const NPC_KOKORO_VOICES = Object.freeze({
+  steady: "am_michael",
+  bright: "af_bella",
+  warm: "af_heart",
+  low: "am_fenrir",
+  crisp: "bf_emma",
+  gruff: "bm_george",
+  soft: "af_nicole",
+  lively: "am_puck",
+  clear: "af_aoede",
+  keen: "af_kore",
+  calm: "af_sarah",
+  even: "af_alloy",
+  quick: "af_nova",
+  poised: "bf_isabella",
+  dry: "bm_fable",
+});
+
+/** Encode mono float samples at any rate as the 22050 Hz PCM the service takes. */
+export function pcmWaveFromFloat(samples, sourceRate) {
+  const rate = 22_050,
+    frames =
+      samples.length && sourceRate > 0
+        ? Math.max(1, Math.round((samples.length * rate) / sourceRate))
+        : 0,
+    bytes = Buffer.alloc(44 + frames * 2);
+  bytes.write("RIFF", 0);
+  bytes.writeUInt32LE(bytes.length - 8, 4);
+  bytes.write("WAVEfmt ", 8);
+  bytes.writeUInt32LE(16, 16);
+  bytes.writeUInt16LE(1, 20);
+  bytes.writeUInt16LE(1, 22);
+  bytes.writeUInt32LE(rate, 24);
+  bytes.writeUInt32LE(rate * 2, 28);
+  bytes.writeUInt16LE(2, 32);
+  bytes.writeUInt16LE(16, 34);
+  bytes.write("data", 36);
+  bytes.writeUInt32LE(frames * 2, 40);
+  for (let i = 0; i < frames; i++) {
+    // Linear interpolation between neighbours keeps pitch and tempo intact.
+    const position = (i * sourceRate) / rate,
+      left = Math.min(samples.length - 1, Math.floor(position)),
+      right = Math.min(samples.length - 1, left + 1),
+      sample =
+        samples[left] + (samples[right] - samples[left]) * (position - left);
+    bytes.writeInt16LE(
+      Math.round(
+        (Number.isFinite(sample) ? Math.max(-1, Math.min(1, sample)) : 0) *
+          32_767,
+      ),
+      44 + i * 2,
+    );
+  }
+  return bytes;
+}
 export const NPC_SPEECH_LIMITS = Object.freeze({
   textChars: 180,
   bodyBytes: 2048,
@@ -132,7 +199,7 @@ function waveInfo(value) {
 }
 
 /** The system synthesizer only writes a file. It never uses speakers or a shell. */
-function renderMacSpeech({ text, voiceName, path, signal }) {
+export function renderMacSpeech({ text, voiceName, path, signal }) {
   return new Promise((resolve, reject) => {
     let settled = false;
     const child = spawn(
