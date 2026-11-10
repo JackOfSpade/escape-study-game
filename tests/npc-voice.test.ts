@@ -12,7 +12,10 @@ import {
 } from "../src/npc-chatter";
 import {
   NpcVoiceDirector,
+  NPC_VOICE_GROUPS,
   NPC_VOICE_LIMITS,
+  NPC_VOICE_SLOTS,
+  npcVoiceFor,
   npcVoiceTransport,
   type NpcVoiceTransport,
 } from "../src/npc-voice";
@@ -1721,4 +1724,115 @@ test("the real download transport rejects oversized streamed WAV data and incorr
     npcVoiceTransport.download(token, signal),
     /download failed/,
   );
+});
+
+test("narrator voice groups split the fifteen slots into five male and ten female", () => {
+  assert.equal(NPC_VOICE_SLOTS.length, 15);
+  assert.deepEqual(
+    [...NPC_VOICE_GROUPS.male],
+    ["steady", "low", "gruff", "lively", "dry"],
+  );
+  assert.deepEqual(
+    [...NPC_VOICE_GROUPS.female],
+    [
+      "bright",
+      "warm",
+      "crisp",
+      "soft",
+      "clear",
+      "keen",
+      "calm",
+      "even",
+      "quick",
+      "poised",
+    ],
+  );
+  assert.equal(
+    new Set([...NPC_VOICE_GROUPS.male, ...NPC_VOICE_GROUPS.female]).size,
+    15,
+    "the male and female groups are disjoint",
+  );
+  assert.deepEqual(
+    [...NPC_VOICE_GROUPS.male, ...NPC_VOICE_GROUPS.female].sort(),
+    [...NPC_VOICE_SLOTS].sort(),
+    "the two groups together cover exactly the narrator slots",
+  );
+  assert.ok(
+    Object.isFrozen(NPC_VOICE_GROUPS) &&
+      Object.isFrozen(NPC_VOICE_GROUPS.male) &&
+      Object.isFrozen(NPC_VOICE_GROUPS.female),
+  );
+});
+
+test("a run and actor pair always keeps the same narrator voice", () => {
+  const picks = [
+    ["run-a", "survivor-0"],
+    ["run-a", "voice-npc"],
+    ["run-a", "Maya"],
+    ["run-a", "Zoë"],
+    ["run-b", "survivor-0"],
+    ["run-7", "npc-2"],
+  ] as const;
+  for (const [runId, actorId] of picks) {
+    const first = npcVoiceFor(runId, actorId);
+    assert.ok(
+      NPC_VOICE_SLOTS.includes(first),
+      `${runId}/${actorId} picked the known slot ${first}`,
+    );
+    for (let i = 0; i < 5; i++)
+      assert.equal(
+        npcVoiceFor(runId, actorId),
+        first,
+        `${runId}/${actorId} keeps its narrator voice within the run`,
+      );
+  }
+});
+
+test("a new run re-rolls the narrator voices", () => {
+  let changed = 0;
+  for (let i = 0; i < 40; i++)
+    if (
+      npcVoiceFor("run-a", `survivor-${i}`) !==
+      npcVoiceFor("run-b", `survivor-${i}`)
+    )
+      changed++;
+  assert.ok(
+    changed >= 10,
+    `${changed} of 40 actors got a different narrator voice in the new run`,
+  );
+});
+
+test("narrator voices pick gender evenly, then a uniform slot in the group", () => {
+  const picks = Array.from({ length: 4000 }, (_, i) =>
+    npcVoiceFor(`run-${i % 40}`, `survivor-${Math.floor(i / 40)}`),
+  );
+  const male = picks.filter((slot) =>
+    (NPC_VOICE_GROUPS.male as readonly string[]).includes(slot),
+  );
+  const female = picks.filter((slot) =>
+    (NPC_VOICE_GROUPS.female as readonly string[]).includes(slot),
+  );
+  assert.equal(
+    male.length + female.length,
+    picks.length,
+    "every pick belongs to exactly one gender group",
+  );
+  const share = male.length / picks.length;
+  assert.ok(
+    share >= 0.45 && share <= 0.55,
+    `the male share ${share.toFixed(3)} stays near one half`,
+  );
+  for (const [name, group, members] of [
+    ["male", NPC_VOICE_GROUPS.male, male],
+    ["female", NPC_VOICE_GROUPS.female, female],
+  ] as const) {
+    const expected = members.length / group.length;
+    for (const slot of group) {
+      const count = members.filter((pick) => pick === slot).length;
+      assert.ok(
+        count >= expected * 0.75 && count <= expected * 1.25,
+        `${slot} takes ${count} of the ${name} picks near ${expected.toFixed(1)}`,
+      );
+    }
+  }
 });
