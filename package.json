@@ -53,5 +53,8 @@
     "kokoro-js": "1.2.1",
     "planck": "1.5.1",
     "three": "0.186.1"
+  },
+  "overrides": {
+    "sharp": "0.35.5"
   }
 }
