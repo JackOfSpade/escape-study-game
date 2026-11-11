@@ -126,6 +126,9 @@ export interface StudyState {
   session?: string;
   assessments: Assessment[];
   archives: Encounter[];
+  /** The unfinished segmented question; carried across terminals, floors,
+   * death and runs until its last segment is completed. */
+  thread?: import("./question-thread").QuestionThread;
 }
 export interface Finding {
   objectiveId: string;
@@ -547,6 +550,8 @@ export interface Problem {
   validation?: { kind: "trace"; answer: number };
   contract: Contract;
   scopeDefinitions?: ScopeDefinition[];
+  /** Ordered parts of a long question, one per terminal visit and key. */
+  segments?: import("./question-thread").QuestionSegment[];
 }
 export interface TutorRequest {
   id: string;
@@ -556,6 +561,8 @@ export interface TutorRequest {
   state: "pending" | "interrupted" | "applied" | "superseded";
   error?: string;
   responseMessageId?: string;
+  /** Resent once automatically when its question resumed after a restart. */
+  resent?: boolean;
 }
 /** A question session the retired ChatGPT chat once ran. Saves still carry it,
  * so learning history reads it; nothing creates or continues one any more. */
@@ -580,6 +587,8 @@ export interface Encounter {
   studyTurnRecorded?: boolean;
   directStudy?: DirectStudySession;
   chatDraft?: string;
+  /** The segmented question this terminal works and which of its segments. */
+  thread?: { id: string; segment: number };
   /** One question per room; answers, ownership and rewards remain per station. */
   questionRoom?: string;
   tutorRequests?: TutorRequest[];

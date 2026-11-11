@@ -133,22 +133,23 @@ Estimate each stage ladder at 12 settings × 10 stage packets, with the replay c
 
 ### `generate` and its downstream
 
-- Hardest prompts: an `openGap` with `reuseInScopeDefinitions: true` where the apex facet must shape the question; several open gaps competing for one bounded question; D1 conceptual diagnosis with an empty starter; a code-review question that must include the helper and its authorization semantics without leaking the verdict; an integrative objective that must stay small.
-- Quality signal: validator first-try rate (contract copy, stable facets, rubric strings, `estimatedSolveSeconds` between 30 and 900); blind pairwise rank with a criterion set covering self-containment, visible requirements, no unstated assumptions and no leaked solution; then run `tutor` and `assess` on the winning questions and compare those results across arms.
+- Hardest prompts: a long question that must be split at natural sub-goals with a substantive first part (and a short one that must stay whole); an `openGap` with `reuseInScopeDefinitions: true` where the apex facet must shape the question; several open gaps competing for one bounded question; D1 conceptual diagnosis with an empty starter; a code-review question that must include the helper and its authorization semantics without leaking the verdict; an integrative objective that must stay small.
+- Quality signal: validator first-try rate (contract copy, stable facets, rubric strings, `estimatedSolveSeconds` between 30 and 3600, and for questions over 900 seconds a valid `segments` plan: 2-6 parts of 360-900 seconds, every rubric item in exactly one part, facets from `scopeDefinitions`, part estimates adding up to the whole within 25%); blind pairwise rank with a criterion set covering self-containment, visible requirements, no unstated assumptions and no leaked solution; then run `tutor` and `assess` on the winning questions and compare those results across arms.
 - Ladder: cheapest by measured cost first. Estimate 12 settings × 20 questions = 240 calls; because the curriculum packet is large and prompt-cached, the input share dominates, so lower effort may save little. Total estimate = 240 × the measured mean `total_cost_usd` for the operation, which the usage log supplies.
 - Noise-floor arm: Opus xhigh run twice.
 
 ### `tutor`
 
 - Hardest prompts: a learner answer that demonstrates a facet by implication and must mark dependents `impliedBy`; a declared gap that needs one focused follow-up rather than a prerequisite tree; a press for the full answer where a foothold is due; a misconception that must be corrected plainly; a streamed reply whose `text` must appear before the rest of the object.
-- Quality signal: validator rate on `{text, complete, outcome, knowledge}`; blind review for the probe stance (one leverage question, no breadth inflation, no hidden full-project follow-up); agreement with a reference on `complete`/`outcome` and facet statuses; optionally a short delayed check that the learner's next answer improves.
+- Hardest prompts (segmented questions): a reply that must stay inside `payload.segment.goal` without asking for later parts, continue `carriedConversation` from an earlier terminal instead of starting over, and on `complete:true` return a useful `segmentSummary`.
+- Quality signal: validator rate on `{text, complete, outcome, knowledge, segmentSummary?}`; blind review for the probe stance (one leverage question, no breadth inflation, no hidden full-project follow-up); agreement with a reference on `complete`/`outcome` and facet statuses; optionally a short delayed check that the learner's next answer improves.
 - Ladder: estimate 12 settings × 20 transcripts = 240 calls, cheap compared with `generate` because transcripts are short; total = 240 × measured mean cost.
 - Noise-floor arm: current Sonnet medium twice. Generation time is not a criterion, but record first-word latency anyway for the open question above.
 
 ### `complete` and `assess`
 
 - Hardest prompts for `complete`: a solution with credited NPC or assistant contributions; a defender whose useful physical work must count; a claim of execution without a runner receipt; the retrospective NPC outcome where simulated world success must be ignored.
-- Hardest prompts for `assess`: a correct but assisted solution, an answer copied from help, an NPC-authored solution, a partially covered scope that must stay `partial`, a definition issue that needs an exact 20-2000 character quote, and every visible assistance source needing its own `helpAttributions` entry.
+- Hardest prompts for `assess`: one visit of a segmented question (`packet.segment`), whose facets from other parts must stay unknown; a correct but assisted solution, an answer copied from help, an NPC-authored solution, a partially covered scope that must stay `partial`, a definition issue that needs an exact 20-2000 character quote, and every visible assistance source needing its own `helpAttributions` entry.
 - Quality signal: planted-defect catch rate first, then ordinary agreement with a reference on findings, visit outcome and attributions. A validator pass alone proves nothing here because these replies are structurally easy and semantically decisive.
 - Ladder: estimate 12 settings × 15 graded cases = 180 calls per operation, each with a known reference verdict; total = 180 × measured mean cost.
 - Noise-floor arm: the current setting twice; because grading variance is the danger, use the same cases in interleaved order.
@@ -211,6 +212,8 @@ Recommendation: keep every call offline for now. No call has a measured quality 
 - The cost proxy is the CLI's `total_cost_usd` under a subscription; it is useful for ordering settings, not for an invoice.
 
 ## Log
+
+- 2026-11-11: segmented questions landed (`docs/QUESTION_DESIGN.md`, "Segmented questions"). The `generate` prompt, its validator and pacing guidance changed (new `segments` plan, whole estimate up to 3600 s); the `tutor` prompt gained `payload.segment` and the optional `segmentSummary` reply field; the `assess` prompt gained `packet.segment`. This is a re-test trigger: `generate`, `tutor` and `assess` each need a regression re-check, including segmented cases, before any of them is marked Proven.
 
 - 2026-11-10: document created. No measurements yet. Tooling listed in "How to measure" still to build: per-call usage log, replay-sample store and ladder runner, blind judging with planted defects, NPC latency harness.
 - 2026-11-10: per-call usage log added to the gateway (`.local/bridge-service/claude-usage.jsonl`) with `npm run ai:usage` to summarize it. Restart the relay (`npm run bridge:stop`, then start the game) to load it. Next tool: the replay-sample store and ladder runner.

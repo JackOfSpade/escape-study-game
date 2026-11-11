@@ -43,9 +43,12 @@ export function validSolveEstimate(value: unknown): value is number {
   );
 }
 export function solveEstimate(
-  problem?: Pick<Problem, "contract" | "estimatedSolveSeconds">,
+  problem?: Pick<Problem, "contract" | "estimatedSolveSeconds" | "segments">,
   fallbackDepth = 1,
 ) {
+  // A segmented question paces one terminal visit: its first (or current) part.
+  const part = problem?.segments?.[0]?.estimatedSolveSeconds;
+  if (validSolveEstimate(part)) return part;
   const proposed = problem?.contract.depth ?? fallbackDepth;
   const depth = Number.isFinite(proposed)
     ? Math.max(1, Math.min(4, Math.floor(proposed)))
