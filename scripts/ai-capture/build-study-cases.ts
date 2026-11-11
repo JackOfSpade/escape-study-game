@@ -335,7 +335,7 @@ const SCENARIOS: Scenario[] = [
   },
 ];
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
-const roadmap = (): Roadmap =>
+export const roadmap = (): Roadmap =>
   JSON.parse(readFileSync(join(ROOT, "public/curriculum.json"), "utf8"));
 const topicOf = (id: string) => id.split(":")[1]?.split(".")[0] ?? "";
 const HASH = (value: unknown) =>
@@ -800,3 +800,6 @@ if (entry === fileURLToPath(import.meta.url)) {
     },
   );
 }
+
+/** Shared with the downstream builder; re-exported without changing behaviour. */
+export { contractFor, encounterFor, gameFor, scenarioFor, withBridge };
