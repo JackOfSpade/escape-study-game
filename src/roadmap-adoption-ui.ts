@@ -60,7 +60,7 @@ export function renderRoadmapAdoption(host: HTMLElement, options: Options) {
     .slice(0, 10)
     .map(
       (j) =>
-        `<article><strong>${escape(j.id)} · ${escape(j.state)}</strong><p>${escape(j.error ?? j.proposal?.rationale ?? "Saved source-bound review request. No learning change is applied.")}</p>${
+        `<article><strong>${escape(j.id)} · ${escape(j.state)}</strong><p>${escape(j.error ?? j.proposal?.rationale ?? j.keepLocal?.rationale ?? "Saved source-bound review request. No learning change is applied.")}</p>${j.state === "kept-local" ? "<p>The review recommends keeping your local roadmap. Nothing was changed and there is nothing to adopt.</p>" : ""}${
           j.proposal?.attemptUpdates?.length
             ? `<p>${j.proposal.attemptUpdates.length} reviewed attempt update(s). Both previous and updated dispositions are retained in the complete file's audit history; no new gameplay study visit is recorded.</p><p>Invalidating an attempt withdraws judgments supported only by it; it does not create a new failure. Other supported knowledge and gaps remain.</p>${
                 j.proposal.attemptUpdates.some((u) => u.correctionDecision)
@@ -84,7 +84,7 @@ export function renderRoadmapAdoption(host: HTMLElement, options: Options) {
                 )
                 .join("")}</details>`
             : ""
-        }${j.state === "ready" ? `<p>Review the complete proposed file and differences before adopting. Current local work is checked again at adoption.</p><button data-adopt-roadmap="${escape(j.id)}">Adopt reviewed roadmap</button>` : ""}${j.proposal ? `<button data-download-roadmap="${escape(j.id)}" class="quiet">Download proposed roadmap</button>` : ""}${["error", "interrupted"].includes(j.state) && reconcile ? `<button data-retry-roadmap="${escape(j.id)}" class="quiet">Retry saved reconciliation</button>` : ""}</article>`,
+        }${j.state === "ready" ? `<p>Review the complete proposed file and differences before adopting. Current local work is checked again at adoption.</p><button data-adopt-roadmap="${escape(j.id)}">Adopt reviewed roadmap</button>` : ""}${j.proposal && j.state !== "kept-local" ? `<button data-download-roadmap="${escape(j.id)}" class="quiet">Download proposed roadmap</button>` : ""}${["error", "interrupted"].includes(j.state) && reconcile ? `<button data-retry-roadmap="${escape(j.id)}" class="quiet">Retry saved reconciliation</button>` : ""}</article>`,
     )
     .join("")}`;
   if (host.isConnected && !document.getElementById("inspector")?.hidden) {
@@ -141,9 +141,11 @@ export function renderRoadmapAdoption(host: HTMLElement, options: Options) {
       status(
         job?.state === "ready"
           ? `${job.payload.provider === "claude-cli" ? "Claude CLI" : "Study bridge"} roadmap review ready. Inspect its complete proposal; nothing is adopted automatically.`
-          : job?.error
-            ? `Review needs attention; captured files retained. ${job.error}`
-            : "No additional review was needed.",
+          : job?.state === "kept-local"
+            ? `${job.payload.provider === "claude-cli" ? "Claude CLI" : "Study bridge"} roadmap review recommends keeping your local roadmap; nothing was changed and there is nothing to adopt.`
+            : job?.error
+              ? `Review needs attention; captured files retained. ${job.error}`
+              : "No additional review was needed.",
       );
     } catch (error) {
       refresh();

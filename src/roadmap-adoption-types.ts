@@ -80,6 +80,15 @@ export interface RoadmapReconciliation {
   }[];
   rationale: string;
 }
+/** A review that recommends keeping the local roadmap: nothing to adopt. */
+export interface RoadmapKeepLocal {
+  outcome: "keep-local";
+  requestId: string;
+  localHash: string;
+  candidateHash: string;
+  decisions: RoadmapReconciliation["decisions"];
+  rationale: string;
+}
 export interface RoadmapAdoptionReceipt {
   id: string;
   sourceHash: string;
@@ -102,11 +111,14 @@ export interface RoadmapAdoptionReceipt {
 export interface RoadmapReconciliationJob {
   review?: import("./roadmap-review").RoadmapReview;
   id: string;
-  state: "pending" | "ready" | "error" | "interrupted" | "applied";
+  state:
+    "pending" | "ready" | "error" | "interrupted" | "applied" | "kept-local";
   payload: RoadmapReconciliationPayload;
   requestHash: string;
   proposal?: RoadmapReconciliation;
   proposalHash?: string;
+  /** Set when the review recommends keeping the local roadmap unchanged. */
+  keepLocal?: Pick<RoadmapKeepLocal, "decisions" | "rationale">;
   error?: string;
 }
 export interface RoadmapAdoptionBackup {

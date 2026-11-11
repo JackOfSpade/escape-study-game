@@ -17,6 +17,7 @@ import { decode, encode, recover } from "../src/persistence";
 import {
   adoptReconciledRoadmap,
   reconcileRoadmap,
+  roadmapAdoptionBusy,
 } from "../src/roadmap-adoption";
 import type {
   RoadmapReconciliation,
@@ -691,4 +692,85 @@ test("guided, missing-scope and fabricated imported passes cannot be promoted by
         /non-invalidated/,
       );
   }
+});
+/** Exact line edits turning `local` into `target`; the synthetic fixtures only
+ * rewrite lines in place, so each changed line is one unambiguous find. */
+function lineEdits(local: string, target: string) {
+  const from = local.split("\n"),
+    to = target.split("\n");
+  assert.equal(
+    from.length,
+    to.length,
+    "synthetic proposal only rewrites existing lines",
+  );
+  return from
+    .map((line, index) => ({ find: line, replace: to[index] }))
+    .filter((edit) => edit.find !== edit.replace);
+}
+test("an edits reply becomes the complete proposed file without the model writing it", async () => {
+  const { g } = fixture(),
+    incoming = candidate();
+  let local!: string,
+    edits: { find: string; replace: string }[] = [];
+  await reconcileRoadmap(g, r, incoming, async (p) => {
+    local = p.local;
+    edits = lineEdits(p.local, incoming);
+    return {
+      requestId: p.requestId,
+      localHash: p.localHash,
+      candidateHash: p.candidateHash,
+      edits,
+      definitions: [],
+      mappings: [],
+      completeScopes: [],
+      decisions: [],
+      rationale:
+        "Synthetic native review only; not genuine semantic certification",
+    };
+  });
+  const j = g.study.roadmapReconciliations![0];
+  assert.equal(j.state, "ready", j.error);
+  assert.equal(edits.length, 4);
+  assert.notEqual(local, incoming);
+  assert.equal(j.proposal!.canonical, incoming);
+  assert.equal("edits" in j.proposal!, false);
+  assert.equal(g.study.learner!.roadmapAdoptions?.length ?? 0, 0);
+});
+test("a keep-local reply keeps the local roadmap and offers nothing to adopt", async () => {
+  const { g, l } = fixture(),
+    before = JSON.stringify(l),
+    decisions = [
+      {
+        key: "revision",
+        choice: "local" as const,
+        rationale: "The incoming revision belongs to another learner",
+      },
+    ];
+  await reconcileRoadmap(g, r, candidate(), async (p) => ({
+    requestId: p.requestId,
+    localHash: p.localHash,
+    candidateHash: p.candidateHash,
+    outcome: "keep-local" as const,
+    decisions,
+    rationale: "The incoming file is not this learner's progress",
+  }));
+  const j = g.study.roadmapReconciliations![0];
+  assert.equal(j.state, "kept-local", j.error);
+  assert.equal(
+    j.keepLocal!.rationale,
+    "The incoming file is not this learner's progress",
+  );
+  assert.deepEqual(j.keepLocal!.decisions, decisions);
+  assert.equal(j.proposal, undefined);
+  assert.equal(j.proposalHash, undefined);
+  assert.equal(g.study.learner, l);
+  assert.equal(JSON.stringify(l), before);
+  assert.equal(g.study.roadmapExport, undefined);
+  assert.equal(roadmapAdoptionBusy(g), false);
+  await assert.rejects(
+    adoptReconciledRoadmap(g, r, j.id),
+    /ready roadmap reconciliation/,
+  );
+  assert.equal(j.state, "kept-local");
+  assert.equal(JSON.stringify(l), before);
 });

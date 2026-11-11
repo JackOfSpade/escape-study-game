@@ -68,7 +68,11 @@ export const TASK_PROFILES = Object.freeze({
     ...live(120_000, "haiku", "medium"),
     stableKeys: ["instruction", "definition"],
   },
-  "reconcile-roadmap": { ...authoring(), stableKeys: ["instruction"] },
+  "reconcile-roadmap": {
+    ...authoring("high"),
+    model: "sonnet",
+    stableKeys: ["instruction"],
+  },
   "npc-chatter": {
     model: "haiku",
     effort: "high",
