@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -524,4 +524,266 @@ test("a reply the CLI cannot fit to the schema gets one correction turn", async 
   assert.match(system, /StructuredOutput tool/);
   assert.doesNotMatch(system, /no markdown fence/);
   assert.match(buildPrompt("complete", {}).system, /no markdown fence/);
+});
+
+const usageRows = () => {
+  const rows = [];
+  return { rows, log: (row) => rows.push(row) };
+};
+const resultEvent = (extra = {}) => ({
+  type: "result",
+  subtype: "success",
+  is_error: false,
+  result: '{"ok":1}',
+  total_cost_usd: 0.0123,
+  usage: {
+    input_tokens: 120,
+    output_tokens: 45,
+    cache_read_input_tokens: 90,
+    cache_creation_input_tokens: 30,
+  },
+  duration_ms: 1200,
+  duration_api_ms: 900,
+  num_turns: 2,
+  ...extra,
+});
+const fullReply = (extra = {}) => ({
+  model: "claude-sonnet-5-5",
+  result: resultEvent(extra),
+});
+
+test("a successful call logs exactly one measured row", async () => {
+  const { rows, log } = usageRows();
+  const g = gateway([fullReply()], [], { usageLog: log });
+  assert.deepEqual(await g.run("complete", {}), { ok: 1 });
+  assert.equal(rows.length, 1);
+  const row = rows[0];
+  assert.equal(row.v, 1);
+  assert.equal(row.at, new Date(row.at).toISOString());
+  assert.equal(row.operation, "complete");
+  assert.equal(row.phase, null);
+  assert.equal(row.conversationTurn, null);
+  assert.equal(row.attempt, 0);
+  assert.equal(row.sessionResume, null);
+  assert.equal(row.alias, "sonnet");
+  assert.equal(row.effort, "medium");
+  assert.equal(row.model, "claude-sonnet-5-5");
+  assert.equal(row.costUsd, 0.0123);
+  assert.equal(row.inputTokens, 120);
+  assert.equal(row.outputTokens, 45);
+  assert.equal(row.cacheReadTokens, 90);
+  assert.equal(row.cacheWriteTokens, 30);
+  assert.equal(row.numTurns, 2);
+  assert.equal(row.apiDurationMs, 900);
+  assert.equal(row.firstTextMs, null);
+  assert.equal(row.outcome, "accepted");
+  assert.ok(Number.isInteger(row.durationMs) && row.durationMs >= 0);
+});
+
+test("a rejected reply then a valid correction logs both attempts", async () => {
+  const { rows, log } = usageRows();
+  const g = gateway(['{"bad":1}', '{"ok":1}'], [], {
+    usageLog: log,
+    validate: (_job, answer) => {
+      if (answer.bad) throw Error("wrong shape");
+    },
+  });
+  assert.deepEqual(
+    await g.run("complete", { conversation: { turn: 1 }, phase: "content" }),
+    { ok: 1 },
+  );
+  assert.deepEqual(
+    rows.map((row) => [row.attempt, row.outcome]),
+    [
+      [0, "rejected"],
+      [1, "accepted"],
+    ],
+  );
+  assert.deepEqual(
+    rows.map((row) => [row.conversationTurn, row.phase]),
+    [
+      [1, "content"],
+      [1, "content"],
+    ],
+  );
+});
+
+test("a session retry whose reply is rejected still logs that reply", async () => {
+  const { rows, log } = usageRows();
+  const inUse = {
+    result: {
+      type: "result",
+      subtype: "error",
+      is_error: true,
+      result: "Session ID x is already in use.",
+    },
+  };
+  const g = gateway([inUse, '{"bad":1}', '{"ok":1}'], [], {
+    usageLog: log,
+    validate: (_job, answer) => {
+      if (answer.bad) throw Error("wrong shape");
+    },
+  });
+  assert.deepEqual(await g.run("design-run", { generationId: "design-r" }), {
+    ok: 1,
+  });
+  assert.deepEqual(
+    rows.map((row) => [row.attempt, row.sessionResume, row.outcome]),
+    [
+      [0, false, "session-in-use"],
+      [0, true, "rejected"],
+      [1, true, "accepted"],
+    ],
+  );
+});
+
+test("a failed call logs its failure outcome and null measurements", async () => {
+  const { rows, log } = usageRows();
+  const g = gateway(
+    [
+      {
+        result: {
+          type: "result",
+          subtype: "error",
+          is_error: true,
+          result: "You hit your limit",
+        },
+      },
+    ],
+    [],
+    { usageLog: log },
+  );
+  await assert.rejects(g.run("complete", {}), { code: "CLAUDE_USAGE_LIMIT" });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].outcome, "usage-limit");
+  assert.equal(rows[0].costUsd, null);
+  assert.equal(rows[0].inputTokens, null);
+  assert.equal(rows[0].apiDurationMs, null);
+});
+
+test("usage rows carry no prompt, reply or request id content", async () => {
+  const { rows, log } = usageRows();
+  const marker = "SECRET-PROMPT-MARKER-42";
+  const g = gateway(
+    [
+      {
+        model: "claude-sonnet-5-5",
+        result: resultEvent({
+          result: `{"text":"REPLY-${marker}"}`,
+          stderr: `STDERR-${marker}`,
+        }),
+      },
+    ],
+    [],
+    { usageLog: log },
+  );
+  const requestId = "REQ-SECRET-7";
+  assert.deepEqual(await g.run("complete", { requestId, note: marker }), {
+    text: `REPLY-${marker}`,
+  });
+  assert.equal(rows.length, 1);
+  const line = JSON.stringify(rows[0]);
+  for (const secret of [marker, requestId]) assert.ok(!line.includes(secret));
+  assert.deepEqual(Object.keys(rows[0]).sort(), [
+    "alias",
+    "apiDurationMs",
+    "at",
+    "attempt",
+    "cacheReadTokens",
+    "cacheWriteTokens",
+    "conversationTurn",
+    "costUsd",
+    "durationMs",
+    "effort",
+    "firstTextMs",
+    "inputTokens",
+    "model",
+    "numTurns",
+    "operation",
+    "outcome",
+    "outputTokens",
+    "phase",
+    "sessionResume",
+    "v",
+  ]);
+});
+
+test("a throwing usage sink never fails the call", async () => {
+  const warn = console.warn;
+  const warnings = [];
+  console.warn = (message) => warnings.push(message);
+  try {
+    const g = gateway([fullReply()], [], {
+      usageLog: () => {
+        throw Error("disk full");
+      },
+    });
+    assert.deepEqual(await g.run("complete", {}), { ok: 1 });
+  } finally {
+    console.warn = warn;
+  }
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /usage log failed/);
+});
+
+test("the path sink appends private JSONL and rotates above the limit", async () => {
+  const logs = mkdtempSync(join(tmpdir(), "claude-usage-"));
+  const file = join(logs, "claude-usage.jsonl");
+  const g = gateway([fullReply(), fullReply(), fullReply()], [], {
+    usageLog: file,
+    usageLogMaxBytes: 1,
+  });
+  await g.run("complete", {});
+  const firstLines = readFileSync(file, "utf8").trim().split("\n");
+  assert.equal(firstLines.length, 1);
+  assert.equal(JSON.parse(firstLines[0]).operation, "complete");
+  assert.equal(statSync(file).mode & 0o777, 0o600);
+  await g.run("complete", {});
+  assert.equal(readFileSync(`${file}.1`, "utf8").trim().split("\n").length, 1);
+  assert.equal(readFileSync(file, "utf8").trim().split("\n").length, 1);
+  await g.run("complete", {});
+  assert.equal(statSync(file).mode & 0o777, 0o600);
+  assert.equal(readFileSync(`${file}.1`, "utf8").trim().split("\n").length, 1);
+  assert.equal(readFileSync(file, "utf8").trim().split("\n").length, 1);
+});
+
+test("a streamed call records the time to its first text", async () => {
+  const { rows, log } = usageRows();
+  const spawn = () => {
+    const child = new EventEmitter();
+    child.stdout = new PassThrough();
+    child.stderr = new PassThrough();
+    child.stdin = new PassThrough();
+    child.kill = () => {};
+    setImmediate(() => {
+      child.stdout.write(
+        `${JSON.stringify({ type: "system", subtype: "init", model: "claude-sonnet-5-5" })}\n`,
+      );
+      child.stdout.write(
+        `${JSON.stringify({ type: "stream_event", event: { delta: { type: "text_delta", text: '{"text":"Hi"' } } })}\n`,
+      );
+      child.stdout.write(
+        `${JSON.stringify(resultEvent({ result: '{"text":"Hi"}' }))}\n`,
+      );
+      child.stdout.end();
+      child.emit("close", 0);
+    });
+    return child;
+  };
+  const g = createClaudeGateway({
+    env,
+    cwd: dir,
+    spawn,
+    validate: () => {},
+    usageLog: log,
+  });
+  assert.deepEqual(await g.run("tutor", {}, { onText: () => {} }), {
+    text: "Hi",
+  });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].outcome, "accepted");
+  assert.ok(
+    Number.isInteger(rows[0].firstTextMs) && rows[0].firstTextMs >= 0,
+    String(rows[0].firstTextMs),
+  );
 });

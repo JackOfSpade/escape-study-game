@@ -2,7 +2,7 @@
 
 Every AI task is one call to the signed-in Claude CLI, made by `scripts/claude-gateway.mjs` behind the local relay (`scripts/bridge-server.mjs`, `POST /api/bridge`). The CLI is started with no tools, none of the player's own settings, memory or MCP servers, and without any `ANTHROPIC_*` variables. `GET /api/status` reports `mode: "claude-cli"` and the operations the gateway serves; without the gateway it reports a development fallback that awards no academic credit.
 
-The operation names, their instructions and the validators that check each answer are in `scripts/lib/ai-contracts.mjs`. That file is the contract: read it before changing a task. Each task's model and effort are in `TASK_PROFILES` in the gateway.
+The operation names, their instructions and the validators that check each answer are in `scripts/lib/ai-contracts.mjs`. That file is the contract: read it before changing a task. Each task's model and effort are in `TASK_PROFILES` in the gateway. The policy that chose those settings, how to measure a setting, and the evaluation and test plan for every call are in [AI model and effort selection](AI_MODEL_SELECTION.md).
 
 | Operation                                 | Purpose                                                                                               |
 | ----------------------------------------- | ----------------------------------------------------------------------------------------------------- |

@@ -36,7 +36,11 @@ export async function startBridgeService(boot, options = {}) {
       : createNpcSpeechService();
   const server = createStudyBridgeServer({
     speech,
-    claude: options.claude ?? createClaudeGateway(),
+    claude:
+      options.claude ??
+      createClaudeGateway({
+        usageLog: join(boot.directory, "claude-usage.jsonl"),
+      }),
     control: {
       route(req, res) {
         if (req.url !== "/_bridge-service") return false;
