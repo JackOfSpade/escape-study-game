@@ -35,7 +35,8 @@ export function unfinishedEarlierVisits(
   e: Encounter,
 ): { runs: number; established: number } {
   const c = e.problem?.contract;
-  if (!c || c.practice || e.state === "consumed")
+  // A continued question keeps its conversation; nothing is asked again.
+  if (!c || c.practice || e.state === "consumed" || e.thread)
     return { runs: 0, established: 0 };
   const earlier = g.study.archives.filter((a) => {
     const prior = a.problem?.contract;

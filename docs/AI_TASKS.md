@@ -6,8 +6,8 @@ The operation names, their instructions and the validators that check each answe
 
 | Operation                                 | Purpose                                                                                               |
 | ----------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `generate`                                | A question for a terminal, built from the eligible contract and the exact track curriculum            |
-| `tutor`                                   | One reply in the terminal conversation, with the probe reply `{text, complete, outcome?, knowledge?}` |
+| `generate`                                | A question for a terminal, built from the eligible contract and the exact track curriculum; a question over 15 minutes returns `segments`, one part per terminal visit |
+| `tutor`                                   | One reply in the terminal conversation, with the probe reply `{text, complete, outcome?, knowledge?, segmentSummary?}`; for a segmented question `complete` covers the current part |
 | `complete`                                | Whether a captured submission solves the question, from the attributed history                        |
 | `assess`                                  | Formal learning assessment of one frozen question and its evidence                                    |
 | `group`                                   | A bounded NPC group message or proposal from public work records                                      |

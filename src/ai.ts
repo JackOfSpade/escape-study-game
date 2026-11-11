@@ -1,6 +1,18 @@
 import { fnv1a } from "./hash";
 import { QUESTION_DESIGN_GUIDANCE } from "../scripts/lib/study-question-policy.mjs";
-import { adoptQuestionPacing, validSolveEstimate } from "./field-pacing";
+import { adoptQuestionPacing } from "./field-pacing";
+import {
+  SEGMENT_GENERATION_GUIDANCE,
+  validateQuestionSegments,
+} from "../scripts/lib/question-segments.mjs";
+import {
+  completeSegment,
+  isActiveVisit,
+  openThread,
+  segmentPayload,
+  startThread,
+  threadEncounters,
+} from "./question-thread";
 import { roomEncounters, assignRoomProblem } from "./room-questions";
 import { completionVerdict } from "./completion-verdict";
 import { careerScopeGuidance, studyFocus } from "./career-profile";
@@ -191,11 +203,13 @@ function validateProblem(
   g: Game,
   c = eligible(r, g.study),
 ) {
-  if (
-    p?.estimatedSolveSeconds !== undefined &&
-    !validSolveEstimate(p.estimatedSolveSeconds)
-  )
-    throw Error(`Invalid generated solve-time estimate for ${e.id}`);
+  try {
+    validateQuestionSegments(p);
+  } catch (error) {
+    throw Error(
+      `Invalid generated question plan for ${e.id}: ${String(error)}`,
+    );
+  }
   if (
     !p ||
     typeof p.prompt !== "string" ||
@@ -241,12 +255,15 @@ const generationCurrent = (g: Game, e: Encounter, id: string) =>
   !e.problem;
 const roomGenerations = new WeakMap<Game, Map<string, Promise<void>>>();
 export async function ensureProblem(g: Game, e: Encounter, r: Roadmap) {
+  // A continued question belongs to the learner, never to the room.
+  if (e.thread && e.problem) return;
   if (!e.questionRoom) return ensureIndividualProblem(g, e, r);
   if (e.state === "consumed" || g.encounters[e.id] !== e) return;
   const peers = roomEncounters(g, e);
   // Only a question Claude wrote is shared; an old practice one never spreads.
   const existing = peers.find(
-    (peer) => peer.problem && peer.problem.provenance !== "development",
+    (peer) =>
+      peer.problem && peer.problem.provenance !== "development" && !peer.thread,
   );
   if (existing?.problem) {
     assignRoomProblem(g, existing, existing.problem);
@@ -280,7 +297,8 @@ const QUESTION_GENERATION_POLICY =
   "Diagnose before teaching. Write a standalone question: the prompt alone must supply the essential scenario, interface, implementation, data, timing and business-rule facts needed to answer without using the chat. For classification, list the concrete items to classify and their relevant behavior, lifetime and source without supplying their classifications. For tracing, debugging or critique, supply the relevant code, event sequence or evidence. Distinguish fixed facts from intentional design choices; if the learner may choose an example or an approach, say so explicitly rather than expecting them to infer an unspecified implementation. Ask a bounded task that matches the supplied scenario; never paste a capability statement into an unrelated generic story. Every requirement in the rubric must be visible in the question; do not grade unstated assumptions or add unrelated decisions, personal history or edge cases. Before returning the question, check that it can be answered from the prompt alone and repair missing context without revealing the solution. For D1, keep the learner workspace starter empty; put essential scenario or code-reading material in the prompt without supplying the key explanation, endpoint update, worked result or a leading solution hint. Do not interpret an objective's implementation verb as a D1 implementation requirement. Preserve legitimate prior context and assistance attribution without presenting supplied steps as fresh independent understanding. Use probeRecords: build the question around open gaps inside the eligible scope with the facet they blocked as the apex; only a gap marked reuseInScopeDefinitions may add its exact facet id to scopeDefinitions, and existing stable scope definitions are copied exactly; do not spend the question on established facets unless the scope requires them; re-ask what a closed gap blocked. The prompt is read by the learner: never mention the scheduled scope, objective IDs, tiers, depth, scheduling or that this is a formal visit; ask the question in plain language. Keep it minimal: write the smallest self-contained diagnostic that exercises the objective, with one main problem and at most one or two directly connected follow-ups. Include only the essential facts, not pasted project context or a full-project audit. For code review, include the actual code under review, including any required helper and its authorization semantics; a prose proposal supports design review only. Prefer short snippets, traces or evidence, and never turn an objective's scope verbs into a D1 implementation task. The visible task and rubric must match, without leaking the solution. An honestly integrative objective may stay integrative on a small feature. A narrow example never establishes unrelated facets or mastery. " +
   QUESTION_DESIGN_GUIDANCE;
 const QUESTION_PACING_GUIDANCE =
-  "Include estimatedSolveSeconds: a finite number from 30 to 900 estimating typical prepared learner time for the whole bounded question, including reading, reasoning, expected tutoring exchanges and any coding/testing. Exclude network/model queue waiting. This is game pacing metadata, not a grade, mastery claim, door HP or instruction to change difficulty. The game applies its own slower-player margin and safety bounds.";
+  SEGMENT_GENERATION_GUIDANCE +
+  " The game applies its own slower-player margin and safety bounds.";
 const QUESTION_RUNTIME_SUPPORT = {
   scripts: ["python", "typescript"],
   react:
@@ -383,6 +401,8 @@ export function prepareNextQuestion(g: Game, r: Roadmap) {
     status().mode !== "claude-cli" ||
     g.status !== "playing" ||
     study.preparedQuestion ||
+    // The next terminal continues the open question; nothing new is needed.
+    openThread(g) ||
     preparing.has(study) ||
     (preparationBackoff.get(study)?.retryAt ?? 0) > Date.now() ||
     study.assessments.some((a) => a.status === "pending") ||
@@ -646,6 +666,8 @@ export function presentProblem(g: Game, e: Encounter, r?: Roadmap) {
   );
   e.problemPresentedSequence = ev.seq;
   if (e.problemPresentedAt === undefined) e.problemPresentedAt = Date.now();
+  // The question the human now sees is theirs until finished, wherever they go.
+  startThread(g, e);
   e.history.push({
     seq: ev.seq,
     author: "generator",
@@ -978,6 +1000,8 @@ export function retryTutorRequest(
           )
         : undefined;
       checkSnapshot();
+      // Only the terminal opened last may finish the continued question's part.
+      if (dialogue && e.thread && !isActiveVisit(g, e)) answer.complete = false;
       if (dialogue && answer.complete === true && !r)
         throw Error(
           "Reconnect this saved conversation with its curriculum before awarding access",
@@ -1061,7 +1085,25 @@ export function retryTutorRequest(
           dialogueRequestId: job.id,
         };
         e.submissions.push(submission);
+        // The same rule engine.complete applies before handing the human a key.
+        const human = g.survivors.find((a) => a.id === "human");
+        const keyable =
+          !e.studyOnly &&
+          !!human?.alive &&
+          !human.escaped &&
+          g.status !== "dead" &&
+          g.status !== "escaped";
         applyCompletion(g, e, r!, submission, verdict);
+        // Same synchronous step as the key: one snapshot holds both or neither.
+        if (e.thread && (e.state as string) === "consumed") {
+          const finished = completeSegment(g, e, {
+            keyGranted: keyable,
+            summary: answer.segmentSummary,
+          });
+          if (finished)
+            for (const visit of threadEncounters(g, finished))
+              void assess(g, visit, r!);
+        }
         if (topicUpdates.length)
           recordTopicAssessments(g, e, topicUpdates, {
             requestId: job.id,
@@ -1300,6 +1342,7 @@ export async function send(
               responseFormat: TERMINAL_DIALOGUE_FORMAT,
               instruction: TERMINAL_DIALOGUE_INSTRUCTION,
               probe: encounterProbeContract(e, problem),
+              ...(e.thread ? { segment: segmentPayload(g, e) } : {}),
               ...(g.study.profile === "live" && r
                 ? {
                     topicAssessmentContext: topicAssessmentContext(

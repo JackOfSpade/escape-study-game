@@ -10,6 +10,14 @@ import { simulationActive } from "./simulation-state";
 import { spawnGrace } from "./study-pacing";
 import { terminalChannel, submissionView } from "./terminal-view";
 import { unfinishedLastQuestion } from "./final-question";
+import {
+  bindThread,
+  carriedUnanswered,
+  carriedVisits,
+  isInactiveVisit,
+  resendableRequest,
+  segmentCount,
+} from "./question-thread";
 import { encounterGaps, probeSummary } from "./knowledge-probe";
 import { unfinishedEarlierVisits } from "./room-questions";
 import { setTopicEnabled } from "./topic-spawn";
@@ -306,6 +314,9 @@ function persistLook() {
   if (savedLook) writeSavedLook(savedLook);
 }
 window.addEventListener("pagehide", persistLook);
+// A closing tab gets a full save: its synchronous local copy lands even when
+// the IndexedDB write cannot finish before the page goes away.
+window.addEventListener("pagehide", () => void persist());
 canvas3d.addEventListener("webglcontextlost", (event) => {
   event.preventDefault();
   if (firstPersonView) useClassicFallback();
@@ -1290,9 +1301,31 @@ function placeTerminal(inStudy: boolean) {
     terminalHome = undefined;
   }
 }
+/** Continue the unfinished question at the terminal being opened, and resend
+ * a turn a reload or relay restart cut off. Saved at once, so the binding and
+ * the resend survive the next crash too. */
+function continueThread(e: Encounter, resend = true) {
+  const bound = bindThread(game, e);
+  if (bound) {
+    const draft = carriedUnanswered(game, e);
+    if (draft) e.chatDraft = draft;
+    // Resend only over a live connection, so the one automatic retry is not spent offline.
+    const job = resend ? resendableRequest(e) : undefined;
+    if (job) {
+      job.resent = true;
+      void retryTutorRequest(game, e, job.id, roadmap).then(() => {
+        persist();
+        if (active === e.id) renderTerminal();
+      });
+    }
+    void persist();
+  }
+  return bound;
+}
 /** Opens an encounter in the study view's terminal. It has no physical station. */
 function openStudyTerminal(e: Encounter) {
   if (active && active !== e.id) closeTerminal();
+  continueThread(e);
   lastQuestion = e.id;
   game.lastStudyEncounter = e.id;
   active = e.id;
@@ -1302,6 +1335,7 @@ function openStudyTerminal(e: Encounter) {
 /** After death the last tutor question stays answerable; no station is
  * claimed and engine rewards skip the dead human. */
 function openFinalQuestion(e: Encounter) {
+  continueThread(e);
   lastQuestion = e.id;
   game.lastStudyEncounter = e.id;
   $("#start-card").hidden = true;
@@ -1458,9 +1492,11 @@ async function interact() {
   else void recheckConnection();
   if (active !== e.id) return;
   if (connectionLocked(e)) {
+    continueThread(e, false);
     showEmbeddedTerminal(e);
     return;
   }
+  continueThread(e);
   const preparing = startConnectedQuestion(e);
   showEmbeddedTerminal(e);
   await preparing;
@@ -1808,6 +1844,17 @@ function renderTerminal(force = false) {
   if (e.problem?.contract.practice)
     $("#terminal-provenance").textContent +=
       " · Variety practice on another topic of this tier: knowledge is probed and recorded, but this is not the scheduled visit";
+  if (e.thread && e.problem) {
+    const count = segmentCount(e.problem);
+    const goal = e.problem.segments?.[e.thread.segment]?.goal;
+    $("#terminal-provenance").textContent += isInactiveVisit(game, e)
+      ? " · This question continues at the terminal you opened most recently; this one is read-only history."
+      : count > 1
+        ? ` · Part ${e.thread.segment + 1} of ${count}${goal ? `: ${goal.replace(/[.!?]+$/, "")}` : ""}. Finishing this part earns a key; the next terminal continues the question.`
+        : carriedVisits(game, e).length
+          ? " · Continued question: your earlier conversation and progress are kept."
+          : "";
+  }
   const earlier = unfinishedEarlierVisits(game, e);
   if (earlier.runs)
     $("#terminal-provenance").textContent +=
@@ -2104,7 +2151,21 @@ function renderTerminal(force = false) {
       };
   }
   const messages = e[tab];
+  const carried = tab === "tutor" ? carriedVisits(game, e) : [];
+  const carriedHtml = carried
+    .map(
+      (v) =>
+        `<div class="message system carried"><strong>Earlier visit · part ${v.segment + 1}${v.completed ? " · completed" : ""}</strong></div>` +
+        v.messages
+          .map(
+            (m) =>
+              `<div class="message ${m.kind} carried"><strong>${escape(game.survivors.find((a) => a.id === m.author)?.name ?? m.author)}</strong><div class="message-body">${markdownToHtml(m.text)}</div></div>`,
+          )
+          .join(""),
+    )
+    .join("");
   const html =
+    carriedHtml +
     messages
       .map(
         (m) =>
