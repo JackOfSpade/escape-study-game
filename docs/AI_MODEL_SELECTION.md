@@ -242,7 +242,7 @@ Recommendation: keep every call offline for now. No call has a measured quality 
 - `complete`: Opus low scored above the Sonnet plateau (+0.67); the user chose the strict knee, Sonnet high. Re-check it with real graded submissions.
 - `generate`: the downstream check (tutor and assess on questions generated at the recommended setting) has not been run.
 - All results are on synthetic cases; re-check the recommended settings against real captured prompts once the replay store holds enough.
-- Pending prompt changes from the segmented-questions work (PR #35) change `generate` and `tutor`, a re-test trigger for both.
+- The segmented-questions work (PR #35, merged 2026-11-11) changed the `generate`, `tutor` and `assess` prompts after these ladders ran, so the applied knees for all three need a regression re-check on rebuilt cases, including segmented ones.
 - The cost proxy is the CLI's `total_cost_usd` under a subscription; it is useful for ordering settings, not for an invoice.
 
 ## Log
