@@ -81,15 +81,15 @@ export const TASK_PROFILES = Object.freeze({
     timeoutMs: 45_000,
     stableKeys: ["instruction"],
   },
-  "design-run": { ...authoring(), stableKeys: [] },
+  "design-run": { ...authoring("medium"), model: "sonnet", stableKeys: [] },
 });
-/** The content batch alone gained from more effort; xhigh added nothing. */
+/** No payload overrides remain: every stage of a task runs its profile's model
+ * and effort. The design-run content-batch high override was removed because
+ * the 2026-11-11 ladder ran every stage at Sonnet medium with no quality loss. */
 export function taskProfile(operation, payload) {
   const profile = TASK_PROFILES[operation];
   if (!profile) throw Error("Unknown AI task");
-  return operation === "design-run" && payload?.phase === "content-batch"
-    ? { ...profile, effort: "high" }
-    : profile;
+  return profile;
 }
 
 /** Holds the teaching behaviour of the /learn skill without needing it loaded,

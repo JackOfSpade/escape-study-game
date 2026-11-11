@@ -166,12 +166,12 @@ test("each task runs its chosen model and effort, latest aliases only", () => {
       assess: "haiku/high",
       generate: "sonnet/high",
       "npc-chatter": "haiku/high",
-      "design-run": "opus/medium",
+      "design-run": "sonnet/medium",
     },
   );
   assert.equal(
     taskProfile("design-run", { phase: "content-batch" }).effort,
-    "high",
+    "medium",
   );
 });
 
@@ -852,8 +852,14 @@ test("a session namespace gives each arm its own design conversation", async () 
   const again = [];
   const resumed = gateway(
     [
-      { model: "claude-opus-5-5", result: resultEvent({ result: '{"ok":1}' }) },
-      { model: "claude-opus-5-5", result: resultEvent({ result: '{"ok":2}' }) },
+      {
+        model: "claude-sonnet-5-5",
+        result: resultEvent({ result: '{"ok":1}' }),
+      },
+      {
+        model: "claude-sonnet-5-5",
+        result: resultEvent({ result: '{"ok":2}' }),
+      },
     ],
     again,
     { sessionNamespace: "arm-a" },
@@ -914,7 +920,7 @@ test("replay capture keeps 24 live samples but a whole design conversation", asy
   assert.equal(sampleNames(store).length, 24);
   const design = gateway(
     Array.from({ length: 30 }, () => ({
-      model: "claude-opus-5-5",
+      model: "claude-sonnet-5-5",
       result: resultEvent({ result: '{"ok":1}' }),
     })),
     [],
