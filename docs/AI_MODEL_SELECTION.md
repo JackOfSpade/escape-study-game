@@ -59,13 +59,13 @@ Results are tied to model versions, so record the resolved model id with every r
 
 ## Model versions tested
 
-| Family alias | Resolved model id | Date measured | Where measured |
-| ------------ | ----------------- | ------------- | -------------- |
-| `haiku`      | none recorded     | 2026-11-10    | no measurement |
-| `sonnet`     | none recorded     | 2026-11-10    | no measurement |
-| `opus`       | none recorded     | 2026-11-10    | no measurement |
+| Family alias | Resolved model id   | Date measured | Where measured                   |
+| ------------ | ------------------- | ------------- | -------------------------------- |
+| `haiku`      | `claude-haiku-5-5`  | 2026-11-11    | every result in Measured results |
+| `sonnet`     | `claude-sonnet-5-5` | 2026-11-11    | every result in Measured results |
+| `opus`       | `claude-opus-5-5`   | 2026-11-11    | every result in Measured results |
 
-As of 2026-11-10 nothing has been measured. The table stays empty until the tooling below produces results; every row copied here must name the resolved id the CLI reported, not the alias alone.
+Every row copied here must name the resolved id the CLI reported, not the alias alone.
 
 ## How to measure
 
@@ -75,7 +75,10 @@ As of 2026-11-10 nothing has been measured. The table stays empty until the tool
 - The gateway itself is reusable for ladder runs: `buildPrompt(operation, payload)` and `validateAnswer(job, answer)` are exported, so a runner can replay a captured payload through the real system prompt, the real schema and the real validator.
 - `tests/fixtures/run-designs/` holds synthetic design replies used by relay tests. They establish orchestration, not live model quality, and are not measurement data.
 - **Per-call usage log (built 2026-11-10).** The bridge service writes one row per CLI invocation, correction turns and session retries included, to `.local/bridge-service/claude-usage.jsonl` (owner-only, rotated to `.1` above 5 MB). A row holds the operation, `phase`, `conversationTurn` (1 = NPC first line, 2+ = reply), `attempt` (0 first try, 1 correction), alias, effort, resolved model id, `costUsd`, input/output/cache tokens, CLI turns, wall and API duration, `firstTextMs` for streamed calls, and `outcome` (`accepted`, `rejected`, `schema-rejected`, `timeout`, or the error code such as `usage-limit`). Missing numbers are `null`. It never records prompt, reply, validator text, stderr or request ids. `npm run ai:usage` (`scripts/ai-usage-report.mjs`, `--json` for machine output) summarizes it per operation, phase, first line or reply, setting and model: calls, first-try accept rate, corrections, failures, total and mean cost, mean tokens, p50/p95 duration and p95 first-text time. Run the game normally for a while before reading it; the means become the measured cost order for each ladder.
-- No captured production prompt set, no blind judging protocol and no NPC latency harness exist.
+- **Ladder tooling (built 2026-11-11).** The gateway takes `profileFor` (one model and effort per arm), `sessionNamespace` (separate design conversations per arm) and an opt-in `replaySamples` store (`ZOMBIE_AI_REPLAY_SAMPLES=1` on the relay keeps the newest 24 real payloads and answers per call, 200 for `design-run`, owner-only under `.local/bridge-service/ai-replay-samples/`). `npm run ai:ladder` (`scripts/ai-ladder.mjs`) replays case files or the sample store at any `model:effort` list, refuses `max` effort and models other than Haiku, Sonnet and Opus, writes rows to a durable folder as it goes and resumes. `npm run ai:judge` (`scripts/ai-judge.mjs`) scores every arm blind against a reference arm with DeepSeek Flash through `offload complete` and prints the knee report.
+- **Case builders.** `scripts/ai-capture/build-cases.ts` (NPC-side calls), `build-study-cases.ts` (`generate`, `tutor`, `assess`), `build-roadmap-cases.ts` and `build-review-cases.mjs` (critic cases with planted defects from real generator lines) call the game's own payload builders with no network; `scripts/ai-capture/design-arm.ts` runs the whole designer pipeline at one setting (`production` keeps each stage's real profile).
+- **Browser capture** (`npm run ai:capture`, `tests/ai-capture/`) plays the real game against the relay with a simulated learner. It works for one question at a time but proved unreliable at scale, so the case builders are the main source.
+- No NPC latency harness that includes the critic pass and Kokoro start exists yet; reply latency so far is the model call only.
 
 ### Tooling to build first, in priority order
 
@@ -93,7 +96,39 @@ Every result row, whatever tool produced it, is copied into this document with t
 3. Record the new resolved model id and date in the versions table and the results rows.
 4. For live NPC replies, re-measure p95 time to first audible word first; a newer model may change the latency ordering even if quality is unchanged.
 
-## Results by call
+## Measured results (2026-11-11)
+
+Measured on `claude-haiku-5-5`, `claude-sonnet-5-5` and `claude-opus-5-5`. Cases are synthetic but built by the game's own payload builders on state seeded the way the unit tests seed it (`scripts/ai-capture/build-cases.ts`, `build-study-cases.ts`, `build-roadmap-cases.ts`, `build-review-cases.mjs`), 12 cases per call unless noted. Each setting ran through `scripts/ai-ladder.mjs` with the real prompts and validators. Quality is a blind pairwise score from `scripts/ai-judge.mjs` (DeepSeek Flash, hashed A/B order, the call's own instructions as the rubric): the mean difference on a 1-10 scale against the production setting's first run. The noise floor is the production setting's second run scored the same way. Costs are per call at list price as the CLI reports them; a setting's first run pays the prompt-cache write, so the cost order uses warm-cache costs. Raw rows: `~/Library/Application Support/zombie-escape-study-game/ai-test-runs/<run>/results.jsonl` and `judgments.jsonl`.
+
+The recommended settings were applied to `TASK_PROFILES` on 2026-11-11, except `design-run` (still measuring) and `reconcile-roadmap` (blocked). How the knee was applied: climb in warm-cost order; a setting S is the knee when its valid rate is within 10 points of production and neither of the next two dearer settings beats it by more than the noise floor; S is then confirmed with a second run on all cases (a failed confirmation steps up one setting).
+
+| Call                                    | Production                       | Knee (recommended)                                             | Status                                              | Evidence (delta vs production; noise floor in brackets)                                                                                                                                                                                                                                                                  | Cost per call, knee vs production |
+| --------------------------------------- | -------------------------------- | -------------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------- |
+| `generate`                              | Opus xhigh                       | **Sonnet high**                                                | Proven on synthetic cases; downstream check not run | [−1.08] Haiku low −4.05 (67% valid), medium −3.10 (75%), high −2.07 (83%); Sonnet low −1.08, medium −0.58 / −1.42, **high +0.17 / −0.50**; Opus low −0.08                                                                                                                                                                | $0.061 vs $0.31-0.61              |
+| `tutor`                                 | Sonnet medium                    | **Sonnet low**                                                 | Proven on synthetic cases                           | [+0.92] Haiku low −1.75, medium −1.00, high 0.00 / −0.83; **Sonnet low +0.33 / +0.42**; Sonnet high +0.83                                                                                                                                                                                                                | $0.02-0.06 vs $0.20               |
+| `assess`                                | Sonnet medium                    | **Haiku high**                                                 | Proven on synthetic cases                           | [−0.25] Haiku low −0.58, medium +0.33, **high +1.08 / +0.33** (9 and 7 wins of 12); Sonnet low 0.00                                                                                                                                                                                                                      | $0.006 vs $0.12                   |
+| `complete`                              | Sonnet medium                    | **Sonnet high** (strict knee; the user chose it over Opus low) | Proven on synthetic cases                           | [+0.08] Haiku low −0.58, medium −1.00, high −0.75 (9-10 losses each); Sonnet low +0.08 / −0.58 (confirmation failed); **Sonnet high +0.08 / −0.17**; Opus low +0.67 (9 wins) at $0.020                                                                                                                                   | $0.007 vs $0.008-0.010            |
+| `group`                                 | Sonnet medium                    | **Haiku high**                                                 | Proven on synthetic cases                           | [+0.67] Haiku low +0.59 (92% valid), medium +0.76 (92%), **high +2.08 / +0.35** (83% valid on the second run); Sonnet low +0.67                                                                                                                                                                                          | $0.001 vs $0.009-0.015            |
+| `materialize-work`                      | Sonnet medium                    | **Sonnet medium (keep)**                                       | Proven on synthetic cases                           | [+0.33] Haiku low −1.83 (lost all 12), medium −1.58, high −0.83; Sonnet low −0.75, high −0.17; Opus low −0.38 (92% valid)                                                                                                                                                                                                | unchanged ($0.010-0.016)          |
+| `materialize-outcome`                   | Sonnet medium                    | **Haiku low**                                                  | Proven on synthetic cases                           | [+0.25] **Haiku low +0.08 / +0.08**, medium −0.50, high −0.33; Sonnet low −0.42                                                                                                                                                                                                                                          | $0.003-0.007 vs $0.07-0.17        |
+| `review-environment`                    | Sonnet medium                    | **Haiku medium**                                               | Proven on synthetic cases                           | [−0.42] Haiku low −0.17, **medium +0.25 / −0.33**, high +0.83 / −0.08; Sonnet low −0.25                                                                                                                                                                                                                                  | $0.001 vs $0.011-0.014            |
+| `npc-chatter` (first lines and replies) | Haiku high                       | **Haiku high (keep)**                                          | Proven on synthetic cases                           | [−0.42] Haiku low −1.50, medium −1.00; Sonnet low −1.75, medium −1.08 / −1.92. Replies only: Haiku low was about 3 s faster at p95 (6.8 s vs 9.7 s, three calls at a time, model call only) but −1.83, a large quality loss the live rule does not accept                                                                | unchanged ($0.0008)               |
+| `npc-chatter-review`                    | Haiku high                       | **Haiku low**                                                  | Proven on synthetic cases (critic cases)            | 10 real production lines plus the same 10 with a planted defect (invented fact, unseen enemy, off-topic reply, false progress): every setting caught 10/10 defects. Real lines approved: Haiku low 7 and 5, medium 8, high 6 and 5, Sonnet low 4, medium 4 (no ground truth for those, so stricter is not proven better) | $0.0006 vs $0.001-0.0016          |
+| `reconcile-roadmap`                     | Opus medium                      | **None: the contract cannot be met**                           | Blocked by a design defect                          | 0 of 12 production answers and 0 of 6 Haiku low answers were valid; every model returned an empty `canonical` because the contract asks for the whole reconciled roadmap (about 430K characters a side) in one reply. Production cost $8-10 and about 20 minutes a call                                                  | —                                 |
+| `design-run`                            | Opus medium (content batch high) | Pending                                                        | In progress                                         | Full pipeline per arm (`scripts/ai-capture/design-arm.ts`). Production: seed 11 valid (42 stages, 73 min), seed 12 valid (49 stages, 86 min, $218.57). Haiku low failed both seeds ("room needs at least one authored prop" after repair). Haiku medium/high and Sonnet low/medium are queued                            | production $218.57 per level      |
+
+Findings outside model choice, all fixed except the last:
+
+- `review-environment` was failing at every setting, production included: the instructions never said `learnerWork` and `completeScope` are booleans, and the correction turn did not name the field. Fixed in `scripts/lib/ai-contracts.mjs`.
+- `materialize-outcome` was 92% invalid at production: the instructions did not say a generated `problem` is an object. Fixed in the same file.
+- The CLI reports a resumed conversation's cost as its running total, so `design-run` costs were summed about twenty-fold. `scripts/claude-gateway.mjs` now records each call's own cost (unknown after a relay restart).
+- `reconcile-roadmap` needs a contract change (return decisions and mappings, let the game assemble the Markdown) before any setting can be tested.
+
+Caveats: 12 cases per call leave a noise floor of 0.25-1.08 points, so small differences are not real; cases are synthetic, so re-check against real captured prompts (`ZOMBIE_AI_REPLAY_SAMPLES=1`) once there are enough; `generate`'s downstream check (`tutor` and `assess` on questions generated at Sonnet high) has not been run.
+
+## Original test plans (2026-11-10)
+
+The plans below were written before any measurement; the measured results above supersede their status column.
 
 Status: **Proven** means a recorded test meets the policy and no trigger applies; **Partial** means something survives but not enough to prove the setting; **Needs test** means no measurement exists. No row is Proven.
 
@@ -202,13 +237,12 @@ Recommendation: keep every call offline for now. No call has a measured quality 
 
 ## Open gaps
 
-- No measurement data exists for any call yet. The usage log now records cost, usage, resolved model and validator outcome per call, but it starts empty and holds no quality signal on its own.
-- No store of real production prompts exists per operation, so no ladder can be replayed yet. `tests/fixtures/run-designs/` is synthetic and cannot stand in.
-- No blind judging protocol, no planted-defect sets and no agreed noise-floor size in quality points.
-- `design-run` content-batch is only Partial: one conclusion, "high gained, xhigh added nothing", with no numbers, no sample size and no resolved model id.
-- `tutor` and `generate` have never been judged downstream together, so the shared cost of the pair is unknown.
-- `npc-chatter` first lines and replies share one profile, and the critic pass runs on replies with no measured latency contribution.
-- The `npc-chatter-review` call is a judge that has never been tested against planted bad lines, so a false accept rate is unknown.
+- `design-run`: ladder in progress (two seeds per arm, full pipeline).
+- `reconcile-roadmap`: untestable until its contract stops asking for the whole roadmap in one reply.
+- `complete`: Opus low scored above the Sonnet plateau (+0.67); the user chose the strict knee, Sonnet high. Re-check it with real graded submissions.
+- `generate`: the downstream check (tutor and assess on questions generated at the recommended setting) has not been run.
+- All results are on synthetic cases; re-check the recommended settings against real captured prompts once the replay store holds enough.
+- The segmented-questions work (PR #35, merged 2026-11-11) changed the `generate`, `tutor` and `assess` prompts after these ladders ran, so the applied knees for all three need a regression re-check on rebuilt cases, including segmented ones.
 - The cost proxy is the CLI's `total_cost_usd` under a subscription; it is useful for ordering settings, not for an invoice.
 
 ## Log
@@ -217,3 +251,4 @@ Recommendation: keep every call offline for now. No call has a measured quality 
 
 - 2026-11-10: document created. No measurements yet. Tooling listed in "How to measure" still to build: per-call usage log, replay-sample store and ladder runner, blind judging with planted defects, NPC latency harness.
 - 2026-11-10: per-call usage log added to the gateway (`.local/bridge-service/claude-usage.jsonl`) with `npm run ai:usage` to summarize it. Restart the relay (`npm run bridge:stop`, then start the game) to load it. Next tool: the replay-sample store and ladder runner.
+- 2026-11-11: first ladders. Tooling added (ladder runner, blind judge, case builders, design arm, replay store). Measured every call except `design-run` (in progress) and `reconcile-roadmap` (blocked by its contract); results in Measured results. Fixed two prompt bugs (`review-environment`, `materialize-outcome`) and the resumed-session cost overcount. Applied the knees to `TASK_PROFILES` the same day (the user's decision): `generate` Sonnet high, `tutor` Sonnet low, `complete` Sonnet high (the strict knee; the user chose it over Opus low), `assess` Haiku high, `group` Haiku high, `materialize-outcome` Haiku low, `review-environment` Haiku medium, `npc-chatter-review` Haiku low; `materialize-work`, `npc-chatter`, `reconcile-roadmap` and `design-run` unchanged.

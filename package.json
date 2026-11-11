@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts tests/*.test.mjs",
     "test:browser": "playwright test",
+    "ai:capture": "playwright test -c playwright.capture.config.ts",
     "import:curriculum": "node --import tsx scripts/import-curriculum.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "predev": "npm run import:curriculum",
@@ -38,6 +39,8 @@
     "eval:dialogue": "tsx scripts/evaluate-npc-dialogue.ts",
     "bridge:start": "node scripts/bridge-service.mjs start",
     "ai:usage": "node scripts/ai-usage-report.mjs",
+    "ai:ladder": "node scripts/ai-ladder.mjs",
+    "ai:judge": "node scripts/ai-judge.mjs",
     "bridge:status": "node scripts/bridge-service.mjs status",
     "bridge:stop": "node scripts/bridge-service.mjs stop"
   },

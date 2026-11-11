@@ -14,5 +14,11 @@
     "noFallthroughCasesInSwitch": true,
     "noImplicitOverride": true
   },
-  "include": ["src", "tests", "playwright.config.ts", "scripts"]
+  "include": [
+    "src",
+    "tests",
+    "playwright.config.ts",
+    "playwright.capture.config.ts",
+    "scripts"
+  ]
 }
