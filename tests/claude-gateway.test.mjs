@@ -153,6 +153,7 @@ test("each task runs its chosen model and effort, latest aliases only", () => {
         "complete",
         "assess",
         "generate",
+        "reconcile-roadmap",
         "npc-chatter",
         "design-run",
       ].map((op) => {
@@ -165,6 +166,7 @@ test("each task runs its chosen model and effort, latest aliases only", () => {
       complete: "sonnet/high",
       assess: "haiku/high",
       generate: "sonnet/high",
+      "reconcile-roadmap": "sonnet/high",
       "npc-chatter": "haiku/high",
       "design-run": "sonnet/medium",
     },
