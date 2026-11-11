@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -155,10 +161,10 @@ test("each task runs its chosen model and effort, latest aliases only", () => {
       }),
     ),
     {
-      tutor: "sonnet/medium",
-      complete: "sonnet/medium",
-      assess: "sonnet/medium",
-      generate: "opus/xhigh",
+      tutor: "sonnet/low",
+      complete: "sonnet/high",
+      assess: "haiku/high",
+      generate: "sonnet/high",
       "npc-chatter": "haiku/high",
       "design-run": "opus/medium",
     },
@@ -566,7 +572,7 @@ test("a successful call logs exactly one measured row", async () => {
   assert.equal(row.attempt, 0);
   assert.equal(row.sessionResume, null);
   assert.equal(row.alias, "sonnet");
-  assert.equal(row.effort, "medium");
+  assert.equal(row.effort, "high");
   assert.equal(row.model, "claude-sonnet-5-5");
   assert.equal(row.costUsd, 0.0123);
   assert.equal(row.inputTokens, 120);
@@ -785,5 +791,236 @@ test("a streamed call records the time to its first text", async () => {
   assert.ok(
     Number.isInteger(rows[0].firstTextMs) && rows[0].firstTextMs >= 0,
     String(rows[0].firstTextMs),
+  );
+});
+
+const sampleNames = (store, operation = "complete") =>
+  readdirSync(join(store, operation)).sort();
+const readSample = (store, operation = "complete") => {
+  const names = sampleNames(store, operation);
+  return JSON.parse(
+    readFileSync(join(store, operation, names[names.length - 1]), "utf8"),
+  );
+};
+
+test("a profile override changes the model and effort the CLI runs with", async () => {
+  const calls = [];
+  const { rows, log } = usageRows();
+  const g = gateway(
+    [{ model: "claude-opus-5-5", result: resultEvent() }],
+    calls,
+    {
+      usageLog: log,
+      profileFor: (operation, payload) => ({
+        ...taskProfile(operation, payload),
+        model: "opus",
+        effort: "xhigh",
+      }),
+    },
+  );
+  assert.deepEqual(await g.run("complete", {}), { ok: 1 });
+  assert.equal(calls[0].args[calls[0].args.indexOf("--model") + 1], "opus");
+  assert.equal(calls[0].args[calls[0].args.indexOf("--effort") + 1], "xhigh");
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].alias, "opus");
+  assert.equal(rows[0].effort, "xhigh");
+  assert.equal(rows[0].model, "claude-opus-5-5");
+});
+
+test("a session namespace gives each arm its own design conversation", async () => {
+  const sessionId = (calls) =>
+    calls[0].args[calls[0].args.indexOf("--session-id") + 1];
+  const plain = [];
+  const alpha = [];
+  const beta = [];
+  await gateway(['{"ok":1}'], plain).run("design-run", {
+    generationId: "design-n",
+  });
+  await gateway(['{"ok":1}'], alpha, { sessionNamespace: "arm-a" }).run(
+    "design-run",
+    { generationId: "design-n" },
+  );
+  await gateway(['{"ok":1}'], beta, { sessionNamespace: "arm-b" }).run(
+    "design-run",
+    { generationId: "design-n" },
+  );
+  assert.ok(plain[0].args.includes("--session-id"));
+  assert.notEqual(sessionId(alpha), sessionId(beta));
+  assert.notEqual(sessionId(alpha), sessionId(plain));
+  assert.notEqual(sessionId(beta), sessionId(plain));
+  // One namespace and design still share one conversation across stages.
+  const again = [];
+  const resumed = gateway(
+    [
+      { model: "claude-opus-5-5", result: resultEvent({ result: '{"ok":1}' }) },
+      { model: "claude-opus-5-5", result: resultEvent({ result: '{"ok":2}' }) },
+    ],
+    again,
+    { sessionNamespace: "arm-a" },
+  );
+  await resumed.run("design-run", {
+    requestId: "s1",
+    generationId: "design-n",
+  });
+  assert.ok(again[0].args.includes("--session-id"));
+  await resumed.run("design-run", {
+    requestId: "s2",
+    generationId: "design-n",
+  });
+  assert.ok(again[1].args.includes("--resume"));
+  assert.equal(
+    again[1].args[again[1].args.indexOf("--resume") + 1],
+    sessionId(alpha),
+  );
+});
+
+test("replay samples capture one private JSON per finished call", async () => {
+  const store = mkdtempSync(join(tmpdir(), "claude-replay-"));
+  const g = gateway([fullReply()], [], { replaySamples: store });
+  const payload = { requestId: "req-1", note: "value" };
+  assert.deepEqual(await g.run("complete", payload), { ok: 1 });
+  const names = sampleNames(store);
+  assert.equal(names.length, 1);
+  assert.match(
+    names[0],
+    /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d{3}Z-[a-f0-9]{8}\.json$/,
+  );
+  const file = join(store, "complete", names[0]);
+  assert.equal(statSync(file).mode & 0o777, 0o600);
+  const sample = JSON.parse(readFileSync(file, "utf8"));
+  assert.equal(sample.v, 1);
+  assert.equal(sample.at, new Date(sample.at).toISOString());
+  assert.equal(sample.operation, "complete");
+  assert.deepEqual(sample.payload, payload);
+  assert.deepEqual(sample.answer, { ok: 1 });
+  assert.equal(sample.outcome, "accepted");
+  assert.equal(sample.alias, "sonnet");
+  assert.equal(sample.effort, "high");
+  assert.equal(sample.model, "claude-sonnet-5-5");
+  assert.equal(sample.costUsd, 0.0123);
+  assert.equal(typeof sample.durationMs, "number");
+  assert.equal(sample.attempts, 1);
+});
+
+test("replay capture keeps 24 live samples but a whole design conversation", async () => {
+  const store = mkdtempSync(join(tmpdir(), "claude-replay-"));
+  const live = gateway(
+    Array.from({ length: 30 }, () => fullReply()),
+    [],
+    { replaySamples: store },
+  );
+  for (let index = 0; index < 30; index++)
+    assert.deepEqual(await live.run("complete", {}), { ok: 1 });
+  assert.equal(sampleNames(store).length, 24);
+  const design = gateway(
+    Array.from({ length: 30 }, () => ({
+      model: "claude-opus-5-5",
+      result: resultEvent({ result: '{"ok":1}' }),
+    })),
+    [],
+    { replaySamples: store },
+  );
+  for (let index = 0; index < 30; index++)
+    await design.run("design-run", {
+      requestId: `design-${index}`,
+      generationId: "design-keep",
+    });
+  assert.equal(sampleNames(store, "design-run").length, 30);
+});
+
+test("replay capture records a rejected answer as invalid", async () => {
+  const store = mkdtempSync(join(tmpdir(), "claude-replay-"));
+  const g = gateway(
+    [
+      {
+        model: "claude-sonnet-5-5",
+        result: resultEvent({ result: '{"bad":1}' }),
+      },
+      {
+        model: "claude-sonnet-5-5",
+        result: resultEvent({ result: '{"bad":2}' }),
+      },
+    ],
+    [],
+    {
+      replaySamples: store,
+      validate: () => {
+        throw Error("still wrong");
+      },
+    },
+  );
+  await assert.rejects(g.run("complete", {}), {
+    code: "CLAUDE_INVALID_ANSWER",
+  });
+  const sample = readSample(store);
+  assert.equal(sample.outcome, "invalid");
+  assert.equal(sample.answer, null);
+  assert.equal(sample.attempts, 2);
+  assert.equal(sample.costUsd, 0.0123 + 0.0123);
+});
+
+test("a broken replay store never fails a call", async () => {
+  const blocker = join(dir, "not-a-directory");
+  writeFileSync(blocker, "");
+  const warn = console.warn;
+  const warnings = [];
+  console.warn = (message) => warnings.push(message);
+  try {
+    const g = gateway([fullReply()], [], {
+      replaySamples: join(blocker, "samples"),
+    });
+    assert.deepEqual(await g.run("complete", {}), { ok: 1 });
+  } finally {
+    console.warn = warn;
+  }
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /replay sample failed/i);
+});
+
+test("a resumed conversation logs each call's own cost, not the CLI's running total", async () => {
+  const { rows, log } = usageRows();
+  const g = gateway(
+    [
+      { result: resultEvent({ total_cost_usd: 0.5 }) },
+      { result: resultEvent({ total_cost_usd: 0.8 }) },
+    ],
+    [],
+    { usageLog: log },
+  );
+  await g.run("design-run", { requestId: "a", generationId: "design-cost" });
+  await g.run("design-run", { requestId: "b", generationId: "design-cost" });
+  assert.deepEqual(
+    rows.map((row) => [row.sessionResume, row.costUsd]),
+    [
+      [false, 0.5],
+      [true, 0.30000000000000004],
+    ],
+  );
+});
+
+test("a resumed call whose earlier total is unknown records an unknown cost", async () => {
+  const { rows, log } = usageRows();
+  const fail = {
+    result: {
+      type: "result",
+      subtype: "error",
+      is_error: true,
+      result: "Session ID x is already in use.",
+    },
+  };
+  const g = gateway(
+    [fail, { result: resultEvent({ total_cost_usd: 2 }) }],
+    [],
+    {
+      usageLog: log,
+    },
+  );
+  await g.run("design-run", { generationId: "design-restarted" });
+  assert.deepEqual(
+    rows.map((row) => [row.sessionResume, row.costUsd]),
+    [
+      [false, null],
+      [true, null],
+    ],
   );
 });

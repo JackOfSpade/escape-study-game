@@ -1,10 +1,11 @@
 import { spawn as spawnChild } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import {
   accessSync,
   appendFileSync,
   constants,
   mkdirSync,
+  readdirSync,
   renameSync,
   rmSync,
   statSync,
@@ -12,14 +13,15 @@ import {
 import { homedir, tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { taskInstructions, validateAnswer } from "./lib/ai-contracts.mjs";
-import { privateDirectory } from "./lib/private-fs.mjs";
+import { privateDirectory, writePrivate } from "./lib/private-fs.mjs";
 import { designReplySchema } from "../src/run-design-schema.mjs";
 
-/** Every AI task's model and effort, chosen by blind quality scoring against
- * cost. Aliases always resolve to the latest version of each model. */
-const live = (timeoutMs = 120_000) => ({
-  model: "sonnet",
-  effort: "medium",
+/** Every AI task's model and effort: the measured quality knee from the
+ * 2026-11-11 ladders (docs/AI_MODEL_SELECTION.md, "Measured results"). Aliases
+ * always resolve to the latest version of each model. */
+const live = (timeoutMs = 120_000, model = "sonnet", effort = "medium") => ({
+  model,
+  effort,
   timeoutMs,
 });
 const authoring = (effort = "medium") => ({
@@ -29,7 +31,8 @@ const authoring = (effort = "medium") => ({
 });
 export const TASK_PROFILES = Object.freeze({
   generate: {
-    ...authoring("xhigh"),
+    ...authoring("high"),
+    model: "sonnet",
     stableKeys: [
       "curriculum",
       "generationPolicy",
@@ -38,7 +41,7 @@ export const TASK_PROFILES = Object.freeze({
     ],
   },
   tutor: {
-    ...live(),
+    ...live(120_000, "sonnet", "low"),
     stableKeys: [
       "instruction",
       "responseFormat",
@@ -47,19 +50,22 @@ export const TASK_PROFILES = Object.freeze({
       "problem",
     ],
   },
-  complete: { ...live(), stableKeys: ["problem"] },
+  complete: { ...live(120_000, "sonnet", "high"), stableKeys: ["problem"] },
   assess: {
-    ...live(5 * 60_000),
+    ...live(5 * 60_000, "haiku", "high"),
     stableKeys: ["assessmentCriteria", "curriculum", "problem"],
   },
   group: {
-    ...live(),
+    ...live(120_000, "haiku", "high"),
     stableKeys: ["instructions", "proposalFormat", "problem"],
   },
   "materialize-work": { ...live(), stableKeys: ["instruction", "problem"] },
-  "materialize-outcome": { ...live(), stableKeys: ["instruction"] },
+  "materialize-outcome": {
+    ...live(120_000, "haiku", "low"),
+    stableKeys: ["instruction"],
+  },
   "review-environment": {
-    ...live(),
+    ...live(120_000, "haiku", "medium"),
     stableKeys: ["instruction", "definition"],
   },
   "reconcile-roadmap": { ...authoring(), stableKeys: ["instruction"] },
@@ -71,7 +77,7 @@ export const TASK_PROFILES = Object.freeze({
   },
   "npc-chatter-review": {
     model: "haiku",
-    effort: "high",
+    effort: "low",
     timeoutMs: 45_000,
     stableKeys: ["instruction"],
   },
@@ -421,6 +427,47 @@ function failureOutcome(error) {
       .replace(/_/g, "-") || "error"
   );
 }
+const sumKnown = (values) => {
+  const known = values.filter(
+    (value) => typeof value === "number" && Number.isFinite(value),
+  );
+  return known.length ? known.reduce((total, value) => total + value, 0) : null;
+};
+/** A whole design conversation is worth keeping; a live call is one of many. */
+const REPLAY_KEEP = { "design-run": 200 };
+const REPLAY_KEEP_DEFAULT = 24;
+/** One private JSON per finished call, so a ladder can replay real inputs.
+ * Capture is best effort: a broken store never fails or delays a call. */
+function replaySampleSink(directory) {
+  if (!directory) return undefined;
+  let warned = false;
+  const warn = (error) => {
+    if (warned) return;
+    warned = true;
+    console.warn(
+      `Claude replay sample failed: ${error?.message ?? error ?? "unknown error"}`,
+    );
+  };
+  return (sample) => {
+    try {
+      const operation = String(sample.operation);
+      const folder = join(directory, operation);
+      const file = join(
+        folder,
+        `${sample.at.replace(/:/g, "-")}-${randomBytes(4).toString("hex")}.json`,
+      );
+      writePrivate(file, `${JSON.stringify(sample)}\n`);
+      const keep = REPLAY_KEEP[operation] ?? REPLAY_KEEP_DEFAULT;
+      const names = readdirSync(folder)
+        .filter((name) => name.endsWith(".json"))
+        .sort();
+      for (const name of names.slice(0, Math.max(0, names.length - keep)))
+        rmSync(join(folder, name), { force: true });
+    } catch (error) {
+      warn(error);
+    }
+  };
+}
 
 const CONNECTION_CACHE_MS = 2000;
 // Well under the browser's 5 s status timeout, so a slow check never reads as a dead relay.
@@ -434,13 +481,35 @@ export function createClaudeGateway({
   now = Date.now,
   usageLog,
   usageLogMaxBytes = USAGE_LOG_MAX_BYTES,
+  profileFor,
+  sessionNamespace = "",
+  replaySamples,
 } = {}) {
   mkdirSync(cwd, { recursive: true });
   const logUsage = usageSink(usageLog, usageLogMaxBytes);
+  const captureReplay = replaySampleSink(replaySamples);
+  // A ladder arm replaces only the model and effort, so taskProfile still
+  // decides timeouts and the prompt cache's stable keys.
+  const resolveProfile = profileFor ?? taskProfile;
   const waiting = [];
   const inFlight = new Map();
   const finished = new Map();
   const started = new Set();
+  // The CLI reports a resumed conversation's cost as its running total, so a
+  // call's own cost is the difference from that session's previous total.
+  const sessionTotals = new Map();
+  const ownCost = (meta, session) => {
+    if (!meta || !session) return meta;
+    const total = meta.costUsd;
+    const previous = sessionTotals.get(session.id);
+    if (typeof total === "number") sessionTotals.set(session.id, total);
+    if (!session.resume || typeof total !== "number") return meta;
+    // After a relay restart the earlier total is unknown, so is this call's cost.
+    return {
+      ...meta,
+      costUsd: previous === undefined ? null : Math.max(0, total - previous),
+    };
+  };
   let running = 0;
   const release = () => {
     running--;
@@ -594,12 +663,17 @@ export function createClaudeGateway({
       );
     });
   async function execute(operation, payload, signal, onText) {
-    const profile = taskProfile(operation, payload);
+    const profile = resolveProfile(operation, payload);
     const schema = replySchema(operation, payload);
     const { system, user } = buildPrompt(operation, payload);
     const key = conversationKey(operation, payload);
-    const id = key && sessionUuid(key);
+    const id =
+      key &&
+      sessionUuid(sessionNamespace ? `${sessionNamespace}\u0000${key}` : key);
     await slot(operation);
+    const rows = [];
+    let answered = null,
+      failure;
     try {
       const cancelled = () =>
         new ClaudeGatewayError("CLAUDE_CANCELLED", "Request cancelled", 499);
@@ -609,9 +683,8 @@ export function createClaudeGateway({
         ? payload.conversation.turn
         : null;
       const logCall = (call, meta, outcome) => {
-        if (!logUsage) return;
         const measured = meta ?? {};
-        logUsage({
+        const row = {
           v: 1,
           at: measured.at ?? new Date(now()).toISOString(),
           operation,
@@ -632,7 +705,9 @@ export function createClaudeGateway({
           apiDurationMs: measured.apiDurationMs ?? null,
           firstTextMs: measured.firstTextMs ?? null,
           outcome,
-        });
+        };
+        rows.push(row);
+        logUsage?.(row);
       };
       let prompt = user,
         problem;
@@ -657,13 +732,14 @@ export function createClaudeGateway({
               schema,
             });
             text = done.text;
-            measured = done.meta;
+            measured = ownCost(done.meta, session);
             opening = call;
             // A failed earlier session try logged its own row; this one has not.
             logged = false;
             break;
           } catch (error) {
             // This invocation's row is written before any retry is decided.
+            error.meta = ownCost(error.meta, session);
             logCall(call, error.meta, failureOutcome(error));
             logged = true;
             // Which turn a conversation is on is only remembered in memory, so
@@ -693,6 +769,7 @@ export function createClaudeGateway({
             );
           validate(job, answer);
           logCall(opening, measured, "accepted");
+          answered = answer;
           return answer;
         } catch (error) {
           problem = String(error?.message ?? error);
@@ -707,7 +784,33 @@ export function createClaudeGateway({
         "CLAUDE_INVALID_ANSWER",
         `Claude's answer failed validation: ${problem}`.slice(0, 500),
       );
+    } catch (error) {
+      failure = error;
+      throw error;
     } finally {
+      if (captureReplay) {
+        const sample = {
+          v: 1,
+          at: new Date(now()).toISOString(),
+          operation,
+          payload,
+          answer: answered,
+          outcome: answered
+            ? "accepted"
+            : failure?.code === "CLAUDE_INVALID_ANSWER"
+              ? "invalid"
+              : failure
+                ? failureOutcome(failure)
+                : "error",
+          alias: profile.model,
+          effort: profile.effort,
+          model: rows.length ? (rows[rows.length - 1].model ?? null) : null,
+          costUsd: sumKnown(rows.map((row) => row.costUsd)),
+          durationMs: sumKnown(rows.map((row) => row.durationMs)),
+          attempts: rows.length,
+        };
+        captureReplay(sample);
+      }
       release();
     }
   }

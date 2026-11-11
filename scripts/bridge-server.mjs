@@ -40,6 +40,10 @@ export async function startBridgeService(boot, options = {}) {
       options.claude ??
       createClaudeGateway({
         usageLog: join(boot.directory, "claude-usage.jsonl"),
+        // Opt-in only: a study install keeps no copies of prompts or replies.
+        ...(process.env.ZOMBIE_AI_REPLAY_SAMPLES === "1"
+          ? { replaySamples: join(boot.directory, "ai-replay-samples") }
+          : {}),
       }),
     control: {
       route(req, res) {
