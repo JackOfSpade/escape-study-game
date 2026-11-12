@@ -1,4 +1,5 @@
 import type { Actor, Game, Point } from "./model";
+import { START_SITE, sitesOf, type Site } from "./site";
 import type { StairTravel } from "./stair-travel";
 
 /** Shared by the walking motor and renderer. Three/world Y is elevation. */
@@ -25,19 +26,36 @@ function segmentLength(a: StairRoutePoint, b: StairRoutePoint) {
   return Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
 }
 
+/** The site a stored flight belongs to; the start building when unrecorded. */
+export function travelSite(
+  g: Pick<Game, "floors" | "sites">,
+  travel: Pick<StairTravel, "site">,
+): Site {
+  const sites = sitesOf(g);
+  return sites.find((site) => site.id === travel.site) ?? sites[0];
+}
+
 /**
  * The generated office route enters at its south end and exits at its north
  * end. An exterior emergency stair and gallery connect those actual doors:
  * neither the camera nor the player cuts diagonally through occupied offices.
- * Downward travel uses the same physical route in reverse.
+ * Downward travel uses the same physical route in reverse. Both ends belong to
+ * the flight's own site, so a second building keeps its own stair columns.
  */
 export function buildStairRoute(g: Game, travel: StairTravel): StairRoute {
   const down = travel.toFloor < travel.fromFloor,
     lower = g.floors[Math.min(travel.fromFloor, travel.toFloor)],
     upper = g.floors[Math.max(travel.fromFloor, travel.toFloor)],
-    boundary = lower.boundary,
-    north = Math.min(boundary?.top ?? lower.stairs.y + 1, lower.stairs.y) - 2,
-    south = Math.max(boundary?.bottom ?? upper.entry.y - 1, upper.entry.y) + 2,
+    site = travelSite(g, travel),
+    // The start site keeps its per-floor boundary; others use their own shell.
+    boundary =
+      site.id === START_SITE
+        ? lower.boundary
+        : (site.boundary ?? lower.boundary),
+    stairs = site.stairs[lower.index] ?? lower.stairs,
+    arrival = site.entry[upper.index] ?? upper.entry,
+    north = Math.min(boundary?.top ?? stairs.y + 1, stairs.y) - 2,
+    south = Math.max(boundary?.bottom ?? arrival.y - 1, arrival.y) + 2,
     east = Math.max(...(boundary?.rows.map((r) => r?.right ?? 0) ?? [42])) + 3,
     lowY = lower.index * FLOOR_HEIGHT,
     highY = upper.index * FLOOR_HEIGHT,
@@ -45,12 +63,12 @@ export function buildStairRoute(g: Game, travel: StairTravel): StairRoute {
     high = down ? travel.origin : travel.destination,
     canonical: StairRoutePoint[] = [
       { x: low.x, y: lowY, z: low.y },
-      { x: lower.stairs.x, y: lowY, z: north },
+      { x: stairs.x, y: lowY, z: north },
       { x: east, y: lowY, z: north },
       // Twenty 18 cm risers over a 7.2 m run, followed by a level gallery.
       { x: east, y: highY, z: Math.min(south - 1, north + 7.2) },
       { x: east, y: highY, z: south },
-      { x: upper.entry.x, y: highY, z: south },
+      { x: arrival.x, y: highY, z: south },
       { x: high.x, y: highY, z: high.y },
     ],
     points =

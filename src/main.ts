@@ -15,6 +15,7 @@ import {
   carriedUnanswered,
   carriedVisits,
   isInactiveVisit,
+  openThread,
   resendableRequest,
   segmentCount,
 } from "./question-thread";
@@ -65,6 +66,17 @@ import { AudioDirector } from "./audio";
 import { eligible, initialStudy, syncLearningView } from "./curriculum";
 import { doorFrame } from "./doors";
 import { displayScale } from "./display-scale";
+import {
+  endLoop,
+  epilogueForNewGame,
+  prepareCatastrophe,
+} from "./escape-prepare";
+import { escapeFrame, escapeInteract, escapeJournal } from "./escape-runtime";
+import { createEscapeState, loopReset } from "./escape-state";
+import { startTask, taskIndicator } from "./escape-tasks";
+import { taskAtStation, takeEscapeDecision } from "./escape-terminal";
+import type { VoiceGender } from "./escape-types";
+import { installPlayerChat } from "./player-chat";
 import {
   board,
   canReachStation,
@@ -135,6 +147,23 @@ import {
   spectating,
   spectatorFloors,
 } from "./spectator";
+import {
+  enterRegion,
+  exitSiteReached,
+  prefetchArea,
+  regionEdgeCrossed,
+  restampSites,
+  setAreaDesigner,
+  setAreaFactory,
+  setDesignedAreaFactory,
+  siteLoadingDue,
+  stampReadySites,
+  takeAreaSwitch,
+} from "./areas";
+import { buildDesignedArea, startAreaDesign } from "./area-design";
+import { escapeRead } from "./director";
+import { crossRegionEdges, tickParkedAreas } from "./parked-areas";
+import { readableInFront } from "./readables";
 import { renderRoadmapAdoption } from "./roadmap-adoption-ui";
 import { prepareRoadmapExport } from "./roadmap-export";
 import { presentRoadmapReview } from "./roadmap-exposure";
@@ -237,6 +266,16 @@ activateCareerFocus(
   game.study.careerFocus ??
     game.study.learner?.careerFocus ??
     "product-feature-owner",
+);
+// Areas are their own games, built from the seed alone; the roadmap stays here.
+setAreaFactory((seed) => createGame(seed, roadmap, undefined));
+// A newly reached area is designed for its place (a rocket is built as a
+// rocket); the seed-only factory above stays the fallback when design fails.
+setAreaDesigner((stub, signal) => startAreaDesign(stub, { roadmap, signal }));
+// Every entry rebuilds the area fresh from its saved design, so a reload or a
+// Restart gets the same place back rather than the office fallback.
+setDesignedAreaFactory((seed, saved) =>
+  buildDesignedArea(seed, roadmap, saved),
 );
 function latestStudyEncounter(g: Game): string | undefined {
   const saved = g.lastStudyEncounter && g.encounters[g.lastStudyEncounter];
@@ -687,8 +726,7 @@ $("#pause-toggle").onclick = () =>
   setPaused(!$<HTMLDialogElement>("#pause-menu").open);
 $("#resume-game").onclick = () => setPaused(false);
 $("#restart-game").onclick = () => void fresh($("#pause-save-status"));
-$("#generate-run").onclick = () =>
-  void fresh($("#pause-save-status"), { generate: true });
+$("#generate-run").onclick = () => void newGame($("#pause-save-status"));
 $("#save-quit").onclick = () => void saveAndQuit();
 $("#pause-menu").addEventListener("cancel", (event) => {
   event.preventDefault();
@@ -872,6 +910,23 @@ function begin() {
     void beginDesignedRun();
     return;
   }
+  void (async () => {
+    // Old saves have no escape state; the first game asks for the voice once.
+    if (!game.escape) {
+      const gender = await askGender();
+      if (!gender || game.status !== "ready") return;
+      game.escape = createEscapeState(game, { gender, seed: game.seed });
+      try {
+        await prepareCatastrophe(game);
+      } catch (error) {
+        game.notice = `${game.notice} The catastrophe could not be prepared; the offline plan stays. (${String(error)})`;
+      }
+      await persist();
+    }
+    startRun();
+  })();
+}
+function startRun() {
   document.body.classList.remove("agent-tools");
   game.status = "playing";
   game.paused = false;
@@ -928,7 +983,10 @@ function currentRunChoice(g: Game): RunChoice | undefined {
 let designingNextRun = false;
 async function fresh(
   statusLine?: HTMLElement,
-  { generate = false }: { generate?: boolean } = {},
+  {
+    generate = false,
+    gender,
+  }: { generate?: boolean; gender?: VoiceGender } = {},
 ) {
   if (saveRecoveryError) {
     if (statusLine) statusLine.textContent = saveRecoveryError;
@@ -989,10 +1047,29 @@ async function fresh(
   unsavedRestartConfirmed = false;
   runLogs.capture(previous, true);
   runLogs.record(previous, "restart");
+  // A replay is the next loop: the old loop ends and its plan carries over.
+  if (reused && previous.escape) endLoop(previous, "restarted");
   // Encounter drafts are archived; a new run never inherits a nearly completed lock.
   delete previous.study.pending;
   game = newPlayableGame(choice.seed, previous.study, choice.saved);
   game.settings = previous.settings;
+  if (!reused && gender) {
+    // Only a generated game gets escape state, and only once its catastrophe
+    // is prepared (or has fallen back to the offline plan).
+    game.escape = createEscapeState(game, { gender, seed: game.seed });
+    try {
+      await prepareCatastrophe(game);
+    } catch (error) {
+      game.notice = `${game.notice} The catastrophe could not be prepared; the offline plan stays. (${String(error)})`;
+    }
+  } else if (previous.escape) {
+    game.escape = loopReset(previous.escape);
+    // The fresh world has none of the buildings the last loop reached: stamp
+    // every place that was already built before the loop starts again.
+    restampSites(game);
+  }
+  // A restart ends any loading screen the last loop was showing.
+  hidePreparing();
   const learningNotice = !saved
     ? "New run ready. The last run's learning could not be saved."
     : assessed
@@ -1010,6 +1087,85 @@ async function fresh(
   readyRun();
   if ((await persist()) && !reused) finishRunDesign(previous.id, choice);
   return true;
+}
+/** The last loop's epilogue is read before generation and stays on screen
+ * (plain text) while the new building and its catastrophe are prepared. */
+function showEpilogue(text: string) {
+  const panel = document.getElementById("epilogue-panel");
+  const body = document.getElementById("epilogue-text");
+  if (!panel || !body) return;
+  body.textContent = text;
+  panel.hidden = false;
+  document.body.classList.add("epilogue-open");
+}
+function hideEpilogue() {
+  const panel = document.getElementById("epilogue-panel");
+  const body = document.getElementById("epilogue-text");
+  if (body) body.textContent = "";
+  if (!panel) return;
+  panel.hidden = true;
+  document.body.classList.remove("epilogue-open");
+}
+let genderPrompt: Promise<VoiceGender | undefined> | undefined;
+/** The player's voice gender, asked at a new game and once at the first run. */
+function askGender(): Promise<VoiceGender | undefined> {
+  genderPrompt ??= new Promise((resolve) => {
+    const dialog = document.querySelector<HTMLDialogElement>("#gender-dialog");
+    if (!dialog) {
+      resolve("female");
+      return;
+    }
+    let settled = false;
+    const finish = (value: VoiceGender | undefined) => {
+      if (settled) return;
+      settled = true;
+      if (dialog.open) dialog.close();
+      genderPrompt = undefined;
+      resolve(value);
+    };
+    dialog.addEventListener("cancel", (event) => {
+      // A new game needs a voice: cancelling leaves the run as it was.
+      event.preventDefault();
+      finish(undefined);
+    });
+    document
+      .getElementById("gender-man")
+      ?.addEventListener("click", () => finish("male"));
+    document
+      .getElementById("gender-woman")
+      ?.addEventListener("click", () => finish("female"));
+    if (!dialog.open) dialog.showModal();
+    document
+      .querySelector<HTMLButtonElement>("#gender-woman")
+      ?.focus({ preventScroll: true });
+  });
+  return genderPrompt;
+}
+let newGameBusy = false;
+/** New game: the last loop's epilogue, the player's voice, then a generated
+ * design whose catastrophe is sealed before Start appears. */
+async function newGame(statusLine?: HTMLElement) {
+  if (newGameBusy || saveRecoveryError) return false;
+  newGameBusy = true;
+  const before = game;
+  try {
+    let epilogue: string | undefined;
+    try {
+      epilogue = await epilogueForNewGame(game);
+    } catch {
+      epilogue = undefined;
+    }
+    if (epilogue) showEpilogue(epilogue);
+    const gender = await askGender();
+    if (!gender || game !== before) {
+      if (statusLine && !gender) statusLine.textContent = "New game cancelled.";
+      return false;
+    }
+    return await fresh(statusLine, { generate: true, gender });
+  } finally {
+    hideEpilogue();
+    newGameBusy = false;
+  }
 }
 /** The notice text stays in the DOM for assistive tech and checks, but is only
  * shown for a few seconds after it changes. Whatever was already there when a
@@ -1072,6 +1228,7 @@ function titleCardHtml(saved: SavedRunDesign) {
   return `<div class="title-card-inner"><h2 class="title-card-title" style="${style(card.title, 11)}">${escape(d.title)}</h2><div class="title-card-story" style="${style(card.story, 5)}"><p>${escape(d.premise)}</p><p>${escape(d.opening)}</p></div><button id="start">Start game ↗</button><small class="agent-only">${escape(status().detail)}</small></div>`;
 }
 function startCard() {
+  endHumanLoop(game);
   const card = $("#start-card");
   card.classList.remove("title-card");
   if (saveRecoveryError) {
@@ -1258,6 +1415,135 @@ canvas.addEventListener(
   },
   { passive: false },
 );
+/** A station by id, wherever in the building it stands. */
+function stationById(id: string) {
+  for (const floor of game.floors) {
+    const found = floor.stations.find((s) => s.id === id);
+    if (found) return found;
+  }
+  return undefined;
+}
+/** The escape task performed at a station, whatever its state (a finished one
+ * no longer answers `taskAtStation`, but its title is still needed). */
+function taskAt(stationId: string) {
+  return game.escape?.tasks.find((t) => t.stationId === stationId);
+}
+/**
+ * The unanswered encounter an escape task's station moves to next, so one
+ * station carries every segment and then the next question without closing.
+ * It clones the worked terminal's identity and clears its answer, conversation
+ * and thread binding; the thread (or a fresh question) fills it in again.
+ */
+function nextTaskEncounter(e: Encounter, segment: number): Encounter {
+  const fresh: Encounter = {
+    ...structuredClone(e),
+    id: `${e.id}-p${segment}`,
+    state: "available",
+    owner: "human",
+    revision: 0,
+    workspace: "",
+    history: [],
+    group: [],
+    tutor: [],
+    submissions: [],
+    contributors: [],
+    recentSpeakers: [],
+    npcProgress: 0,
+    loot: [],
+    chatCursor: 0,
+    chatOpen: false,
+    scroll: 0,
+    selection: [0, 0],
+  };
+  delete fresh.thread;
+  delete fresh.problem;
+  delete fresh.workspaceBase;
+  delete fresh.accepted;
+  delete fresh.generation;
+  delete fresh.pendingGeneration;
+  delete fresh.error;
+  delete fresh.problemPresentedSequence;
+  delete fresh.problemPresentedAt;
+  delete fresh.chatDraft;
+  return fresh;
+}
+/**
+ * Rebind a task's station to a fresh encounter and open it there. `continue`
+ * resumes the unfinished thread on its next segment; `next-question` asks for
+ * the next question on the same station once the thread is done. The terminal
+ * itself stays where it is and is only re-rendered.
+ */
+function bindTaskStation(
+  stationId: string,
+  old: Encounter,
+  decision: "continue" | "next-question",
+) {
+  const station = stationById(stationId);
+  if (!station) return;
+  const segment = game.study.thread?.segment ?? 0;
+  const fresh = nextTaskEncounter(old, segment);
+  game.encounters[fresh.id] = fresh;
+  station.encounter = fresh.id;
+  active = fresh.id;
+  lastQuestion = fresh.id;
+  game.lastStudyEncounter = fresh.id;
+  // The thread resumes its next segment here; when it cannot, the station asks
+  // for the next question rather than leaving a dead terminal.
+  const resumed = decision === "continue" && continueThread(fresh);
+  if (!resumed) void startConnectedQuestion(fresh);
+  showEmbeddedTerminal(fresh);
+  persist();
+}
+/**
+ * Apply what a completed segment decided for this terminal: stay for the next
+ * segment, carry on to the next question, or close with the finished task.
+ * Called from the per-frame UI pass, so it runs once per decision.
+ */
+function applyEscapeDecision() {
+  const decision = takeEscapeDecision(game);
+  if (!decision) return;
+  const a = human(game);
+  const station = a.station ? stationById(a.station) : undefined;
+  const task = station ? taskAt(station.id) : undefined;
+  const old = station ? game.encounters[station.encounter] : undefined;
+  if (!station || !task || !old || active !== old.id) return;
+  if (decision === "close") {
+    closeTerminal();
+    game.notice = `${task.title}: done.`;
+    persist();
+    return;
+  }
+  bindTaskStation(station.id, old, decision);
+}
+/** Opening a task's station starts its task; the HUD shows the counter. */
+function beginEscapeTask(stationId: string) {
+  if (!game.escape) return;
+  const task = taskAtStation(game, stationId);
+  if (!task) return;
+  startTask(task);
+  syncEscapeHud();
+}
+/**
+ * An escape station whose task is still being worked reopens on its next
+ * segment instead of reporting that the terminal is complete.
+ */
+function reopenTaskStation(stationId: string): boolean {
+  if (!game.escape) return false;
+  const station = stationById(stationId);
+  const task = station ? taskAtStation(game, station.id) : undefined;
+  const old = station ? game.encounters[station.encounter] : undefined;
+  if (!station || !old || !task) return false;
+  if (!claimStation(game, human(game), station.id)) return false;
+  startTask(task);
+  syncEscapeHud();
+  // A thread still in progress resumes; a finished one asks the next question.
+  bindTaskStation(
+    station.id,
+    old,
+    openThread(game) ? "continue" : "next-question",
+  );
+  return true;
+}
 function closeTerminal() {
   if (active) {
     const e = game.encounters[active];
@@ -1361,6 +1647,38 @@ function leaveTerminal() {
   persist();
   startCard();
 }
+/**
+ * F in an escape game: try or use the object (or door) in front of the player.
+ * The director answers with what the player learns, and may turn it into a
+ * task, a route or a place. E keeps its grip, door and terminal behaviour.
+ */
+function engage() {
+  if (!game.escape || game.status !== "playing" || game.paused) return;
+  const a = human(game);
+  const yaw = firstPersonPlaying()
+    ? firstPersonControls.yaw
+    : Math.atan2(a.heading.y, a.heading.x);
+  // Writing in front of the player (a note, sign or screen) is read first.
+  const readable = readableInFront(game, yaw);
+  if (readable) {
+    if (escapeRead(game, readable)) void persist();
+    return;
+  }
+  const target = firstPersonPlaying()
+    ? lookTarget(game, firstPersonControls.yaw)
+    : undefined;
+  const object =
+    target?.kind === "grip" || target?.kind === "door"
+      ? target.object
+      : (nearestGrip(game, a) ?? nearbyDoor(game, a));
+  if (!object) {
+    game.notice = "There is nothing within reach to try or read.";
+    return;
+  }
+  const label = (object as { label?: string }).label?.trim() || object.kind;
+  if (escapeInteract(game, { kind: "attempt", subjectId: object.id, label }))
+    void persist();
+}
 async function interact() {
   if (game.status !== "playing" || game.paused) return;
   const a = human(game);
@@ -1459,6 +1777,8 @@ async function interact() {
   }
   const e = game.encounters[st.encounter];
   if (e.state === "consumed") {
+    // An escape task's station carries on with its next segment instead.
+    if (reopenTaskStation(st.id)) return;
     game.notice =
       "This station is already complete. Find an unused station for your next question.";
     return;
@@ -1485,6 +1805,8 @@ async function interact() {
   jumpRequested = false;
   lastQuestion = e.id;
   game.lastStudyEncounter = e.id;
+  // An escape task performed at this station starts as its terminal opens.
+  beginEscapeTask(st.id);
   // A recent check is trusted and confirmed behind; an old one is confirmed
   // first, so a signed-out CLI never claims the terminal or sends a request.
   if (performance.now() - connectionCheckedAt > OPEN_CONNECTION_POLL_MS)
@@ -2712,6 +3034,8 @@ async function restoreRunBackup(file: File) {
 }
 /** WASD/arrow movement as a -1/0/1 vector (y grows downward). */
 function moveInput(held: ReadonlySet<string>) {
+  // While escorted the NPC walks the player; Space is the break-free gesture.
+  if (human(game).escortedBy) return { x: 0, y: 0 };
   return {
     x:
       Number(held.has("KeyD") || held.has("ArrowRight")) -
@@ -2776,6 +3100,11 @@ window.addEventListener("keydown", (ev) => {
   }
   if (game.status !== "playing" || game.paused || ownsKeyboard(ev.target))
     return;
+  if (ev.code === "KeyJ") {
+    journalOpen = !journalOpen;
+    syncEscapeHud();
+    return;
+  }
   if (ev.code === "Tab" && firstPersonControls.isLocked && !lookUiVisible()) {
     // Esc opens the pause menu before keyboard focus can leave captured play.
     ev.preventDefault();
@@ -2795,7 +3124,10 @@ window.addEventListener("keydown", (ev) => {
   keys.add(ev.code);
   if (ev.repeat) return;
   if (ev.code === "KeyE") void interact();
+  if (ev.code === "KeyF" && game.escape) engage();
   if (ev.code === "Space") {
+    // Escorted? Space is the break-free gesture, not a jump or a vault.
+    if (breakFree(game)) return;
     if (game.rules === "force-fields") {
       jumpRequested = true;
       return;
@@ -2906,7 +3238,64 @@ function watchReward(a: ReturnType<typeof human>) {
   if (keys > rewardWatch.keys) announceReward();
   rewardWatch.keys = keys;
 }
+let journalOpen = false;
+const endedLoops = new WeakSet<Game>();
+/** Death or escape ends the loop once, whichever path notices the status first. */
+function endHumanLoop(g: Game) {
+  if (!g.escape) return;
+  if (g.status !== "dead" && g.status !== "escaped") return;
+  if (endedLoops.has(g)) return;
+  endedLoops.add(g);
+  endLoop(g, g.status === "escaped" ? "escaped" : "died");
+}
+/** Journal panel (J, hidden by default) and the running task's indicator line. */
+function syncEscapeHud() {
+  const state = game.escape;
+  const panel = document.getElementById("journal-panel");
+  const list = document.getElementById("journal-lines");
+  if (panel) panel.hidden = !journalOpen || !state;
+  if (panel && !panel.hidden && list && state) {
+    const lines = escapeJournal(game);
+    const signature = lines.join("\n");
+    if (list.dataset.signature !== signature) {
+      list.dataset.signature = signature;
+      list.textContent = "";
+      for (const line of lines) {
+        const p = document.createElement("p");
+        p.textContent = line;
+        list.append(p);
+      }
+    }
+  }
+  const indicator = document.getElementById("task-indicator");
+  const task = state?.tasks.find((t) => t.state === "in-progress");
+  if (indicator) {
+    indicator.hidden = !task;
+    const text = task ? taskIndicator(task) : "";
+    if (indicator.textContent !== text) indicator.textContent = text;
+  }
+}
+let escortPress = { at: 0, count: 0 };
+/** Three Space presses within two seconds break free of an NPC's escort. */
+function breakFree(g: Game): boolean {
+  const a = human(g);
+  if (!a.escortedBy) return false;
+  const now = performance.now();
+  escortPress =
+    now - escortPress.at > 2000
+      ? { at: now, count: 1 }
+      : { at: now, count: escortPress.count + 1 };
+  if (escortPress.count >= 3) {
+    a.escortedBy = undefined;
+    escortPress = { at: 0, count: 0 };
+    g.notice = "You pull free of your escort.";
+    void persist();
+  }
+  return true;
+}
 function ui() {
+  applyEscapeDecision();
+  syncEscapeHud();
   setText("#npc-voice-status", npcVoices.message);
   $("#log-status").textContent =
     runLogs.error ||
@@ -3065,6 +3454,7 @@ function ui() {
   }
   if (game.status !== "playing" && running) {
     running = false;
+    endHumanLoop(game);
     audio.stop();
     preserveRunLearning(game);
     const unfinished =
@@ -3081,6 +3471,48 @@ function ui() {
       $("#start-card").hidden = true;
       syncSpectatorBar();
     } else startCard();
+  }
+}
+/** A full-screen loading overlay, shown only while something is generated. */
+type Preparing = { kind: "site" | "region"; id: string; name: string };
+let preparing: Preparing | undefined;
+function showPreparing(next: Preparing): void {
+  preparing = next;
+  const label =
+    next.kind === "site"
+      ? `Building ${next.name}…`
+      : `Travelling to ${next.name}…`;
+  const text = $("#world-loading-text");
+  if (text.textContent !== label) text.textContent = label;
+  $("#world-loading").hidden = false;
+}
+function hidePreparing(): void {
+  preparing = undefined;
+  const overlay = $("#world-loading");
+  if (!overlay.hidden) overlay.hidden = true;
+}
+/** Retry the place being prepared, then resume the paused simulation. */
+function resumeWhenPrepared(): void {
+  const asked = preparing;
+  if (!asked) return;
+  if (!game.escape) {
+    hidePreparing();
+    return;
+  }
+  if (asked.kind === "site") {
+    // A stamp is synchronous: the same frame that finishes it resumes play.
+    stampReadySites(game);
+    const due = siteLoadingDue(game);
+    if (!due || due.id !== asked.id) hidePreparing();
+    return;
+  }
+  if (enterRegion(game, asked.id) !== "entered") return;
+  hidePreparing();
+  const next = takeAreaSwitch(game);
+  if (next) {
+    if (active) closeTerminal();
+    game = next;
+    persist();
   }
 }
 const framePerformance = new FramePerformance();
@@ -3104,9 +3536,12 @@ function frame(time: number) {
     if (lookUiVisible()) firstPersonControls.release();
     firstPersonControls.turn(keys, elapsed);
   }
+  // A place being built or reached pauses the world behind a loading screen.
+  resumeWhenPrepared();
   if (
     simulationActive(game) &&
     !game.paused &&
+    !preparing &&
     !quitMenu &&
     !waitingOnEmbeddedReply()
   ) {
@@ -3133,6 +3568,39 @@ function frame(time: number) {
       simulationMs += performance.now() - stepStarted;
       steps++;
       acc -= 1 / 30;
+    }
+    // The escape director advances once per simulated frame block.
+    if (game.escape && steps > 0) {
+      escapeFrame(game, steps / 30);
+      // Ready near places join the shared floors: a stamp is safe mid-frame.
+      stampReadySites(game);
+      // Parked regions keep living, and hunters follow at the matching edges.
+      tickParkedAreas(game, steps / 30);
+      crossRegionEdges(game);
+      // A site the player reached is built before they can walk in.
+      const due = siteLoadingDue(game);
+      if (due) {
+        prefetchArea(game, due.id);
+        showPreparing({ kind: "site", id: due.id, name: due.name });
+      }
+      // Reaching the edge of the world travels to the region beyond it.
+      const region = regionEdgeCrossed(game);
+      if (region && enterRegion(game, region.id) === "preparing") {
+        showPreparing({ kind: "region", id: region.id, name: region.name });
+      }
+      // An exit site ends the loop when the human walks into it.
+      const exit = exitSiteReached(game);
+      if (exit) {
+        game.status = "escaped";
+        game.endedAt = game.time;
+      }
+    }
+    // A region switch prepared by the director swaps the active game.
+    const next = game.escape ? takeAreaSwitch(game) : undefined;
+    if (next) {
+      if (active) closeTerminal();
+      game = next;
+      persist();
     }
     // A study-only encounter has no physical station to stay near.
     if (active && game.status === "playing" && !game.studyWorkspace?.enabled) {
@@ -3316,5 +3784,12 @@ if (!restoreStudyView && spectating(game)) {
   }
 }
 resumeQuestions();
+// In-world player speech is installed once for the life of the page; the host
+// reads the current game, so restarts and imports need no re-install.
+installPlayerChat({
+  game: () => game,
+  yaw: () => firstPersonControls.yaw,
+  keyboardBusy: () => ownsKeyboard(document.activeElement),
+});
 ui();
 requestAnimationFrame(frame);

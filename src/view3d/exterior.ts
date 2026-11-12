@@ -23,7 +23,7 @@ import {
   SRGBColorSpace,
 } from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
-import type { Floor } from "../model";
+import type { BuildingFootprint, Floor } from "../model";
 import type { RunNeighborStyle, RunSurroundings } from "../setting-catalog.mjs";
 import {
   NEIGHBOR_RIM,
@@ -57,9 +57,13 @@ import {
   cityGroundRectangles,
   cityBackdrop,
   cityLayout,
+  exteriorSignature,
+  neighbourLotAllowed,
   overlapsPad,
   roadGround,
   sceneryPads,
+  shellFootprints,
+  siteFootprints,
   streetLayout,
   type SceneryPad,
 } from "./exterior-layout";
@@ -322,6 +326,12 @@ export class ExteriorDressing {
   private iceMaterial?: MeshStandardMaterial;
   private icePieces: BufferGeometry[] = [];
   private pads: SceneryPad[] = [];
+  /** Every real building footprint the outside must respect. */
+  private sites: BuildingFootprint[] = [];
+  /** Floors and shell cache key of the current build. */
+  private dressedFloor?: Floor;
+  private dressedFloors?: Floor[];
+  private siteKey = "";
   private pieces = 0;
   private fogMix = 1;
   private fogClock = 0;
@@ -403,6 +413,12 @@ export class ExteriorDressing {
     const ground = floors?.[0] ?? floor,
       city = cityLayout(ground);
     this.enabled = this.group.visible = !!city;
+    // Remember every site so fake lots can never crowd a real building, and
+    // keep a cache key that includes the shells so stamping rebuilds once.
+    this.dressedFloor = floor;
+    this.dressedFloors = floors;
+    this.sites = floors ? shellFootprints(floors) : siteFootprints(floor);
+    this.siteKey = floors ? exteriorSignature(floors) : "";
     this.applyLook(city ? ground : undefined);
     if (!city) return;
     this.updateSigns(ground);
@@ -582,6 +598,14 @@ export class ExteriorDressing {
   ) {
     const look = this.look;
     if (!look || !style) return;
+    // A fake lot never covers or crowds a real site, including stamped ones.
+    if (
+      !neighbourLotAllowed(
+        { x: lot.x, y: lot.z, w: lot.w, d: lot.d },
+        this.sites,
+      )
+    )
+      return;
     const emit = this.emitter(solid, glow),
       { rim, core } = lotCells(lot, NEIGHBOR_RIM, far ? 30 : 12);
     rim.forEach((cell, i) => {
@@ -1615,6 +1639,9 @@ export class ExteriorDressing {
     let address = 0;
     const signParts: BufferGeometry[] = [];
     const facade = (o: CityObstacle) => {
+      // A physical-city facade never grows over a real site, stamped ones too.
+      if (!neighbourLotAllowed({ x: o.x, y: o.y, w: o.w, d: o.h }, this.sites))
+        return;
       const addresses: { x: number; z: number; w: number; d: number }[] = [],
         depth = Math.min(6, o.h / 2),
         sideDepth = Math.min(6, o.w / 2),
@@ -2429,6 +2456,14 @@ export class ExteriorDressing {
     reducedMotion = false,
     view?: { x: number; y: number; z: number; exposed: boolean },
   ) {
+    // A stamped site changes the outside; the cache key includes the shells so
+    // this rebuilds exactly once, even when the city plan itself is unchanged.
+    if (
+      this.dressedFloors &&
+      this.dressedFloor &&
+      exteriorSignature(this.dressedFloors) !== this.siteKey
+    )
+      this.build(this.dressedFloor, this.dressedFloors);
     // Weather follows the viewer and fades out indoors.
     if (this.weather?.active)
       this.weather.update(

@@ -1,6 +1,7 @@
 import type { Encounter, Game, Message, Problem } from "./model";
 import { adoptQuestionPacing } from "./field-pacing";
 import { encounterKey, interruptLearningAttempt } from "./learner";
+import { onEscapeSegment } from "./escape-terminal";
 import { segmentSummary } from "../scripts/lib/question-segments.mjs";
 
 /** One part of a long question: one terminal visit, one key. */
@@ -194,9 +195,14 @@ export function completeSegment(
   }
   delete t.active;
   t.segment++;
-  if (t.segment < segmentCount(t.problem)) return undefined;
-  t.finishedAt = new Date().toISOString();
-  return t;
+  let finished: QuestionThread | undefined;
+  if (t.segment >= segmentCount(t.problem)) {
+    t.finishedAt = new Date().toISOString();
+    finished = t;
+  }
+  // An escape task worked at this station ticks one step per segment.
+  onEscapeSegment(g, e);
+  return finished;
 }
 
 /** Every terminal this thread visited that this save still holds. */

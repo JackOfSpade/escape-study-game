@@ -1,4 +1,5 @@
 import { floorSectors, inRect, type Sector } from "./floor-plan";
+import { stampedBySite } from "./building-layout";
 import { boxBounds, boxesOverlap, worldPoint } from "./furniture-geometry";
 import {
   H,
@@ -565,13 +566,19 @@ export function propWorldPose(floor: Floor, prop: ResolvedSceneProp) {
   return { ...worldPoint(prop, parent), elevation: prop.top, parent };
 }
 
-/** Validate saved anchors without regenerating geometry or undoing player movement. */
-export function sceneSaveErrors(floor: Floor): string[] {
+/** Validate saved anchors without regenerating geometry or undoing player movement.
+ * Stamped extra sites own their floor furniture; `sites` tells their prefixed
+ * ids from the start site's authored content. */
+export function sceneSaveErrors(
+  floor: Floor,
+  sites?: readonly { id: string }[],
+): string[] {
   const design = floor.design?.scene,
     scene = floor.scene,
     errors: string[] = [];
   if (!design)
-    return scene || floor.furniture.some((o) => o.appearance)
+    return scene ||
+      floor.furniture.some((o) => o.appearance && !stampedBySite(o, sites))
       ? ["Scene data has no authored blueprint"]
       : [];
   if (
@@ -641,7 +648,9 @@ export function sceneSaveErrors(floor: Floor): string[] {
   }
   for (const { room, item, id } of expectedFurniture) {
     const bindings = scene.furniture.filter((o) => o?.id === id),
-      objects = floor.furniture.filter((o) => o.id === id),
+      objects = floor.furniture.filter(
+        (o) => o.id === id && !stampedBySite(o, sites),
+      ),
       resolved = sceneKind(floor, item.kind),
       size = furnitureSpec(resolved),
       support = supportSurface({
@@ -754,7 +763,11 @@ export function sceneSaveErrors(floor: Floor): string[] {
     }
   }
   const ids = new Set(expectedFurniture.map((o) => o.id));
-  if (floor.furniture.some((o) => o.appearance && !ids.has(o.id)))
+  if (
+    floor.furniture.some(
+      (o) => o.appearance && !ids.has(o.id) && !stampedBySite(o, sites),
+    )
+  )
     errors.push("Unbound authored furniture in saved floor");
   return errors;
 }

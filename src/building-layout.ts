@@ -91,14 +91,47 @@ export function buildingRoof(f: Floor) {
   carveStairwells(f);
 }
 
+/** Ids of stamped extra sites are `${siteId}:`-prefixed, so an id alone tells
+ * the start site's own content from a stamped building's. */
+export function stampedId(id: string, sites?: readonly { id: string }[]) {
+  const colon = id.indexOf(":");
+  return colon > 0 && !!sites?.some((s) => s.id === id.slice(0, colon));
+}
+
+/** True for furniture, stations or scene props a stamped extra site owns. */
+export function stampedBySite<T extends { id: string; site?: string }>(
+  o: T,
+  sites?: readonly { id: string }[],
+) {
+  return o.site !== undefined || stampedId(o.id, sites);
+}
+
+/** True when a footprint covers tile (x, y); rows are indexed by absolute y. */
+function coversCell(boundary: BuildingFootprint, x: number, y: number) {
+  const span =
+    y >= boundary.top && y < boundary.bottom ? boundary.rows?.[y] : undefined;
+  return !!span && x >= span.left && x < span.right;
+}
+/** Footprints of the stamped extra sites standing on this floor. */
+function stampedFootprints(g: Game, floor: number) {
+  return (g.sites ?? [])
+    .filter((s) => s.boundary && s.floors?.includes(floor))
+    .map((s) => s.boundary);
+}
+
 /** Check the stored design against actual geometry. Portal cells are explicit:
- * wells occupy the two boundary-wall rows; only ground level has an outside lane. */
+ * wells occupy the two boundary-wall rows; only ground level has an outside lane.
+ * With stamped extra sites only the start site's own region is checked. */
 export function buildingLayoutErrors(g: Game): string[] {
   const first = g.floors[0]?.boundary;
   if (!first) return ["missing building boundary"];
   const expected = JSON.stringify(first);
   const errors: string[] = [];
+  const extra = g.sites ?? [];
   for (const f of g.floors) {
+    // Extra sites can add storeys above the start building's roof; those
+    // floors carry their own site's layout, not the start site's shell.
+    if (extra.length && f.index > CONFIG.floors) continue;
     if (JSON.stringify(f.boundary) !== expected) {
       errors.push(`floor ${f.index} has a different building boundary`);
       continue;
@@ -112,8 +145,11 @@ export function buildingLayoutErrors(g: Game): string[] {
       (f.stairs.x !== 22 || f.stairs.y !== first.top - 1)
     )
       errors.push(`floor ${f.index} ascending shaft is misaligned`);
+    const shells = extra.length ? stampedFootprints(g, f.index) : [];
     for (let y = 0; y < H; y++)
       for (let x = 0; x < W; x++) {
+        // A stamped site's own interior and shell are validated by its site.
+        if (shells.some((b) => coversCell(b, x, y))) continue;
         const row = first.rows[y];
         const inside = x >= row.left && x < row.right;
         const well =

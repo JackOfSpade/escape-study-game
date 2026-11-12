@@ -1,4 +1,4 @@
-import type { Floor, Point } from "../model";
+import type { BuildingFootprint, Floor, Point } from "../model";
 
 export interface StreetProp extends Point {
   kind: "car" | "streetlight" | "cone" | "debris";
@@ -13,13 +13,44 @@ export interface StreetLayout {
   props: StreetProp[];
 }
 
+/** Whether a world cell lies inside one building footprint. */
+export function footprintContains(b: BuildingFootprint, x: number, y: number) {
+  if (y < b.top || y >= b.bottom) return false;
+  const row = b.rows[Math.floor(y)];
+  return !!row && x >= row.left && x < row.right;
+}
+
+/** Every real building on one storey: the start building, then stamped sites. */
+export function siteFootprints(
+  floor: Pick<Floor, "boundary" | "shells">,
+): BuildingFootprint[] {
+  const out: BuildingFootprint[] = [];
+  if (floor.boundary) out.push(floor.boundary);
+  for (const shell of floor.shells ?? [])
+    if (shell.boundary && !out.includes(shell.boundary))
+      out.push(shell.boundary);
+  return out;
+}
+
+/** The start building's ground footprint followed by every shell stamped onto
+ * floors 0..n. A game without shells yields exactly the old single footprint. */
+export function shellFootprints(floors: readonly Floor[]): BuildingFootprint[] {
+  const out: BuildingFootprint[] = [],
+    ground = floors[0]?.boundary;
+  if (ground) out.push(ground);
+  for (const floor of floors)
+    for (const shell of floor.shells ?? [])
+      if (shell.boundary && !out.includes(shell.boundary))
+        out.push(shell.boundary);
+  return out;
+}
+
 /** The footprint is authoritative; exterior scenery never edits the physics
  * grid. The extra tile is the solid shell immediately outside the mask. */
 export function outsideBuilding(floor: Floor, x: number, y: number) {
-  const b = floor.boundary;
-  if (!b) return false;
-  const row = b.rows[Math.floor(y)];
-  return !row || y < b.top || y >= b.bottom || x < row.left || x >= row.right;
+  const sites = siteFootprints(floor);
+  if (!sites.length) return false;
+  return !sites.some((b) => footprintContains(b, x, y));
 }
 
 /** All central outside cells are reserved, including the full survivor arrival
@@ -163,6 +194,68 @@ export interface CityLayout {
   blocks: CityBlock[];
 }
 
+/** Fake lots keep clear of real buildings by this many tiles. */
+export const SITE_MARGIN = 6;
+
+export interface LotBox {
+  x: number;
+  /** Centre along the other horizontal axis; `z` is accepted too. */
+  y?: number;
+  z?: number;
+  w: number;
+  d?: number;
+  h?: number;
+}
+
+/** The tile rectangle a footprint occupies. */
+export function footprintBounds(b: BuildingFootprint) {
+  let left = Infinity,
+    right = -Infinity;
+  for (let y = b.top; y < b.bottom; y++) {
+    const row = b.rows[y];
+    if (!row) continue;
+    left = Math.min(left, row.left);
+    right = Math.max(right, row.right);
+  }
+  return { left, right, top: b.top, bottom: b.bottom };
+}
+
+/** Whether a fake lot may stand: never over a site footprint plus margin. */
+export function neighbourLotAllowed(
+  lot: LotBox,
+  sites: readonly BuildingFootprint[],
+  margin = SITE_MARGIN,
+) {
+  const cx = lot.x,
+    cz = lot.y ?? lot.z ?? 0,
+    w = lot.w,
+    d = lot.d ?? lot.h ?? w;
+  if (!(w > 0) || !(d > 0) || !Number.isFinite(cx) || !Number.isFinite(cz))
+    return false;
+  return !sites.some((b) => {
+    const f = footprintBounds(b);
+    return (
+      f.right > f.left &&
+      f.bottom > f.top &&
+      cx + w / 2 > f.left - margin &&
+      cx - w / 2 < f.right + margin &&
+      cz + d / 2 > f.top - margin &&
+      cz - d / 2 < f.bottom + margin
+    );
+  });
+}
+
+/** Everything the outside must follow, including every stamped shell, so
+ * stamping a site rebuilds the dressing exactly once. */
+export function exteriorSignature(floors: readonly Floor[]) {
+  return JSON.stringify([
+    shellFootprints(floors),
+    floors.map((f) =>
+      f.city ? [f.city.version, f.city.seed, f.city.bounds] : null,
+    ),
+  ]);
+}
+
 /** Unreachable outer districts sit wholly beyond the solid playable city.
  * A fixed silhouette budget closes rooftop sightlines without inventing
  * decorative blocks on the real invasion streets. */
@@ -210,7 +303,9 @@ export function cityBackdrop(floor: Floor): CityBlock[] {
         distant: true,
       });
     }
-  return blocks;
+  // Decorative lots never cover or crowd a real site, including stamped ones.
+  const sites = siteFootprints(floor);
+  return blocks.filter((block) => neighbourLotAllowed(block, sites));
 }
 
 /** One stable city shared by every storey. Layout is derived only from the
@@ -230,7 +325,14 @@ export function cityLayout(floor: Floor): CityLayout | undefined {
       north,
       south,
       blocks: floor.city.obstacles
-        .filter((o) => o.kind === "building")
+        .filter(
+          (o) =>
+            o.kind === "building" &&
+            neighbourLotAllowed(
+              { x: o.x, y: o.y, w: o.w, d: o.h },
+              siteFootprints(floor),
+            ),
+        )
         .map((o) => ({
           x: o.x,
           y: o.y,
@@ -290,7 +392,15 @@ export function cityLayout(floor: Floor): CityLayout | undefined {
       true,
     );
   }
-  return { left, right, north, south, blocks };
+  // Real buildings keep a clear margin; fake blocks never crowd a stamped site.
+  const sites = siteFootprints(floor);
+  return {
+    left,
+    right,
+    north,
+    south,
+    blocks: blocks.filter((block) => neighbourLotAllowed(block, sites)),
+  };
 }
 
 export interface CityGroundRectangle {
@@ -307,6 +417,7 @@ export interface CityGroundRectangle {
 export function cityGroundRectangles(floor: Floor): CityGroundRectangle[] {
   const b = floor.boundary;
   if (!b) return [];
+  if (floor.shells?.length) return multiSiteGround(floor, b);
   const minX = floor.city ? floor.city.bounds.left - 700 : -118,
     maxX = floor.city ? floor.city.bounds.right + 700 : 162,
     minZ = floor.city ? floor.city.bounds.top - 700 : -124,
@@ -343,6 +454,68 @@ export function cityGroundRectangles(floor: Floor): CityGroundRectangle[] {
     }
   }
   return rectangles;
+}
+
+/**
+ * Ground with several buildings: every footprint (the start building and each
+ * stamped shell) is cut out row by row, and consecutive rows with the same
+ * free intervals share one rectangle, so no asphalt lies under any room floor.
+ */
+function multiSiteGround(
+  floor: Floor,
+  start: NonNullable<Floor["boundary"]>,
+): CityGroundRectangle[] {
+  const prints = [start, ...(floor.shells ?? []).map((s) => s.boundary)];
+  const minX = floor.city ? floor.city.bounds.left - 700 : -118,
+    maxX = floor.city ? floor.city.bounds.right + 700 : 162,
+    minZ = floor.city ? floor.city.bounds.top - 700 : -124,
+    maxZ = floor.city ? floor.city.bounds.bottom + 700 : 156,
+    top = Math.min(...prints.map((p) => p.top)),
+    bottom = Math.max(...prints.map((p) => p.bottom)),
+    out: CityGroundRectangle[] = [
+      {
+        x: (minX + maxX) / 2,
+        z: (minZ + top) / 2,
+        w: maxX - minX,
+        d: top - minZ,
+      },
+      {
+        x: (minX + maxX) / 2,
+        z: (bottom + maxZ) / 2,
+        w: maxX - minX,
+        d: maxZ - bottom,
+      },
+    ];
+  const free = (y: number) => {
+    const cuts = prints
+      .filter((p) => y >= p.top && y < p.bottom && p.rows[y])
+      .map((p) => [p.rows[y].left, p.rows[y].right] as const)
+      .sort((a, c) => a[0] - c[0]);
+    const spans: [number, number][] = [];
+    let x = minX;
+    for (const [l, r] of cuts) {
+      if (l > x) spans.push([x, l]);
+      x = Math.max(x, r);
+    }
+    if (x < maxX) spans.push([x, maxX]);
+    return spans;
+  };
+  let y = top;
+  while (y < bottom) {
+    const spans = free(y),
+      key = JSON.stringify(spans);
+    let end = y + 1;
+    while (end < bottom && JSON.stringify(free(end)) === key) end++;
+    for (const [from, to] of spans)
+      out.push({
+        x: (from + to) / 2,
+        z: (y + end) / 2,
+        w: to - from,
+        d: end - y,
+      });
+    y = end;
+  }
+  return out;
 }
 
 /** Grounds that carry streets, lamp posts and parked cars. Every other ground
@@ -406,7 +579,14 @@ export function sceneryPads(
     seed = floor.city?.seed ?? 1 + b.top * 31 + b.bottom,
     lots: Lot[] = floor.city
       ? floor.city.obstacles
-          .filter((o) => o.kind === "building")
+          .filter(
+            (o) =>
+              o.kind === "building" &&
+              neighbourLotAllowed(
+                { x: o.x, y: o.y, w: o.w, d: o.h },
+                siteFootprints(floor),
+              ),
+          )
           .map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h }))
       : (cityLayout(floor)?.blocks ?? [])
           .filter((blk) => !blk.distant)

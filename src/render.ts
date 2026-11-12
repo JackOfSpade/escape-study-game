@@ -10,12 +10,13 @@ import {
   CONFIG,
   HELIPAD,
   distance,
+  type BuildingFootprint,
+  type Floor,
   type Furniture,
   type Game,
-  H,
   type Point,
-  W,
 } from "./model";
+import { floorCols, floorRows } from "./site";
 import { BODY_RADIUS } from "./physics";
 import { wall } from "./spatial";
 import {
@@ -55,6 +56,9 @@ const tileMemory = new WeakMap<
     masks: Map<number, Uint8Array>;
     outside: Map<number, Set<string>>;
     length: number;
+    /** Raster size of the floor sampled last; a grown floor re-samples. */
+    cols: number;
+    rows: number;
   }
 >();
 /** Sample sight independently of canvas drawing, including between minimap draws. */
@@ -62,9 +66,17 @@ export function rememberVisibleTiles(g: Game) {
   if (spectating(g)) return;
   const a = human(g),
     floor = g.floors[a.floor],
+    cols = floorCols(floor),
+    rows = floorRows(floor),
     radius = sightRadius(floor);
   let memory = tileMemory.get(a);
-  if (!memory || memory.source !== a.seen || memory.length !== a.seen.length) {
+  if (
+    !memory ||
+    memory.source !== a.seen ||
+    memory.length !== a.seen.length ||
+    memory.cols !== cols ||
+    memory.rows !== rows
+  ) {
     const masks = new Map<number, Uint8Array>();
     const outside = new Map<number, Set<string>>();
     for (const id of a.seen) {
@@ -72,31 +84,41 @@ export function rememberVisibleTiles(g: Game) {
       if (!m) continue;
       const f = Number(m[1]),
         tx = Number(m[2]),
-        ty = Number(m[3]);
-      if (tx < 0 || tx >= W || ty < 0 || ty >= H) {
+        ty = Number(m[3]),
+        other = g.floors[f] ?? floor,
+        otherCols = floorCols(other),
+        otherRows = floorRows(other);
+      if (tx < 0 || ty < 0 || tx >= otherCols || ty >= otherRows) {
         let tiles = outside.get(f);
         if (!tiles) outside.set(f, (tiles = new Set()));
         tiles.add(`${tx},${ty}`);
         continue;
       }
       let mask = masks.get(f);
-      if (!mask) masks.set(f, (mask = new Uint8Array(W * H)));
-      mask[ty * W + tx] = 1;
+      if (!mask) masks.set(f, (mask = new Uint8Array(otherCols * otherRows)));
+      mask[ty * otherCols + tx] = 1;
     }
-    memory = { source: a.seen, masks, outside, length: a.seen.length };
+    memory = {
+      source: a.seen,
+      masks,
+      outside,
+      length: a.seen.length,
+      cols,
+      rows,
+    };
     tileMemory.set(a, memory);
   }
   let mask = memory.masks.get(a.floor);
-  if (!mask) memory.masks.set(a.floor, (mask = new Uint8Array(W * H)));
+  if (!mask) memory.masks.set(a.floor, (mask = new Uint8Array(cols * rows)));
   const pt = { x: 0, y: 0 };
-  for (let y = 0; y < H; y++)
-    for (let x = 0; x < W; x++) {
-      if (mask[y * W + x]) continue;
+  for (let y = 0; y < rows; y++)
+    for (let x = 0; x < cols; x++) {
+      if (mask[y * cols + x]) continue;
       pt.x = x + 0.5;
       pt.y = y + 0.5;
       if (playerCanSee(floor, a, pt, radius)) {
         a.seen.push(`tile-${a.floor}-${x}-${y}`);
-        mask[y * W + x] = 1;
+        mask[y * cols + x] = 1;
       }
     }
   // Fresh runs can continue into the physical streets beyond the office grid.
@@ -108,7 +130,7 @@ export function rememberVisibleTiles(g: Game) {
     const r = radius;
     for (let y = Math.floor(a.y - r); y <= Math.floor(a.y + r); y++)
       for (let x = Math.floor(a.x - r); x <= Math.floor(a.x + r); x++) {
-        if (x >= 0 && x < W && y >= 0 && y < H) continue;
+        if (x >= 0 && x < cols && y >= 0 && y < rows) continue;
         const key = `${x},${y}`;
         if (outside.has(key)) continue;
         pt.x = x + 0.5;
@@ -172,8 +194,8 @@ export function renderMinimap(canvas: HTMLCanvasElement, g: Game) {
     mask = memory?.masks.get(a.floor),
     outside = memory?.outside.get(a.floor),
     known = (x: number, y: number) =>
-      x >= 0 && x < W && y >= 0 && y < H
-        ? !!mask?.[y * W + x]
+      x >= 0 && x < floorCols(f) && y >= 0 && y < floorRows(f)
+        ? !!mask?.[y * floorCols(f) + x]
         : !!outside?.has(`${x},${y}`),
     open = (x: number, y: number) => !wall(f, x + 0.5, y + 0.5),
     { scale, ox, oy } = camera(
@@ -189,15 +211,17 @@ export function renderMinimap(canvas: HTMLCanvasElement, g: Game) {
   ctx.translate(ox, oy);
   ctx.scale(scale, scale);
   const bounds = f.city?.bounds,
+    cols = floorCols(f),
+    rows = floorRows(f),
     x1 = Math.max(Math.floor(-ox / scale) - 1, Math.floor(bounds?.left ?? 0)),
     x2 = Math.min(
       Math.ceil((rect.width - ox) / scale) + 1,
-      Math.ceil(bounds?.right ?? W),
+      Math.ceil(bounds?.right ?? cols),
     ),
     y1 = Math.max(Math.floor(-oy / scale) - 1, Math.floor(bounds?.top ?? 0)),
     y2 = Math.min(
       Math.ceil((rect.height - oy) / scale) + 1,
-      Math.ceil(bounds?.bottom ?? H),
+      Math.ceil(bounds?.bottom ?? rows),
     );
   // Every discovered cell keeps the same brightness after the player leaves.
   // Unknown cells receive no overlay, texture, or outline.
@@ -230,6 +254,36 @@ let pointer: Point | undefined;
 /** Pointer position in canvas CSS pixels, or undefined once it leaves. */
 export function setPointer(x?: number, y?: number) {
   pointer = x === undefined || y === undefined ? undefined : { x, y };
+}
+
+export interface BuildingClipRow {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Raster rows of the 2-D building clip: the start boundary plus every
+ * stamped site footprint. Footprint rows are indexed by absolute y, so these
+ * rectangles are already in floor coordinates. */
+export function buildingClipRows(floor: Floor): BuildingClipRow[] {
+  const rows: BuildingClipRow[] = [],
+    add = (b?: BuildingFootprint) => {
+      if (!b) return;
+      for (let y = b.top - 1; y <= b.bottom; y++) {
+        const row = b.rows[Math.max(b.top, Math.min(b.bottom - 1, y))];
+        if (row)
+          rows.push({
+            x: row.left - 1,
+            y,
+            w: row.right - row.left + 2,
+            h: 1,
+          });
+      }
+    };
+  add(floor.boundary);
+  for (const shell of floor.shells ?? []) add(shell.boundary);
+  return rows;
 }
 
 export function render(
@@ -313,20 +367,23 @@ export function render(
         block.h,
       );
     }
-    // The stored office raster owns only the building and its masonry ring.
-    // Do not paint the retired grid border over the physical city streets.
+    // The stored office raster owns only the buildings and their masonry ring.
+    // Do not paint the retired grid border over the physical city streets, and
+    // keep the open ground between stamped sites unclipped.
     ctx.save();
     ctx.beginPath();
-    const b = f.boundary!;
-    for (let y = b.top - 1; y <= b.bottom; y++) {
-      const row = b.rows[Math.max(b.top, Math.min(b.bottom - 1, y))];
-      ctx.rect(row.left - 1, y, row.right - row.left + 2, 1);
-    }
-    ctx.rect(20, b.top - 2, 4, 2);
+    for (const row of buildingClipRows(f)) ctx.rect(row.x, row.y, row.w, row.h);
+    if (f.boundary) ctx.rect(20, f.boundary.top - 2, 4, 2);
     ctx.clip();
   }
   // Carpet, vinyl and wall textures are one cached image; the clip limits it to sight.
-  ctx.drawImage(terrainCanvas(f, theme, g.seed), 0, 0, W, H);
+  ctx.drawImage(
+    terrainCanvas(f, theme, g.seed),
+    0,
+    0,
+    floorCols(f),
+    floorRows(f),
+  );
   if (f.city) ctx.restore();
   ctx.globalAlpha = 1;
   drawBlood(ctx, f);
@@ -574,6 +631,30 @@ export function render(
     if (s.floor !== floorIndex || s.escaped || !visible(s)) continue;
     ctx.save();
     ctx.translate(s.x, s.y);
+    if (!s.alive && s.downAt !== undefined) {
+      // Escape redesign: fallen bodies stay in the world, drawn along the floor.
+      ctx.fillStyle = p.danger;
+      ctx.beginPath();
+      ctx.ellipse(
+        0,
+        0,
+        BODY_RADIUS * 1.35,
+        BODY_RADIUS * 0.55,
+        0,
+        0,
+        Math.PI * 2,
+      );
+      ctx.fill();
+      ctx.strokeStyle = p.ink;
+      ctx.lineWidth = 0.07;
+      ctx.beginPath();
+      ctx.arc(BODY_RADIUS * 1.1, 0, BODY_RADIUS * 0.45, 0, Math.PI * 2);
+      ctx.moveTo(-BODY_RADIUS, 0);
+      ctx.lineTo(BODY_RADIUS, 0);
+      ctx.stroke();
+      ctx.restore();
+      continue;
+    }
     ctx.fillStyle = s.alive
       ? s.id === "human"
         ? p.accent
@@ -610,7 +691,29 @@ export function render(
       spoken.push({ text: speech.text, x: s.x, y: s.y - 1.0 });
   }
   for (const z of g.zombies) {
-    if (z.floor !== floorIndex || z.hp <= 0 || !visible(z)) continue;
+    if (z.floor !== floorIndex || !visible(z)) continue;
+    if (z.hp <= 0 && z.downAt === undefined) continue;
+    if (z.hp <= 0) {
+      ctx.fillStyle = "#6f7a2c";
+      ctx.beginPath();
+      ctx.ellipse(
+        z.x,
+        z.y,
+        BODY_RADIUS * 1.35,
+        BODY_RADIUS * 0.55,
+        0,
+        0,
+        Math.PI * 2,
+      );
+      ctx.fill();
+      ctx.strokeStyle = p.ink;
+      ctx.lineWidth = 0.07;
+      ctx.beginPath();
+      ctx.moveTo(z.x - BODY_RADIUS, z.y);
+      ctx.lineTo(z.x + BODY_RADIUS, z.y);
+      ctx.stroke();
+      continue;
+    }
     ctx.fillStyle = "#96a534";
     ctx.beginPath();
     ctx.arc(z.x, z.y, BODY_RADIUS, 0, Math.PI * 2);

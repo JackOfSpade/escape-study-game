@@ -5,11 +5,10 @@ import {
   type Actor,
   type Floor,
   type Furniture,
-  H,
   type Point,
   type Station,
-  W,
 } from "./model";
+import { floorCols, floorRows } from "./site";
 import { MinHeap } from "./heap";
 import { solidDesks } from "./station-clearance";
 export function inFurniture(p: Point, f: Furniture, pad = 0) {
@@ -69,24 +68,29 @@ export function furnitureNear(
   if (!indexEpoch || pad > INDEX_MAX_PAD || !indexedFloors.has(f))
     return undefined;
   let index = furnitureIndexes.get(f);
+  const cols = floorCols(f),
+    rows = floorRows(f);
   if (
     !index ||
     index.epoch !== indexEpoch ||
     index.list !== f.furniture ||
-    index.length !== f.furniture.length
+    index.length !== f.furniture.length ||
+    index.cells.length !== cols * rows
   ) {
     // Reuse this floor's bucket arrays; only their contents change per step.
     const cells =
-      index?.cells ?? Array.from({ length: W * H }, (): Furniture[] => []);
+      index && index.cells.length === cols * rows
+        ? index.cells
+        : Array.from({ length: cols * rows }, (): Furniture[] => []);
     for (const cell of cells) cell.length = 0;
     for (const o of f.furniture) {
       const reach = (o.w + o.h) / 2 + INDEX_SLACK;
       const x1 = Math.max(0, Math.floor(o.x - reach)),
-        x2 = Math.min(W - 1, Math.floor(o.x + reach)),
+        x2 = Math.min(cols - 1, Math.floor(o.x + reach)),
         y1 = Math.max(0, Math.floor(o.y - reach)),
-        y2 = Math.min(H - 1, Math.floor(o.y + reach));
+        y2 = Math.min(rows - 1, Math.floor(o.y + reach));
       for (let y = y1; y <= y2; y++)
-        for (let x = x1; x <= x2; x++) cells[y * W + x].push(o);
+        for (let x = x1; x <= x2; x++) cells[y * cols + x].push(o);
     }
     index = {
       epoch: indexEpoch,
@@ -98,8 +102,8 @@ export function furnitureNear(
   }
   const x = Math.floor(p.x),
     y = Math.floor(p.y);
-  if (x < 0 || y < 0 || x >= W || y >= H) return undefined;
-  return index.cells[y * W + x];
+  if (x < 0 || y < 0 || x >= cols || y >= rows) return undefined;
+  return index.cells[y * cols + x];
 }
 /** Footprint of a terminal's desk, matching its first-person model. */
 export const STATION_BODY = { w: 0.98, h: 0.65 };
@@ -120,14 +124,28 @@ export function inStation(s: Point, p: Point, pad = 0) {
 export function stationSignature(f: Floor) {
   return f.stations.map((s) => `${s.x},${s.y}`).join(";");
 }
+const stampBits = new Float64Array(1),
+  stampWords = new Uint32Array(stampBits.buffer);
+function stampMix(h: number, value: number) {
+  stampBits[0] = value;
+  h = Math.imul(h ^ stampWords[0]!, 0x01000193);
+  return Math.imul(h ^ stampWords[1]!, 0x01000193);
+}
+/** The same x/y values as stationSignature, mixed into one number without
+ * allocating the per-call string that route validity checks used to build. */
+export function stationStamp(f: Floor) {
+  let h = Math.imul(2166136261 ^ f.stations.length, 0x01000193);
+  for (const s of f.stations) h = stampMix(stampMix(h, s.x), s.y);
+  return h | 0;
+}
 export function wall(f: Floor, x: number, y: number) {
   const city = cityWall(f, x, y);
   if (city !== undefined) return city;
   return (
     x < 0 ||
     y < 0 ||
-    x >= W ||
-    y >= H ||
+    x >= floorCols(f) ||
+    y >= floorRows(f) ||
     f.tiles[Math.floor(y)]?.[Math.floor(x)] !== 0
   );
 }
@@ -277,9 +295,11 @@ const routeCache = new WeakMap<Floor, PathCache>();
 const POSE = 6;
 /** Geometry snapshot compared without building strings on every query. */
 function snapshot(f: Floor) {
-  const tiles = new Uint8Array(W * H);
-  for (let y = 0; y < H; y++)
-    for (let x = 0; x < W; x++) tiles[y * W + x] = f.tiles[y]?.[x] ?? 1;
+  const cols = floorCols(f),
+    rows = floorRows(f),
+    tiles = new Uint8Array(cols * rows);
+  for (let y = 0; y < rows; y++)
+    for (let x = 0; x < cols; x++) tiles[y * cols + x] = f.tiles[y]?.[x] ?? 1;
   const poses = new Float64Array(f.furniture.length * POSE);
   f.furniture.forEach((o, i) => {
     poses.set(
@@ -306,9 +326,12 @@ function unchanged(cache: PathCache, f: Floor) {
   if (cache.city !== f.city) return false;
   if (cache.ids.length !== f.furniture.length) return false;
   if (cache.stations !== stationSignature(f)) return false;
-  for (let y = 0; y < H; y++)
-    for (let x = 0; x < W; x++)
-      if (cache.tiles[y * W + x] !== (f.tiles[y]?.[x] ?? 1)) return false;
+  const cols = floorCols(f),
+    rows = floorRows(f);
+  if (cache.tiles.length !== cols * rows) return false;
+  for (let y = 0; y < rows; y++)
+    for (let x = 0; x < cols; x++)
+      if (cache.tiles[y * cols + x] !== (f.tiles[y]?.[x] ?? 1)) return false;
   for (let i = 0; i < f.furniture.length; i++) {
     const o = f.furniture[i],
       p = cache.poses,
@@ -332,7 +355,7 @@ function unchanged(cache: PathCache, f: Floor) {
 export function path(f: Floor, a: Point, b: Point, breakable = false): Point[] {
   // This bounded grid owns indoor guidance. Public exterior recovery has its
   // own road graph; out-of-range indices must never enter a typed-array path.
-  if (!gridPoint(a) || !gridPoint(b)) return [];
+  if (!gridPoint(f, a) || !gridPoint(f, b)) return [];
   // Exact grid queries recur while a crowd waits at a barricade. Geometry is
   // authoritative, including externally loaded/edited floors; HP is not a cost.
   let cache = routeCache.get(f);
@@ -354,34 +377,38 @@ export function path(f: Floor, a: Point, b: Point, breakable = false): Point[] {
   return route.map((p) => ({ ...p }));
 }
 function furnitureCells(f: Floor) {
-  const cells = new Uint8Array(W * H);
+  const cols = floorCols(f),
+    rows = floorRows(f),
+    cells = new Uint8Array(cols * rows);
   for (const o of f.furniture) {
     const r = (o.w + o.h) / 2 + 0.22;
     for (
       let y = Math.max(0, Math.floor(o.y - r));
-      y <= Math.min(H - 1, Math.floor(o.y + r));
+      y <= Math.min(rows - 1, Math.floor(o.y + r));
       y++
     )
       for (
         let x = Math.max(0, Math.floor(o.x - r));
-        x <= Math.min(W - 1, Math.floor(o.x + r));
+        x <= Math.min(cols - 1, Math.floor(o.x + r));
         x++
       )
         if (
-          !cells[y * W + x] &&
+          !cells[y * cols + x] &&
           inFurniture({ x: x + 0.5, y: y + 0.5 }, o, 0.22)
         )
-          cells[y * W + x] = 1;
+          cells[y * cols + x] = 1;
   }
   return cells;
 }
 function deskCells(f: Floor) {
-  const cells = new Uint8Array(W * H),
+  const cols = floorCols(f),
+    rows = floorRows(f),
+    cells = new Uint8Array(cols * rows),
     desks = solidDesks(f);
-  for (let y = 0; y < H; y++)
-    for (let x = 0; x < W; x++)
+  for (let y = 0; y < rows; y++)
+    for (let x = 0; x < cols; x++)
       if (desks.some((s) => inStation(s, { x: x + 0.5, y: y + 0.5 }, 0.22)))
-        cells[y * W + x] = 1;
+        cells[y * cols + x] = 1;
   return cells;
 }
 // Dijkstra with positive furniture traversal costs: zombies prefer open alternatives, then break a physical route.
@@ -393,11 +420,13 @@ function computePath(
   furniture: Uint8Array,
   desks: Uint8Array,
 ): Point[] {
-  const start = Math.floor(a.y) * W + Math.floor(a.x),
-    end = Math.floor(b.y) * W + Math.floor(b.x);
-  const dist = new Float64Array(W * H).fill(Infinity),
-    prev = new Int32Array(W * H).fill(-1),
-    closed = new Uint8Array(W * H);
+  const cols = floorCols(f),
+    rows = floorRows(f),
+    start = Math.floor(a.y) * cols + Math.floor(a.x),
+    end = Math.floor(b.y) * cols + Math.floor(b.x);
+  const dist = new Float64Array(cols * rows).fill(Infinity),
+    prev = new Int32Array(cols * rows).fill(-1),
+    closed = new Uint8Array(cols * rows);
   dist[start] = 0;
   const heap = new MinHeap();
   heap.push(start, 0);
@@ -406,8 +435,8 @@ function computePath(
     if (closed[v]) continue;
     closed[v] = 1;
     if (v === end) break;
-    const x = v % W,
-      y = Math.floor(v / W);
+    const x = v % cols,
+      y = Math.floor(v / cols);
     for (const [dx, dy] of [
       [1, 0],
       [-1, 0],
@@ -416,9 +445,9 @@ function computePath(
     ]) {
       const xx = x + dx,
         yy = y + dy;
-      if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+      if (xx < 0 || yy < 0 || xx >= cols || yy >= rows) continue;
       if (wall(f, xx + 0.5, yy + 0.5)) continue;
-      const id = yy * W + xx;
+      const id = yy * cols + xx;
       if (closed[id]) continue;
       // A desk cannot be broken, but its own cell may be the destination.
       if (desks[id] && id !== end) continue;
@@ -435,25 +464,30 @@ function computePath(
   if (!Number.isFinite(dist[end]) || prev[end] < 0) return [];
   const out: Point[] = [];
   for (let v = end, count = 0; v !== start; v = prev[v]) {
-    if (!Number.isSafeInteger(v) || v < 0 || v >= W * H || ++count > W * H)
+    if (
+      !Number.isSafeInteger(v) ||
+      v < 0 ||
+      v >= cols * rows ||
+      ++count > cols * rows
+    )
       return [];
-    out.push({ x: (v % W) + 0.5, y: Math.floor(v / W) + 0.5 });
+    out.push({ x: (v % cols) + 0.5, y: Math.floor(v / cols) + 0.5 });
   }
   return out.reverse();
 }
-function gridPoint(p: Point) {
+function gridPoint(f: Floor, p: Point) {
   return (
     Number.isFinite(p.x) &&
     Number.isFinite(p.y) &&
     p.x >= 0 &&
     p.y >= 0 &&
-    p.x < W &&
-    p.y < H
+    p.x < floorCols(f) &&
+    p.y < floorRows(f)
   );
 }
 export function soundGain(f: Floor, a: Point, b: Point) {
   if (line(f, a, b, true)) return 1;
-  if (f.city && (!gridPoint(a) || !gridPoint(b))) return 0.15;
+  if (f.city && (!gridPoint(f, a) || !gridPoint(f, b))) return 0.15;
   const open = path(f, a, b, false);
   return open.length ? Math.max(0.25, 1 - open.length / 100) : 0.025;
 }

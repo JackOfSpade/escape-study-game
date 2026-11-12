@@ -1,4 +1,6 @@
 import { furnitureSpec, type Game, type Floor } from "./model";
+import { stampedBySite } from "./building-layout";
+import { startSite } from "./site";
 import type {
   EnvironmentManifest,
   SurfaceSlot,
@@ -204,11 +206,15 @@ export function assertDesignedEnvironment(game: Game) {
       environment.surfaceFingerprint,
     "surface fingerprint mismatch",
   );
+  // Stamped extra sites keep their own storeys and environment content; only
+  // the start site's floors belong to the accepted run design.
+  const startFloors = new Set(startSite(game).floors);
   for (const floor of game.floors)
-    requireThat(
-      same(floor.environment, floorManifest(environment, floor.index)),
-      `floor ${floor.index} manifest differs from the accepted run`,
-    );
+    if (startFloors.has(floor.index))
+      requireThat(
+        same(floor.environment, floorManifest(environment, floor.index)),
+        `floor ${floor.index} manifest differs from the accepted run`,
+      );
   for (const slot of environment.surfaces) {
     const floor = game.floors[slot.floor];
     requireThat(
@@ -257,6 +263,8 @@ export function rebindComposedObjects(game: Game) {
       p.object = structuredClone(recipe);
     }
     for (const o of floor.furniture) {
+      // A stamped extra site's custom furniture is not part of the run design.
+      if (stampedBySite(o, game.sites)) continue;
       if (o.kind !== "custom") {
         delete o.object;
         continue;

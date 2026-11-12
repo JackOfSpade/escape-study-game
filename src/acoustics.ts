@@ -1,6 +1,8 @@
 import { doorFrame } from "./doors";
+import { cityWall } from "./city-layout";
 import { worldPoint } from "./furniture-geometry";
-import { type Floor, type Point, H, W } from "./model";
+import { type Floor, type Point } from "./model";
+import { floorCols, floorRows } from "./site";
 import { inFurniture } from "./spatial";
 
 // Walking grids miss gaps narrower than a character or a grid cell. Sweep the
@@ -25,6 +27,16 @@ interface Space {
   polys: Polygon[];
 }
 const spaces = new WeakMap<Floor, Space>();
+const planIds = new WeakMap<object, number>();
+let nextPlanId = 1;
+function planId(plan: object) {
+  let id = planIds.get(plan);
+  if (id === undefined) {
+    id = nextPlanId++;
+    planIds.set(plan, id);
+  }
+  return id;
+}
 function polygons(f: Floor): Polygon[] {
   const boxes: {
     x: number;
@@ -33,14 +45,20 @@ function polygons(f: Floor): Polygon[] {
     h: number;
     angle?: number;
   }[] = [];
-  for (let y = 0; y < H; y++)
-    for (let x = 0; x < W;) {
-      if (f.tiles[y]?.[x] === 0) {
+  const cols = floorCols(f),
+    rows = floorRows(f);
+  // Walkable outdoor ground is free space even where the raster kept a legacy
+  // wall bit; inside an authored shell the tiles still decide.
+  const freeCell = (x: number, y: number) =>
+    f.tiles[y]?.[x] === 0 || cityWall(f, x + 0.5, y + 0.5) === false;
+  for (let y = 0; y < rows; y++)
+    for (let x = 0; x < cols;) {
+      if (freeCell(x, y)) {
         x++;
         continue;
       }
       const start = x++;
-      while (x < W && f.tiles[y]?.[x] !== 0) x++;
+      while (x < cols && !freeCell(x, y)) x++;
       boxes.push({ x: (start + x) / 2, y: y + 0.5, w: x - start, h: 1 });
     }
   for (const o of f.furniture) {
@@ -63,7 +81,7 @@ function polygons(f: Floor): Polygon[] {
     };
   });
 }
-function freeAt(polys: Polygon[], x: number): Interval[] {
+function freeAt(polys: Polygon[], x: number, rows: number): Interval[] {
   const blocked: Interval[] = [];
   for (const p of polys) {
     if (x < p.min - EPS || x > p.max + EPS) continue;
@@ -82,7 +100,7 @@ function freeAt(polys: Polygon[], x: number): Interval[] {
     if (ys.length)
       blocked.push([
         Math.max(0, Math.min(...ys)),
-        Math.min(H, Math.max(...ys)),
+        Math.min(rows, Math.max(...ys)),
       ]);
   }
   blocked.sort((a, b) => a[0] - b[0]);
@@ -92,17 +110,19 @@ function freeAt(polys: Polygon[], x: number): Interval[] {
     if (a > top + EPS) free.push([top, a]);
     top = Math.max(top, b);
   }
-  if (top < H - EPS) free.push([top, H]);
+  if (top < rows - EPS) free.push([top, rows]);
   return free;
 }
 function build(f: Floor, signature: string): Space {
   const polys = polygons(f),
-    xs = new Set([0, W]);
+    cols = floorCols(f),
+    rows = floorRows(f),
+    xs = new Set([0, cols]);
   const edges = polys.flatMap((p) =>
     p.points.map((a, i) => ({ a, b: p.points[(i + 1) % 4] })),
   );
   for (const p of polys)
-    for (const v of p.points) if (v.x > 0 && v.x < W) xs.add(v.x);
+    for (const v of p.points) if (v.x > 0 && v.x < cols) xs.add(v.x);
   // Axis-aligned intersections already have a vertex x-coordinate. Only
   // diagonals introduce additional critical coordinates.
   for (let i = 0; i < edges.length; i++) {
@@ -121,7 +141,7 @@ function build(f: Floor, signature: string): Space {
         u = ((c.x - a.x) * dy - (c.y - a.y) * dx) / cross;
       if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
         const x = a.x + t * dx;
-        if (x > 0 && x < W) xs.add(x);
+        if (x > 0 && x < cols) xs.add(x);
       }
     }
   }
@@ -135,7 +155,7 @@ function build(f: Floor, signature: string): Space {
   for (let i = 1; i < split.length; i++) {
     const left = split[i - 1],
       right = split[i],
-      free = freeAt(polys, (left + right) / 2),
+      free = freeAt(polys, (left + right) / 2, rows),
       ids = free.map(() => {
         const id = roots.length;
         roots.push(id);
@@ -149,9 +169,9 @@ function build(f: Floor, signature: string): Space {
         (right - left) * 0.001,
         (prev.right - prev.left) * 0.001,
       ),
-      before = freeAt(polys, left - near),
-      after = freeAt(polys, left + near),
-      boundary = freeAt(polys, left);
+      before = freeAt(polys, left - near, rows),
+      after = freeAt(polys, left + near, rows),
+      boundary = freeAt(polys, left, rows);
     for (let a = 0; a < before.length; a++)
       for (let b = 0; b < after.length; b++) {
         if (prev.ids[a] === undefined || ids[b] === undefined) continue;
@@ -179,13 +199,17 @@ export function soundConnectivity(f: Floor) {
         (o) =>
           `${o.id}/${o.x}/${o.y}/${o.w}/${o.h}/${o.angle ?? 0}/${o.open}/${o.destroyed}/${o.turning < 0}/${o.door?.latched}`,
       )
-      .join(";");
+      .join(";") +
+    // A replaced outdoor plan changes free space without touching the raster.
+    "/city:" +
+    (f.city ? `${f.index}/${planId(f.city)}` : "-");
   let space = spaces.get(f);
   if (!space || space.signature !== signature) {
     space = build(f, signature);
     spaces.set(f, space);
   }
-  const positions = new Map<string, number[]>();
+  const positions = new Map<string, number[]>(),
+    rows = floorRows(f);
   const components = (p: Point) => {
     const key = `${p.x}/${p.y}`;
     const cached = positions.get(key);
@@ -193,12 +217,12 @@ export function soundConnectivity(f: Floor) {
     const ids: number[] = [];
     for (const s of space.slabs) {
       if (p.x < s.left - EPS || p.x > s.right + EPS) continue;
-      const actual = freeAt(space.polys, p.x);
+      const actual = freeAt(space.polys, p.x, rows);
       if (!actual.some(([lo, hi]) => p.y > lo + EPS && p.y < hi - EPS))
         continue;
       const near = Math.min(1e-7, (s.right - s.left) * 0.001),
         x = Math.max(s.left + near, Math.min(s.right - near, p.x)),
-        free = freeAt(space.polys, x);
+        free = freeAt(space.polys, x, rows);
       for (let i = 0; i < free.length; i++)
         if (
           p.y > free[i][0] + EPS &&

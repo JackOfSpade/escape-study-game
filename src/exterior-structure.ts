@@ -1,5 +1,6 @@
 import { interiorHash } from "./interior-lighting";
-import { type Game, type Point } from "./model";
+import { type BuildingFootprint, type Game, type Point } from "./model";
+import { START_SITE, roofFloorOf, sitesOf, startSite, type Site } from "./site";
 import {
   buildStairRoute,
   cityStairBase,
@@ -98,6 +99,14 @@ function structureKey(g: Game) {
       f.entry,
       f.design?.brokenGuard,
     ]),
+    g.sites?.map((site) => [
+      site.id,
+      site.origin,
+      site.floors,
+      site.boundary,
+      site.stairs,
+      site.entry,
+    ]),
     !!g.floors[0]?.city,
   ]);
 }
@@ -114,22 +123,76 @@ export function exteriorStructure(g: Game): ExteriorStructure {
   return structure;
 }
 
+interface StructureBuild {
+  slabs: Slab[];
+  guards: GuardBay[];
+  columns: Map<string, Column>;
+}
+
+/** Every site's exterior stair and galleries, the start building first. */
 function buildStructure(g: Game): ExteriorStructure {
-  const slabs: Slab[] = [],
-    guards: GuardBay[] = [],
-    columns = new Map<string, Column>();
-  if (!g.floors[0]?.boundary) return { slabs, guards, columns: [] };
-  for (let level = 0; level < g.floors.length - 1; level++) {
+  const out: StructureBuild = {
+      slabs: [],
+      guards: [],
+      columns: new Map<string, Column>(),
+    },
+    start = startSite(g);
+  if (!start.boundary) return { slabs: [], guards: [], columns: [] };
+  // The start building bridges every consecutive pair of its floors; each
+  // stamped site only the storeys below its own roof, from its own markers.
+  buildSite(g, start, startLevels(g), out);
+  for (const site of g.sites ?? [])
+    buildSite(g, site, siteLevels(g, site), out);
+  return {
+    slabs: out.slabs,
+    guards: out.guards,
+    columns: [...out.columns.values()],
+  };
+}
+
+/** The start building's levels, exactly the flights it has always built. */
+function startLevels(g: Game) {
+  const levels: number[] = [];
+  for (let level = 0; level < g.floors.length - 1; level++) levels.push(level);
+  return levels;
+}
+
+/** A stamped site's flights: below its roof, between its own two markers. */
+function siteLevels(g: Game, site: Site) {
+  const levels: number[] = [],
+    roof = roofFloorOf(site);
+  for (const level of site.floors)
+    if (
+      level < roof &&
+      site.stairs[level] &&
+      site.entry[level + 1] &&
+      g.floors[level] &&
+      g.floors[level + 1]
+    )
+      levels.push(level);
+  return levels;
+}
+
+/** One site's stair slabs, guards and columns beside its own markers. */
+function buildSite(g: Game, site: Site, levels: number[], out: StructureBuild) {
+  const { slabs, guards, columns } = out;
+  for (const level of levels) {
     const floor = g.floors[level],
       next = g.floors[level + 1],
+      // A site's own markers; the start building keeps its floor fields.
+      origin = site.stairs[level] ?? floor.stairs,
+      destination = site.entry[level + 1] ?? next.entry,
       route = buildStairRoute(g, {
         fromFloor: level,
         toFloor: level + 1,
-        origin: floor.stairs,
-        destination: next.entry,
+        site: site.id,
+        origin,
+        destination,
         until: 0,
       }),
-      broken = brokenBay(g, level);
+      broken = brokenBay(g, level),
+      // Only the start site's ground storey opens onto the public court.
+      cityAccess = site.id === START_SITE && level === 0 && !!floor.city;
     for (let i = 0; i < route.points.length - 1; i++) {
       const a = route.points[i],
         b = route.points[i + 1],
@@ -194,7 +257,7 @@ function buildStructure(g: Game): ExteriorStructure {
                 !!broken &&
                 broken.segment === i &&
                 j === Math.min(broken.bay, sections - 1) &&
-                side === outerSide(g, a, ux, uy),
+                side === outerSide(site, a, ux, uy),
               corner: false,
               level,
             });
@@ -227,8 +290,8 @@ function buildStructure(g: Game): ExteriorStructure {
         for (const side of closed) {
           if (groundCourt) continue;
           // Ground-level city access is a real third opening on this landing.
-          if (level === 0 && floor.city && i === 2 && side.y < -0.5) continue;
-          const groundFlight = level === 0 && !!floor.city && i === 2,
+          if (cityAccess && i === 2 && side.y < -0.5) continue;
+          const groundFlight = cityAccess && i === 2,
             length = groundFlight ? 0.9 : 1.85,
             cx = a.x + side.x * 0.9,
             cy = a.z + side.y * 0.9 + (groundFlight ? 0.45 : 0),
@@ -257,19 +320,32 @@ function buildStructure(g: Game): ExteriorStructure {
         columns.set(id, { x, y: p.z, top });
     }
   }
-  return { slabs, guards, columns: [...columns.values()] };
 }
 
-/** The side of a gallery segment facing away from the building. */
+/** Horizontal centre of a site's footprint: (min left + max right) / 2. */
+export function footprintCentreX(b?: BuildingFootprint) {
+  let left = Infinity,
+    right = -Infinity;
+  for (const row of b?.rows ?? [])
+    if (row) {
+      left = Math.min(left, row.left);
+      right = Math.max(right, row.right);
+    }
+  return Number.isFinite(left) && Number.isFinite(right)
+    ? (left + right) / 2
+    : 22;
+}
+
+/** The side of a gallery segment facing away from its own building. */
 function outerSide(
-  g: Game,
+  site: Site,
   a: { x: number; z: number },
   ux: number,
   uy: number,
 ) {
-  const b = g.floors[0].boundary!,
-    cx = 22,
-    cy = (b.top + b.bottom) / 2;
+  const b = site.boundary,
+    cx = footprintCentreX(b),
+    cy = b ? (b.top + b.bottom) / 2 : a.z;
   return (a.x - cx) * -uy + (a.z - cy) * ux > 0 ? 1 : -1;
 }
 
@@ -299,23 +375,33 @@ export interface StairAccessPortal extends Point {
 }
 
 export function stairAccessPortals(g: Game): StairAccessPortal[] {
-  const portals: StairAccessPortal[] = g.floors.flatMap((floor, index) =>
-    floor.boundary && index < g.floors.length - 1
-      ? [
-          {
-            kind: "well" as const,
-            axis: "y" as const,
-            floor: index,
-            x: floor.stairs.x,
-            y: floor.stairs.y - 1,
-            width: 2,
-            base: index * FLOOR_HEIGHT,
-            height: 2.8,
-            direction: -1 as const,
-          },
-        ]
-      : [],
-  );
+  const portals: StairAccessPortal[] = [];
+  for (const site of sitesOf(g))
+    for (const index of site.floors) {
+      const at = site.stairs[index],
+        floor = g.floors[index];
+      // A portal exists only below this site's own roof, never on it.
+      if (
+        !at ||
+        !floor ||
+        index >= roofFloorOf(site) ||
+        index >= g.floors.length - 1
+      )
+        continue;
+      // The start building opens its well only for a real floor footprint.
+      if (site.id === START_SITE && !floor.boundary) continue;
+      portals.push({
+        kind: "well",
+        axis: "y",
+        floor: index,
+        x: at.x,
+        y: at.y - 1,
+        width: 2,
+        base: index * FLOOR_HEIGHT,
+        height: 2.8,
+        direction: -1,
+      });
+    }
   const base = cityStairBase(g);
   if (base)
     portals.push(

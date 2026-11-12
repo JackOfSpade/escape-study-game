@@ -1,6 +1,6 @@
 import type { AudioDirector } from "./audio";
 import { bridgeRequest, status } from "./bridge-client";
-import { distance, type Game } from "./model";
+import { distance, type Actor, type Game } from "./model";
 import { npcCanHearSpeech } from "./npc-hearing";
 import {
   classifyNpcSpeechAct,
@@ -25,6 +25,28 @@ import {
   clearNpcSpeechBubbles,
   showNpcSpeechBubble,
 } from "./speech-bubbles";
+import { canSee } from "./visibility";
+import {
+  conversationRequest,
+  fallbackConverseLine,
+  handleConverseAnswer,
+  nextResponder,
+  recordUtterance,
+  resolveAddressee,
+  utteranceById,
+  type ConversePayload,
+} from "./escape-conversation";
+import { npcVoiceKey } from "./voice-key";
+
+/** Lazy to keep voice-identity's module-level slot table out of a cycle. */
+async function escapeVoiceSlot(
+  identity: import("./escape-types").VoiceIdentity,
+  actorId: string,
+  seed: number,
+) {
+  const { npcVoiceSlot } = await import("./voice-identity");
+  return npcVoiceSlot(identity, actorId, seed);
+}
 
 export const NPC_VOICE_LIMITS = Object.freeze({
   requestMs: 120_000,
@@ -48,6 +70,12 @@ export interface NpcVoiceTransport extends NpcDialogueTransport {
   available(signal: AbortSignal): Promise<boolean>;
   generate(
     request: NpcChatterRequest,
+    signal: AbortSignal,
+    isActive: () => boolean,
+  ): Promise<unknown>;
+  /** Escape games only: one open-conversation answer. */
+  converse?(
+    payload: ConversePayload,
     signal: AbortSignal,
     isActive: () => boolean,
   ): Promise<unknown>;
@@ -140,6 +168,12 @@ export const npcVoiceTransport: NpcVoiceTransport = {
     }),
   review: (request, signal, isActive) =>
     bridgeRequest("npc-chatter-review", request, {
+      signal,
+      isActive,
+      timeoutMs: NPC_VOICE_LIMITS.requestMs,
+    }),
+  converse: (payload, signal, isActive) =>
+    bridgeRequest("escape-converse", payload, {
       signal,
       isActive,
       timeoutMs: NPC_VOICE_LIMITS.requestMs,
@@ -280,6 +314,16 @@ export class NpcVoiceDirector {
   private recent: NpcChatterRecentLine[] = [];
   private spoken = new Map<string, number>();
   private active = false;
+  private escapeLoop = "";
+  private greeted = new Set<string>();
+  private paSeen = new Set<string>();
+  private escapeReply?: { utteranceId: string; at: number };
+  private escapePlaying?: {
+    actorId: string;
+    id: string;
+    addresseeId?: string;
+    until: number;
+  };
   constructor(
     private audio: VoiceAudio,
     private transport: NpcVoiceTransport = npcVoiceTransport,
@@ -288,7 +332,9 @@ export class NpcVoiceDirector {
       status().capabilities.includes("npc-chatter") &&
       status().capabilities.includes("npc-chatter-review"),
     private random = Math.random,
-  ) {}
+  ) {
+    playerVoiceDirector = this;
+  }
 
   update(game: Game) {
     if (
@@ -305,6 +351,11 @@ export class NpcVoiceDirector {
       this.nextCheck = 0;
       this.available = undefined;
       this.nextAvailability = 0;
+      this.escapeLoop = "";
+      this.greeted.clear();
+      this.paSeen.clear();
+      this.escapeReply = undefined;
+      this.escapePlaying = undefined;
     }
     this.lastTime = game.time;
     const enabled =
@@ -324,6 +375,10 @@ export class NpcVoiceDirector {
       return;
     }
     this.active = true;
+    if (game.escape) {
+      this.updateEscape(game);
+      return;
+    }
     if (game.time < this.nextCheck) return;
     this.nextCheck = game.time + 0.5;
     if (
@@ -780,8 +835,397 @@ export class NpcVoiceDirector {
       game.time + NPC_VOICE_LIMITS.globalSeconds + this.random() * 10,
     );
   }
+  /**
+   * Escape games replace ambient chatter with scripted prompts, first-meeting
+   * greetings and open-conversation replies, one speaker at a time.
+   */
+  private updateEscape(game: Game) {
+    const escape = game.escape!;
+    const loopKey = `${game.id}:${escape.loop}`;
+    if (this.escapeLoop !== loopKey) {
+      this.escapeLoop = loopKey;
+      this.greeted.clear();
+      this.paSeen.clear();
+      this.escapeReply = undefined;
+      this.escapePlaying = undefined;
+    }
+    this.announce(game);
+    if (this.escapePlaying) {
+      if (game.time < this.escapePlaying.until) return;
+      clearNpcSpeechBubble(
+        game,
+        this.escapePlaying.actorId,
+        this.escapePlaying.id,
+      );
+      this.escapePlaying = undefined;
+    }
+    if (this.pending || this.playing || !this.audio.canSpeak(game)) return;
+    if (game.time < this.nextAt) return;
+    if (
+      this.available === undefined ||
+      (!this.available && Date.now() >= this.nextAvailability)
+    ) {
+      this.checkAvailability(game);
+      return;
+    }
+    if (!this.available) return;
+    const cue = this.escapeCue(game);
+    if (!cue) return;
+    const payload = conversationRequest(game, cue.speakerId, {
+      reason: cue.reason,
+      addresseeId: cue.addresseeId,
+    });
+    const epoch = this.epoch,
+      controller = new AbortController();
+    this.controller = controller;
+    const signal = AbortSignal.any([
+      controller.signal,
+      AbortSignal.timeout(NPC_VOICE_LIMITS.requestMs),
+    ]);
+    const live = () =>
+      !signal.aborted &&
+      this.epoch === epoch &&
+      this.game === game &&
+      this.active &&
+      game.settings.npcVoices !== false &&
+      game.status === "playing" &&
+      !game.paused;
+    this.message = "A nearby survivor may respond; gameplay continues.";
+    const work = this.speakEscapeLine(game, cue, payload, signal, live);
+    this.pending = work;
+    void work.finally(() => {
+      if (this.pending === work) this.pending = undefined;
+      if (this.controller === controller) this.controller = undefined;
+    });
+  }
+
+  private escapeCue(game: Game) {
+    const now = game.time;
+    const reply = this.escapeReply;
+    if (reply) {
+      if (now >= reply.at) {
+        this.escapeReply = undefined;
+        const utterance = utteranceById(game, reply.utteranceId);
+        const responder = utterance
+          ? nextResponder(game, utterance, now, this.random)
+          : undefined;
+        if (utterance && responder)
+          return {
+            speakerId: responder,
+            reason: "reply",
+            addresseeId: utterance.speakerId,
+          };
+      }
+    }
+    const prompts = game.escape!.prompts;
+    while (prompts.length && now - prompts[0]!.at > 30) prompts.shift();
+    const prompt = prompts.shift();
+    if (prompt) return { speakerId: prompt.npcId, reason: prompt.reason };
+    const human = game.survivors.find((a) => a.id === "human");
+    if (!human) return undefined;
+    const floor = game.floors[human.floor];
+    if (!floor) return undefined;
+    const nearby = game.survivors.find(
+      (a) =>
+        a.id !== "human" &&
+        a.alive &&
+        !a.escaped &&
+        !this.greeted.has(a.id) &&
+        a.floor === human.floor &&
+        distance(a, human) <= 4 &&
+        canSee(floor, a, human, 6),
+    );
+    if (!nearby) return undefined;
+    this.greeted.add(nearby.id);
+    return {
+      speakerId: nearby.id,
+      reason: "greet the player in passing",
+      addresseeId: "human",
+    };
+  }
+
+  private async speakEscapeLine(
+    game: Game,
+    cue: { speakerId: string; reason: string; addresseeId?: string },
+    payload: ConversePayload,
+    signal: AbortSignal,
+    live: () => boolean,
+  ): Promise<void> {
+    let raw: unknown;
+    try {
+      raw = this.transport.converse
+        ? await this.transport.converse(payload, signal, live)
+        : undefined;
+    } catch {
+      raw = undefined;
+    }
+    if (!live()) return;
+    const npc = game.survivors.find((a) => a.id === cue.speakerId);
+    if (!npc || npc.id === "human") return;
+    const usable =
+      isRecord(raw) &&
+      raw.speakerId === cue.speakerId &&
+      typeof raw.text === "string" &&
+      raw.text.trim().length > 0;
+    const result = handleConverseAnswer(
+      game,
+      usable
+        ? (raw as { speakerId: string; text: string; outcome?: unknown })
+        : {
+            speakerId: cue.speakerId,
+            ...fallbackConverseLine(game, cue.speakerId),
+          },
+    );
+    if (!result || !live()) return;
+    // NPCs of a generated area reuse generator ids (npc-1...), so their voice
+    // is keyed by area: a different person keeps a voice of their own.
+    const voice = await escapeVoiceSlot(
+      game.escape!.voices,
+      npcVoiceKey(game.escape!, game.escape!.areas?.current, npc.id),
+      game.seed,
+    );
+    const id = payload.requestId;
+    const buffer = await this.synthesizeBuffer(
+      id,
+      npc.id,
+      result.text,
+      voice,
+      signal,
+    );
+    if (!buffer || !live()) return;
+    const target = cue.addresseeId
+      ? game.survivors.find((a) => a.id === cue.addresseeId)
+      : undefined;
+    const until = game.time + buffer.duration;
+    if (target) npc.lookAt = { x: target.x, y: target.y, until };
+    const noise = npc as typeof npc & {
+      noiseLevel?: number;
+      noiseUntil?: number;
+    };
+    noise.noiseLevel = 5;
+    noise.noiseUntil = until;
+    if (
+      !this.audio.speak(game, {
+        id,
+        actorId: npc.id,
+        delivery: "calm",
+        buffer,
+        onEnded: () => {
+          clearNpcSpeechBubble(game, npc.id, id);
+          if (this.escapePlaying?.id === id) this.escapePlaying = undefined;
+        },
+      })
+    )
+      return;
+    recordUtterance(game, {
+      id,
+      speakerId: npc.id,
+      text: result.text,
+      at: game.time,
+      floor: npc.floor,
+      x: npc.x,
+      y: npc.y,
+      ...(target ? { addressee: target.id } : {}),
+    } as Parameters<typeof recordUtterance>[1]);
+    showNpcSpeechBubble(game, {
+      id,
+      actorId: npc.id,
+      text: result.text,
+      until,
+    });
+    this.escapePlaying = {
+      actorId: npc.id,
+      id,
+      ...(target ? { addresseeId: target.id } : {}),
+      until,
+    };
+    this.nextAt = game.time + 1.2 + this.random() * 1.8;
+    this.message = "Computer-generated NPC speech is playing.";
+  }
+
+  /** Text-to-speech for a single line, reusing the speech service limits. */
+  private async synthesizeBuffer(
+    requestId: string,
+    actorId: string,
+    text: string,
+    voice: string,
+    signal: AbortSignal,
+  ) {
+    const reply = { requestId, actorId, text } as unknown as NpcChatterReply;
+    let ticket: SpeechTicket;
+    try {
+      ticket = await this.transport.synthesize(reply, voice, signal);
+    } catch {
+      return undefined;
+    }
+    if (!validTicket(ticket, reply)) return undefined;
+    const bytes = await this.transport
+      .download(ticket.audio.url, signal)
+      .catch(() => undefined);
+    if (!bytes || bytes.byteLength <= 0) return undefined;
+    const buffer = await this.audio.decodeSpeech(bytes).catch(() => undefined);
+    if (
+      !buffer ||
+      !Number.isFinite(buffer.duration) ||
+      buffer.duration <= 0 ||
+      buffer.duration > NPC_VOICE_LIMITS.durationSeconds
+    )
+      return undefined;
+    return buffer;
+  }
+
+  /**
+   * Speak as the player. The human's voice is the escape identity's player
+   * slot; the line is recorded for replies and given the same noise footprint
+   * as NPC speech.
+   */
+  async speakAsPlayer(game: Game, text: string, yaw: number): Promise<boolean> {
+    const trimmed = text.trim();
+    if (
+      !game.escape ||
+      this.game !== game ||
+      trimmed.length === 0 ||
+      trimmed.length > 200
+    )
+      return false;
+    const human = game.survivors.find((a) => a.id === "human");
+    if (!human || !human.alive || human.escaped) return false;
+    const listeners = game.survivors.filter(
+      (a) => a.id !== human.id && npcCanHearSpeech(game, a, human),
+    );
+    const addressee = resolveAddressee(
+      { x: human.x, y: human.y, yaw },
+      trimmed,
+      listeners,
+    );
+    const id = `say-${crypto.randomUUID()}`;
+    const heardBy = recordUtterance(game, {
+      id,
+      speakerId: human.id,
+      text: trimmed,
+      at: game.time,
+      floor: human.floor,
+      x: human.x,
+      y: human.y,
+      ...(addressee ? { addressee } : {}),
+    } as Parameters<typeof recordUtterance>[1]);
+    this.escapeReply = {
+      utteranceId: id,
+      at: game.time + 1.2 + this.random() * 1.8,
+    };
+    const voice = game.escape.voices.player;
+    const signal = AbortSignal.timeout(NPC_VOICE_LIMITS.requestMs);
+    const buffer = await this.synthesizeBuffer(
+      id,
+      human.id,
+      trimmed,
+      voice,
+      signal,
+    );
+    void heardBy;
+    if (
+      !buffer ||
+      !this.audio.speak(game, {
+        id,
+        actorId: human.id,
+        delivery: "calm",
+        buffer,
+        onEnded: () => clearNpcSpeechBubble(game, human.id, id),
+      })
+    )
+      return false;
+    const noise = human as typeof human & {
+      noiseLevel?: number;
+      noiseUntil?: number;
+    };
+    noise.noiseLevel = 5;
+    noise.noiseUntil = game.time + buffer.duration;
+    if (addressee) {
+      const target = game.survivors.find((a) => a.id === addressee);
+      if (target)
+        human.lookAt = {
+          x: target.x,
+          y: target.y,
+          until: game.time + buffer.duration,
+        };
+    }
+    showNpcSpeechBubble(game, {
+      id,
+      actorId: human.id,
+      text: trimmed,
+      until: game.time + buffer.duration,
+    });
+    return true;
+  }
+
+  /** New PA announcements: chime, then the announcement, non-spatially. */
+  private announce(game: Game) {
+    const escape = game.escape!;
+    const human = game.survivors.find((a) => a.id === "human");
+    if (!human) return;
+    for (const announcement of escape.announcements) {
+      if (this.paSeen.has(announcement.id)) continue;
+      this.paSeen.add(announcement.id);
+      if (!this.paAudible(game, announcement.areaId, human)) continue;
+      void this.playAnnouncement(game, announcement.id, announcement.text);
+    }
+  }
+
+  private paAudible(game: Game, areaId: string | undefined, human: Actor) {
+    const escape = game.escape;
+    if (!escape) return false;
+    if (areaId && escape.areas.current !== areaId) return false;
+    const floor = game.floors[human.floor] as
+      { rooms?: { x: number; y: number; w: number; h: number }[] } | undefined;
+    const rooms = floor?.rooms ?? [];
+    return (
+      rooms.length > 0 &&
+      rooms.some(
+        (room) =>
+          human.x >= room.x &&
+          human.x < room.x + room.w &&
+          human.y >= room.y &&
+          human.y < room.y + room.h,
+      )
+    );
+  }
+
+  private async playAnnouncement(
+    game: Game,
+    announcementId: string,
+    text: string,
+  ): Promise<void> {
+    const audio = this.audio as VoiceAudio &
+      Partial<Pick<AudioDirector, "canAnnounce" | "speakAnnouncement">>;
+    const escape = game.escape;
+    if (!escape || !audio.canAnnounce?.(game)) return;
+    const id = `pa-${announcementId}`;
+    const line = text.trim().slice(0, 300);
+    if (!line) return;
+    const buffer = await this.synthesizeBuffer(
+      id,
+      "pa",
+      line,
+      escape.voices.pa,
+      AbortSignal.timeout(NPC_VOICE_LIMITS.requestMs),
+    );
+    if (!buffer || this.game !== game) return;
+    audio.speakAnnouncement?.(game, { id, text: line, buffer });
+  }
+
   dispose() {
     this.cancel();
     this.active = false;
+    if (playerVoiceDirector === this) playerVoiceDirector = undefined;
   }
+}
+
+let playerVoiceDirector: NpcVoiceDirector | undefined;
+/** The most recent director; main.ts keeps its instance for the player chat. */
+export function setPlayerVoiceDirector(director: NpcVoiceDirector | undefined) {
+  playerVoiceDirector = director;
+}
+/** Speak a player line through the live director (escape games only). */
+export function speakAsPlayer(game: Game, text: string, yaw: number) {
+  return playerVoiceDirector?.speakAsPlayer(game, text, yaw) ?? false;
 }

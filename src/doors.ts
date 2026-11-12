@@ -188,3 +188,35 @@ export function doorHandle(o: Furniture): Point {
     o,
   );
 }
+
+/**
+ * Escape redesign: lock a door so it cannot be opened from `side` (-1 or 1,
+ * the same side convention as `DoorState.side`). CONTRACT STUB, implemented
+ * with the world runtime.
+ */
+export function lockDoor(o: Furniture, side: -1 | 1, by: string, at: number) {
+  o.lock = { side, by, at };
+}
+
+/** Escape redesign: anyone outside can unlock it. */
+export function unlockDoor(o: Furniture) {
+  if (!o.lock) return false;
+  delete o.lock;
+  return true;
+}
+
+/**
+ * Which face of the door frame `p` stands on, using the same convention as
+ * `DoorState.side` (the leaf's positive swing side).
+ */
+export function doorSideOf(o: Furniture, p: Point): -1 | 1 {
+  const frame = doorFrame(o),
+    vertical = frame.h >= frame.w;
+  if (vertical) return p.x <= frame.x ? 1 : -1;
+  return p.y >= frame.y ? 1 : -1;
+}
+
+/** A locked door refuses its locked face; the other face may unlock it. */
+export function doorBlocksFrom(o: Furniture, p: Point) {
+  return !!o.lock && doorSideOf(o, p) === o.lock.side;
+}

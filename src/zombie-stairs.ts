@@ -11,8 +11,24 @@ import { inFurniture, line, solid, wall } from "./spatial";
 import { walkSegment } from "./navigation";
 import { STAIRWELL_RADIUS } from "./stairwell";
 import { actorOnFloor } from "./stair-route";
+import { stairMarkers, type StairMarker } from "./site";
 import { canSee, playerCanSee, sightRadius } from "./visibility";
 import type { ZombieIndex } from "./zombie-index";
+
+/** The up marker of the site this zombie is climbing, if any is in reach. */
+function upMarkerOf(g: Game, z: Zombie): StairMarker | undefined {
+  let best: StairMarker | undefined,
+    bestDistance = Infinity;
+  for (const marker of stairMarkers(g, z.floor)) {
+    if (marker.direction !== "up") continue;
+    const d = distance(z, marker.at);
+    if (d < bestDistance) {
+      best = marker;
+      bestDistance = d;
+    }
+  }
+  return best;
+}
 export type StairArrival =
   | { kind: "wait" | "cancel" }
   | { kind: "arrive"; floor: number; position: Point }
@@ -27,13 +43,19 @@ export function zombieStairArrival(
 ): StairArrival | undefined {
   if (z.stairUntil === undefined) return;
   const source = g.floors[z.floor],
-    next = g.floors[z.floor + 1];
-  const wellRadius = source?.layout === "pursuit" ? STAIRWELL_RADIUS : 0.8;
-  if (!source || !next || distance(z, source.stairs) > wellRadius)
+    marker = upMarkerOf(g, z),
+    well = marker?.at,
+    wellRadius = source?.layout === "pursuit" ? STAIRWELL_RADIUS : 0.8;
+  if (!source || !marker || !well || distance(z, well) > wellRadius)
     return { kind: "cancel" };
   if (g.time + 1e-8 < z.stairUntil) return { kind: "wait" };
-  const p = next.entry,
-    floor = next.index;
+  // Layers are shared, so the climb stays on this site's own stair column.
+  const site = marker.site,
+    upFloor = site.floors[site.floors.indexOf(z.floor) + 1],
+    next = upFloor === undefined ? undefined : g.floors[upFloor],
+    p = next ? site.entry[next.index] : undefined;
+  if (!next || !p) return { kind: "cancel" };
+  const floor = next.index;
   const bubbleAt = (at: Point) =>
     g.effects.some(
       (e) =>
@@ -78,9 +100,7 @@ export function zombieStairArrival(
     );
     if (position) return { kind: "arrive", floor, position: { ...position } };
   }
-  const ahead = (
-    crowd?.near(z.floor, source.stairs, wellRadius) ?? g.zombies
-  ).some(
+  const ahead = (crowd?.near(z.floor, well, wellRadius) ?? g.zombies).some(
     (other) =>
       other !== z &&
       other.floor === z.floor &&
@@ -88,7 +108,7 @@ export function zombieStairArrival(
       other.stagger <= 0 &&
       other.stairUntil !== undefined &&
       other.stairUntil <= g.time + 1e-8 &&
-      distance(other, source.stairs) <= wellRadius &&
+      distance(other, well) <= wellRadius &&
       (other.stairUntil < z.stairUntil! ||
         (other.stairUntil === z.stairUntil && other.id < z.id)),
   );

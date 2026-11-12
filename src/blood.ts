@@ -1,10 +1,10 @@
-import { type Floor, type Game, type Point, H, W, distance } from "./model";
+import { type Floor, type Game, type Point, distance } from "./model";
+import { floorCols, floorRows } from "./site";
 import { wall } from "./spatial";
 
 // Four cells per world unit: permanent coverage has a fixed upper bound of
-// W*H*16 characters per floor, rather than one saved object per footstep.
+// cols*rows*16 characters per floor, rather than one saved object per footstep.
 export const BLOOD_RESOLUTION = 4;
-const width = W * BLOOD_RESOLUTION;
 const marks = "abcdefghijklmnop";
 const stride = 0.28;
 export function footprintPose(mark: string) {
@@ -22,9 +22,11 @@ export function footprintPose(mark: string) {
 }
 function stain(f: Floor, p: Point, angle: number, right: boolean) {
   if (wall(f, p.x, p.y)) return;
-  const x = Math.floor(p.x * BLOOD_RESOLUTION),
+  const width = floorCols(f) * BLOOD_RESOLUTION,
+    height = floorRows(f) * BLOOD_RESOLUTION,
+    x = Math.floor(p.x * BLOOD_RESOLUTION),
     y = Math.floor(p.y * BLOOD_RESOLUTION);
-  if (x < 0 || x >= width || y < 0 || y >= H * BLOOD_RESOLUTION) return;
+  if (x < 0 || x >= width || y < 0 || y >= height) return;
   const rows = (f.blood ??= []),
     row = (rows[y] ?? "").padEnd(width, "0"),
     direction = ((Math.round(angle / (Math.PI / 4)) % 8) + 8) % 8,
@@ -71,16 +73,24 @@ const layers = new WeakMap<
 >();
 export function drawBlood(ctx: CanvasRenderingContext2D, f: Floor) {
   if (!f.blood) return;
+  const cols = floorCols(f),
+    rows = floorRows(f),
+    width = cols * BLOOD_RESOLUTION,
+    height = rows * BLOOD_RESOLUTION;
   let layer = layers.get(f);
-  if (!layer) {
+  if (
+    !layer ||
+    layer.canvas.width !== cols * 32 ||
+    layer.canvas.height !== rows * 32
+  ) {
     const canvas = document.createElement("canvas");
-    canvas.width = W * 32;
-    canvas.height = H * 32;
+    canvas.width = cols * 32;
+    canvas.height = rows * 32;
     layer = { canvas, rows: [] };
     layers.set(f, layer);
   }
   const ink = layer.canvas.getContext("2d")!;
-  for (let y = 0; y < H * BLOOD_RESOLUTION; y++) {
+  for (let y = 0; y < height; y++) {
     const row = f.blood[y];
     if (row === layer.rows[y]) continue;
     ink.clearRect(0, y * 8, layer.canvas.width, 8);
@@ -105,5 +115,5 @@ export function drawBlood(ctx: CanvasRenderingContext2D, f: Floor) {
     }
     layer.rows[y] = row;
   }
-  ctx.drawImage(layer.canvas, 0, 0, W, H);
+  ctx.drawImage(layer.canvas, 0, 0, cols, rows);
 }

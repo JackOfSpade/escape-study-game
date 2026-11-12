@@ -12,7 +12,7 @@ import {
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { CONFIG, type Floor } from "../model";
 import { FLOOR_HEIGHT } from "../stair-route";
-import { outsideBuilding } from "./exterior-layout";
+import { outsideBuilding, siteFootprints } from "./exterior-layout";
 import type { RunFacade, RunWindowStyle } from "../setting-catalog.mjs";
 import { resolveRoofFeatures } from "../venue";
 import { PartAnimator, roofFeatureParts } from "./roof-features";
@@ -30,11 +30,17 @@ function inside(floor: Floor, x: number, z: number) {
   return !outsideBuilding(floor, x + 0.5, z + 0.5);
 }
 
+/** A storey may hold real buildings without owning the start footprint: every
+ * stamped site on it is a shell too. */
+function hasSites(floor: Floor) {
+  return !!floor.boundary || !!floor.shells?.length;
+}
+
 /** Only the one-cell outer shell belongs to the facade. Interior partitions
  * and the collision grid remain authoritative and are never edited here. */
 export function isPerimeterWall(floor: Floor, x: number, z: number) {
   return (
-    !!floor.boundary &&
+    hasSites(floor) &&
     !!floor.tiles[z]?.[x] &&
     !inside(floor, x, z) &&
     [
@@ -51,7 +57,7 @@ export function isPerimeterWall(floor: Floor, x: number, z: number) {
 }
 
 export function perimeterWindows(floor: Floor): PerimeterWindow[] {
-  if (!floor.boundary || floor.index === CONFIG.floors) return [];
+  if (!hasSites(floor) || floor.index === CONFIG.floors) return [];
   const windows: PerimeterWindow[] = [];
   for (let z = 0; z < floor.tiles.length; z++)
     for (let x = 0; x < floor.tiles[z].length; x++) {
@@ -195,14 +201,31 @@ export class BuildingShell {
   });
   private tint = new Color();
   private roofMotion = new PartAnimator();
+  /** Cache key for this shell: tiles, footprints and every stamped shell. */
+  private signature = "";
 
   constructor() {
     this.group.name = "building-shell";
   }
 
+  private static signatureOf(floors: Floor[]) {
+    return JSON.stringify(
+      floors.map((f) => [
+        f.index,
+        f.boundary ?? null,
+        f.shells ?? [],
+        f.setting ?? null,
+        f.tiles.map((row) => row.join("")),
+      ]),
+    );
+  }
+
   build(floors: Floor[]) {
+    const signature = BuildingShell.signatureOf(floors);
+    if (signature === this.signature) return;
+    this.signature = signature;
     this.clear();
-    this.group.visible = !!floors[0]?.boundary;
+    this.group.visible = floors.some((f) => !!f.boundary || !!f.shells?.length);
     if (!this.group.visible) return;
     // A designed building restyles its facade, windows, wall faces and roof.
     // Without a setting every colour and dimension below is the original.
@@ -347,7 +370,7 @@ export class BuildingShell {
         );
     };
     for (const floor of floors) {
-      if (!floor.boundary) continue;
+      if (!hasSites(floor)) continue;
       const base = floor.index * FLOOR_HEIGHT,
         roof = floor.index === CONFIG.floors;
       const windows = new Map(
@@ -517,7 +540,7 @@ export class BuildingShell {
           }
           box(walls, cx, base + 3.2, cz, 1.04, 0.8, 1.04, trim);
         }
-      if (!roof) {
+      if (!roof && floor.boundary) {
         // Open stair/entrance portals still have continuous floor beams above
         // them, rather than a black vertical slot through every storey.
         const southWidth = floor.index === 0 ? 4 : 2;
@@ -543,22 +566,25 @@ export class BuildingShell {
         );
       }
       // Thin floor plates reveal the true storey spacing without populating
-      // undiscovered interiors or creating another active simulation.
-      for (let z = floor.boundary.top; z < floor.boundary.bottom; z++) {
-        const row = floor.boundary.rows[z];
-        box(
-          walls,
-          (row.left + row.right) / 2,
-          // Structure sits below the finished floor (-0.025), rather than
-          // hiding it or competing with its texture in the depth buffer.
-          base - 0.2,
-          z + 0.5,
-          row.right - row.left,
-          0.2,
-          1,
-          "#4c5c60",
-        );
-      }
+      // undiscovered interiors or creating another active simulation. Stamped
+      // sites get them too, so every shell reads as a real storey.
+      for (const site of siteFootprints(floor))
+        for (let z = site.top; z < site.bottom; z++) {
+          const row = site.rows[z];
+          if (!row) continue;
+          box(
+            walls,
+            (row.left + row.right) / 2,
+            // Structure sits below the finished floor (-0.025), rather than
+            // hiding it or competing with its texture in the depth buffer.
+            base - 0.2,
+            z + 0.5,
+            row.right - row.left,
+            0.2,
+            1,
+            "#4c5c60",
+          );
+        }
     }
     this.merge(walls, this.structure, "facade-structure");
     this.merge(frames, this.frames, "facade-window-frames");

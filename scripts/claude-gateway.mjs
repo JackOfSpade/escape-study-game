@@ -80,6 +80,31 @@ export const TASK_PROFILES = Object.freeze({
     timeoutMs: 45_000,
     stableKeys: ["instruction"],
   },
+  "escape-engage": {
+    ...live(120_000, "haiku", "medium"),
+    stableKeys: ["instruction"],
+  },
+  "escape-converse": {
+    ...live(45_000, "sonnet", "low"),
+    stableKeys: ["instruction"],
+  },
+  "escape-pa": {
+    ...live(45_000, "haiku", "high"),
+    stableKeys: ["instruction"],
+  },
+  "escape-intent": {
+    ...live(120_000, "haiku", "medium"),
+    stableKeys: ["instruction"],
+  },
+  "escape-epilogue": {
+    ...live(180_000, "haiku", "high"),
+    stableKeys: ["instruction"],
+  },
+  "escape-area": {
+    ...live(180_000, "opus", "medium"),
+    stableKeys: ["instruction"],
+  },
+  "escape-catastrophe": { ...live(180_000), stableKeys: ["instruction"] },
   "design-run": { ...authoring(), model: "sonnet", stableKeys: [] },
 });
 /** Every task runs the model and effort in its own profile: the 2026-11-12

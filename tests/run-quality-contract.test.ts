@@ -813,3 +813,50 @@ test("partial authoring retains global drawing complexity limits before completi
     /drawing complexity/,
   );
 });
+
+test("a place brief is validated and carried by every concept request", () => {
+  const place = {
+    name: "Deep-sea research lab",
+    brief:
+      "A pressurised lab standing on the trench floor, tiled in cold ceramic.",
+  };
+  const parsed = parseQualityRequest({ ...base, phase: "concepts", place });
+  assert.deepEqual(parsed.place, place);
+  assert.match(
+    RUN_DESIGN_GUIDANCE,
+    /When the request carries place, every concept must be that exact place/,
+  );
+  // A request without a place keeps its historical shape: no empty field.
+  assert.equal(
+    "place" in parseQualityRequest({ ...base, phase: "concepts" }),
+    false,
+  );
+});
+
+test("an over-long place brief is rejected", () => {
+  assert.throws(
+    () =>
+      parseQualityRequest({
+        ...base,
+        phase: "concepts",
+        place: { name: "Orbital rocket", brief: "x".repeat(601) },
+      }),
+    /place\.brief/,
+  );
+});
+
+test("a place accepts no unknown keys", () => {
+  assert.throws(
+    () =>
+      parseQualityRequest({
+        ...base,
+        phase: "concepts",
+        place: {
+          name: "Orbital rocket",
+          brief: "The cramped interior of a sounding rocket.",
+          kind: "vehicle",
+        },
+      }),
+    /place has missing or unknown fields/,
+  );
+});

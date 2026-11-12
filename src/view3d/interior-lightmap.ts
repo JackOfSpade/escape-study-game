@@ -7,6 +7,7 @@ import {
   LinearFilter,
   type Material,
   RGBAFormat,
+  Vector2,
 } from "three";
 import {
   ambientTexels,
@@ -16,12 +17,13 @@ import {
   type InteriorLighting,
   WALL_SAMPLE_HEIGHTS,
 } from "../interior-lighting";
-import { CONFIG, H, W } from "../model";
+import { CONFIG } from "../model";
+import { floorCols, floorRows } from "../site";
 import { FLOOR_HEIGHT } from "../stair-route";
 
-const BANDS = CONFIG.floors + 1,
-  TW = W * LIGHTMAP_RES,
-  TH = H * LIGHTMAP_RES;
+const BANDS = CONFIG.floors + 1;
+/** Smallest atlas, in lightmap texels; a build grows it to its floor's raster. */
+const MIN_TEXELS = 1;
 /** Irradiance per unit of zone power on surfaces lamps do not reach directly. */
 const ROOM_BOUNCE = 0.6;
 
@@ -64,18 +66,23 @@ export class InteriorLightmap {
     interiorLmGround: { value: new Color("#3f494c") },
     interiorLmWarm: { value: new Color("#f2d7a3") },
     interiorLmCool: { value: new Color("#9dbfc7") },
+    /** Lightmap atlas size in texels (x = columns, y = rows per floor). */
+    interiorLmSize: { value: new Vector2(MIN_TEXELS, MIN_TEXELS) },
   };
-  private data = new Uint16Array(TW * TH * BANDS * 4);
-  private sidesData = new Uint16Array(TW * TH * BANDS * 4);
-  private overData = new Uint16Array(TW * TH * BANDS * 4);
+  /** Atlas size in texels; grows with the widest floor that is built. */
+  private cols = MIN_TEXELS;
+  private rows = MIN_TEXELS;
+  private data = new Uint16Array(this.cols * this.rows * BANDS * 4);
+  private sidesData = new Uint16Array(this.cols * this.rows * BANDS * 4);
+  private overData = new Uint16Array(this.cols * this.rows * BANDS * 4);
   private bands = new Map<number, Band>();
 
   constructor() {
     const texture = (data: Uint16Array, name: string) => {
       const map = new DataTexture(
         data,
-        TW,
-        TH * BANDS,
+        this.cols,
+        this.rows * BANDS,
         RGBAFormat,
         HalfFloatType,
       );
@@ -99,23 +106,112 @@ export class InteriorLightmap {
       map.needsUpdate = true;
   }
 
+  /** Grow the atlas so a floor larger than the legacy raster fits. Bands baked
+   * for the old stride move into the wider one so other floors keep their
+   * light, then every band is re-uploaded. */
+  private resize(cols: number, rows: number) {
+    if (cols <= this.cols && rows <= this.rows) return;
+    const fromCols = this.cols,
+      fromRows = this.rows;
+    this.cols = Math.max(cols, this.cols);
+    this.rows = Math.max(rows, this.rows);
+    const texels = this.cols * this.rows;
+    this.data = new Uint16Array(texels * BANDS * 4);
+    this.sidesData = new Uint16Array(texels * BANDS * 4);
+    this.overData = new Uint16Array(texels * BANDS * 4);
+    for (const [map, data] of [
+      [this.texture, this.data],
+      [this.sidesTexture, this.sidesData],
+      [this.overTexture, this.overData],
+    ] as const) {
+      map.image = { data, width: this.cols, height: this.rows * BANDS };
+      map.dispose();
+      map.needsUpdate = true;
+    }
+    this.uniforms.interiorLmSize.value.set(this.cols, this.rows);
+    for (const band of this.bands.values()) {
+      band.ambient = this.restripe(
+        band.ambient,
+        Float32Array,
+        fromCols,
+        fromRows,
+      );
+      band.covered = this.restripe(
+        band.covered,
+        Uint8Array,
+        fromCols,
+        fromRows,
+      );
+      band.warm = this.restripe(band.warm, Float32Array, fromCols, fromRows);
+      band.cool = this.restripe(band.cool, Float32Array, fromCols, fromRows);
+      band.ceilingWarm = this.restripe(
+        band.ceilingWarm,
+        Float32Array,
+        fromCols,
+        fromRows,
+      );
+      band.ceilingCool = this.restripe(
+        band.ceilingCool,
+        Float32Array,
+        fromCols,
+        fromRows,
+      );
+      band.walls = band.walls.map((channel) =>
+        this.restripe(channel, Float32Array, fromCols, fromRows),
+      );
+    }
+    for (const index of this.bands.keys()) this.write(index);
+  }
+
+  /** Copy a band baked at one atlas stride into the current atlas stride. */
+  private restripe<T extends Float32Array | Uint8Array>(
+    source: T,
+    type: new (size: number) => T,
+    fromCols: number,
+    fromRows: number,
+  ) {
+    const target = new type(this.cols * this.rows),
+      width = Math.min(fromCols, this.cols),
+      rows = Math.min(fromRows, this.rows);
+    for (let y = 0; y < rows; y++)
+      target.set(
+        source.subarray(y * fromCols, y * fromCols + width),
+        y * this.cols,
+      );
+    return target;
+  }
+
   build(index: number, plan: InteriorLighting) {
     if (index < 0 || index >= BANDS) return;
-    const { values: ambient, covered } = ambientTexels(plan),
-      band: Band = {
-        ambient,
-        covered,
-        warm: new Float32Array(TW * TH),
-        cool: new Float32Array(TW * TH),
-        ceilingWarm: new Float32Array(TW * TH),
-        ceilingCool: new Float32Array(TW * TH),
-        walls: Array.from(
-          { length: WALL_SAMPLE_HEIGHTS.length * 2 },
-          () => new Float32Array(TW * TH),
-        ),
-        pools: new Map(),
-        removed: new Map(),
-      };
+    const { floor } = plan,
+      cols = floorCols(floor) * LIGHTMAP_RES,
+      rows = floorRows(floor) * LIGHTMAP_RES;
+    this.resize(cols, rows);
+    const texels = this.cols * this.rows,
+      source = ambientTexels(plan),
+      ambient = new Float32Array(texels),
+      covered = new Uint8Array(texels);
+    // A floor smaller than the atlas occupies its top-left corner.
+    for (let y = 0; y < Math.min(rows, this.rows); y++) {
+      const from = y * cols,
+        to = from + Math.min(cols, this.cols);
+      ambient.set(source.values.subarray(from, to), y * this.cols);
+      covered.set(source.covered.subarray(from, to), y * this.cols);
+    }
+    const band: Band = {
+      ambient,
+      covered,
+      warm: new Float32Array(texels),
+      cool: new Float32Array(texels),
+      ceilingWarm: new Float32Array(texels),
+      ceilingCool: new Float32Array(texels),
+      walls: Array.from(
+        { length: WALL_SAMPLE_HEIGHTS.length * 2 },
+        () => new Float32Array(texels),
+      ),
+      pools: new Map(),
+      removed: new Map(),
+    };
     for (const pool of fixturePools(plan)) {
       band.pools.set(pool.fixture.id, pool);
       this.accumulate(band, pool, 1);
@@ -126,9 +222,10 @@ export class InteriorLightmap {
 
   clear(index: number) {
     this.bands.delete(index);
-    const start = index * TW * TH * 4;
+    const texels = this.cols * this.rows,
+      start = index * texels * 4;
     for (const data of [this.data, this.sidesData, this.overData])
-      data.fill(0, start, start + TW * TH * 4);
+      data.fill(0, start, start + texels * 4);
     this.markUploaded();
   }
 
@@ -160,11 +257,20 @@ export class InteriorLightmap {
     if (changed) this.write(index);
   }
 
+  /** Texel index of a world point in the atlas, or undefined outside it. */
+  private texel(x: number, y: number) {
+    const col = Math.floor(x * LIGHTMAP_RES),
+      row = Math.floor(y * LIGHTMAP_RES);
+    if (col < 0 || row < 0 || col >= this.cols || row >= this.rows)
+      return undefined;
+    return row * this.cols + col;
+  }
+
   /** Baked floor irradiance (warm + cool) and zone level, for tests. */
   sample(index: number, x: number, y: number) {
-    const band = this.bands.get(index);
-    if (!band) return undefined;
-    const i = Math.floor(y * LIGHTMAP_RES) * TW + Math.floor(x * LIGHTMAP_RES);
+    const band = this.bands.get(index),
+      i = this.texel(x, y);
+    if (!band || i === undefined) return undefined;
     return {
       zone: band.ambient[i],
       pool: band.warm[i] + band.cool[i],
@@ -174,9 +280,9 @@ export class InteriorLightmap {
 
   /** Baked ceiling irradiance and wall light vectors, for tests. */
   surface(index: number, x: number, y: number) {
-    const band = this.bands.get(index);
-    if (!band) return undefined;
-    const i = Math.floor(y * LIGHTMAP_RES) * TW + Math.floor(x * LIGHTMAP_RES);
+    const band = this.bands.get(index),
+      i = this.texel(x, y);
+    if (!band || i === undefined) return undefined;
     return {
       ceiling: band.ceilingWarm[i] + band.ceilingCool[i],
       walls: WALL_SAMPLE_HEIGHTS.map((_, layer) => ({
@@ -192,7 +298,7 @@ export class InteriorLightmap {
     for (let y = 0; y < pool.h; y++)
       for (let x = 0; x < pool.w; x++) {
         const source = y * pool.w + x;
-        const i = (pool.y0 + y) * TW + pool.x0 + x;
+        const i = (pool.y0 + y) * this.cols + pool.x0 + x;
         const v = pool.values[source];
         if (v) target[i] = Math.max(0, target[i] + v * scale);
         const c = pool.ceiling[source];
@@ -206,9 +312,10 @@ export class InteriorLightmap {
 
   private write(index: number) {
     const band = this.bands.get(index)!,
-      offset = index * TW * TH * 4,
+      texels = this.cols * this.rows,
+      offset = index * texels * 4,
       half = DataUtils.toHalfFloat;
-    for (let i = 0; i < TW * TH; i++) {
+    for (let i = 0; i < texels; i++) {
       const o = offset + i * 4;
       this.data[o] = half(band.ambient[i]);
       this.data[o + 1] = half(band.warm[i]);
@@ -265,13 +372,17 @@ uniform vec3 interiorLmSky;
 uniform vec3 interiorLmGround;
 uniform vec3 interiorLmWarm;
 uniform vec3 interiorLmCool;
+uniform vec2 interiorLmSize;
 vec3 interiorLightmapIrradiance() {
   vec3 n = normalize( vLmNormal );
   // Sample just off the surface so a wall face reads its own room's texels.
   vec3 p = vLmWorld + n * 0.3;
   float band = clamp( floor( p.y / ${FLOOR_HEIGHT.toFixed(2)} ), 0.0, ${(BANDS - 1).toFixed(1)} );
-  float z = clamp( p.z * ${LIGHTMAP_RES.toFixed(1)}, 0.5, ${(TH - 0.5).toFixed(1)} );
-  vec2 uv = vec2( p.x / ${W.toFixed(1)}, ( band * ${TH.toFixed(1)} + z ) / ${(TH * BANDS).toFixed(1)} );
+  float z = clamp( p.z * ${LIGHTMAP_RES.toFixed(1)}, 0.5, interiorLmSize.y - 0.5 );
+  vec2 uv = vec2(
+    p.x * ${LIGHTMAP_RES.toFixed(1)} / interiorLmSize.x,
+    ( band * interiorLmSize.y + z ) / ( interiorLmSize.y * ${BANDS.toFixed(1)} )
+  );
   vec4 lm = texture2D( interiorLightmap, uv );
   vec4 sides = texture2D( interiorLmSides, uv );
   vec4 over = texture2D( interiorLmOver, uv );

@@ -16,7 +16,14 @@ import {
   FLOOR_HEIGHT,
   sampleStairRoute,
   STAIR_ROUTE_WIDTH,
+  travelSite,
 } from "./stair-route";
+import {
+  START_SITE,
+  roofFloorOf,
+  stairMarkers,
+  type StairMarker,
+} from "./site";
 import {
   insideFootprint,
   startElevated,
@@ -31,6 +38,8 @@ export const STAIRWELL_DEEP = STAIRWELL_RADIUS / 2;
 export interface StairTravel {
   fromFloor: number;
   toFloor: number;
+  /** Site whose markers this flight connects; omitted for the start building. */
+  site?: string;
   origin: Point;
   destination: Point;
   until: number;
@@ -118,27 +127,49 @@ export function enterCityStairBase(g: Game, a: Actor, input: Point) {
     true,
   );
 }
+/** The nearest stair marker of any site on this floor that the actor stands
+ * in; on an exact tie the start building's own marker wins, as before. */
+function stairMarkerAt(
+  g: Game,
+  a: Actor,
+  direction?: "up" | "down",
+): StairMarker | undefined {
+  let best: StairMarker | undefined,
+    bestDistance = Infinity;
+  for (const marker of stairMarkers(g, a.floor)) {
+    if (direction && marker.direction !== direction) continue;
+    if (!inStairwell(a, marker.at)) continue;
+    const d = distance(a, marker.at);
+    if (d < bestDistance) {
+      best = marker;
+      bestDistance = d;
+    }
+  }
+  return best;
+}
 /** Which staircase on its floor the survivor is standing in, if any. */
 export function stairwellAt(g: Game, a: Actor): "up" | "down" | undefined {
-  const f = g.floors[a.floor];
-  if (!f) return undefined;
-  if (a.floor < CONFIG.floors && inStairwell(a, f.stairs)) return "up";
-  if (a.floor > 0 && inStairwell(a, f.entry)) return "down";
-  return undefined;
+  if (!g.floors[a.floor]) return undefined;
+  return stairMarkerAt(g, a)?.direction;
 }
 /** Walking into a staircase starts its flight. Standing in one, or arriving
  * in one from another floor, does not start another; the survivor must step
  * out and back in. A locked staircase refuses the entry and says why. */
 export function enterStairs(g: Game, a: Actor, walking = false, input?: Point) {
-  const well = a.alive && !a.escaped ? stairwellAt(g, a) : undefined;
+  const marker = a.alive && !a.escaped ? stairMarkerAt(g, a) : undefined,
+    well = marker?.direction;
   if (well === a.stairwell) {
     // A newly unlocked visible portal must work without requiring an unseen
     // step-out/reset. Outbound input also distinguishes this from an arrival.
     const outbound = well && input && input.y * (well === "up" ? -1 : 1) > 0;
+    // Only the start building's climb is gated by personal credentials.
     if (
       !walking ||
       !outbound ||
-      (well === "up" && !a.access.includes(a.floor) && !devPass(a))
+      (well === "up" &&
+        marker?.site.id === START_SITE &&
+        !a.access.includes(a.floor) &&
+        !devPass(a))
     )
       return false;
   }
@@ -157,27 +188,39 @@ export function cancelStairs(g: Game, a: Actor) {
 export function beginStairs(g: Game, a: Actor, down = false, walking = false) {
   if (!a.alive || a.escaped || a.vault || a.stairTravel) return false;
   const source = g.floors[a.floor],
-    marker = down ? source.entry : source.stairs;
+    marker = stairMarkerAt(g, a, down ? "down" : "up");
+  if (!source || !marker || !walkSegment(source, a, marker.at)) return false;
+  const site = marker.site,
+    toFloor = a.floor + (down ? -1 : 1),
+    f = g.floors[toFloor],
+    // Layers share x/y, so a flight stays on this site's own column: its
+    // landing on the floor above, its stair head on the floor below.
+    at = down ? site.stairs[toFloor] : site.entry[toFloor],
+    destination = at && (down ? { x: at.x, y: at.y + 1 } : { ...at });
   if (
-    (down && a.floor === 0) ||
-    (!down && a.floor >= CONFIG.floors) ||
-    !inStairwell(a, marker) ||
-    !walkSegment(source, a, marker)
+    !f ||
+    !destination ||
+    (down && a.floor <= (site.floors[0] ?? 0)) ||
+    (!down && a.floor >= roofFloorOf(site))
   )
     return false;
-  if (!down && !a.access.includes(a.floor) && !devPass(a)) {
+  // Only the start building gates climbing on a personal floor credential.
+  if (
+    !down &&
+    site.id === START_SITE &&
+    !a.access.includes(a.floor) &&
+    !devPass(a)
+  ) {
     refuseStairs(g, a);
     return false;
   }
-  const toFloor = a.floor + (down ? -1 : 1),
-    f = g.floors[toFloor],
-    destination = down ? { x: f.stairs.x, y: f.stairs.y + 1 } : { ...f.entry };
   return startStairTravel(
     g,
     a,
     {
       fromFloor: a.floor,
       toFloor,
+      site: site.id,
       origin: { x: a.x, y: a.y },
       destination,
       until: g.time + CONFIG.stairSeconds,
@@ -231,8 +274,13 @@ export function advanceStairs(g: Game, a: Actor) {
   const travel = a.stairTravel;
   if (!travel) return false;
   const source = g.floors[travel.fromFloor],
-    marker = travel.toFloor > travel.fromFloor ? source?.stairs : source?.entry;
+    site = travelSite(g, travel),
+    marker =
+      travel.toFloor > travel.fromFloor
+        ? site.stairs[travel.fromFloor]
+        : site.entry[travel.fromFloor];
   if (
+    !source ||
     !a.alive ||
     a.escaped ||
     (travel.walked === undefined && a.floor !== travel.fromFloor) ||
@@ -251,7 +299,11 @@ export function advanceStairs(g: Game, a: Actor) {
   }
   const f = g.floors[travel.toFloor];
   if (!f) return true;
-  const well = stairwell(f, travel.toFloor > travel.fromFloor ? "down" : "up");
+  // Only the start building has a carved well to fall back into.
+  const well =
+    site.id === START_SITE
+      ? stairwell(f, travel.toFloor > travel.fromFloor ? "down" : "up")
+      : undefined;
   const points: Point[] = [
     { x: 0, y: 0 },
     { x: 0, y: 0.7 },
@@ -262,13 +314,15 @@ export function advanceStairs(g: Game, a: Actor) {
     x: travel.destination.x + p.x,
     y: travel.destination.y + p.y,
   }));
-  points.push({ ...well.mouth });
-  for (const depth of [0.5, 1, 1.5, 2, 2.5])
-    for (const lateral of [0, 0.5, -0.5])
-      points.push({
-        x: well.mouth.x + lateral,
-        y: well.mouth.y + well.open * depth,
-      });
+  if (well) {
+    points.push({ ...well.mouth });
+    for (const depth of [0.5, 1, 1.5, 2, 2.5])
+      for (const lateral of [0, 0.5, -0.5])
+        points.push({
+          x: well.mouth.x + lateral,
+          y: well.mouth.y + well.open * depth,
+        });
+  }
   const destinationBlocked = solid(
     f,
     travel.destination,

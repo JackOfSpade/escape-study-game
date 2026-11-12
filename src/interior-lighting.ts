@@ -1,5 +1,14 @@
 import { floorSectors, inRect, type Rect } from "./floor-plan";
-import { CONFIG, H, W, type Floor, type Furniture, type Point } from "./model";
+import { roomPowerKey } from "./room-power-key";
+import {
+  CONFIG,
+  type BuildingFootprint,
+  type Floor,
+  type Furniture,
+  type Game,
+  type Point,
+} from "./model";
+import { floorCols, floorRows, inRaster, toLocal, type Site } from "./site";
 
 export type InteriorPower = "lit" | "dim" | "outage";
 export interface LightingZone {
@@ -7,6 +16,8 @@ export interface LightingZone {
   rect: Rect;
   power: InteriorPower;
   level: number;
+  /** Site the zone belongs to; absent on the start building. */
+  site?: string;
 }
 export interface CeilingFixture extends Point {
   id: string;
@@ -21,12 +32,25 @@ export interface WallStory extends Point {
   height: number;
   story: number;
 }
+/** One building standing on a floor, and the floor data that names its rooms. */
+export interface InteriorRegion {
+  /** Stamped site id; absent on the start building. */
+  site?: string;
+  /** World footprint of the building (rows indexed by absolute y). */
+  boundary?: BuildingFootprint;
+  /** Floor whose sectors name this region's rooms (local for a site). */
+  floor: Floor;
+  /** World offset of that floor's coordinates. */
+  origin: Point;
+}
 export interface InteriorLighting {
   floor: Floor;
   seed: number;
   zones: LightingZone[];
   fixtures: CeilingFixture[];
   stories: WallStory[];
+  /** Every building on the floor: the start building first, then the sites. */
+  regions?: InteriorRegion[];
 }
 
 /** Cosmetic randomness is independent of the saved simulation/loot stream. */
@@ -38,9 +62,8 @@ export function interiorHash(seed: number, floor: number, id: string) {
   return (value ^ (value >>> 15)) >>> 0;
 }
 
-function inside(floor: Floor, p: Point) {
-  const b = floor.boundary;
-  if (!b) return p.x >= 0 && p.y >= 0 && p.x < W && p.y < H;
+/** Footprint rows are indexed by absolute y, like `Site.boundary`. */
+function inFootprint(b: BuildingFootprint, p: Point) {
   const row = b.rows[Math.floor(p.y)];
   return (
     !!row &&
@@ -51,6 +74,47 @@ function inside(floor: Floor, p: Point) {
   );
 }
 
+function inside(floor: Floor, p: Point) {
+  const b = floor.boundary;
+  return b ? inFootprint(b, p) : inRaster(floor, p.x, p.y);
+}
+
+const ZERO: Point = { x: 0, y: 0 };
+
+function inRegion(region: InteriorRegion, p: Point) {
+  // Footprints are stored in world coordinates; the raster is region-local.
+  if (region.boundary) return inFootprint(region.boundary, p);
+  const local = toLocal(region, p);
+  return inRaster(region.floor, local.x, local.y);
+}
+
+/** The start building's region, for plans built without one. */
+const startRegion = (plan: InteriorLighting): InteriorRegion => ({
+  floor: plan.floor,
+  origin: ZERO,
+  boundary: plan.floor.boundary,
+});
+
+/** The building whose footprint holds this world point, if any. */
+export function regionAt(
+  plan: InteriorLighting,
+  p: Point,
+): InteriorRegion | undefined {
+  const regions = plan.regions;
+  if (!regions) {
+    const start = startRegion(plan);
+    return inRegion(start, p) ? start : undefined;
+  }
+  for (const region of regions) if (inRegion(region, p)) return region;
+  return undefined;
+}
+
+/** Room power key of a room inside a stamped site: the prefixed form of
+ * `roomPowerKey` that non-start areas use (`${site}/${floor}:${roomId}`). */
+export function siteRoomPowerKey(site: string, floor: number, roomId: string) {
+  return `${site}/${floor}:${roomId}`;
+}
+
 const LEVEL: Record<InteriorPower, number> = {
   lit: 0.82,
   dim: 0.34,
@@ -58,26 +122,169 @@ const LEVEL: Record<InteriorPower, number> = {
 };
 
 export function lightAt(plan: InteriorLighting, p: Point) {
-  if (!inside(plan.floor, p) || plan.floor.index >= CONFIG.floors) return 1;
+  if (plan.floor.index >= CONFIG.floors) return 1;
+  const region = regionAt(plan, p);
+  if (!region) return 1;
   const x = Math.floor(p.x),
     y = Math.floor(p.y);
   // Sub-room zones follow their parent sector in the list, and override it.
   let level =
-    plan.floor.dark > 0.8
+    region.floor.dark > 0.8
       ? LEVEL.outage
-      : plan.floor.dark > 0.3
+      : region.floor.dark > 0.3
         ? LEVEL.dim
         : LEVEL.lit;
+  const overrides = overrideByFloor.get(plan.floor),
+    zoneId = roomIdAt(region.floor, toLocal(region, p));
+  if (overrides && zoneId) {
+    const override =
+      overrides.power[
+        region.site
+          ? siteRoomPowerKey(region.site, plan.floor.index, zoneId)
+          : overrides.key(plan.floor.index, zoneId)
+      ];
+    if (override) return LEVEL[override];
+  }
   for (const zone of plan.zones)
-    if (inRect(zone.rect, x, y)) level = zone.level;
+    if (zone.site === region.site && inRect(zone.rect, x, y))
+      level = zone.level;
   return level;
 }
 
+interface FloorPowerOverrides {
+  power: Record<string, InteriorPower>;
+  key: (floor: number, roomId: string) => string;
+}
+
+const overrideByFloor = new WeakMap<Floor, FloorPowerOverrides>();
+const planCache = new WeakMap<
+  Floor,
+  {
+    seed: number;
+    cols: number;
+    rows: number;
+    sites: string;
+    plan: InteriorLighting;
+  }
+>();
+
+/** Zone id at an interior cell (sub-room first, then its parent sector). */
+export function roomIdAt(floor: Floor, p: Point): string | undefined {
+  const x = Math.floor(p.x),
+    y = Math.floor(p.y);
+  const sectors = floorSectors(floor);
+  for (const sector of sectors)
+    for (const room of sector.rooms)
+      if (inRect(room.rect, x, y)) return room.id;
+  for (const sector of sectors)
+    for (const rect of sector.blocks) if (inRect(rect, x, y)) return sector.id;
+  return undefined;
+}
+
+/** Every mutable room-power key a floor exposes. */
+export function roomIdsForFloor(floor: Floor): string[] {
+  const ids: string[] = [];
+  for (const sector of floorSectors(floor)) {
+    ids.push(sector.id);
+    for (const room of sector.rooms) ids.push(room.id);
+  }
+  return ids;
+}
+
+/** Cache signature of the sites that own a storey on a floor. */
+function sitesKey(sites: readonly Site[]) {
+  return sites
+    .map(
+      (site) =>
+        `${site.id}@${site.origin.x},${site.origin.y}:${site.floors.join(".")}#${site.localFloors?.length ?? 0}`,
+    )
+    .join("|");
+}
+
+function planFor(floor: Floor, seed: number, sites: readonly Site[] = []) {
+  const cached = planCache.get(floor),
+    cols = floorCols(floor),
+    rows = floorRows(floor),
+    sites_ = sitesKey(sites);
+  if (
+    cached &&
+    cached.seed === seed &&
+    cached.cols === cols &&
+    cached.rows === rows &&
+    cached.sites === sites_
+  )
+    return cached.plan;
+  const plan = buildInteriorLighting(floor, seed, sites);
+  planCache.set(floor, { seed, cols, rows, sites: sites_, plan });
+  return plan;
+}
+
+/** Point the renderer's lighting lookup at this loop's mutable room power. */
+export function registerRoomPowerOverrides(g: Game) {
+  const escape = g.escape;
+  if (!escape) return;
+  const areaId = g.areaId,
+    power = escape.roomPower;
+  for (const floor of g.floors)
+    overrideByFloor.set(floor, {
+      power,
+      key: (index, roomId) => roomPowerKey({ areaId, escape }, index, roomId),
+    });
+}
+
+/** Effective room power: a loop override, otherwise the seeded lighting plan. */
+export function roomPowerAt(
+  g: Game,
+  floor: number,
+  x: number,
+  y: number,
+): InteriorPower {
+  const f = g.floors[floor];
+  if (!f) return "lit";
+  const escape = g.escape,
+    overrides = escape?.roomPower;
+  if (escape && overrides)
+    overrideByFloor.set(f, {
+      power: overrides,
+      key: (index, roomId) =>
+        roomPowerKey({ areaId: g.areaId, escape }, index, roomId),
+    });
+  const sites = g.sites ?? [],
+    plan = planFor(f, g.seed, sites),
+    at = { x, y },
+    region = regionAt(plan, at),
+    id = region ? roomIdAt(region.floor, toLocal(region, at)) : roomIdAt(f, at);
+  if (overrides && id) {
+    const override =
+      overrides[
+        region?.site
+          ? siteRoomPowerKey(region.site, floor, id)
+          : roomPowerKey(g, floor, id)
+      ];
+    if (override) return override;
+  }
+  let seeded: InteriorLighting["zones"][number] | undefined;
+  for (let i = plan.zones.length - 1; i >= 0; i--) {
+    const zone = plan.zones[i]!;
+    if (zone.site !== region?.site) continue;
+    if (inRect(zone.rect, Math.floor(x), Math.floor(y))) {
+      seeded = zone;
+      break;
+    }
+  }
+  const dark = region?.floor.dark ?? f.dark;
+  return seeded?.power ?? (dark > 0.8 ? "outage" : dark > 0.3 ? "dim" : "lit");
+}
+
 /** Lighting follows actual office territories, rather than screen-space or a
- * whole-floor darkness switch. Fixtures are cosmetic, never navigation props. */
+ * whole-floor darkness switch. Fixtures are cosmetic, never navigation props.
+ *
+ * Every site with a storey on this floor contributes its own plan, built from
+ * its local floor by this same code path and translated to its origin. */
 export function buildInteriorLighting(
   floor: Floor,
   seed: number,
+  sites: readonly Site[] = [],
 ): InteriorLighting {
   const plan: InteriorLighting = {
     floor,
@@ -85,6 +292,7 @@ export function buildInteriorLighting(
     zones: [],
     fixtures: [],
     stories: [],
+    regions: [{ floor, origin: { x: 0, y: 0 }, boundary: floor.boundary }],
   };
   if (floor.index >= CONFIG.floors) return plan;
   const sectors = floorSectors(floor);
@@ -228,7 +436,45 @@ export function buildInteriorLighting(
     plan.stories.push(candidate);
     if (plan.stories.length >= 12) break;
   }
+  for (const site of sites) mergeSite(plan, site, seed);
   return plan;
+}
+
+/** Add one stamped site's zones and fixtures, translated to its origin. */
+function mergeSite(plan: InteriorLighting, site: Site, seed: number) {
+  const index = plan.floor.index;
+  if (!site.floors.includes(index)) return;
+  const local = site.localFloors?.find((f) => f.index === index);
+  if (!local) return;
+  const { origin } = site,
+    prefix = (id: string) => `${site.id}:${id}`;
+  // The site's own plan comes from this same code path on its local floor.
+  const own = buildInteriorLighting(local, seed);
+  for (const zone of own.zones)
+    plan.zones.push({
+      ...zone,
+      id: prefix(zone.id),
+      site: site.id,
+      rect: {
+        x1: zone.rect.x1 + origin.x,
+        y1: zone.rect.y1 + origin.y,
+        x2: zone.rect.x2 + origin.x,
+        y2: zone.rect.y2 + origin.y,
+      },
+    });
+  for (const fixture of own.fixtures)
+    plan.fixtures.push({
+      ...fixture,
+      id: prefix(fixture.id),
+      x: fixture.x + origin.x,
+      y: fixture.y + origin.y,
+    });
+  plan.regions?.push({
+    site: site.id,
+    floor: local,
+    origin: { ...origin },
+    boundary: site.boundary,
+  });
 }
 
 export function hasDeskStory(o: Furniture) {
@@ -407,8 +653,14 @@ export function fixturePools(plan: InteriorLighting): FixturePool[] {
     .map((fixture) => {
       const x0 = Math.max(0, Math.floor(fixture.x * R) - reach),
         y0 = Math.max(0, Math.floor(fixture.y * R) - reach),
-        x1 = Math.min(W * R, Math.floor(fixture.x * R) + reach + 1),
-        y1 = Math.min(H * R, Math.floor(fixture.y * R) + reach + 1),
+        x1 = Math.min(
+          floorCols(floor) * R,
+          Math.floor(fixture.x * R) + reach + 1,
+        ),
+        y1 = Math.min(
+          floorRows(floor) * R,
+          Math.floor(fixture.y * R) + reach + 1,
+        ),
         w = x1 - x0,
         h = y1 - y0,
         values = new Float32Array(w * h),
@@ -455,14 +707,14 @@ export function fixturePools(plan: InteriorLighting): FixturePool[] {
 /** Zone power level per lightmap texel; 0 outside the occupied footprint. */
 export function ambientTexels(plan: InteriorLighting) {
   const R = LIGHTMAP_RES,
-    w = W * R,
-    h = H * R,
+    w = floorCols(plan.floor) * R,
+    h = floorRows(plan.floor) * R,
     values = new Float32Array(w * h),
     covered = new Uint8Array(w * h);
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
       const p = { x: (x + 0.5) / R, y: (y + 0.5) / R };
-      if (!inside(plan.floor, p)) continue;
+      if (!regionAt(plan, p)) continue;
       covered[y * w + x] = 1;
       values[y * w + x] = lightAt(plan, p);
     }

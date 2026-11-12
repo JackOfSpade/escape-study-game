@@ -13,7 +13,7 @@ import {
   SphereGeometry,
   SRGBColorSpace,
 } from "three";
-import type { Floor, Furniture } from "../model";
+import type { Floor, Furniture, Point } from "../model";
 import {
   PROP_CATALOG,
   SCENE_LIMITS,
@@ -396,6 +396,11 @@ function labelAtlas(labels: Label[]) {
   return texture;
 }
 
+/** World placement of a scene given in local coordinates. */
+export function authoredPlacement(local: Point, origin: Point) {
+  return { x: local.x + origin.x, z: local.y + origin.y };
+}
+
 /** A bounded saved dressing manifest: at most five draw calls per floor. */
 export class AuthoredScene {
   readonly group = new Group();
@@ -414,8 +419,14 @@ export class AuthoredScene {
   constructor(
     private readonly floor: Floor,
     lightmap: InteriorLightmap,
+    origin?: Point,
   ) {
     this.group.name = "authored-scene";
+    if (origin) {
+      // A stamped site's scene is authored in its local coordinates.
+      const at = authoredPlacement({ x: 0, y: 0 }, origin);
+      this.group.position.set(at.x, 0, at.z);
+    }
     this.material = new MeshStandardMaterial({
       color: "white",
       roughness: 0.86,
