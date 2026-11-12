@@ -138,10 +138,13 @@ test("every stage of the arm receives the forced model and effort", async () => 
       phase,
     );
   }
-  // The forced arm overrides production's high effort for the content batch.
-  assert.equal(
-    taskProfile("design-run", { phase: "content-batch" }).effort,
-    "high",
+  // Production now runs Sonnet medium in every stage, the content batch too.
+  assert.deepEqual(
+    [
+      taskProfile("design-run", { phase: "content-batch" }).model,
+      taskProfile("design-run", { phase: "content-batch" }).effort,
+    ],
+    ["sonnet", "medium"],
   );
   assert.equal(arm.profiles[arm.phases.indexOf("content-batch")].effort, "low");
   const [model, effort, seed, rep, ...stamp] =

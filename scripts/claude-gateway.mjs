@@ -17,8 +17,8 @@ import { privateDirectory, writePrivate } from "./lib/private-fs.mjs";
 import { designReplySchema } from "../src/run-design-schema.mjs";
 
 /** Every AI task's model and effort: the measured quality knee from the
- * 2026-11-11 ladders (docs/AI_MODEL_SELECTION.md, "Measured results"). Aliases
- * always resolve to the latest version of each model. */
+ * 2026-11-11 and 2026-11-12 ladders (docs/AI_MODEL_SELECTION.md, "Measured
+ * results"). Aliases always resolve to the latest version of each model. */
 const live = (timeoutMs = 120_000, model = "sonnet", effort = "medium") => ({
   model,
   effort,
@@ -31,8 +31,7 @@ const authoring = (effort = "medium") => ({
 });
 export const TASK_PROFILES = Object.freeze({
   generate: {
-    ...authoring("high"),
-    model: "sonnet",
+    ...authoring(),
     stableKeys: [
       "curriculum",
       "generationPolicy",
@@ -68,7 +67,7 @@ export const TASK_PROFILES = Object.freeze({
     ...live(120_000, "haiku", "medium"),
     stableKeys: ["instruction", "definition"],
   },
-  "reconcile-roadmap": { ...authoring(), stableKeys: ["instruction"] },
+  "reconcile-roadmap": { ...authoring("high"), stableKeys: ["instruction"] },
   "npc-chatter": {
     model: "haiku",
     effort: "high",
@@ -81,18 +80,16 @@ export const TASK_PROFILES = Object.freeze({
     timeoutMs: 45_000,
     stableKeys: ["instruction"],
   },
-  "design-run": { ...authoring(), stableKeys: [] },
+  "design-run": { ...authoring(), model: "sonnet", stableKeys: [] },
 });
-/** The only payload override left: `design-run` writes its content batches at
- * high effort. The 2026-11-11 follow-up ladders (the confirmation run and the
- * dearer steps) put its knee back at production, Opus medium with the content
- * batch at high. */
-export function taskProfile(operation, payload) {
+/** Every task runs the model and effort in its own profile: the 2026-11-12
+ * ladders left no payload override, so `design-run` now runs Sonnet medium in
+ * every stage (docs/AI_MODEL_SELECTION.md, "Follow-ups (2026-11-12)"). The
+ * unknown task still throws so a typo cannot silently call the wrong model. */
+export function taskProfile(operation) {
   const profile = TASK_PROFILES[operation];
   if (!profile) throw Error("Unknown AI task");
-  return operation === "design-run" && payload?.phase === "content-batch"
-    ? { ...profile, effort: "high" }
-    : profile;
+  return profile;
 }
 
 /** Holds the teaching behaviour of the /learn skill without needing it loaded,
@@ -472,6 +469,17 @@ function replaySampleSink(directory) {
   };
 }
 
+// The designer re-validates content batches with the same parser and has its
+// own bounded repair loop, so an answer this gateway cannot correct in one
+// turn is handed back for that loop to repair instead of ending the run.
+function designerRepairsInvalid(operation, payload) {
+  return (
+    operation === "design-run" &&
+    (payload?.phase === "content-batch" ||
+      payload?.phase === "content-revision")
+  );
+}
+
 const CONNECTION_CACHE_MS = 2000;
 // Well under the browser's 5 s status timeout, so a slow check never reads as a dead relay.
 const CONNECTION_TIMEOUT_MS = 3000;
@@ -676,6 +684,7 @@ export function createClaudeGateway({
     await slot(operation);
     const rows = [];
     let answered = null,
+      returnedInvalid = false,
       failure;
     try {
       const cancelled = () =>
@@ -778,6 +787,21 @@ export function createClaudeGateway({
           problem = String(error?.message ?? error);
           // A failed invocation already logged its own row.
           if (!logged) logCall(opening, measured, "rejected");
+          // The designer re-validates this content batch with the same parser
+          // and repairs it in its own bounded loop, so after this gateway's one
+          // correction hand the answer over rather than ending the run.
+          if (
+            attempt === 1 &&
+            text !== undefined &&
+            designerRepairsInvalid(operation, payload)
+          ) {
+            const salvage = firstJsonObject(text);
+            if (salvage) {
+              answered = salvage;
+              returnedInvalid = true;
+              return salvage;
+            }
+          }
           // The correction restarts the reply, so the partial text is dropped.
           onText?.("");
           prompt = `${user}\n\nYour previous answer was rejected: ${problem}\nReturn the complete corrected JSON object.`;
@@ -798,13 +822,15 @@ export function createClaudeGateway({
           operation,
           payload,
           answer: answered,
-          outcome: answered
-            ? "accepted"
-            : failure?.code === "CLAUDE_INVALID_ANSWER"
-              ? "invalid"
-              : failure
-                ? failureOutcome(failure)
-                : "error",
+          outcome: returnedInvalid
+            ? "invalid"
+            : answered
+              ? "accepted"
+              : failure?.code === "CLAUDE_INVALID_ANSWER"
+                ? "invalid"
+                : failure
+                  ? failureOutcome(failure)
+                  : "error",
           alias: profile.model,
           effort: profile.effort,
           model: rows.length ? (rows[rows.length - 1].model ?? null) : null,

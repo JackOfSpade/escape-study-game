@@ -572,7 +572,8 @@ function parseContent(
     usage.set(f.id, new Set());
   });
   const ids = new Set(),
-    totals = { primitives: 0, points: 0 };
+    totals = { primitives: 0, points: 0 },
+    budgetErrors = [];
   array(
     value.entries,
     repair || partial ? 0 : checked.length,
@@ -618,10 +619,10 @@ function parseContent(
         if (!repair) {
           const length = expandContentText(e[field], value.fragments).length;
           const limit = slot[field === "title" ? "maxTitle" : "maxBody"];
-          fail(
-            length <= limit,
-            `${p}.${field} for surface ${e.surfaceId} has ${length} characters and exceeds the surface's readable budget of ${limit}; shorten it to at most ${limit} characters`,
-          );
+          if (length > limit)
+            budgetErrors.push(
+              `${p}.${field} for surface ${e.surfaceId} has ${length} characters and exceeds the surface's readable budget of ${limit}`,
+            );
         }
       }
       const hasText = !!normalizeEnvironmentText(
@@ -651,6 +652,13 @@ function parseContent(
       }
     },
   );
+  // Correcting one over-budget entry per attempt wastes the designer's few
+  // repairs, so every over-budget title and body is reported together.
+  if (budgetErrors.length)
+    fail(
+      false,
+      `${budgetErrors.length} ${budgetErrors.length === 1 ? "entry exceeds its" : "entries exceed their"} surface's readable budget: ${budgetErrors.slice(0, 20).join("; ")}${budgetErrors.length > 20 ? `; and ${budgetErrors.length - 20} more` : ""}; shorten each to its limit`,
+    );
   for (const f of value.fragments)
     fail(
       repair ||
