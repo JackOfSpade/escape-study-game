@@ -7,6 +7,12 @@ import {
   openNativeQuestion,
   seedLegacyDraft,
 } from "./study-harness";
+import { answerVoicePrompt } from "./helpers/voice-prompt";
+
+// A legacy save has no escape state: its first Start asks for the voice.
+test.beforeEach(async ({ page }) => {
+  await answerVoicePrompt(page);
+});
 
 async function safeRun(page: Page) {
   await mockClaudeStudy(page);

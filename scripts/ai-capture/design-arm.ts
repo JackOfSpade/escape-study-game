@@ -12,7 +12,12 @@
  *
  *   node --import tsx scripts/ai-capture/design-arm.ts \
  *     --setting sonnet:medium --seeds 11,12,13 [--name design-2026-11-11] \
- *     [--rep 0] [--out dir] [--ephemeral]
+ *     [--rep 0] [--out dir] [--ephemeral] [--place-file place.json]
+ *
+ * `--place-file` names one exact place, the way the escape area designer calls
+ * the pipeline (`{tag, name, brief}`). Its rows and cases carry the case id
+ * `design-seed-<seed>-place-<tag>`, so a place arm never resumes from, or is
+ * resumed by, the plain `design-seed-<seed>` rows of the same seed.
  */
 import {
   appendFileSync,
@@ -89,7 +94,46 @@ export interface DesignRow {
   model: string[];
 }
 
-export const designCaseId = (seed: number) => `design-seed-${seed}`;
+export const designCaseId = (seed: number, placeTag?: string) =>
+  placeTag ? `design-seed-${seed}-place-${placeTag}` : `design-seed-${seed}`;
+
+/** One exact place the pipeline must design, as the area designer asks for it.
+ * `tag` is a lowercase slug so case ids and files stay stable and readable. */
+export interface DesignPlace {
+  tag: string;
+  name: string;
+  brief: string;
+}
+
+const PLACE_TAG = /^[a-z0-9-]{1,40}$/;
+/** The contract's bounds; clipped exactly as `designArea` clips them. */
+const clip = (value: string, max: number) => value.trim().slice(0, max).trim();
+const placeText = (value: unknown) =>
+  typeof value === "string" ? value.trim() : "";
+
+/** Validates a caller's place before any case id, case file or gateway uses it. */
+export function parsePlace(value: unknown): DesignPlace | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "object" || Array.isArray(value))
+    throw Error("A place must be an object with {tag, name, brief}");
+  const place = value as Record<string, unknown>;
+  const tag = placeText(place.tag);
+  if (!PLACE_TAG.test(tag))
+    throw Error(
+      `Place tag must be a lowercase slug of 1-40 [a-z0-9-] characters (got ${JSON.stringify(place.tag) ?? "nothing"})`,
+    );
+  const name = placeText(place.name);
+  if (name.length < 1 || name.length > 60)
+    throw Error(
+      `Place name must be 1-60 characters (got ${name.length}): ${JSON.stringify(place.name) ?? "nothing"}`,
+    );
+  const brief = placeText(place.brief);
+  if (brief.length < 1 || brief.length > 600)
+    throw Error(
+      `Place brief must be 1-600 characters (got ${brief.length}): ${JSON.stringify(place.brief) ?? "nothing"}`,
+    );
+  return { tag, name, brief };
+}
 const isNumber = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value);
 const total = (values: unknown[]) => {
@@ -113,6 +157,7 @@ export function designRow({
   answers = [],
   usage = [],
   error,
+  placeTag,
 }: {
   at: string;
   seed: number;
@@ -121,6 +166,8 @@ export function designRow({
   answers?: unknown[];
   usage?: UsageRow[];
   error?: unknown;
+  /** Present for a place arm, so its row carries the place case id. */
+  placeTag?: string;
 }): DesignRow {
   const rows = Array.isArray(usage) ? usage : [];
   const models = rows
@@ -129,7 +176,7 @@ export function designRow({
   return {
     v: 1,
     at,
-    caseId: designCaseId(seed),
+    caseId: designCaseId(seed, placeTag),
     operation: "design-run",
     setting,
     rep,
@@ -158,11 +205,20 @@ export const CASES_FILE = "cases-design.json";
 export interface DesignCase {
   id: string;
   operation: "design-run";
-  payload: { seed: number; note: string };
+  payload: {
+    seed: number;
+    note: string;
+    place?: { name: string; brief: string };
+  };
 }
 
-/** The judge needs a case per seed; ids merge so a resumed run never loses one. */
-export function writeDesignCases(out: string, seeds: number[]) {
+/** The judge needs a case per seed and place; ids merge so a resumed run never
+ * loses one, and a place case records exactly what was asked for. */
+export function writeDesignCases(
+  out: string,
+  seeds: number[],
+  place?: DesignPlace,
+) {
   const file = join(out, CASES_FILE);
   let existing: DesignCase[] = [];
   if (existsSync(file)) {
@@ -176,12 +232,18 @@ export function writeDesignCases(out: string, seeds: number[]) {
   const byId = new Map<string, DesignCase>(
     existing.map((entry) => [String(entry?.id), entry]),
   );
-  for (const seed of seeds)
-    byId.set(designCaseId(seed), {
-      id: designCaseId(seed),
-      operation: "design-run",
-      payload: { seed, note: "full pipeline" },
-    });
+  const payload = (seed: number): DesignCase["payload"] =>
+    place
+      ? {
+          seed,
+          note: "full pipeline",
+          place: { name: clip(place.name, 60), brief: clip(place.brief, 600) },
+        }
+      : { seed, note: "full pipeline" };
+  for (const seed of seeds) {
+    const id = designCaseId(seed, place?.tag);
+    byId.set(id, { id, operation: "design-run", payload: payload(seed) });
+  }
   writeFileSync(file, `${JSON.stringify([...byId.values()], null, 2)}\n`, {
     mode: 0o600,
   });
@@ -195,6 +257,9 @@ export interface DesignArmInput {
   out: string;
   /** Tests keep their output under the temporary directory. */
   ephemeral?: boolean;
+  /** When present the pipeline designs exactly this place, and every case id
+   * gains `-place-<tag>`; absent, the arm behaves and names exactly as before. */
+  place?: DesignPlace;
   gatewayFactory?: DesignGatewayFactory;
   now?: () => number;
   signal?: AbortSignal;
@@ -208,11 +273,15 @@ export async function runDesignArm({
   rep = 0,
   out,
   ephemeral = false,
+  place: requestedPlace,
   gatewayFactory = createClaudeGateway as unknown as DesignGatewayFactory,
   now = Date.now,
   signal = new AbortController().signal,
   log = () => {},
 }: DesignArmInput): Promise<{ skipped: boolean; row: DesignRow }> {
+  // A malformed place is rejected before any file, case or gateway exists.
+  const place = parsePlace(requestedPlace);
+  const caseId = designCaseId(seed, place?.tag);
   // "production" keeps each stage's real profile (medium, high for content
   // batches), so the reference arm matches what players get.
   const production = requested === "production";
@@ -221,18 +290,14 @@ export async function runDesignArm({
     : parseSetting(requested);
   assertSafeOut(out, { ephemeral });
   privateDirectory(out);
-  writeDesignCases(out, [seed]);
+  writeDesignCases(out, [seed], place);
   const resultsFile = join(out, "results.jsonl");
   const done = readLadderRows(out).find(
     (row: any) =>
-      row?.caseId === designCaseId(seed) &&
-      row?.setting === setting &&
-      row?.rep === rep,
+      row?.caseId === caseId && row?.setting === setting && row?.rep === rep,
   );
   if (done) {
-    log(
-      `${designCaseId(seed)} ${setting} rep ${rep} already recorded; skipped`,
-    );
+    log(`${caseId} ${setting} rep ${rep} already recorded; skipped`);
     return { skipped: true, row: done as DesignRow };
   }
   const usage: UsageRow[] = [];
@@ -251,10 +316,14 @@ export async function runDesignArm({
     seed,
     [],
     [],
+    // The same bounds and clipping `designArea` uses for a named place.
+    place
+      ? { name: clip(place.name, 60), brief: clip(place.brief, 600) }
+      : undefined,
   );
   const answers: unknown[] = [];
   let failure: unknown;
-  log(`${designCaseId(seed)} ${setting} rep ${rep} starting`);
+  log(`${caseId} ${setting} rep ${rep} starting`);
   try {
     const result = await prepareDesignedRun(draft, {
       signal,
@@ -282,6 +351,7 @@ export async function runDesignArm({
     answers,
     usage,
     error: failure,
+    placeTag: place?.tag,
   });
   appendFileSync(resultsFile, `${JSON.stringify(row)}\n`, { mode: 0o600 });
   log(`${row.caseId} ${setting} rep ${rep}: ${row.outcome}`);
@@ -309,12 +379,29 @@ export interface DesignSeedsInput extends Omit<
   seeds: unknown;
 }
 
+/** `--place-file` holds one JSON object: `{tag, name, brief}`. */
+export function readPlaceFile(path: string): DesignPlace {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    throw Error(`--place-file ${path} is not valid JSON`);
+  }
+  const place = parsePlace(parsed);
+  if (!place)
+    throw Error(
+      `Pass a {tag, name, brief} place object in --place-file ${path}`,
+    );
+  return place;
+}
+
 /** Seeds run one at a time: every design is a long, dependent conversation. */
 export async function runDesignSeeds({
   settings,
   seeds,
   out,
   ephemeral = false,
+  place: requestedPlace,
   ...rest
 }: DesignSeedsInput) {
   const list = Array.isArray(settings) ? settings : String(settings).split(",");
@@ -325,9 +412,11 @@ export async function runDesignSeeds({
       : []),
   ];
   const wanted = parseSeeds(seeds);
+  // Validate the place once, before a case file or an arm exists.
+  const place = parsePlace(requestedPlace);
   assertSafeOut(out, { ephemeral });
   privateDirectory(out);
-  writeDesignCases(out, wanted);
+  writeDesignCases(out, wanted, place);
   const rows: { skipped: boolean; row: DesignRow }[] = [];
   for (const seed of wanted)
     for (const setting of chosen) {
@@ -337,6 +426,7 @@ export async function runDesignSeeds({
         seed,
         out,
         ephemeral,
+        place,
       });
       if (!arm.skipped) rows.push(arm);
     }
@@ -354,12 +444,17 @@ async function main(argv: string[]) {
   const rep = args.rep === undefined ? 0 : Number(args.rep);
   if (!Number.isInteger(rep) || rep < 0)
     throw Error(`--rep must be a non-negative integer (got ${args.rep})`);
+  const place =
+    args["place-file"] === undefined
+      ? undefined
+      : readPlaceFile(String(args["place-file"]));
   const rows = await runDesignSeeds({
     settings: args.setting,
     seeds: args.seeds,
     out,
     rep,
     ephemeral: !!args.ephemeral,
+    place,
     log: (text) => console.log(text),
   });
   const valid = rows.filter(({ row }) => row.outcome === "valid").length;

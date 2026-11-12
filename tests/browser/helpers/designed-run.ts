@@ -1,6 +1,27 @@
 import { expect, test, type Page } from "@playwright/test";
 import { environmentDesignFixture } from "../../helpers/environment-design";
 import { qualityFixtureReply } from "../../helpers/quality-design";
+import { answerVoicePrompt, chooseVoiceIfAsked } from "./voice-prompt";
+
+/** A New game asks for the voice before it requests the design, sometimes after
+ * an epilogue request has settled, so give that prompt the full allowance. */
+async function settleVoice(page: Page) {
+  await answerVoicePrompt(page);
+  await chooseVoiceIfAsked(page);
+}
+
+/** Click Start. A run without escape state asks for the voice immediately, and
+ * the status waits that follow never run locator handlers, so answer it here.
+ * A preparing run opens the design dialog first and asks only on the Start
+ * after it, so it is never prompted. */
+async function clickStart(page: Page) {
+  await page.locator("#start").click();
+  const prompted = await page.evaluate(() => {
+    const game = (window as any).__deadAir?.game;
+    return !!game && !game.preparingRun && !game.escape;
+  });
+  if (prompted) await chooseVoiceIfAsked(page);
+}
 
 const design = environmentDesignFixture();
 interface SyntheticDesigner {
@@ -72,6 +93,18 @@ async function syntheticDesigner(page: Page, activate = true) {
           json: qualityFixtureReply(body.payload, design, [design]),
         });
       }
+      if (path === "/api/bridge" && request.method() === "POST") {
+        const operation = request.postDataJSON()?.operation;
+        // Escape narration has no synthetic answer: fail fast so the game falls
+        // back offline instead of leaving the request in flight.
+        if (typeof operation === "string" && operation.startsWith("escape-"))
+          return route.fulfill({
+            status: 503,
+            json: {
+              error: `No synthetic ${operation} in the browser fixture.`,
+            },
+          });
+      }
       return route.fallback();
     });
   }
@@ -130,8 +163,9 @@ export async function startRestartedRun(page: Page) {
     const game = (window as any).__deadAir.game;
     return game.status === "ready" && !game.preparingRun && !game.paused;
   });
+  await answerVoicePrompt(page);
   await expect(page.locator("#run-design-dialog")).toHaveCount(0);
-  await page.locator("#start").click();
+  await clickStart(page);
   await page.waitForFunction(() => {
     const game = (window as any).__deadAir.game;
     return game.status === "playing" && !game.paused;
@@ -141,6 +175,8 @@ export async function startRestartedRun(page: Page) {
 /** Complete every new run through the real quality pipeline using local replies. */
 export async function chooseDesignedRun(page: Page) {
   const designer = await syntheticDesigner(page);
+  // A New game asks for the voice before it requests the design.
+  await settleVoice(page);
   const dialog = page.locator("#run-design-dialog");
   const previousId = designer.previousRunId!;
   // A restart may have checked the study mock's capabilities before this helper
@@ -169,7 +205,7 @@ export async function chooseDesignedRun(page: Page) {
   await expect(dialog).toHaveCount(0);
   await expect(page.locator("#start-card")).toBeVisible();
   await finishSyntheticDesign(page, designer);
-  await page.locator("#start").click();
+  await clickStart(page);
   await page.waitForFunction(() => {
     const game = (window as any).__deadAir.game;
     return game.status === "playing" && !game.paused;
@@ -197,7 +233,7 @@ export async function startDesignedRun(page: Page) {
     () => !!(window as any).__deadAir.game.preparingRun,
   );
   await syntheticDesigner(page, preparing);
-  await page.locator("#start").click();
+  await clickStart(page);
   if (preparing) await chooseDesignedRun(page);
   else {
     await page.waitForFunction(() => {
