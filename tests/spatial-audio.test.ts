@@ -782,3 +782,42 @@ test("horde, footsteps, drag and the bounded oscillator fallback all retain real
       .every((s) => s.stops.includes(undefined)),
   );
 });
+
+test("speech loudness and range follow the delivery, matching what survivors can hear", () => {
+  // Quieter at the same spot for a whisper, louder for an urgent warning.
+  const gainAt = (delivery: "whisper" | "calm" | "urgent", dx: number) => {
+    const audio = graph(),
+      g = fixture(),
+      actor = g.survivors[1];
+    actor.escaped = false;
+    Object.assign(actor, {
+      x: g.survivors[0].x + dx,
+      y: g.survivors[0].y,
+      floor: 0,
+    });
+    audio.director.start();
+    audio.director.update(g, { yaw: 0 });
+    const started = audio.director.speak(g, {
+      id: `${delivery}-${dx}`,
+      actorId: actor.id,
+      delivery,
+      buffer: buffer(),
+    });
+    const gain = started ? path(audio.sources.at(-1)!)[2].gain.value : 0;
+    audio.director.stop();
+    return { started, gain };
+  };
+  const whisper = gainAt("whisper", 1),
+    calm = gainAt("calm", 1),
+    urgent = gainAt("urgent", 1);
+  assert.ok(whisper.started && calm.started && urgent.started);
+  assert.ok(whisper.gain < calm.gain / 3, "a whisper is far quieter");
+  assert.ok(urgent.gain > calm.gain, "an urgent voice is louder");
+  // Survivors hear a whisper within 4 m and calm speech within 10 m; the
+  // player's audio stops at the same distances instead of at 18 m.
+  assert.equal(gainAt("whisper", 5).started, false);
+  assert.equal(gainAt("calm", 11).started, false);
+  assert.equal(gainAt("urgent", 11).started, true);
+  // Near the edge of its range a line fades rather than cutting off.
+  assert.ok(gainAt("calm", 9).gain < gainAt("calm", 7).gain / 2);
+});

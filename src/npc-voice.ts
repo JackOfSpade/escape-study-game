@@ -694,6 +694,7 @@ export class NpcVoiceDirector {
         !this.audio.speak(game, {
           id: reply.requestId,
           actorId: reply.actorId,
+          ...(reply.delivery === undefined ? {} : { delivery: reply.delivery }),
           buffer,
           onEnded,
         })
