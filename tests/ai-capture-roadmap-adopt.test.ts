@@ -460,6 +460,28 @@ test("the progress cases carry real study progress", async () => {
   }
 });
 
+test("progress adopt cases carry only realistic study text and real game evidence modes", async () => {
+  const cases = await PROGRESS_CASES;
+  for (const item of cases) {
+    const candidate = JSON.stringify(item.payload.candidate),
+      payload = JSON.stringify(item.payload);
+    assert.equal(
+      /synthetic/i.test(candidate),
+      false,
+      `${item.id} candidate still contains placeholder text`,
+    );
+    assert.equal(
+      /synthetic/i.test(payload),
+      false,
+      `${item.id} payload still contains placeholder text`,
+    );
+    assert.ok(
+      item.payload.candidate.includes("GAME_AI_ASSESSED_INDEPENDENT"),
+      `${item.id} candidate carries no game-assessed independent evidence row`,
+    );
+  }
+});
+
 test("a lone independent observation is adopted as one imported scope", async () => {
   const { item, l } = await adoptProgress(PROGRESS_IDS[0]);
   const [scopeId] = item.expected!.completeScopes;
