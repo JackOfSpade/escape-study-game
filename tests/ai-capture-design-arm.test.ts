@@ -138,10 +138,10 @@ test("every stage of the arm receives the forced model and effort", async () => 
       phase,
     );
   }
-  // The forced arm overrides production's effort for the content batch too.
+  // The forced arm overrides production's high effort for the content batch.
   assert.equal(
     taskProfile("design-run", { phase: "content-batch" }).effort,
-    "medium",
+    "high",
   );
   assert.equal(arm.profiles[arm.phases.indexOf("content-batch")].effort, "low");
   const [model, effort, seed, rep, ...stamp] =

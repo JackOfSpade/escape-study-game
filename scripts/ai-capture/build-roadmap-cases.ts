@@ -78,6 +78,53 @@ function insertAfter(text: string, prefix: string, added: string[]) {
   });
 }
 
+/** Insert rows after the one row that contains `marker` (marker is unique). */
+function insertAfterRow(text: string, marker: string, added: string[]) {
+  return rows(text, (lines) => {
+    const found = lines
+      .map((line, index) => ({ line, index }))
+      .filter(
+        (entry) => entry.line.startsWith("|") && entry.line.includes(marker),
+      );
+    if (found.length !== 1)
+      throw Error(
+        `insertAfterRow: expected one row containing ${JSON.stringify(marker)}, found ${found.length}`,
+      );
+    lines.splice(found[0].index + 1, 0, ...added);
+  });
+}
+
+/** Replace the one row that contains `marker` (marker must be unique). */
+function replaceRow(text: string, marker: string, row: string) {
+  return rows(text, (lines) => {
+    const found = lines
+      .map((line, index) => ({ line, index }))
+      .filter(
+        (entry) => entry.line.startsWith("|") && entry.line.includes(marker),
+      );
+    if (found.length !== 1)
+      throw Error(
+        `replaceRow: expected one row containing ${JSON.stringify(marker)}, found ${found.length}`,
+      );
+    lines[found[0].index] = row;
+  });
+}
+
+/** Replace every occurrence of exact text, requiring the expected count. */
+function replaceAll(
+  text: string,
+  before: string,
+  after: string,
+  count: number,
+) {
+  const seen = text.split(before).length - 1;
+  if (seen !== count)
+    throw Error(
+      `replaceAll: expected ${count} occurrences of ${JSON.stringify(before)}, found ${seen}`,
+    );
+  return text.split(before).join(after);
+}
+
 function dropRows(text: string, prefixes: string[]) {
   return rows(text, (lines) => {
     for (const prefix of prefixes) {
@@ -104,7 +151,9 @@ function editCells(
 ) {
   return rows(text, (lines) => {
     const { index, line } = only(lines, prefix, "editCells");
-    const cells = line.slice(1, -1).split(" | ");
+    // "| a | b |" -> ["a", "b"]: drop the outer "| " and " |" so a rewritten
+    // row keeps the document's exact single-space cell padding.
+    const cells = line.slice(2, -2).split(" | ");
     for (const [at, value] of Object.entries(changes))
       cells[Number(at)] = value;
     lines[index] = `| ${cells.join(" | ")} |`;
@@ -212,6 +261,185 @@ export const RECIPES: RoadmapRecipe[] = [
   },
 ];
 
+const ADMIN_DATE = "2026-09-20";
+const ADMIN_SESSION = "S0007";
+const ADMIN_DECISION = "DEC0028";
+const NEXT_DECISION = "DEC0029";
+
+/** One learner-requested administrative change, recorded as revision 10. */
+export type AdoptRecipe = RoadmapRecipe & {
+  /** Cells 2-5 of the new shared decision row (id, date/session and status fixed). */
+  decision: { type: string; scope: string; reason: string; expiry: string };
+  /** One clause naming the change in each track's revision-history row. */
+  recorded: string;
+};
+
+const decisionRow = (recipe: AdoptRecipe) =>
+  `| ${[
+    ADMIN_DECISION,
+    `${ADMIN_DATE} / ${ADMIN_SESSION}`,
+    recipe.decision.type,
+    recipe.decision.scope,
+    recipe.decision.reason,
+    recipe.decision.expiry,
+    "ACTIVE",
+  ].join(" | ")} |`;
+
+/**
+ * Record one learner-requested administrative change the way the roadmap's own
+ * protocol records a distinct saved change: `updated_on` plus one revision bump
+ * (`revise()` sets `previous_revision` and `parent_file_sha256`), a new shared
+ * decision row after DEC0027, advanced shared decision counters in the S0.2
+ * declaration and both reserved rows, a revision-history row in each track, and
+ * save anchors that describe merged revision 10 and its parent. Nothing here
+ * adds, reorders or re-scores a record; the change is learner-reported, never
+ * evidence and never a mastery claim.
+ */
+export function recordAdministrativeRevision(raw: string, recipe: AdoptRecipe) {
+  const parent = createHash("sha256").update(raw).digest("hex");
+  const history = (track: "PY" | "PE") =>
+    `| Merged r10 | ${ADMIN_DATE} | ${recipe.recorded} Shared ${ADMIN_DECISION} records the learner's request; ${track} curriculum and learning evidence are unchanged, so this administrative save closes no study. | None; no ${track} learning evidence or checkpoint state changed. |`;
+  let text = recipe.edit(raw);
+  text = insertAfterRow(text, "| DEC0027 |", [decisionRow(recipe)]);
+  text = replaceAll(
+    text,
+    "next shared decision DEC0028",
+    `next shared decision ${NEXT_DECISION}`,
+    2,
+  );
+  text = editOnce(
+    text,
+    "and decision DEC0028.",
+    `and decision ${NEXT_DECISION}.`,
+  );
+  text = editOnce(
+    text,
+    "G0048 and shared DEC0027 are allocated",
+    `G0048 and shared DEC0027–${ADMIN_DECISION} are allocated`,
+  );
+  text = editOnce(
+    text,
+    'updated_on: "2026-09-19"',
+    `updated_on: "${ADMIN_DATE}"`,
+  );
+  text = replaceRow(
+    text,
+    "| Save anchor | Merged revision 9, 2026-09-19",
+    `| Save anchor | Merged revision 10, ${ADMIN_DATE}, is a mid-session save from uploaded merged revision 9 (parent SHA-256 \`${parent}\`). It records the learner-requested administrative change as ${ADMIN_DECISION} with no study outcome and no evidence claim. Next distinct saved change becomes merged revision 11 |`,
+  );
+  text = replaceRow(
+    text,
+    "Track PY learning state is unchanged inside merged revision 9",
+    `| Save anchor | Track PY learning state is unchanged inside merged revision 10; shared ${ADMIN_DECISION} records the learner-requested administrative change. Revision 10 parent is \`${parent}\` and PY curriculum bytes are unchanged. Next distinct merged save becomes revision 11 |`,
+  );
+  text = replaceRow(
+    text,
+    "Track PE updated inside merged revision 9",
+    `| Save anchor | Track PE carries the ${ADMIN_DECISION} administrative note inside merged revision 10 from uploaded merged revision 9 parent \`${parent}\`; no PE learning record moved. Curriculum bytes are unchanged and the next distinct merged save becomes revision 11 |`,
+  );
+  text = insertAfterRow(
+    text,
+    "Mid-session S0007 save affected PE learning state only",
+    [history("PY")],
+  );
+  text = insertAfterRow(
+    text,
+    "Mid-session S0007 save: X08 W0 visit completed using TypeScript",
+    [history("PE")],
+  );
+  text = editOnce(
+    text,
+    "If revision 9 is used in a genuinely new session",
+    "If revision 10 is used in a genuinely new session",
+  );
+  text = editOnce(
+    text,
+    "S0007; merged revision 9; 2026-09-19; mid-session save, not a session close",
+    `S0007; merged revision 10; ${ADMIN_DATE}; mid-session administrative save, not a session close`,
+  );
+  return text;
+}
+
+/**
+ * Cases where adopting the incoming revision is the correct review. Every
+ * candidate is a sibling revision whose only changes are administrative rows:
+ * no recorded observation, objective, gate or rule block moves, and the change
+ * is fully recorded as revision 10 (DEC0028, advanced counters, a
+ * revision-history row and updated save anchors), so the game accepts adoption
+ * once each changed row is resolved as "incoming".
+ */
+export const ADOPT_RECIPES: AdoptRecipe[] = [
+  {
+    id: "administrative-profile",
+    conflict:
+      "candidate records a learner-reported design-systems profile addition in the shared Learner row and PE Section 0.1 as a complete revision 10; local work is untouched and the incoming administrative profile should be adopted",
+    decision: {
+      type: "LEARNER_PROFILE",
+      scope:
+        "Both tracks; shared S0.1 Learner row and PE Section 0.1 career goal",
+      reason:
+        "Learner asked that the reported profile note an added design-systems depth. This is a learner-reported preference, not evidence, and it changes no objective, checkpoint, evidence row or denominator",
+      expiry:
+        "Until the learner reports a different profile; confers no learning credit",
+    },
+    recorded:
+      "The shared Learner row and the PE Section 0.1 career goal note the learner-reported design-systems depth.",
+    edit: (raw) =>
+      editCells(
+        editOnce(
+          raw,
+          "rather than repeating current work (learner statement, 2026-09-15) |",
+          "rather than repeating current work (learner statement, 2026-09-15; S0007 learner-reported update adds design-systems depth, recorded as DEC0028 and not treated as evidence) |",
+        ),
+        "| Learner |",
+        {
+          1: "Mid-level engineer pivoting from internal tools to customer-facing product work; administrative profile updated from S0007 to add design-systems depth, with details in PE Section 0.1 (contact details deliberately not stored)",
+        },
+      ),
+  },
+  {
+    id: "administrative-deadline-window",
+    conflict:
+      "candidate records the learner-reported interview window as an availability note in the shared session-length row, with a complete revision 10 record; no study record moves and the note should be adopted",
+    decision: {
+      type: "SCHEDULE_AVAILABILITY",
+      scope:
+        "Both tracks; shared S0.1 session length and interview deadline row",
+      reason:
+        "Learner reported an on-site interview loop from 2026-10-05 to 2026-10-09 and asked that no study visit or due review fall inside it. Availability only: no session, attempt, evidence row, checkpoint or denominator changes",
+      expiry:
+        "Until 2026-10-09 passes; revisit only if the learner moves the loop",
+    },
+    recorded:
+      "The shared session-length row notes the learner-reported 2026-10-05 to 2026-10-09 interview window with no study visit inside it.",
+    edit: (raw) =>
+      editCells(raw, "| Session length / interview deadline |", {
+        1: "On-site interview loop 2026-10-05 to 2026-10-09 (learner report, DEC0028): schedule no study visit or due review inside that window. Session length itself is still unconfirmed",
+      }),
+  },
+  {
+    id: "administrative-decision-reason",
+    conflict:
+      "candidate rewords the reason of one administrative shared decision (DEC0019) without changing its scope, status or effect and records that clarification as a complete revision 10; the clearer wording should be adopted",
+    decision: {
+      type: "DECISION_CLARIFICATION",
+      scope:
+        "Shared S0.3 administrative decision DEC0019 and its ratio and format rule",
+      reason:
+        "Learner asked for clearer wording in the reason of shared decision DEC0019. Only that wording changes; its scope, status, 1 PY : 2 PE ratio and effect are unchanged and no study record moves",
+      expiry: "Wording only; DEC0019 stays ACTIVE until the learner changes it",
+    },
+    recorded:
+      "The reason of shared administrative decision DEC0019 is reworded for clarity at the learner's request with no change to its scope, status, ratio or effect.",
+    edit: (raw) =>
+      editOnce(
+        raw,
+        "Two interview-loop research reports (S0.6) agree that algorithms remain in many loops",
+        "Two interview-loop research reports (S0.6) agree that algorithm questions remain in many loops",
+      ),
+  },
+];
+
 /** Turn a raw candidate into a sibling revision of the checked-in roadmap. */
 export function revise(raw: string, parent: string, revision = 10) {
   return raw
@@ -228,6 +456,19 @@ async function capturePayload(
   roadmap: Roadmap,
   candidate: string,
 ): Promise<RoadmapPayload> {
+  const { payload } = await openReconciliation(roadmap, candidate);
+  return payload;
+}
+
+/**
+ * Start a reconciliation with an intercepted requester and hand back both the
+ * captured payload and the game that owns it, so a caller can resume the same
+ * saved request offline. No provider is contacted.
+ */
+export async function openReconciliation(
+  roadmap: Roadmap,
+  candidate: string,
+): Promise<{ g: ReturnType<typeof createGame>; payload: RoadmapPayload }> {
   const g = createGame(7, roadmap);
   g.study.profile = "live";
   let payload: unknown;
@@ -237,7 +478,73 @@ async function capturePayload(
   });
   if (!payload)
     throw Error("reconcileRoadmap never reached its request stage; no payload");
-  return payload as RoadmapPayload;
+  return { g, payload: payload as RoadmapPayload };
+}
+
+/** Build one adopt case per recipe: the candidate changes administrative rows only. */
+export async function buildAdoptCases({
+  roadmap,
+}: { roadmap?: Roadmap } = {}): Promise<RoadmapCase[]> {
+  const base = roadmap ?? loadRoadmap();
+  const seen = new Map<string, string>();
+  const cases: RoadmapCase[] = [];
+  for (const recipe of ADOPT_RECIPES) {
+    // A fresh copy keeps one case's learner state out of the next payload.
+    const local: Roadmap = JSON.parse(JSON.stringify(base)) as Roadmap;
+    const candidate = revise(
+      recordAdministrativeRevision(local.raw, recipe),
+      local.sourceHash,
+    );
+    if (candidate === local.raw)
+      throw Error(`Adopt recipe ${recipe.id} produced an unchanged candidate`);
+    const payload = await capturePayload(local, candidate);
+    const hash = createHash("sha256")
+      .update(JSON.stringify([payload.local, payload.candidate]))
+      .digest("hex");
+    if (seen.has(hash))
+      throw Error(
+        `Adopt recipes ${seen.get(hash)} and ${recipe.id} produced the same payload`,
+      );
+    seen.set(hash, recipe.id);
+    cases.push({
+      id: `${RECONCILE_OPERATION}-adopt-${recipe.id}`,
+      operation: RECONCILE_OPERATION,
+      payload,
+    });
+  }
+  return cases;
+}
+
+export const ADOPT_FILE = `${RECONCILE_OPERATION}-adopt.json`;
+
+/** Write the adopt case file and merge its count into the shared index. */
+export async function writeAdoptCases(
+  out: string,
+  built?: RoadmapCase[],
+): Promise<{ cases: RoadmapCase[]; index: Record<string, number> }> {
+  const cases = built ?? (await buildAdoptCases());
+  const target = resolve(out);
+  mkdirSync(target, { recursive: true, mode: 0o700 });
+  chmodSync(target, 0o700);
+  const file = join(target, ADOPT_FILE);
+  writeFileSync(file, `${JSON.stringify(cases, null, 2)}\n`, { mode: 0o600 });
+  chmodSync(file, 0o600);
+  const indexFile = join(target, "index.json");
+  let index: Record<string, number> = {};
+  try {
+    const existing: unknown = JSON.parse(readFileSync(indexFile, "utf8"));
+    if (!existing || typeof existing !== "object" || Array.isArray(existing))
+      throw Error("index.json must hold an operation -> count object");
+    index = existing as Record<string, number>;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+  index[`${RECONCILE_OPERATION}-adopt`] = cases.length;
+  writeFileSync(indexFile, `${JSON.stringify(index, null, 2)}\n`, {
+    mode: 0o600,
+  });
+  chmodSync(indexFile, 0o600);
+  return { cases, index };
 }
 
 /** Build `count` distinct reconcile-roadmap payloads without any network. */
@@ -319,8 +626,15 @@ function argument(name: string, fallback?: string) {
 const entry = process.argv[1] ? resolve(process.argv[1]) : "";
 if (entry === fileURLToPath(import.meta.url)) {
   const out = argument("--out", ".local/ai-cases")!;
+  const set = argument("--set", "default");
+  if (set !== "default" && set !== "adopt")
+    throw Error(
+      `--set must be "default" or "adopt" (got ${JSON.stringify(set)})`,
+    );
   const count = Number(argument("--count", String(DEFAULT_COUNT)));
-  writeRoadmapCases(out, count).then(
+  const written =
+    set === "adopt" ? writeAdoptCases(out) : writeRoadmapCases(out, count);
+  written.then(
     ({ cases, index }) => {
       const characters = cases.reduce(
         (sum, item) =>
@@ -330,7 +644,7 @@ if (entry === fileURLToPath(import.meta.url)) {
         0,
       );
       console.log(
-        `Wrote ${cases.length} ${RECONCILE_OPERATION} cases to ${resolve(out)} (${characters} local+candidate characters); index: ${JSON.stringify(index)}.`,
+        `Wrote ${cases.length} ${set === "adopt" ? `${RECONCILE_OPERATION}-adopt` : RECONCILE_OPERATION} cases to ${resolve(out)} (${characters} local+candidate characters); index: ${JSON.stringify(index)}.`,
       );
     },
     (error) => {

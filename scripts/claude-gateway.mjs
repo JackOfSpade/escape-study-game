@@ -68,11 +68,7 @@ export const TASK_PROFILES = Object.freeze({
     ...live(120_000, "haiku", "medium"),
     stableKeys: ["instruction", "definition"],
   },
-  "reconcile-roadmap": {
-    ...authoring("high"),
-    model: "sonnet",
-    stableKeys: ["instruction"],
-  },
+  "reconcile-roadmap": { ...authoring(), stableKeys: ["instruction"] },
   "npc-chatter": {
     model: "haiku",
     effort: "high",
@@ -85,15 +81,18 @@ export const TASK_PROFILES = Object.freeze({
     timeoutMs: 45_000,
     stableKeys: ["instruction"],
   },
-  "design-run": { ...authoring("medium"), model: "sonnet", stableKeys: [] },
+  "design-run": { ...authoring(), stableKeys: [] },
 });
-/** No payload overrides remain: every stage of a task runs its profile's model
- * and effort. The design-run content-batch high override was removed because
- * the 2026-11-11 ladder ran every stage at Sonnet medium with no quality loss. */
+/** The only payload override left: `design-run` writes its content batches at
+ * high effort. The 2026-11-11 follow-up ladders (the confirmation run and the
+ * dearer steps) put its knee back at production, Opus medium with the content
+ * batch at high. */
 export function taskProfile(operation, payload) {
   const profile = TASK_PROFILES[operation];
   if (!profile) throw Error("Unknown AI task");
-  return profile;
+  return operation === "design-run" && payload?.phase === "content-batch"
+    ? { ...profile, effort: "high" }
+    : profile;
 }
 
 /** Holds the teaching behaviour of the /learn skill without needing it loaded,
