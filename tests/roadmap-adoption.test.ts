@@ -61,6 +61,45 @@ function reply(p: RoadmapReconciliationPayload): RoadmapReconciliation {
       "Synthetic native review only; not genuine semantic certification",
   };
 }
+test("the reconcile instruction names the game's own evidence modes and incoming descendant records", async () => {
+  const { g } = fixture();
+  let instruction = "";
+  await reconcileRoadmap(g, r, candidate(), async (p) => {
+    instruction = p.instruction;
+    return reply(p);
+  });
+  for (const mode of [
+    "GAME_AI_ASSESSED_INDEPENDENT",
+    "GAME_AI_ASSESSED_ASSISTED",
+    "GAME_AI_ASSESSED_CONTRADICTED",
+    "GAME_AI_ASSESSED_UNKNOWN",
+  ])
+    assert.ok(instruction.includes(mode), `instruction omits ${mode}`);
+  assert.ok(
+    instruction.includes("source records from the device that saved it"),
+    "instruction does not treat incoming descendant records as source records",
+  );
+});
+test("the reconcile instruction spells out the definitions and mappings shapes", async () => {
+  const { g } = fixture();
+  let instruction = "";
+  await reconcileRoadmap(g, r, candidate(), async (p) => {
+    instruction = p.instruction;
+    return reply(p);
+  });
+  assert.ok(
+    instruction.includes(
+      "{id,objectiveId,depth,sourceScope,facets:[{id,description}]}",
+    ),
+    "instruction does not spell out the definitions entry shape",
+  );
+  assert.ok(
+    instruction.includes(
+      "{scopeId,facet,outcome,evidenceIds,sourceExcerpts,rationale}",
+    ),
+    "instruction does not spell out the mappings entry shape",
+  );
+});
 test("visible roadmap material is private assistance at its actual presentation cutoff, never NPC context or human proof", () => {
   const { g, l } = fixture(),
     h = g.survivors[0],

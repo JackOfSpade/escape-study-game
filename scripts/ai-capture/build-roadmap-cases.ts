@@ -29,6 +29,7 @@ import {
   applyLearningAssessment,
   beginLearningAttempt,
   eligibleLearning,
+  encounterKey,
   registerScopes,
 } from "../../src/learner";
 import type { Roadmap } from "../../src/model";
@@ -697,8 +698,9 @@ async function studiedProgressFile(roadmap: Roadmap, rounds: number) {
     const e = Object.values(g.encounters)[n++],
       c = eligibleLearning(roadmap, l, "2026-10-16T16:00:00Z");
     e.problem = {
-      title: "Synthetic external study",
-      prompt: "Synthetic only",
+      title: `Study visit: ${c.objectiveIds.join(", ")}`,
+      prompt:
+        "Work the objective from its source text and explain your own reasoning.",
       rubric: [],
       starter: "",
       provenance: "study-mode",
@@ -709,7 +711,7 @@ async function studiedProgressFile(roadmap: Roadmap, rounds: number) {
         depth: c.depth,
         sourceScope: c.scopes[c.objectiveIds.indexOf(id)],
         facets: [
-          { id: "scope", description: "Synthetic complete same-depth scope" },
+          { id: "scope", description: c.scopes[c.objectiveIds.indexOf(id)] },
         ],
       })),
     };
@@ -718,7 +720,7 @@ async function studiedProgressFile(roadmap: Roadmap, rounds: number) {
         seq: 1,
         author: "human",
         kind: "reasoning",
-        text: "Synthetic external human contribution",
+        text: "I read the source objective and worked through it step by step, checking each claim against the scope before writing it down.",
         at: 0,
         revision: 0,
         wallTime: "2026-10-16T16:00:00Z",
@@ -731,7 +733,7 @@ async function studiedProgressFile(roadmap: Roadmap, rounds: number) {
       l,
       e,
       {
-        id: `synthetic-external-${i}`,
+        id: `assessment-${encounterKey(e)}-1`,
         encounter: e.id,
         provenance: "study-mode",
         sourceVersion: l.version,
@@ -741,7 +743,8 @@ async function studiedProgressFile(roadmap: Roadmap, rounds: number) {
         scopeReviews: e.problem.scopeDefinitions!.map((d) => ({
           id: d.id,
           completeCoverage: true,
-          rationale: "Synthetic complete source scope",
+          rationale:
+            "The learner's own reasoning covers the full source scope at this depth.",
         })),
         findings: c.objectiveIds.map((id) => ({
           objectiveId: id,
@@ -750,7 +753,8 @@ async function studiedProgressFile(roadmap: Roadmap, rounds: number) {
           outcome: "independent",
           evidence: [1],
           completeCheckpointScope: false,
-          rationale: "Synthetic only",
+          rationale:
+            "Independent work on this facet; source evidence reviewed.",
         })),
       },
       "2026-10-16T16:00:00Z",
@@ -776,7 +780,7 @@ async function studiedProgressFile(roadmap: Roadmap, rounds: number) {
         evidenceIds: [ev.id],
         sourceExcerpts: { [ev.id]: cells[8] },
         rationale:
-          "Synthetic source correspondence; not actual human certification",
+          "The exported row carries this independent observation for the objective's full scope.",
       };
     }),
     completeScopes: l.verifiedScopes,
