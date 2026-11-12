@@ -1,5 +1,6 @@
 import { loadSfx, SFX, type SoundSample } from "./sfx";
 import { type Game } from "./model";
+import { npcSpeechHearingRange, type NpcSpeechDelivery } from "./npc-hearing";
 import { surfacePoint } from "./furniture-geometry";
 import {
   captureHordeAcoustics,
@@ -34,17 +35,33 @@ interface Voice {
   id?: string;
   envelope?: GainNode;
   onEnded?: (completed?: boolean) => void;
+  /** Speech only: the distance at which this delivery stops carrying. */
+  range?: number;
 }
 export interface SpeechPlayback {
   id: string;
   actorId: string;
   buffer: AudioBuffer;
+  /** How the line is spoken; sets its loudness and how far it carries. */
+  delivery?: NpcSpeechDelivery;
   /** False when cancelled before the utterance finished. */
   onEnded?: (completed?: boolean) => void;
 }
 const MAX_SPEECH_SECONDS = 12;
 const MAX_SPEECH_BYTES = 1_000_000;
 const MIN_SPEECH_GAIN = 0.001;
+/** Source level of each delivery before distance and walls. A whisper is far
+ * quieter than ordinary speech and a raised, urgent voice louder, so what the
+ * player hears matches what nearby survivors can hear. */
+export const SPEECH_LEVEL: Readonly<Record<NpcSpeechDelivery, number>> =
+  Object.freeze({ whisper: 0.12, calm: 0.45, relieved: 0.45, urgent: 0.65 });
+/** Speech carries as far for the player as for survivors (npc-hearing.ts),
+ * fading out over the last quarter of that range instead of cutting off. */
+export function speechFade(distance: number, range: number) {
+  if (!Number.isFinite(distance) || distance >= range) return 0;
+  const start = range * 0.75;
+  return distance <= start ? 1 : (range - distance) / (range - start);
+}
 
 export class AudioDirector {
   ctx?: AudioContext;
@@ -210,16 +227,28 @@ export class AudioDirector {
     );
     if (!actor) return false;
     const origin = actorSoundOrigin(g, actor),
-      mix = this.mix(origin);
-    if (mix.distance > 18 || mix.gain * 0.45 < MIN_SPEECH_GAIN) return false;
+      mix = this.mix(origin),
+      delivery = speech.delivery ?? "calm",
+      level = SPEECH_LEVEL[delivery],
+      range = npcSpeechHearingRange(delivery),
+      fade = speechFade(mix.distance, range);
+    if (fade <= 0 || mix.gain * level * fade < MIN_SPEECH_GAIN) return false;
     const c = this.ctx!,
       source = c.createBufferSource();
     source.buffer = speech.buffer;
-    const voice = this.connectVoice(source, 0.45, 6500, "speech", origin);
+    const voice = this.connectVoice(
+      source,
+      level * fade,
+      6500,
+      "speech",
+      origin,
+    );
     if (!voice) {
       source.disconnect();
       return false;
     }
+    voice.gain = level;
+    voice.range = range;
     voice.actorId = speech.actorId;
     voice.id = speech.id;
     voice.onEnded = speech.onEnded;
@@ -419,7 +448,7 @@ export class AudioDirector {
           continue;
         }
         voice.origin = actorSoundOrigin(g, actor);
-        if (soundDistance(g, voice.origin) > 18) {
+        if (soundDistance(g, voice.origin) >= (voice.range ?? 18)) {
           this.finish(voice, true);
           continue;
         }
@@ -452,10 +481,12 @@ export class AudioDirector {
       }
       // Obstruction work stays bounded to the acoustic refresh. Distance is
       // cheap and follows the listener and emitter on every rendered frame.
-      const gain =
-        voice.gain *
-        voice.transmission *
-        distanceAttenuation(soundDistance(g, voice.origin));
+      const distance = soundDistance(g, voice.origin),
+        gain =
+          voice.gain *
+          voice.transmission *
+          distanceAttenuation(distance) *
+          (voice.range === undefined ? 1 : speechFade(distance, voice.range));
       if (voice.channel === "speech" && gain < MIN_SPEECH_GAIN) {
         this.finish(voice, true);
         continue;

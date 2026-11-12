@@ -222,7 +222,11 @@ test("ambient and actual impact/breach sound follow distance, floors and success
   event(g, "breach", "debris", 0).position = { x: 20.5, y: 15.5 };
   assert.match(soundEvents(g, before)[0].caption, /crashing debris/);
   g.survivors[0].floor = 1;
-  assert.equal(hordeSound(g).gain, 0);
+  // Another floor is faint through the slab, not silent, and far quieter
+  // than the same horde heard through an open barricade on its own floor.
+  const upstairs = hordeSound(g).gain;
+  assert.ok(upstairs > 0, "a horde one floor below is still faintly audible");
+  assert.ok(upstairs < open.gain / 100);
   assert.equal(soundEvents(g, seq).length, 0);
   g.survivors[0].floor = 0;
   g.time += 1;
@@ -287,7 +291,9 @@ test("cached horde propagation remixes live listener and source distances withou
     "a moving emitter also changes its live distance",
   );
   assert.equal(hordeSound(g, cache).origin?.x, zombie.x);
+  // The shared mixer's range is 24 m; 25 m away is out of hearing.
   a.x = 1.5;
+  zombie.x = 26.5;
   assert.equal(
     hordeSound(g, cache).gain,
     0,
