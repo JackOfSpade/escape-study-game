@@ -838,3 +838,44 @@ test("escaped multibyte content plus its exact inventory compose below accepted-
   const { artDescriptions: _, ...retained } = summary;
   assert.deepEqual(parseEnvironmentSummaries([retained]), [retained]);
 });
+
+test("every over-budget title and body is reported in one readable-budget error", () => {
+  const s = slots(),
+    c = content(s);
+  c.entries[0].title = [{ text: "An overlong poster title ".repeat(3) }];
+  c.entries[1].body = [
+    { text: "The lunch table still holds a folded invitation. ".repeat(3) },
+    { text: "The night crew is named on the inside of the card. ".repeat(3) },
+  ];
+  const titleLength = expandContentText(c.entries[0].title, c.fragments).length,
+    bodyLength = expandContentText(c.entries[1].body, c.fragments).length;
+  assert.ok(titleLength > s[0].maxTitle && bodyLength > s[1].maxBody);
+  assert.throws(
+    () => parseEnvironmentContent(c, structure(), s),
+    (error: unknown) => {
+      const message = (error as Error).message;
+      assert.match(
+        message,
+        /: 2 entries exceed their surface's readable budget: /,
+      );
+      assert.ok(
+        message.includes(
+          `entries[0].title for surface ${s[0].id} has ${titleLength} characters and exceeds the surface's readable budget of ${s[0].maxTitle}`,
+        ),
+      );
+      assert.ok(
+        message.includes(
+          `entries[1].body for surface ${s[1].id} has ${bodyLength} characters and exceeds the surface's readable budget of ${s[1].maxBody}`,
+        ),
+      );
+      assert.ok(message.endsWith("; shorten each to its limit"));
+      return true;
+    },
+  );
+  const single = content(s);
+  single.entries[0].title = [{ text: "An overlong poster title ".repeat(3) }];
+  assert.throws(
+    () => parseEnvironmentContent(single, structure(), s),
+    /1 entry exceeds its surface's readable budget: entries\[0\]\.title/,
+  );
+});

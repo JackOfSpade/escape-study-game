@@ -25,8 +25,16 @@ import { createHash } from "node:crypto";
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  applyLearningAssessment,
+  beginLearningAttempt,
+  eligibleLearning,
+  registerScopes,
+} from "../../src/learner";
 import type { Roadmap } from "../../src/model";
 import { reconcileRoadmap } from "../../src/roadmap-adoption";
+import type { RoadmapReconciliation } from "../../src/roadmap-adoption-types";
+import { prepareRoadmapExport } from "../../src/roadmap-export";
 import { createGame } from "../../src/world";
 
 export const RECONCILE_OPERATION = "reconcile-roadmap" as const;
@@ -41,7 +49,15 @@ export type RoadmapCase = {
   id: string;
   operation: typeof RECONCILE_OPERATION;
   payload: RoadmapPayload;
+  /** Imported progress a ready reply must carry; ignored by the offline ladder. */
+  expected?: RoadmapExpectation;
 };
+
+/** The reply fields that carry imported study progress into an adopted file. */
+export type RoadmapExpectation = Pick<
+  RoadmapReconciliation,
+  "definitions" | "mappings" | "completeScopes"
+>;
 
 const ROADMAP_FILE = "public/curriculum.json";
 
@@ -522,7 +538,10 @@ export async function writeAdoptCases(
   out: string,
   built?: RoadmapCase[],
 ): Promise<{ cases: RoadmapCase[]; index: Record<string, number> }> {
-  const cases = built ?? (await buildAdoptCases());
+  const cases = built ?? [
+    ...(await buildAdoptCases()),
+    ...(await buildProgressAdoptCases()),
+  ];
   const target = resolve(out);
   mkdirSync(target, { recursive: true, mode: 0o700 });
   chmodSync(target, 0o700);
@@ -652,4 +671,157 @@ if (entry === fileURLToPath(import.meta.url)) {
       process.exitCode = 1;
     },
   );
+}
+
+/** A fresh live game, mirroring the study fixture the reference test proves. */
+function liveStudy(roadmap: Roadmap) {
+  const g = createGame(7, roadmap);
+  g.study.profile = "live";
+  g.status = "playing";
+  g.zombies = [];
+  g.nextSpawn = Number.MAX_SAFE_INTEGER;
+  if (!g.study.learner) throw Error("a live study profile has no learner");
+  return { g, l: g.study.learner };
+}
+
+/**
+ * Run real study through the game's own learner functions and export the
+ * resulting descendant revision. One round records an independent observation
+ * on a single facet without completing the checkpoint scope; the full three
+ * rounds complete it and pass the checkpoint.
+ */
+async function studiedProgressFile(roadmap: Roadmap, rounds: number) {
+  const { g, l } = liveStudy(roadmap);
+  let n = 0;
+  for (let i = 0; i < rounds; i++) {
+    const e = Object.values(g.encounters)[n++],
+      c = eligibleLearning(roadmap, l, "2026-10-16T16:00:00Z");
+    e.problem = {
+      title: "Synthetic external study",
+      prompt: "Synthetic only",
+      rubric: [],
+      starter: "",
+      provenance: "study-mode",
+      contract: c,
+      scopeDefinitions: c.objectiveIds.map((id) => ({
+        id: `${id}/D${c.depth}`,
+        objectiveId: id,
+        depth: c.depth,
+        sourceScope: c.scopes[c.objectiveIds.indexOf(id)],
+        facets: [
+          { id: "scope", description: "Synthetic complete same-depth scope" },
+        ],
+      })),
+    };
+    e.history = [
+      {
+        seq: 1,
+        author: "human",
+        kind: "reasoning",
+        text: "Synthetic external human contribution",
+        at: 0,
+        revision: 0,
+        wallTime: "2026-10-16T16:00:00Z",
+      },
+    ];
+    registerScopes(roadmap, l, e);
+    beginLearningAttempt(roadmap, l, e, "2026-10-16T16:00:00Z");
+    applyLearningAssessment(
+      roadmap,
+      l,
+      e,
+      {
+        id: `synthetic-external-${i}`,
+        encounter: e.id,
+        provenance: "study-mode",
+        sourceVersion: l.version,
+        status: "pending",
+        evidenceCutoffSequence: 1,
+        visitOutcome: "usable",
+        scopeReviews: e.problem.scopeDefinitions!.map((d) => ({
+          id: d.id,
+          completeCoverage: true,
+          rationale: "Synthetic complete source scope",
+        })),
+        findings: c.objectiveIds.map((id) => ({
+          objectiveId: id,
+          depth: c.depth,
+          facet: "scope",
+          outcome: "independent",
+          evidence: [1],
+          completeCheckpointScope: false,
+          rationale: "Synthetic only",
+        })),
+      },
+      "2026-10-16T16:00:00Z",
+      "study-mode",
+    );
+  }
+  const file = await prepareRoadmapExport(roadmap, l);
+  const expected: RoadmapExpectation = {
+    definitions: Object.values(l.scopes),
+    mappings: l.evidence.map((ev) => {
+      const row = file.content
+        .split("\n")
+        .find((line) => line.startsWith(`| ${ev.id} |`));
+      if (!row) throw Error(`exported file has no evidence row for ${ev.id}`);
+      const cells = row
+        .split("|")
+        .slice(1, -1)
+        .map((v) => v.trim());
+      return {
+        scopeId: `${ev.objectiveId}/D${ev.depth}`,
+        facet: ev.facet,
+        outcome: "independent" as const,
+        evidenceIds: [ev.id],
+        sourceExcerpts: { [ev.id]: cells[8] },
+        rationale:
+          "Synthetic source correspondence; not actual human certification",
+      };
+    }),
+    completeScopes: l.verifiedScopes,
+  };
+  return { file, l, expected };
+}
+
+/** Descendants that carry real study progress, not hand-written rows. */
+const PROGRESS_ADOPT_RECIPES = [
+  { id: "progress-one-observation", rounds: 1 },
+  { id: "progress-checkpoint-pass", rounds: 3 },
+] as const;
+
+/**
+ * Build adopt cases whose candidate is a genuine descendant holding imported
+ * evidence, and record the reply fields that carry that progress across.
+ */
+export async function buildProgressAdoptCases({
+  roadmap,
+}: { roadmap?: Roadmap } = {}): Promise<RoadmapCase[]> {
+  const base = roadmap ?? loadRoadmap();
+  const cases: RoadmapCase[] = [];
+  for (const recipe of PROGRESS_ADOPT_RECIPES) {
+    // A fresh copy keeps one case's learner state out of the next payload.
+    const local: Roadmap = JSON.parse(JSON.stringify(base)) as Roadmap;
+    const { file, expected } = await studiedProgressFile(local, recipe.rounds);
+    if (file.content === local.raw)
+      throw Error(
+        `Progress recipe ${recipe.id} produced an unchanged candidate`,
+      );
+    const payload = await capturePayload(local, file.content);
+    if (payload.candidate !== file.content)
+      throw Error(
+        `Progress recipe ${recipe.id} captured a different candidate`,
+      );
+    if (payload.local !== local.raw)
+      throw Error(
+        `Progress recipe ${recipe.id} captured a different local file`,
+      );
+    cases.push({
+      id: `${RECONCILE_OPERATION}-adopt-${recipe.id}`,
+      operation: RECONCILE_OPERATION,
+      payload,
+      expected,
+    });
+  }
+  return cases;
 }

@@ -165,15 +165,15 @@ test("each task runs its chosen model and effort, latest aliases only", () => {
       tutor: "sonnet/low",
       complete: "sonnet/high",
       assess: "haiku/high",
-      generate: "sonnet/high",
-      "reconcile-roadmap": "opus/medium",
+      generate: "opus/medium",
+      "reconcile-roadmap": "opus/high",
       "npc-chatter": "haiku/high",
-      "design-run": "opus/medium",
+      "design-run": "sonnet/medium",
     },
   );
-  assert.equal(
-    taskProfile("design-run", { phase: "content-batch" }).effort,
-    "high",
+  assert.deepEqual(
+    taskProfile("design-run", { phase: "content-batch" }),
+    taskProfile("design-run", {}),
   );
 });
 
@@ -645,6 +645,54 @@ test("a session retry whose reply is rejected still logs that reply", async () =
   );
 });
 
+test("a still-invalid design content batch returns for the designer's repair", async () => {
+  for (const phase of ["content-batch", "content-revision"]) {
+    const { rows, log } = usageRows();
+    const g = gateway(['{"bad":1}', '{"bad":2}'], [], {
+      usageLog: log,
+      validate: (_job, answer) => {
+        if (answer.bad) throw Error("entry exceeds its readable budget");
+      },
+    });
+    assert.deepEqual(
+      await g.run("design-run", { generationId: `design-${phase}`, phase }),
+      { bad: 2 },
+    );
+    assert.deepEqual(
+      rows.map((row) => [row.phase, row.attempt, row.outcome]),
+      [
+        [phase, 0, "rejected"],
+        [phase, 1, "rejected"],
+      ],
+    );
+  }
+});
+
+test("a still-invalid answer outside the designer's phases still ends the call", async () => {
+  for (const [operation, payload] of [
+    ["design-run", { generationId: "design-structure", phase: "structure" }],
+    ["complete", {}],
+  ]) {
+    const { rows, log } = usageRows();
+    const g = gateway(['{"bad":1}', '{"bad":2}'], [], {
+      usageLog: log,
+      validate: (_job, answer) => {
+        if (answer.bad) throw Error("wrong shape");
+      },
+    });
+    await assert.rejects(g.run(operation, payload), {
+      code: "CLAUDE_INVALID_ANSWER",
+    });
+    assert.deepEqual(
+      rows.map((row) => [row.attempt, row.outcome]),
+      [
+        [0, "rejected"],
+        [1, "rejected"],
+      ],
+    );
+  }
+});
+
 test("a failed call logs its failure outcome and null measurements", async () => {
   const { rows, log } = usageRows();
   const g = gateway(
@@ -855,11 +903,11 @@ test("a session namespace gives each arm its own design conversation", async () 
   const resumed = gateway(
     [
       {
-        model: "claude-opus-5-5",
+        model: "claude-sonnet-5-5",
         result: resultEvent({ result: '{"ok":1}' }),
       },
       {
-        model: "claude-opus-5-5",
+        model: "claude-sonnet-5-5",
         result: resultEvent({ result: '{"ok":2}' }),
       },
     ],
@@ -922,7 +970,7 @@ test("replay capture keeps 24 live samples but a whole design conversation", asy
   assert.equal(sampleNames(store).length, 24);
   const design = gateway(
     Array.from({ length: 30 }, () => ({
-      model: "claude-opus-5-5",
+      model: "claude-sonnet-5-5",
       result: resultEvent({ result: '{"ok":1}' }),
     })),
     [],
