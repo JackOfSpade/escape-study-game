@@ -52,6 +52,15 @@ export interface LegacyRunExteriorDesign {
   streetLabels: string[];
   skyline: { minHeight: number; maxHeight: number; damageRate: number };
 }
+export type RunTitleCardFontGroup =
+  | "sans"
+  | "condensed"
+  | "serif"
+  | "display"
+  | "mono"
+  | "techno"
+  | "handwritten"
+  | "horror";
 export type RunTitleCardFont =
   | "space-grotesk"
   | "dm-sans"
@@ -67,7 +76,53 @@ export type RunTitleCardFont =
   | "vt323"
   | "creepster"
   | "caveat"
-  | "permanent-marker";
+  | "permanent-marker"
+  | "inter"
+  | "manrope"
+  | "work-sans"
+  | "rubik"
+  | "josefin-sans"
+  | "anton"
+  | "league-gothic"
+  | "barlow-condensed"
+  | "big-shoulders-display"
+  | "eb-garamond"
+  | "crimson-pro"
+  | "lora"
+  | "spectral"
+  | "old-standard-tt"
+  | "im-fell-english"
+  | "dm-serif-display"
+  | "cinzel"
+  | "bitter"
+  | "abril-fatface"
+  | "bodoni-moda"
+  | "limelight"
+  | "poiret-one"
+  | "monoton"
+  | "rye"
+  | "bungee"
+  | "black-ops-one"
+  | "stardos-stencil"
+  | "alfa-slab-one"
+  | "jetbrains-mono"
+  | "space-mono"
+  | "share-tech-mono"
+  | "major-mono-display"
+  | "orbitron"
+  | "audiowide"
+  | "press-start-2p"
+  | "homemade-apple"
+  | "reenie-beanie"
+  | "kalam"
+  | "shadows-into-light"
+  | "rock-salt"
+  | "patrick-hand"
+  | "nosifer"
+  | "eater"
+  | "unifrakturmaguntia"
+  | "pirata-one"
+  | "metal-mania";
 export interface RunTitleCardStyle {
   font: RunTitleCardFont;
   color: string;
@@ -80,8 +135,9 @@ export interface RunTitleCard {
 }
 export declare const TITLE_CARD_FONTS: Record<
   RunTitleCardFont,
-  { family: string; fallback: string }
+  { family: string; fallback: string; group: RunTitleCardFontGroup }
 >;
+export declare const TITLE_CARD_FONT_GROUPS: readonly RunTitleCardFontGroup[];
 export declare const TITLE_CARD_SIZES: {
   title: [number, number];
   story: [number, number];
@@ -308,6 +364,9 @@ export function summarizeRunDesign(
 export function runDesignNoveltyErrors(
   design: RunDesign | RunStructureV3,
   recent: RunDesignSummary[],
+): string[];
+export function titleCardSpoilerErrors(
+  design: RunDesign | RunStructureV3,
 ): string[];
 export function runDesignFingerprint(design: unknown): string;
 export function runStructureFingerprint(design: RunStructureV3): string;
