@@ -67,46 +67,310 @@ function parseDoorDesign(d, path) {
   );
 }
 /** Fonts the opening title card may use, keyed by the name the designer
- * returns. Each is a Google Fonts family loaded only when chosen; the stack
- * after it keeps the card readable offline. */
+ * returns. The 61 Google Fonts families are grouped by feel (sans, condensed,
+ * serif, display, mono, techno, handwritten, horror) so the title can suit the
+ * premise while the story stays readable. Each family is loaded only when
+ * chosen; the stack after it keeps the card readable offline. */
 export const TITLE_CARD_FONTS = {
+  // The original fifteen keys stay first and unchanged for saved designs.
   "space-grotesk": {
     family: "Space Grotesk",
     fallback: "system-ui, sans-serif",
+    group: "sans",
   },
-  "dm-sans": { family: "DM Sans", fallback: "system-ui, sans-serif" },
-  "archivo-black": { family: "Archivo Black", fallback: "Impact, sans-serif" },
-  oswald: { family: "Oswald", fallback: "'Arial Narrow', sans-serif" },
-  "bebas-neue": { family: "Bebas Neue", fallback: "Impact, sans-serif" },
+  "dm-sans": {
+    family: "DM Sans",
+    fallback: "system-ui, sans-serif",
+    group: "sans",
+  },
+  "archivo-black": {
+    family: "Archivo Black",
+    fallback: "Impact, sans-serif",
+    group: "display",
+  },
+  oswald: {
+    family: "Oswald",
+    fallback: "'Arial Narrow', sans-serif",
+    group: "condensed",
+  },
+  "bebas-neue": {
+    family: "Bebas Neue",
+    fallback: "Impact, sans-serif",
+    group: "condensed",
+  },
   "playfair-display": {
     family: "Playfair Display",
     fallback: "Georgia, serif",
+    group: "serif",
   },
   "cormorant-garamond": {
     family: "Cormorant Garamond",
     fallback: "Garamond, Georgia, serif",
+    group: "serif",
   },
   "libre-baskerville": {
     family: "Libre Baskerville",
     fallback: "Baskerville, Georgia, serif",
+    group: "serif",
   },
   "special-elite": {
     family: "Special Elite",
     fallback: "'Courier New', monospace",
+    group: "mono",
   },
   "courier-prime": {
     family: "Courier Prime",
     fallback: "'Courier New', monospace",
+    group: "mono",
   },
-  "ibm-plex-mono": { family: "IBM Plex Mono", fallback: "Menlo, monospace" },
-  vt323: { family: "VT323", fallback: "Menlo, monospace" },
-  creepster: { family: "Creepster", fallback: "Impact, fantasy" },
-  caveat: { family: "Caveat", fallback: "'Comic Sans MS', cursive" },
+  "ibm-plex-mono": {
+    family: "IBM Plex Mono",
+    fallback: "Menlo, monospace",
+    group: "mono",
+  },
+  vt323: { family: "VT323", fallback: "Menlo, monospace", group: "techno" },
+  creepster: {
+    family: "Creepster",
+    fallback: "Impact, fantasy",
+    group: "horror",
+  },
+  caveat: {
+    family: "Caveat",
+    fallback: "'Comic Sans MS', cursive",
+    group: "handwritten",
+  },
   "permanent-marker": {
     family: "Permanent Marker",
     fallback: "'Comic Sans MS', cursive",
+    group: "handwritten",
+  },
+  // sans
+  inter: { family: "Inter", fallback: "system-ui, sans-serif", group: "sans" },
+  manrope: {
+    family: "Manrope",
+    fallback: "system-ui, sans-serif",
+    group: "sans",
+  },
+  "work-sans": {
+    family: "Work Sans",
+    fallback: "'Helvetica Neue', Arial, sans-serif",
+    group: "sans",
+  },
+  rubik: { family: "Rubik", fallback: "system-ui, sans-serif", group: "sans" },
+  "josefin-sans": {
+    family: "Josefin Sans",
+    fallback: "'Trebuchet MS', sans-serif",
+    group: "sans",
+  },
+  // condensed
+  anton: {
+    family: "Anton",
+    fallback: "Impact, sans-serif",
+    group: "condensed",
+  },
+  "league-gothic": {
+    family: "League Gothic",
+    fallback: "'Arial Narrow', sans-serif",
+    group: "condensed",
+  },
+  "barlow-condensed": {
+    family: "Barlow Condensed",
+    fallback: "'Arial Narrow', sans-serif",
+    group: "condensed",
+  },
+  "big-shoulders-display": {
+    family: "Big Shoulders Display",
+    fallback: "Impact, sans-serif",
+    group: "condensed",
+  },
+  // serif
+  "eb-garamond": {
+    family: "EB Garamond",
+    fallback: "Garamond, Georgia, serif",
+    group: "serif",
+  },
+  "crimson-pro": {
+    family: "Crimson Pro",
+    fallback: "Georgia, serif",
+    group: "serif",
+  },
+  lora: { family: "Lora", fallback: "Georgia, serif", group: "serif" },
+  spectral: { family: "Spectral", fallback: "Georgia, serif", group: "serif" },
+  "old-standard-tt": {
+    family: "Old Standard TT",
+    fallback: "'Times New Roman', Times, serif",
+    group: "serif",
+  },
+  "im-fell-english": {
+    family: "IM Fell English",
+    fallback: "Garamond, Georgia, serif",
+    group: "serif",
+  },
+  "dm-serif-display": {
+    family: "DM Serif Display",
+    fallback: "Georgia, serif",
+    group: "serif",
+  },
+  cinzel: {
+    family: "Cinzel",
+    fallback: "'Times New Roman', serif",
+    group: "serif",
+  },
+  bitter: { family: "Bitter", fallback: "Georgia, serif", group: "serif" },
+  // display
+  "abril-fatface": {
+    family: "Abril Fatface",
+    fallback: "Georgia, serif",
+    group: "display",
+  },
+  "bodoni-moda": {
+    family: "Bodoni Moda",
+    fallback: "Didot, Georgia, serif",
+    group: "display",
+  },
+  limelight: {
+    family: "Limelight",
+    fallback: "Impact, sans-serif",
+    group: "display",
+  },
+  "poiret-one": {
+    family: "Poiret One",
+    fallback: "'Trebuchet MS', sans-serif",
+    group: "display",
+  },
+  monoton: {
+    family: "Monoton",
+    fallback: "Impact, sans-serif",
+    group: "display",
+  },
+  rye: { family: "Rye", fallback: "Georgia, serif", group: "display" },
+  bungee: {
+    family: "Bungee",
+    fallback: "Impact, sans-serif",
+    group: "display",
+  },
+  "black-ops-one": {
+    family: "Black Ops One",
+    fallback: "Impact, sans-serif",
+    group: "display",
+  },
+  "stardos-stencil": {
+    family: "Stardos Stencil",
+    fallback: "'Arial Narrow', sans-serif",
+    group: "display",
+  },
+  "alfa-slab-one": {
+    family: "Alfa Slab One",
+    fallback: "Georgia, serif",
+    group: "display",
+  },
+  // mono
+  "jetbrains-mono": {
+    family: "JetBrains Mono",
+    fallback: "Menlo, monospace",
+    group: "mono",
+  },
+  "space-mono": {
+    family: "Space Mono",
+    fallback: "'Courier New', monospace",
+    group: "mono",
+  },
+  // techno
+  "share-tech-mono": {
+    family: "Share Tech Mono",
+    fallback: "Menlo, monospace",
+    group: "techno",
+  },
+  "major-mono-display": {
+    family: "Major Mono Display",
+    fallback: "Menlo, monospace",
+    group: "techno",
+  },
+  orbitron: {
+    family: "Orbitron",
+    fallback: "system-ui, sans-serif",
+    group: "techno",
+  },
+  audiowide: {
+    family: "Audiowide",
+    fallback: "system-ui, sans-serif",
+    group: "techno",
+  },
+  "press-start-2p": {
+    family: "Press Start 2P",
+    fallback: "Menlo, monospace",
+    group: "techno",
+  },
+  // handwritten
+  "homemade-apple": {
+    family: "Homemade Apple",
+    fallback: "'Comic Sans MS', cursive",
+    group: "handwritten",
+  },
+  "reenie-beanie": {
+    family: "Reenie Beanie",
+    fallback: "'Comic Sans MS', cursive",
+    group: "handwritten",
+  },
+  kalam: {
+    family: "Kalam",
+    fallback: "'Comic Sans MS', cursive",
+    group: "handwritten",
+  },
+  "shadows-into-light": {
+    family: "Shadows Into Light",
+    fallback: "'Comic Sans MS', cursive",
+    group: "handwritten",
+  },
+  "rock-salt": {
+    family: "Rock Salt",
+    fallback: "'Comic Sans MS', cursive",
+    group: "handwritten",
+  },
+  "patrick-hand": {
+    family: "Patrick Hand",
+    fallback: "'Comic Sans MS', cursive",
+    group: "handwritten",
+  },
+  // horror
+  nosifer: { family: "Nosifer", fallback: "Impact, fantasy", group: "horror" },
+  eater: { family: "Eater", fallback: "Impact, fantasy", group: "horror" },
+  unifrakturmaguntia: {
+    family: "UnifrakturMaguntia",
+    fallback: "'Times New Roman', serif",
+    group: "horror",
+  },
+  "pirata-one": {
+    family: "Pirata One",
+    fallback: "Impact, fantasy",
+    group: "horror",
+  },
+  "metal-mania": {
+    family: "Metal Mania",
+    fallback: "Impact, fantasy",
+    group: "horror",
   },
 };
+/** The eight feel groups a title-card font may belong to, in guide order. */
+export const TITLE_CARD_FONT_GROUPS = Object.freeze([
+  "sans",
+  "condensed",
+  "serif",
+  "display",
+  "mono",
+  "techno",
+  "handwritten",
+  "horror",
+]);
+/** The catalog as "group: key|key|key" clauses for the design guidance. */
+function titleCardFontsByGroup() {
+  return TITLE_CARD_FONT_GROUPS.map(
+    (group) =>
+      `${group}: ${Object.keys(TITLE_CARD_FONTS)
+        .filter((key) => TITLE_CARD_FONTS[key].group === group)
+        .join("|")}`,
+  ).join("; ");
+}
 /** Inclusive pixel bounds for each title-card text role. */
 export const TITLE_CARD_SIZES = { title: [28, 96], story: [14, 28] };
 /** Minimum WCAG contrast against the card's pure black background. */
@@ -601,6 +865,46 @@ export function summarizeRunDesign(d) {
     tempo: canonical(d.pacing),
   };
 }
+/** The opening card shows the title, premise and opening before play, so they
+ * must not name or foreshadow the catastrophe. Ordered so the most specific
+ * phrase is reported; "the dead of night/winter" is ordinary phrasing. */
+const TITLE_CARD_SPOILERS = [
+  /\bzombies?\b/iu,
+  /\bundead\b/iu,
+  /\bwalking dead\b/iu,
+  /\bthe dead\b(?!\s+of\b)/iu,
+  /\bcorpses?\b/iu,
+  /\binfected\b/iu,
+  /\binfections?\b/iu,
+  /\boutbreaks?\b/iu,
+  /\bplagues?\b/iu,
+  /\bcontagion\b/iu,
+  /\bepidemic\b/iu,
+  /\bpandemic\b/iu,
+  /\bquarantined?\b/iu,
+  /\bhordes?\b/iu,
+  /\bghouls?\b/iu,
+  /\breanimat\w*\b/iu,
+  /\brisen\b/iu,
+];
+/** One repair message per offending field whose title-card text reveals or
+ * foreshadows the catastrophe. Only new designs are checked; saved designs
+ * must keep loading even when they contain such words. */
+export function titleCardSpoilerErrors(design) {
+  const errors = [];
+  for (const field of ["title", "premise", "opening"]) {
+    const value = design?.[field];
+    if (typeof value !== "string") continue;
+    const found = TITLE_CARD_SPOILERS.map((pattern) =>
+      value.match(pattern),
+    ).find(Boolean);
+    if (found)
+      errors.push(
+        `${field} mentions "${found[0]}"; the opening card must not reveal or foreshadow the catastrophe — rewrite it around the place and people.`,
+      );
+  }
+  return errors;
+}
 export function runDesignNoveltyErrors(design, recent) {
   const next = summarizeRunDesign(design),
     errors = [];
@@ -625,6 +929,8 @@ export function runDesignNoveltyErrors(design, recent) {
         `Give this run a new title and premise, distinct from "${previous.title}".`,
       );
   }
+  // Spoilers matter even on a first design, when there is nothing to compare.
+  errors.push(...titleCardSpoilerErrors(design));
   return errors;
 }
 export function parseRunDesignRequest(v) {
@@ -866,12 +1172,12 @@ The remainder describes the shared structural schema and retained legacy request
 For retained request.version:1 only: If payload.designVersion is 2, return design.version:2 and include the scene objects below. If designVersion is absent, return design.version:1 and OMIT scene on every floor. Never upgrade a retained request or downgrade a version 2 request. Version3 structure requests use the exceptions stated above. setting and the tapered, notched and tee silhouettes belong to version 3 structures only: retained version 1 and 2 designs must omit setting and use rectangle, chamfered, stepped or waisted.
 
 The common required design fields and bounds are:
-version:as requested above; title(1-64 characters), premise(1-240), opening(1-200), roofName(1-48).
+version:as requested above; title(1-64 characters), premise(1-240), opening(1-200), roofName(1-48). The title, premise and opening are shown to the player on the black opening card before play, so they set up only the place, the people and an ordinary-seeming tension (a storm, a shift, a deadline, a stranded crew); they must never name, hint at or foreshadow the catastrophe: no zombies, the dead or undead, corpses, infection, outbreak, plague, quarantine, hordes or anything rising, walking or coming back.
 footprint:{shape:${FOOTPRINT_SHAPES.join("|")},width:36|38|40,top:integer2..4,inset:integer2..4,mirrored:boolean,shoulder:integer top+8..top+14}. The footprint is the building's silhouette seen from above and from the street: rectangle is a plain block; chamfered cuts all four corners by inset; stepped narrows one side by inset beyond the shoulder row (mirrored picks the side); waisted pinches both sides by inset around the shoulder row; tapered narrows steadily from the full-width entrance front to a back narrower by inset on each side; notched cuts square inset notches into all four corners; tee keeps a full-width back block and a front wing narrower by inset on each side from the shoulder row. Choose the silhouette that suits this building.
 ${SETTING_GUIDANCE}
 floors:exactly4 entries in ascending order for an enclosed site and exactly1 (the ground plan) for an open one, each {name(1-48),family:stack|columns|serpentine,roomOrder:permutation[0,1,3],layoutSeed:uint32,roomTypes:4 entries indexed rooms0..3 each break|cubicles|meeting|storage|reception|manager (their meaning follows setting.venue),subroomKinds:1..4 unique entries office|meeting|storage|break,furnitureDensity:0.5..1.5,fieldQuotas:4 integers2..6 indexed rooms0..3 (the public entrance to room2 is always free; its outgoing field uses quota2),power:4 entries lit|dim|outage indexed rooms0..3 with room2 lit,stories:exactly6 {title(1-36),lines:1..4 strings each1-50},brokenGuard:{segment:3|4,bay:1|2}}. The six story cards are three wall posters, a whiteboard, a desk photo caption and a desk note. These are actual visible words, not instructions to a renderer. layoutSeed fills smaller geometrical details; family/order are your direct choices. Each ordinary floor keeps all four study rooms along the route; no bypasses. Free hall and entry remain readable. An open site furnishes its one floor's four rooms as outdoor zones (stall rows, plazas, pens, terraces) bounded by low fences, stalls and kerbs rather than walls, with its terminals in the open and roofName naming the ground extraction point; setting.form must match the premise, so open-air places are open and buildings are enclosed.
 Version3 floors also take roomShapes:4 entries indexed rooms0..3 each ${ROOM_SHAPES.join("|")}: how that study room and its sub-rooms are carved from the grid (chamfered cuts the corners at 45°, rounded curves them, octagon makes eight-sided rooms; rect keeps square corners). The engine keeps every route, terminal and exit valid and may square off a corner that would block one. Optional doors, on any floor: doors:exactly4 DoorDesign where doors[r] is the door leading out of room r and doors[2] also covers the hall entrance, and mainDoor:DoorDesign at the top level for the building's main entrance. DoorDesign:{material:wood|steel|glass|fire|security,color:hex,accent:hex,window:none|slit|half|full,label:1..32 short name shown to the player,health:integer400..2400 starting hit points}. Vary doors so they fit each room and the premise. Glass, half and full windows can be seen through when closed, and doors close themselves when zombies come near. The engine always keeps door access rules and can raise the hall entrance's health to protect study time.
-Include titleCard at the top level of every new design (it is optional only so older designs stay valid): {title:TitleStyle,story:TitleStyle}. The game opens on a pure black screen showing the run's title in the title style, then the premise and opening as the scene-setting backstory in the story style, with a Start button beneath. TitleStyle:{font:one of ${Object.keys(TITLE_CARD_FONTS).join("|")},color:six-digit hex readable on pure black (WCAG contrast at least 3 for title and 4.5 for story),size:integer pixels (title ${TITLE_CARD_SIZES.title[0]}..${TITLE_CARD_SIZES.title[1]}, story ${TITLE_CARD_SIZES.story[0]}..${TITLE_CARD_SIZES.story[1]})}. Choose the font, color and size of each so the card sets this premise's particular mood; vary them between runs instead of always choosing the same look, and keep the story readable as several sentences of body text.
+Include titleCard at the top level of every new design (it is optional only so older designs stay valid): {title:TitleStyle,story:TitleStyle}. The game opens on a pure black screen showing the run's title in the title style, then the premise and opening as the scene-setting backstory in the story style, with a Start button beneath. TitleStyle:{font:one of the catalog grouped by feel (${titleCardFontsByGroup()}),color:six-digit hex readable on pure black (WCAG contrast at least 3 for title and 4.5 for story),size:integer pixels (title ${TITLE_CARD_SIZES.title[0]}..${TITLE_CARD_SIZES.title[1]}, story ${TITLE_CARD_SIZES.story[0]}..${TITLE_CARD_SIZES.story[1]})}. Choose the font, color and size of each so the card sets this premise's particular mood; vary them between runs instead of always choosing the same look, and keep the story readable as several sentences of body text. Pick from the group whose feel suits this premise, and pair a title face with a readable story face: a horror, handwritten, techno or display face is for the title, while the story should normally be sans, serif or mono so several sentences stay readable. The title, premise and opening are the first words the player reads on that black card, so they must never name, hint at or foreshadow the catastrophe; set up only the place, the people and an ordinary-seeming tension.
 roster:exactly19 {name:unique1-20 characters distinct from You,role:builder|analyst|rusher|medic|skeptic,skill:0.4..0.9,risk:0.2..0.8,social:0.2..0.8}. Build a varied ensemble; names referenced in stories must belong to it.
 city:{roadWidth:integer7..9,boulevardOffset:integer15..19,districtSize:integer18..25,buildingHeightMin:9..18,buildingHeightMax:25..45,damageRate:0..0.7,palette:3..6 six-digit hex colors}.
 exterior:{buildingName,buildingSubtitle,quarantineTitle,quarantineSubtitle:each1-48 characters,streetLabels:exactly8 strings1-28 characters,skyline:{minHeight:24..60,maxHeight:72..140,damageRate:0..0.7}}. All heights are metres.
