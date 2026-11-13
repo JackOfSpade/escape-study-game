@@ -8,6 +8,12 @@
 import { bridgeRequest } from "./bridge-client";
 import { validateCatastrophe } from "./catastrophe";
 import {
+  recentCatastrophes,
+  rememberCatastrophe,
+  repeatsRecent,
+  summarizeCatastrophe,
+} from "./catastrophe-history";
+import {
   epiloguePacket,
   fallbackEpilogue,
   logEvent,
@@ -46,29 +52,107 @@ const pendingEpilogues = new WeakMap<Game, Promise<void>>();
 const text = (value: unknown): string =>
   typeof value === "string" ? value : "";
 
-/** Generate the sealed catastrophe for a new game (AI, falling back to an offline spec). */
+const words = (value: unknown, max: number): string | undefined =>
+  typeof value === "string" && value.trim()
+    ? value.trim().slice(0, max)
+    : undefined;
+
+/** Distinct, sorted region kinds of an authored outdoor plan. */
+function regionKinds(regions: unknown): string[] {
+  if (!Array.isArray(regions)) return [];
+  const kinds = new Set<string>();
+  for (const region of regions) {
+    const kind = isRecord(region) ? words(region.kind, 24) : undefined;
+    if (kind) kinds.add(kind);
+  }
+  return [...kinds].sort().slice(0, 24);
+}
+
+/** The physical place the threat has to fit, read defensively: an old save or
+ * a design from before `setting.outdoors` may lack any of it. */
+export function physicalSetting(design: unknown): Record<string, unknown> {
+  const setting =
+    isRecord(design) && isRecord(design.setting) ? design.setting : undefined;
+  if (!setting) return {};
+  const place: Record<string, unknown> = {};
+  const venue = words(setting.venue, 40),
+    form = words(setting.form, 40);
+  if (venue) place.venue = venue;
+  if (form) place.form = form;
+  if (isRecord(setting.surroundings)) {
+    const around = setting.surroundings,
+      surroundings: Record<string, string> = {};
+    for (const key of ["ground", "neighbors", "weather"] as const) {
+      const value = words(around[key], 40);
+      if (value) surroundings[key] = value;
+    }
+    if (Object.keys(surroundings).length) place.surroundings = surroundings;
+  }
+  if (isRecord(setting.outdoors)) {
+    const plan = setting.outdoors,
+      outdoors: Record<string, unknown> = {};
+    const enclosure = words(plan.enclosure, 24),
+      backdrop = words(plan.backdrop, 24),
+      ground = words(plan.ground, 40),
+      kinds = regionKinds(plan.regions);
+    if (enclosure) outdoors.enclosure = enclosure;
+    if (backdrop) outdoors.backdrop = backdrop;
+    if (ground) outdoors.ground = ground;
+    if (kinds.length) outdoors.regionKinds = kinds;
+    if (Object.keys(outdoors).length) place.outdoors = outdoors;
+  }
+  return place;
+}
+
+/** One catastrophe request: the spec when it is valid, otherwise undefined. */
+async function requestCatastrophe(
+  payload: Record<string, unknown>,
+  areaIds: string[],
+): Promise<CatastropheSpec | undefined> {
+  try {
+    const answer = await escapeRequest("escape-catastrophe", payload);
+    if (!isRecord(answer) || !("spec" in answer)) return undefined;
+    if (validateCatastrophe(answer.spec, areaIds).length > 0) return undefined;
+    return answer.spec as CatastropheSpec;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Generate the sealed catastrophe for a new game (AI, falling back to an
+ * offline spec). Called only when a new game is generated, never on Restart,
+ * so each accepted catastrophe is recorded in the player's history once. */
 export async function prepareCatastrophe(g: Game): Promise<void> {
   const escape: EscapeState | undefined = g.escape;
   if (!escape) return;
   const design = g.design?.design;
   const areaIds = Object.keys(escape.areas.areas);
-  try {
-    const answer = await escapeRequest("escape-catastrophe", {
-      requestId: `cat-${g.id}`,
-      setting: {
-        title: text(design && "title" in design ? design.title : ""),
-        premise: text(design && "premise" in design ? design.premise : ""),
-        opening: text(design && "opening" in design ? design.opening : ""),
-      },
-      persona: escape.persona,
+  const recent = recentCatastrophes();
+  const payload: Record<string, unknown> = {
+    requestId: `cat-${g.id}`,
+    setting: {
+      title: text(design && "title" in design ? design.title : ""),
+      premise: text(design && "premise" in design ? design.premise : ""),
+      opening: text(design && "opening" in design ? design.opening : ""),
+      ...physicalSetting(design),
+    },
+    persona: escape.persona,
+    areaIds,
+    recent,
+  };
+  let spec = await requestCatastrophe(payload, areaIds);
+  if (!spec) return; // Offline or malformed: keep the catastrophe already on the game.
+  const first = summarizeCatastrophe(spec);
+  if (repeatsRecent(first, recent)) {
+    // The same threat under a new name: ask once more and take that answer.
+    const second = await requestCatastrophe(
+      { ...payload, requestId: `cat-${g.id}-2`, repeated: first },
       areaIds,
-    });
-    if (!isRecord(answer) || !("spec" in answer)) return;
-    if (validateCatastrophe(answer.spec, areaIds).length > 0) return;
-    escape.catastrophe = answer.spec as CatastropheSpec;
-  } catch {
-    // Offline or malformed answer: keep the catastrophe already on the game.
+    );
+    if (second) spec = second;
   }
+  escape.catastrophe = spec;
+  rememberCatastrophe(spec);
 }
 
 const packetOutcome = (outcome: EndOutcome): "escaped" | "died" | "quit" =>

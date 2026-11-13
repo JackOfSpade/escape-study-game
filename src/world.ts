@@ -20,7 +20,8 @@ import {
 import { makeNpcProfile } from "./npc-cognition";
 import { applyStudyPacing } from "./study-pacing";
 import { spawnGrace } from "./study-pacing";
-import { createCityPlan } from "./city-layout";
+import { compileOutdoorPlan, createCityPlan, outdoorSite } from "./city-layout";
+import { checkOutdoorGeometry } from "./outdoor-plan.mjs";
 import { cityZombieSpeed, initCityInvasion } from "./city-invasion";
 import {
   parseSavedRunDesign,
@@ -46,6 +47,17 @@ import type { SurfaceSlot } from "./environment-contract.mjs";
 
 type WorldBlueprint = RunDesign | RunStructureV3;
 
+/** The drawn outdoors of a version 3 design, if it has one. */
+export function designedOutdoors(
+  blueprint: unknown,
+): import("./outdoor-plan.mjs").OutdoorPlan | undefined {
+  const setting =
+    blueprint && typeof blueprint === "object"
+      ? (blueprint as { setting?: { outdoors?: unknown } }).setting
+      : undefined;
+  return setting?.outdoors as
+    import("./outdoor-plan.mjs").OutdoorPlan | undefined;
+}
 /** Only a fresh run opts into a new neighbourhood; saves retain their exact city. */
 export function populateCity(
   g: Game,
@@ -54,12 +66,15 @@ export function populateCity(
 ) {
   const floor = g.floors[0];
   if (!floor.boundary) return g;
-  floor.city = createCityPlan(
-    floor,
-    g.seed,
-    spawnGrace(g) * cityZombieSpeed(g),
-    blueprint?.city ?? g.design?.design.city,
-  );
+  const outdoors = designedOutdoors(blueprint ?? g.design?.design);
+  floor.city = outdoors
+    ? compileOutdoorPlan(floor, outdoors, g.seed)
+    : createCityPlan(
+        floor,
+        g.seed,
+        spawnGrace(g) * cityZombieSpeed(g),
+        blueprint?.city ?? g.design?.design.city,
+      );
   if (invasion) initCityInvasion(g);
   return g;
 }
@@ -211,8 +226,15 @@ export function previewDesignedRun(
   proposed: RunStructureV3,
 ): ProvisionalRun {
   const structure = parseRunStructure(proposed),
-    game = buildPlayableGame(seed, roadmap, study, structure),
-    surfaces = buildEnvironmentSurfaces(game),
+    game = buildPlayableGame(seed, roadmap, study, structure);
+  // Judge a drawn outdoors against the building it was built around. Only
+  // proposals are judged, so a saved design always restarts as it was.
+  const outdoors = designedOutdoors(structure);
+  if (outdoors) {
+    const errors = checkOutdoorGeometry(outdoors, outdoorSite(game.floors[0]));
+    if (errors.length) throw Error(`Run design: ${errors.join(" ")}`);
+  }
+  const surfaces = buildEnvironmentSurfaces(game),
     token = Object.freeze({
       builderVersion: ENVIRONMENT_BUILDER_VERSION,
       structureFingerprint: runStructureFingerprint(structure),

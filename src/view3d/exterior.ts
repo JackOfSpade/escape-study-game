@@ -1,5 +1,12 @@
 import { EnvironmentSurfaces } from "./environment-surfaces";
 import {
+  drawAuthoredObstacle,
+  drawBackdrop,
+  enclosureMesh,
+  neighbourStyleOf,
+  type OutdoorEmit,
+} from "./outdoor-render";
+import {
   BackSide,
   AdditiveBlending,
   BoxGeometry,
@@ -23,6 +30,7 @@ import {
   SRGBColorSpace,
 } from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import type { SurfaceSlot } from "../environment-contract.mjs";
 import type { BuildingFootprint, Floor } from "../model";
 import type { RunNeighborStyle, RunSurroundings } from "../setting-catalog.mjs";
 import {
@@ -244,6 +252,20 @@ export class ExteriorDressing {
     emissiveIntensity: 0.72,
     fog: false,
   });
+  /** Authored water: inlets, moats, canals and the sea backdrop. */
+  private waterMaterial = new MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.12,
+    metalness: 0.2,
+    transparent: true,
+    opacity: 0.8,
+    emissive: "#0d2230",
+    emissiveIntensity: 0.3,
+    fog: true,
+  });
+  /** True while the dressed floor's outdoors was drawn by its design. */
+  private authored = false;
+  private enclosure?: Mesh;
   private signMaterial = new MeshBasicMaterial({
     ...maybeMap(
       messageTexture("MERCER CIVIC CENTRE", "RECEPTION  •  STUDY HALL"),
@@ -419,6 +441,8 @@ export class ExteriorDressing {
     this.dressedFloors = floors;
     this.sites = floors ? shellFootprints(floors) : siteFootprints(floor);
     this.siteKey = floors ? exteriorSignature(floors) : "";
+    this.authored =
+      ground.city?.source === "authored" && !!ground.setting?.outdoors;
     this.applyLook(city ? ground : undefined);
     if (!city) return;
     this.updateSigns(ground);
@@ -446,6 +470,13 @@ export class ExteriorDressing {
     if (ground.city)
       this.buildPhysicalCity(ground, ground.city, opaque, panes, lit, signals);
     else this.buildCity(ground, opaque, panes, lit, signals);
+    if (this.authored && ground.city && ground.setting?.outdoors) {
+      this.enclosure = enclosureMesh(
+        ground.setting.outdoors.enclosure,
+        ground.city,
+      );
+      if (this.enclosure) this.world.add(this.enclosure);
+    }
     const layout = streetLayout(ground);
     this.canopyLights = [];
     this.canopyBody = [];
@@ -475,6 +506,8 @@ export class ExteriorDressing {
         ground,
         ground.environment,
         "exterior",
+        undefined,
+        (slot) => this.streetSignVisible(slot),
       );
       this.world.add(this.environmentSurfaces.group);
     }
@@ -483,7 +516,13 @@ export class ExteriorDressing {
   /** Applies (or clears) the designed surroundings: ground and path surfaces,
    * atmosphere, weather and the fog flags of the exterior materials. */
   private applyLook(floor?: Floor) {
-    const look = floor?.setting?.surroundings;
+    const surroundings = floor?.setting?.surroundings,
+      outdoors = this.authored ? floor?.setting?.outdoors : undefined,
+      // A drawn outdoors names its own ambient ground.
+      look =
+        surroundings && outdoors
+          ? { ...surroundings, ground: outdoors.ground }
+          : surroundings;
     this.look = look;
     this.pieces = 0;
     this.pads = [];
@@ -565,6 +604,20 @@ export class ExteriorDressing {
     return style && style !== "buildings" ? style : undefined;
   }
 
+  /** Themed lots replace the city's street-facing buildings with rock, ruin or
+   * forest, so a saved shopfront or street-name sign would hang in mid-air:
+   * those two roles are dropped. The building's own entrance and quarantine
+   * signs (and any other slot) always stay. Called while the look is current,
+   * and every rebuild after a look change disposes and rebuilds the surfaces. */
+  private streetSignVisible(slot: SurfaceSlot) {
+    return (
+      !this.themedStyle ||
+      // A drawn outdoors only puts shop signs on the buildings it drew.
+      this.authored ||
+      (slot.role !== "storefront-sign" && slot.role !== "street-sign")
+    );
+  }
+
   /** A building colour pulled toward the designed neighbour colour. */
   private neighborTone(color: string) {
     return this.look ? mix(color, this.look.neighborColor, 0.8) : color;
@@ -635,7 +688,9 @@ export class ExteriorDressing {
     if (!look || !b) return;
     const rects = (
       floor.city
-        ? floor.city.roads.map((r) => ({ x: r.x, z: r.y, w: r.w, d: r.h }))
+        ? (this.authored ? (floor.city.paths ?? []) : floor.city.roads).map(
+            (r) => ({ x: r.x, z: r.y, w: r.w, d: r.h }),
+          )
         : legacyRoads(floor)
     ).flatMap((r) => outsideFootprint(floor, r));
     if (!rects.length) return;
@@ -1601,8 +1656,28 @@ export class ExteriorDressing {
       return (v ^ (v >>> 16)) >>> 0;
     };
     const roads = roadGround(this.look?.ground),
-      themed = !!this.themedStyle;
-    for (const [i, block] of cityBackdrop(floor).entries()) {
+      themed = !!this.themedStyle,
+      authored = this.authored,
+      outdoors = authored ? floor.setting?.outdoors : undefined,
+      water: BufferGeometry[] = [],
+      emitOutdoor: OutdoorEmit = (geometry, color, layer) =>
+        this.part(
+          layer === "water" ? water : layer === "glass" ? panes : opaque,
+          geometry,
+          color,
+        );
+    if (outdoors && outdoors.backdrop !== "skyline")
+      drawBackdrop(
+        outdoors.backdrop,
+        plan,
+        emitOutdoor,
+        outdoors.backdrop === "sea"
+          ? "#1f3f5a"
+          : (this.look?.neighborColor ?? "#4a5560"),
+      );
+    for (const [i, block] of outdoors && outdoors.backdrop !== "skyline"
+      ? []
+      : cityBackdrop(floor).entries()) {
       const height = block.stories * 3.15;
       if (themed) {
         this.neighborLot(
@@ -1917,7 +1992,23 @@ export class ExteriorDressing {
       // The real concrete wedge and supported treads belong to StairGallery.
       // Its exact footprint is still a solid urban obstacle for flat walkers.
       if (o.kind === "stair-base") continue;
-      if (themed && o.kind === "building") {
+      if (authored) {
+        const style = neighbourStyleOf(o.kind);
+        if (style) {
+          this.neighborLot(
+            { x: o.x, z: o.y, w: o.w, d: o.h },
+            o.height,
+            hash(index + 5),
+            Math.hypot(o.x - 22, o.y - 30) > 120,
+            opaque,
+            signals,
+            style,
+          );
+          continue;
+        }
+        if (drawAuthoredObstacle(o, emitOutdoor)) continue;
+      }
+      if (themed && !authored && o.kind === "building") {
         this.neighborLot(
           { x: o.x, z: o.y, w: o.w, d: o.h },
           o.height,
@@ -1928,7 +2019,7 @@ export class ExteriorDressing {
         );
         continue;
       }
-      if (!roads && o.kind !== "building") {
+      if (!roads && !authored && o.kind !== "building") {
         // Wrecks and rubble are boulders where there are no streets to park on.
         this.neighborLot(
           { x: o.x, z: o.y, w: o.w, d: o.h },
@@ -2078,6 +2169,7 @@ export class ExteriorDressing {
         }
       }
     }
+    this.merge(water, this.waterMaterial, "authored-water");
     if (signParts.length) {
       const atlas = document.createElement("canvas");
       atlas.width = 768;
@@ -2579,6 +2671,8 @@ export class ExteriorDressing {
     this.smoke = this.flames = undefined;
     this.pathMaterial?.dispose();
     this.pathMaterial = undefined;
+    (this.enclosure?.material as MeshStandardMaterial | undefined)?.dispose();
+    this.enclosure = undefined;
     this.pads = [];
     this.icePieces = [];
     this.incidents = [];
@@ -2596,6 +2690,7 @@ export class ExteriorDressing {
     this.moon.geometry.dispose();
     this.weather?.dispose();
     this.iceMaterial?.dispose();
+    this.waterMaterial.dispose();
     for (const texture of this.groundTextures?.values() ?? [])
       texture.dispose();
     this.groundTextures?.clear();

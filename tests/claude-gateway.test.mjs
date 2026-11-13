@@ -490,6 +490,44 @@ test("quality design stages require schema-validated structured output", async (
   assert.equal(calls[2].args.includes("--json-schema"), false);
 });
 
+test("escape-catastrophe uses its reply schema and is never streamed", async () => {
+  const calls = [];
+  const structured = { requestId: "cat-g1", spec: { id: "c" } };
+  const g = gateway(
+    [
+      {
+        result: {
+          type: "result",
+          subtype: "success",
+          is_error: false,
+          result: "",
+          structured_output: structured,
+        },
+      },
+    ],
+    calls,
+  );
+  const seen = [];
+  const reply = await g.run(
+    "escape-catastrophe",
+    { requestId: "cat-g1", areaIds: ["dorm", "pad"], recent: [] },
+    { onText: (t) => seen.push(t) },
+  );
+  assert.deepEqual(reply, structured);
+  const args = calls[0].args;
+  assert.equal(args.includes("--include-partial-messages"), false);
+  const schema = JSON.parse(args[args.indexOf("--json-schema") + 1]);
+  assert.deepEqual(schema.properties.requestId, { const: "cat-g1" });
+  assert.deepEqual(schema.properties.spec.properties.origin.properties.areaId, {
+    enum: ["dorm", "pad"],
+  });
+  assert.deepEqual(seen, []);
+  const { system } = buildPrompt("escape-catastrophe", { requestId: "x" });
+  assert.match(system, /StructuredOutput tool/);
+  assert.match(system, /payload\.recent/);
+  assert.match(system, /different threat mechanism, not a renamed/);
+});
+
 test("a reply the CLI cannot fit to the schema gets one correction turn", async () => {
   const calls = [];
   const g = gateway(

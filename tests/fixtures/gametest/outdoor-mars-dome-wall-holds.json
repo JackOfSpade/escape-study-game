@@ -1,0 +1,2200 @@
+{
+  "version": 1,
+  "id": "outdoor-mars-dome-wall-holds",
+  "name": "A Mars colony dome: with the airlock moved east, the dome wall holds a player walking south",
+  "seed": 42,
+  "template": "building",
+  "layout": "randomized",
+  "rules": "force-fields",
+  "simulation": "game",
+  "maxTicks": 1500,
+  "startTime": 0,
+  "naturalSpawns": false,
+  "designStructure": {
+    "version": 3,
+    "title": "Static on the Night Shift",
+    "premise": "A volunteer community radio station keeps its overnight request show running as the outbreak reaches the transmitter block.",
+    "opening": "The last caller asked for a song nobody could find. Keep the signal up until the helicopter comes.",
+    "footprint": {
+      "shape": "tee",
+      "width": 38,
+      "top": 3,
+      "inset": 3,
+      "mirrored": false,
+      "shoulder": 14
+    },
+    "floors": [
+      {
+        "name": "LOBBY & NEWSROOM",
+        "family": "columns",
+        "roomOrder": [0, 1, 3],
+        "layoutSeed": 42,
+        "roomTypes": ["reception", "break", "cubicles", "storage"],
+        "subroomKinds": ["office", "meeting", "storage", "break"],
+        "furnitureDensity": 0.7,
+        "fieldQuotas": [3, 4, 5, 6],
+        "power": ["dim", "outage", "lit", "lit"],
+        "brokenGuard": {
+          "segment": 3,
+          "bay": 1
+        },
+        "scene": {
+          "version": 2,
+          "rooms": [
+            {
+              "room": 0,
+              "title": "Station Lobby",
+              "description": "Front desk with the request line, signed photos of every presenter on the wall.",
+              "owner": "Inez",
+              "palette": {
+                "surface": "#6a3b33",
+                "metal": "#b0a58e",
+                "accent": "#f2d06b"
+              },
+              "condition": "kept",
+              "furniture": [
+                {
+                  "id": "r0-reception-0",
+                  "kind": "reception",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.2
+                  },
+                  "angle": 0,
+                  "color": "#6a3b33",
+                  "condition": "intact",
+                  "owner": "Inez",
+                  "props": [
+                    {
+                      "id": "r0-0-phone-0",
+                      "kind": "phone",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Inez"
+                    },
+                    {
+                      "id": "r0-0-headphones-1",
+                      "kind": "headphones",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Inez"
+                    },
+                    {
+                      "id": "r0-0-papers-2",
+                      "kind": "papers",
+                      "at": {
+                        "x": 0,
+                        "y": 0.35
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Inez"
+                    }
+                  ]
+                },
+                {
+                  "id": "r0-onairlight-1",
+                  "kind": "onAirLight",
+                  "at": {
+                    "x": 0.15,
+                    "y": 0.15
+                  },
+                  "angle": 0,
+                  "color": "#30343c",
+                  "condition": "worn",
+                  "owner": "Cal",
+                  "props": []
+                },
+                {
+                  "id": "r0-armchair-2",
+                  "kind": "armchair",
+                  "at": {
+                    "x": 0.8,
+                    "y": 0.75
+                  },
+                  "angle": -160,
+                  "color": "#7a4b3a",
+                  "condition": "intact",
+                  "owner": "Rumi",
+                  "props": []
+                }
+              ]
+            },
+            {
+              "room": 1,
+              "title": "Green Room",
+              "description": "Where guests waited for their slot; the kettle and the guest book are still out.",
+              "owner": "Cal",
+              "palette": {
+                "surface": "#3f6150",
+                "metal": "#a2a8a0",
+                "accent": "#e88a4c"
+              },
+              "condition": "worn",
+              "furniture": [
+                {
+                  "id": "r1-sofa-0",
+                  "kind": "sofa",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.15
+                  },
+                  "angle": 0,
+                  "color": "#7a4b3a",
+                  "condition": "worn",
+                  "owner": "Cal",
+                  "props": []
+                },
+                {
+                  "id": "r1-coffeetable-1",
+                  "kind": "coffeeTable",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.45
+                  },
+                  "angle": 0,
+                  "color": "#6c5a48",
+                  "condition": "intact",
+                  "owner": "Rumi",
+                  "props": [
+                    {
+                      "id": "r1-1-mug-0",
+                      "kind": "mug",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Rumi"
+                    },
+                    {
+                      "id": "r1-1-record-1",
+                      "kind": "record",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Rumi"
+                    },
+                    {
+                      "id": "r1-1-note-2",
+                      "kind": "note",
+                      "at": {
+                        "x": 0,
+                        "y": 0.35
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Rumi"
+                    }
+                  ]
+                },
+                {
+                  "id": "r1-coffeemaker-2",
+                  "kind": "coffeeMaker",
+                  "at": {
+                    "x": 0.12,
+                    "y": 0.85
+                  },
+                  "angle": 90,
+                  "color": "#3b3b3b",
+                  "condition": "damaged",
+                  "owner": "Dev",
+                  "props": []
+                }
+              ]
+            },
+            {
+              "room": 2,
+              "title": "Newsroom",
+              "description": "Desks split by acoustic panels where the local bulletin was cut.",
+              "owner": "Rumi",
+              "palette": {
+                "surface": "#4f5a63",
+                "metal": "#9aa3ad",
+                "accent": "#f0c04a"
+              },
+              "condition": "ransacked",
+              "furniture": [
+                {
+                  "id": "r2-desk-0",
+                  "kind": "desk",
+                  "at": {
+                    "x": 0.25,
+                    "y": 0.15
+                  },
+                  "angle": 0,
+                  "color": "#6c5a48",
+                  "condition": "intact",
+                  "owner": "Rumi",
+                  "props": [
+                    {
+                      "id": "r2-0-papers-0",
+                      "kind": "papers",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Rumi"
+                    },
+                    {
+                      "id": "r2-0-phone-1",
+                      "kind": "phone",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Rumi"
+                    },
+                    {
+                      "id": "r2-0-cassette-2",
+                      "kind": "cassette",
+                      "at": {
+                        "x": 0,
+                        "y": 0.35
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Rumi"
+                    }
+                  ]
+                },
+                {
+                  "id": "r2-soundpanel-1",
+                  "kind": "soundPanel",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.25
+                  },
+                  "angle": 90,
+                  "color": "#3e5871",
+                  "condition": "damaged",
+                  "owner": "Dev",
+                  "props": []
+                },
+                {
+                  "id": "r2-studiomonitor-2",
+                  "kind": "studioMonitor",
+                  "at": {
+                    "x": 0.85,
+                    "y": 0.15
+                  },
+                  "angle": 0,
+                  "color": "#1d1f24",
+                  "condition": "intact",
+                  "owner": "Esme",
+                  "props": []
+                }
+              ]
+            },
+            {
+              "room": 3,
+              "title": "Record Library",
+              "description": "Floor-to-ceiling vinyl, hand-lettered genre cards and the reel archive.",
+              "owner": "Dev",
+              "palette": {
+                "surface": "#6b4a2f",
+                "metal": "#7f8790",
+                "accent": "#e3b04b"
+              },
+              "condition": "kept",
+              "furniture": [
+                {
+                  "id": "r3-recordshelf-0",
+                  "kind": "recordShelf",
+                  "at": {
+                    "x": 0.3,
+                    "y": 0.12
+                  },
+                  "angle": 0,
+                  "color": "#6b4a2f",
+                  "condition": "damaged",
+                  "owner": "Dev",
+                  "props": [
+                    {
+                      "id": "r3-0-record-0",
+                      "kind": "record",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Dev"
+                    },
+                    {
+                      "id": "r3-0-cassette-1",
+                      "kind": "cassette",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Dev"
+                    }
+                  ]
+                },
+                {
+                  "id": "r3-recordshelf-1",
+                  "kind": "recordShelf",
+                  "at": {
+                    "x": 0.7,
+                    "y": 0.12
+                  },
+                  "angle": 0,
+                  "color": "#6b4a2f",
+                  "condition": "intact",
+                  "owner": "Esme",
+                  "props": [
+                    {
+                      "id": "r3-1-record-0",
+                      "kind": "record",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Esme"
+                    },
+                    {
+                      "id": "r3-1-book-1",
+                      "kind": "book",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Esme"
+                    }
+                  ]
+                },
+                {
+                  "id": "r3-reeltoreel-2",
+                  "kind": "reelToReel",
+                  "at": {
+                    "x": 0.15,
+                    "y": 0.8
+                  },
+                  "angle": 90,
+                  "color": "#3b3b3b",
+                  "condition": "worn",
+                  "owner": "Nico",
+                  "props": []
+                },
+                {
+                  "id": "r3-turntable-3",
+                  "kind": "turntable",
+                  "at": {
+                    "x": 0.85,
+                    "y": 0.8
+                  },
+                  "angle": -90,
+                  "color": "#4a3a2c",
+                  "condition": "intact",
+                  "owner": "Tamsin",
+                  "props": []
+                }
+              ]
+            }
+          ]
+        },
+        "roomShapes": ["rect", "chamfered", "rect", "rect"]
+      },
+      {
+        "name": "STUDIO FLOOR",
+        "family": "serpentine",
+        "roomOrder": [3, 0, 1],
+        "layoutSeed": 79,
+        "roomTypes": ["meeting", "manager", "cubicles", "break"],
+        "subroomKinds": ["office", "meeting", "storage", "break"],
+        "furnitureDensity": 0.85,
+        "fieldQuotas": [3, 4, 5, 6],
+        "power": ["lit", "dim", "lit", "outage"],
+        "brokenGuard": {
+          "segment": 4,
+          "bay": 2
+        },
+        "scene": {
+          "version": 2,
+          "rooms": [
+            {
+              "room": 0,
+              "title": "Studio B",
+              "description": "A round mic table for the call-in hour, chairs pulled back mid-segment.",
+              "owner": "Esme",
+              "palette": {
+                "surface": "#5a4636",
+                "metal": "#8f969c",
+                "accent": "#d64a3a"
+              },
+              "condition": "worn",
+              "furniture": [
+                {
+                  "id": "r0-table-0",
+                  "kind": "table",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.5
+                  },
+                  "angle": 0,
+                  "color": "#5a4636",
+                  "condition": "intact",
+                  "owner": "Esme",
+                  "props": [
+                    {
+                      "id": "r0-0-headphones-0",
+                      "kind": "headphones",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Esme"
+                    },
+                    {
+                      "id": "r0-0-record-1",
+                      "kind": "record",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Esme"
+                    },
+                    {
+                      "id": "r0-0-mug-2",
+                      "kind": "mug",
+                      "at": {
+                        "x": 0,
+                        "y": 0.35
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Esme"
+                    }
+                  ]
+                },
+                {
+                  "id": "r0-micstand-1",
+                  "kind": "micStand",
+                  "at": {
+                    "x": 0.3,
+                    "y": 0.3
+                  },
+                  "angle": 30,
+                  "color": "#2a2a2a",
+                  "condition": "worn",
+                  "owner": "Nico",
+                  "props": []
+                },
+                {
+                  "id": "r0-micstand-2",
+                  "kind": "micStand",
+                  "at": {
+                    "x": 0.7,
+                    "y": 0.7
+                  },
+                  "angle": -150,
+                  "color": "#2a2a2a",
+                  "condition": "intact",
+                  "owner": "Tamsin",
+                  "props": []
+                },
+                {
+                  "id": "r0-soundpanel-3",
+                  "kind": "soundPanel",
+                  "at": {
+                    "x": 0.15,
+                    "y": 0.85
+                  },
+                  "angle": 90,
+                  "color": "#4b5d7a",
+                  "condition": "damaged",
+                  "owner": "Paz",
+                  "props": []
+                },
+                {
+                  "id": "r0-onairlight-4",
+                  "kind": "onAirLight",
+                  "at": {
+                    "x": 0.88,
+                    "y": 0.15
+                  },
+                  "angle": 0,
+                  "color": "#30343c",
+                  "condition": "intact",
+                  "owner": "Ellis",
+                  "props": []
+                }
+              ]
+            },
+            {
+              "room": 1,
+              "title": "Control Room One",
+              "description": "The board op's desk faces the studio glass; the overnight playlist is still taped to the rack.",
+              "owner": "Nico",
+              "palette": {
+                "surface": "#3a3f4a",
+                "metal": "#9aa3ad",
+                "accent": "#e0533d"
+              },
+              "condition": "ransacked",
+              "furniture": [
+                {
+                  "id": "r1-mixingconsole-0",
+                  "kind": "mixingConsole",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.2
+                  },
+                  "angle": 0,
+                  "color": "#2f3440",
+                  "condition": "worn",
+                  "owner": "Nico",
+                  "props": [
+                    {
+                      "id": "r1-0-headphones-0",
+                      "kind": "headphones",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Nico"
+                    },
+                    {
+                      "id": "r1-0-cassette-1",
+                      "kind": "cassette",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Nico"
+                    },
+                    {
+                      "id": "r1-0-papers-2",
+                      "kind": "papers",
+                      "at": {
+                        "x": 0,
+                        "y": 0.35
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Nico"
+                    }
+                  ]
+                },
+                {
+                  "id": "r1-equipmentrack-1",
+                  "kind": "equipmentRack",
+                  "at": {
+                    "x": 0.12,
+                    "y": 0.2
+                  },
+                  "angle": 0,
+                  "color": "#23262d",
+                  "condition": "intact",
+                  "owner": "Tamsin",
+                  "props": []
+                },
+                {
+                  "id": "r1-studiomonitor-2",
+                  "kind": "studioMonitor",
+                  "at": {
+                    "x": 0.82,
+                    "y": 0.2
+                  },
+                  "angle": 0,
+                  "color": "#1d1f24",
+                  "condition": "damaged",
+                  "owner": "Paz",
+                  "props": []
+                },
+                {
+                  "id": "r1-onairlight-3",
+                  "kind": "onAirLight",
+                  "at": {
+                    "x": 0.85,
+                    "y": 0.8
+                  },
+                  "angle": 0,
+                  "color": "#30343c",
+                  "condition": "intact",
+                  "owner": "Ellis",
+                  "props": []
+                }
+              ]
+            },
+            {
+              "room": 2,
+              "title": "Newsroom",
+              "description": "Desks split by acoustic panels where the local bulletin was cut.",
+              "owner": "Tamsin",
+              "palette": {
+                "surface": "#4f5a63",
+                "metal": "#9aa3ad",
+                "accent": "#f0c04a"
+              },
+              "condition": "kept",
+              "furniture": [
+                {
+                  "id": "r2-desk-0",
+                  "kind": "desk",
+                  "at": {
+                    "x": 0.25,
+                    "y": 0.15
+                  },
+                  "angle": 0,
+                  "color": "#6c5a48",
+                  "condition": "intact",
+                  "owner": "Tamsin",
+                  "props": [
+                    {
+                      "id": "r2-0-papers-0",
+                      "kind": "papers",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Tamsin"
+                    },
+                    {
+                      "id": "r2-0-phone-1",
+                      "kind": "phone",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Tamsin"
+                    },
+                    {
+                      "id": "r2-0-cassette-2",
+                      "kind": "cassette",
+                      "at": {
+                        "x": 0,
+                        "y": 0.35
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Tamsin"
+                    }
+                  ]
+                },
+                {
+                  "id": "r2-soundpanel-1",
+                  "kind": "soundPanel",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.25
+                  },
+                  "angle": 90,
+                  "color": "#3e5871",
+                  "condition": "damaged",
+                  "owner": "Paz",
+                  "props": []
+                },
+                {
+                  "id": "r2-studiomonitor-2",
+                  "kind": "studioMonitor",
+                  "at": {
+                    "x": 0.85,
+                    "y": 0.15
+                  },
+                  "angle": 0,
+                  "color": "#1d1f24",
+                  "condition": "intact",
+                  "owner": "Ellis",
+                  "props": []
+                }
+              ]
+            },
+            {
+              "room": 3,
+              "title": "Green Room",
+              "description": "Where guests waited for their slot; the kettle and the guest book are still out.",
+              "owner": "Paz",
+              "palette": {
+                "surface": "#3f6150",
+                "metal": "#a2a8a0",
+                "accent": "#e88a4c"
+              },
+              "condition": "worn",
+              "furniture": [
+                {
+                  "id": "r3-sofa-0",
+                  "kind": "sofa",
+                  "at": {
+                    "x": 0.85,
+                    "y": 0.5
+                  },
+                  "angle": 90,
+                  "color": "#7a4b3a",
+                  "condition": "damaged",
+                  "owner": "Paz",
+                  "props": []
+                },
+                {
+                  "id": "r3-coffeetable-1",
+                  "kind": "coffeeTable",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.45
+                  },
+                  "angle": 0,
+                  "color": "#6c5a48",
+                  "condition": "intact",
+                  "owner": "Ellis",
+                  "props": [
+                    {
+                      "id": "r3-1-mug-0",
+                      "kind": "mug",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Ellis"
+                    },
+                    {
+                      "id": "r3-1-record-1",
+                      "kind": "record",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Ellis"
+                    },
+                    {
+                      "id": "r3-1-note-2",
+                      "kind": "note",
+                      "at": {
+                        "x": 0,
+                        "y": 0.35
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Ellis"
+                    }
+                  ]
+                },
+                {
+                  "id": "r3-coffeemaker-2",
+                  "kind": "coffeeMaker",
+                  "at": {
+                    "x": 0.12,
+                    "y": 0.85
+                  },
+                  "angle": 90,
+                  "color": "#3b3b3b",
+                  "condition": "worn",
+                  "owner": "Luz",
+                  "props": []
+                }
+              ]
+            }
+          ]
+        },
+        "roomShapes": ["rect", "rect", "chamfered", "rect"]
+      },
+      {
+        "name": "RECORD LIBRARY",
+        "family": "stack",
+        "roomOrder": [1, 3, 0],
+        "layoutSeed": 116,
+        "roomTypes": ["storage", "meeting", "cubicles", "manager"],
+        "subroomKinds": ["office", "meeting", "storage", "break"],
+        "furnitureDensity": 1,
+        "fieldQuotas": [3, 4, 5, 6],
+        "power": ["outage", "lit", "lit", "dim"],
+        "brokenGuard": {
+          "segment": 3,
+          "bay": 1
+        },
+        "scene": {
+          "version": 2,
+          "rooms": [
+            {
+              "room": 0,
+              "title": "Record Library",
+              "description": "Floor-to-ceiling vinyl, hand-lettered genre cards and the reel archive.",
+              "owner": "Ellis",
+              "palette": {
+                "surface": "#6b4a2f",
+                "metal": "#7f8790",
+                "accent": "#e3b04b"
+              },
+              "condition": "ransacked",
+              "furniture": [
+                {
+                  "id": "r0-recordshelf-0",
+                  "kind": "recordShelf",
+                  "at": {
+                    "x": 0.3,
+                    "y": 0.12
+                  },
+                  "angle": 0,
+                  "color": "#6b4a2f",
+                  "condition": "intact",
+                  "owner": "Ellis",
+                  "props": [
+                    {
+                      "id": "r0-0-record-0",
+                      "kind": "record",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Ellis"
+                    },
+                    {
+                      "id": "r0-0-cassette-1",
+                      "kind": "cassette",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Ellis"
+                    }
+                  ]
+                },
+                {
+                  "id": "r0-recordshelf-1",
+                  "kind": "recordShelf",
+                  "at": {
+                    "x": 0.7,
+                    "y": 0.12
+                  },
+                  "angle": 0,
+                  "color": "#6b4a2f",
+                  "condition": "worn",
+                  "owner": "Luz",
+                  "props": [
+                    {
+                      "id": "r0-1-record-0",
+                      "kind": "record",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Luz"
+                    },
+                    {
+                      "id": "r0-1-book-1",
+                      "kind": "book",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Luz"
+                    }
+                  ]
+                },
+                {
+                  "id": "r0-reeltoreel-2",
+                  "kind": "reelToReel",
+                  "at": {
+                    "x": 0.15,
+                    "y": 0.8
+                  },
+                  "angle": 90,
+                  "color": "#3b3b3b",
+                  "condition": "intact",
+                  "owner": "Ren",
+                  "props": []
+                },
+                {
+                  "id": "r0-turntable-3",
+                  "kind": "turntable",
+                  "at": {
+                    "x": 0.85,
+                    "y": 0.8
+                  },
+                  "angle": -90,
+                  "color": "#4a3a2c",
+                  "condition": "damaged",
+                  "owner": "Ada",
+                  "props": []
+                }
+              ]
+            },
+            {
+              "room": 1,
+              "title": "Studio B",
+              "description": "A round mic table for the call-in hour, chairs pulled back mid-segment.",
+              "owner": "Luz",
+              "palette": {
+                "surface": "#5a4636",
+                "metal": "#8f969c",
+                "accent": "#d64a3a"
+              },
+              "condition": "kept",
+              "furniture": [
+                {
+                  "id": "r1-table-0",
+                  "kind": "table",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.5
+                  },
+                  "angle": 0,
+                  "color": "#5a4636",
+                  "condition": "worn",
+                  "owner": "Luz",
+                  "props": [
+                    {
+                      "id": "r1-0-headphones-0",
+                      "kind": "headphones",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Luz"
+                    },
+                    {
+                      "id": "r1-0-record-1",
+                      "kind": "record",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Luz"
+                    },
+                    {
+                      "id": "r1-0-mug-2",
+                      "kind": "mug",
+                      "at": {
+                        "x": 0,
+                        "y": 0.35
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Luz"
+                    }
+                  ]
+                },
+                {
+                  "id": "r1-micstand-1",
+                  "kind": "micStand",
+                  "at": {
+                    "x": 0.3,
+                    "y": 0.3
+                  },
+                  "angle": 30,
+                  "color": "#2a2a2a",
+                  "condition": "intact",
+                  "owner": "Ren",
+                  "props": []
+                },
+                {
+                  "id": "r1-micstand-2",
+                  "kind": "micStand",
+                  "at": {
+                    "x": 0.7,
+                    "y": 0.7
+                  },
+                  "angle": -150,
+                  "color": "#2a2a2a",
+                  "condition": "damaged",
+                  "owner": "Ada",
+                  "props": []
+                },
+                {
+                  "id": "r1-soundpanel-3",
+                  "kind": "soundPanel",
+                  "at": {
+                    "x": 0.15,
+                    "y": 0.85
+                  },
+                  "angle": 90,
+                  "color": "#4b5d7a",
+                  "condition": "intact",
+                  "owner": "Seth",
+                  "props": []
+                },
+                {
+                  "id": "r1-onairlight-4",
+                  "kind": "onAirLight",
+                  "at": {
+                    "x": 0.88,
+                    "y": 0.15
+                  },
+                  "angle": 0,
+                  "color": "#30343c",
+                  "condition": "worn",
+                  "owner": "Mei",
+                  "props": []
+                }
+              ]
+            },
+            {
+              "room": 2,
+              "title": "Newsroom",
+              "description": "Desks split by acoustic panels where the local bulletin was cut.",
+              "owner": "Ren",
+              "palette": {
+                "surface": "#4f5a63",
+                "metal": "#9aa3ad",
+                "accent": "#f0c04a"
+              },
+              "condition": "worn",
+              "furniture": [
+                {
+                  "id": "r2-desk-0",
+                  "kind": "desk",
+                  "at": {
+                    "x": 0.25,
+                    "y": 0.15
+                  },
+                  "angle": 0,
+                  "color": "#6c5a48",
+                  "condition": "intact",
+                  "owner": "Ren",
+                  "props": [
+                    {
+                      "id": "r2-0-papers-0",
+                      "kind": "papers",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Ren"
+                    },
+                    {
+                      "id": "r2-0-phone-1",
+                      "kind": "phone",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Ren"
+                    },
+                    {
+                      "id": "r2-0-cassette-2",
+                      "kind": "cassette",
+                      "at": {
+                        "x": 0,
+                        "y": 0.35
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Ren"
+                    }
+                  ]
+                },
+                {
+                  "id": "r2-soundpanel-1",
+                  "kind": "soundPanel",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.25
+                  },
+                  "angle": 90,
+                  "color": "#3e5871",
+                  "condition": "damaged",
+                  "owner": "Ada",
+                  "props": []
+                },
+                {
+                  "id": "r2-studiomonitor-2",
+                  "kind": "studioMonitor",
+                  "at": {
+                    "x": 0.85,
+                    "y": 0.15
+                  },
+                  "angle": 0,
+                  "color": "#1d1f24",
+                  "condition": "intact",
+                  "owner": "Seth",
+                  "props": []
+                }
+              ]
+            },
+            {
+              "room": 3,
+              "title": "Control Room One",
+              "description": "The board op's desk faces the studio glass; the overnight playlist is still taped to the rack.",
+              "owner": "Ada",
+              "palette": {
+                "surface": "#3a3f4a",
+                "metal": "#9aa3ad",
+                "accent": "#e0533d"
+              },
+              "condition": "ransacked",
+              "furniture": [
+                {
+                  "id": "r3-mixingconsole-0",
+                  "kind": "mixingConsole",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.2
+                  },
+                  "angle": 0,
+                  "color": "#2f3440",
+                  "condition": "damaged",
+                  "owner": "Ada",
+                  "props": [
+                    {
+                      "id": "r3-0-headphones-0",
+                      "kind": "headphones",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Ada"
+                    },
+                    {
+                      "id": "r3-0-cassette-1",
+                      "kind": "cassette",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Ada"
+                    },
+                    {
+                      "id": "r3-0-papers-2",
+                      "kind": "papers",
+                      "at": {
+                        "x": 0,
+                        "y": 0.35
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Ada"
+                    }
+                  ]
+                },
+                {
+                  "id": "r3-equipmentrack-1",
+                  "kind": "equipmentRack",
+                  "at": {
+                    "x": 0.12,
+                    "y": 0.2
+                  },
+                  "angle": 0,
+                  "color": "#23262d",
+                  "condition": "intact",
+                  "owner": "Seth",
+                  "props": []
+                },
+                {
+                  "id": "r3-studiomonitor-2",
+                  "kind": "studioMonitor",
+                  "at": {
+                    "x": 0.82,
+                    "y": 0.2
+                  },
+                  "angle": 0,
+                  "color": "#1d1f24",
+                  "condition": "worn",
+                  "owner": "Mei",
+                  "props": []
+                },
+                {
+                  "id": "r3-onairlight-3",
+                  "kind": "onAirLight",
+                  "at": {
+                    "x": 0.85,
+                    "y": 0.8
+                  },
+                  "angle": 0,
+                  "color": "#30343c",
+                  "condition": "intact",
+                  "owner": "Jules",
+                  "props": []
+                }
+              ]
+            }
+          ]
+        },
+        "roomShapes": ["chamfered", "rect", "rect", "rect"]
+      },
+      {
+        "name": "TRANSMITTER LEVEL",
+        "family": "columns",
+        "roomOrder": [3, 1, 0],
+        "layoutSeed": 153,
+        "roomTypes": ["manager", "storage", "cubicles", "meeting"],
+        "subroomKinds": ["office", "meeting", "storage", "break"],
+        "furnitureDensity": 1.15,
+        "fieldQuotas": [3, 4, 5, 6],
+        "power": ["dim", "lit", "lit", "outage"],
+        "brokenGuard": {
+          "segment": 4,
+          "bay": 2
+        },
+        "scene": {
+          "version": 2,
+          "rooms": [
+            {
+              "room": 0,
+              "title": "Control Room One",
+              "description": "The board op's desk faces the studio glass; the overnight playlist is still taped to the rack.",
+              "owner": "Seth",
+              "palette": {
+                "surface": "#3a3f4a",
+                "metal": "#9aa3ad",
+                "accent": "#e0533d"
+              },
+              "condition": "kept",
+              "furniture": [
+                {
+                  "id": "r0-mixingconsole-0",
+                  "kind": "mixingConsole",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.2
+                  },
+                  "angle": 0,
+                  "color": "#2f3440",
+                  "condition": "intact",
+                  "owner": "Seth",
+                  "props": [
+                    {
+                      "id": "r0-0-headphones-0",
+                      "kind": "headphones",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Seth"
+                    },
+                    {
+                      "id": "r0-0-cassette-1",
+                      "kind": "cassette",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Seth"
+                    },
+                    {
+                      "id": "r0-0-papers-2",
+                      "kind": "papers",
+                      "at": {
+                        "x": 0,
+                        "y": 0.35
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Seth"
+                    }
+                  ]
+                },
+                {
+                  "id": "r0-equipmentrack-1",
+                  "kind": "equipmentRack",
+                  "at": {
+                    "x": 0.12,
+                    "y": 0.2
+                  },
+                  "angle": 0,
+                  "color": "#23262d",
+                  "condition": "worn",
+                  "owner": "Mei",
+                  "props": []
+                },
+                {
+                  "id": "r0-studiomonitor-2",
+                  "kind": "studioMonitor",
+                  "at": {
+                    "x": 0.82,
+                    "y": 0.2
+                  },
+                  "angle": 0,
+                  "color": "#1d1f24",
+                  "condition": "intact",
+                  "owner": "Jules",
+                  "props": []
+                },
+                {
+                  "id": "r0-onairlight-3",
+                  "kind": "onAirLight",
+                  "at": {
+                    "x": 0.85,
+                    "y": 0.8
+                  },
+                  "angle": 0,
+                  "color": "#30343c",
+                  "condition": "damaged",
+                  "owner": "Sol",
+                  "props": []
+                }
+              ]
+            },
+            {
+              "room": 1,
+              "title": "Record Library",
+              "description": "Floor-to-ceiling vinyl, hand-lettered genre cards and the reel archive.",
+              "owner": "Mei",
+              "palette": {
+                "surface": "#6b4a2f",
+                "metal": "#7f8790",
+                "accent": "#e3b04b"
+              },
+              "condition": "worn",
+              "furniture": [
+                {
+                  "id": "r1-recordshelf-0",
+                  "kind": "recordShelf",
+                  "at": {
+                    "x": 0.3,
+                    "y": 0.12
+                  },
+                  "angle": 0,
+                  "color": "#6b4a2f",
+                  "condition": "worn",
+                  "owner": "Mei",
+                  "props": [
+                    {
+                      "id": "r1-0-record-0",
+                      "kind": "record",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Mei"
+                    },
+                    {
+                      "id": "r1-0-cassette-1",
+                      "kind": "cassette",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Mei"
+                    }
+                  ]
+                },
+                {
+                  "id": "r1-recordshelf-1",
+                  "kind": "recordShelf",
+                  "at": {
+                    "x": 0.7,
+                    "y": 0.12
+                  },
+                  "angle": 0,
+                  "color": "#6b4a2f",
+                  "condition": "intact",
+                  "owner": "Jules",
+                  "props": [
+                    {
+                      "id": "r1-1-record-0",
+                      "kind": "record",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Jules"
+                    },
+                    {
+                      "id": "r1-1-book-1",
+                      "kind": "book",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Jules"
+                    }
+                  ]
+                },
+                {
+                  "id": "r1-reeltoreel-2",
+                  "kind": "reelToReel",
+                  "at": {
+                    "x": 0.15,
+                    "y": 0.8
+                  },
+                  "angle": 90,
+                  "color": "#3b3b3b",
+                  "condition": "damaged",
+                  "owner": "Sol",
+                  "props": []
+                },
+                {
+                  "id": "r1-turntable-3",
+                  "kind": "turntable",
+                  "at": {
+                    "x": 0.85,
+                    "y": 0.8
+                  },
+                  "angle": -90,
+                  "color": "#4a3a2c",
+                  "condition": "intact",
+                  "owner": "Bryn",
+                  "props": []
+                }
+              ]
+            },
+            {
+              "room": 2,
+              "title": "Newsroom",
+              "description": "Desks split by acoustic panels where the local bulletin was cut.",
+              "owner": "Jules",
+              "palette": {
+                "surface": "#4f5a63",
+                "metal": "#9aa3ad",
+                "accent": "#f0c04a"
+              },
+              "condition": "ransacked",
+              "furniture": [
+                {
+                  "id": "r2-desk-0",
+                  "kind": "desk",
+                  "at": {
+                    "x": 0.25,
+                    "y": 0.15
+                  },
+                  "angle": 0,
+                  "color": "#6c5a48",
+                  "condition": "intact",
+                  "owner": "Jules",
+                  "props": [
+                    {
+                      "id": "r2-0-papers-0",
+                      "kind": "papers",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Jules"
+                    },
+                    {
+                      "id": "r2-0-phone-1",
+                      "kind": "phone",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Jules"
+                    },
+                    {
+                      "id": "r2-0-cassette-2",
+                      "kind": "cassette",
+                      "at": {
+                        "x": 0,
+                        "y": 0.35
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Jules"
+                    }
+                  ]
+                },
+                {
+                  "id": "r2-soundpanel-1",
+                  "kind": "soundPanel",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.25
+                  },
+                  "angle": 90,
+                  "color": "#3e5871",
+                  "condition": "damaged",
+                  "owner": "Sol",
+                  "props": []
+                },
+                {
+                  "id": "r2-studiomonitor-2",
+                  "kind": "studioMonitor",
+                  "at": {
+                    "x": 0.85,
+                    "y": 0.15
+                  },
+                  "angle": 0,
+                  "color": "#1d1f24",
+                  "condition": "intact",
+                  "owner": "Bryn",
+                  "props": []
+                }
+              ]
+            },
+            {
+              "room": 3,
+              "title": "Studio B",
+              "description": "A round mic table for the call-in hour, chairs pulled back mid-segment.",
+              "owner": "Sol",
+              "palette": {
+                "surface": "#5a4636",
+                "metal": "#8f969c",
+                "accent": "#d64a3a"
+              },
+              "condition": "kept",
+              "furniture": [
+                {
+                  "id": "r3-table-0",
+                  "kind": "table",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.5
+                  },
+                  "angle": 0,
+                  "color": "#5a4636",
+                  "condition": "damaged",
+                  "owner": "Sol",
+                  "props": [
+                    {
+                      "id": "r3-0-headphones-0",
+                      "kind": "headphones",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Sol"
+                    },
+                    {
+                      "id": "r3-0-record-1",
+                      "kind": "record",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Sol"
+                    },
+                    {
+                      "id": "r3-0-mug-2",
+                      "kind": "mug",
+                      "at": {
+                        "x": 0,
+                        "y": 0.35
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Sol"
+                    }
+                  ]
+                },
+                {
+                  "id": "r3-micstand-1",
+                  "kind": "micStand",
+                  "at": {
+                    "x": 0.3,
+                    "y": 0.3
+                  },
+                  "angle": 30,
+                  "color": "#2a2a2a",
+                  "condition": "intact",
+                  "owner": "Bryn",
+                  "props": []
+                },
+                {
+                  "id": "r3-micstand-2",
+                  "kind": "micStand",
+                  "at": {
+                    "x": 0.7,
+                    "y": 0.7
+                  },
+                  "angle": -150,
+                  "color": "#2a2a2a",
+                  "condition": "worn",
+                  "owner": "Uma",
+                  "props": []
+                },
+                {
+                  "id": "r3-soundpanel-3",
+                  "kind": "soundPanel",
+                  "at": {
+                    "x": 0.15,
+                    "y": 0.85
+                  },
+                  "angle": 90,
+                  "color": "#4b5d7a",
+                  "condition": "intact",
+                  "owner": "Vera",
+                  "props": []
+                },
+                {
+                  "id": "r3-onairlight-4",
+                  "kind": "onAirLight",
+                  "at": {
+                    "x": 0.88,
+                    "y": 0.15
+                  },
+                  "angle": 0,
+                  "color": "#30343c",
+                  "condition": "damaged",
+                  "owner": "Inez",
+                  "props": []
+                }
+              ]
+            }
+          ]
+        },
+        "roomShapes": ["rect", "rect", "rect", "chamfered"]
+      }
+    ],
+    "roofName": "TRANSMITTER ROOF",
+    "roster": [
+      {
+        "name": "Inez",
+        "role": "builder",
+        "skill": 0.45,
+        "risk": 0.25,
+        "social": 0.3
+      },
+      {
+        "name": "Cal",
+        "role": "analyst",
+        "skill": 0.51,
+        "risk": 0.35,
+        "social": 0.42
+      },
+      {
+        "name": "Rumi",
+        "role": "rusher",
+        "skill": 0.57,
+        "risk": 0.45,
+        "social": 0.54
+      },
+      {
+        "name": "Dev",
+        "role": "medic",
+        "skill": 0.63,
+        "risk": 0.55,
+        "social": 0.66
+      },
+      {
+        "name": "Esme",
+        "role": "skeptic",
+        "skill": 0.69,
+        "risk": 0.65,
+        "social": 0.3
+      },
+      {
+        "name": "Nico",
+        "role": "builder",
+        "skill": 0.75,
+        "risk": 0.25,
+        "social": 0.42
+      },
+      {
+        "name": "Tamsin",
+        "role": "analyst",
+        "skill": 0.81,
+        "risk": 0.35,
+        "social": 0.54
+      },
+      {
+        "name": "Paz",
+        "role": "rusher",
+        "skill": 0.45,
+        "risk": 0.45,
+        "social": 0.66
+      },
+      {
+        "name": "Ellis",
+        "role": "medic",
+        "skill": 0.51,
+        "risk": 0.55,
+        "social": 0.3
+      },
+      {
+        "name": "Luz",
+        "role": "skeptic",
+        "skill": 0.57,
+        "risk": 0.65,
+        "social": 0.42
+      },
+      {
+        "name": "Ren",
+        "role": "builder",
+        "skill": 0.63,
+        "risk": 0.25,
+        "social": 0.54
+      },
+      {
+        "name": "Ada",
+        "role": "analyst",
+        "skill": 0.69,
+        "risk": 0.35,
+        "social": 0.66
+      },
+      {
+        "name": "Seth",
+        "role": "rusher",
+        "skill": 0.75,
+        "risk": 0.45,
+        "social": 0.3
+      },
+      {
+        "name": "Mei",
+        "role": "medic",
+        "skill": 0.81,
+        "risk": 0.55,
+        "social": 0.42
+      },
+      {
+        "name": "Jules",
+        "role": "skeptic",
+        "skill": 0.45,
+        "risk": 0.65,
+        "social": 0.54
+      },
+      {
+        "name": "Sol",
+        "role": "builder",
+        "skill": 0.51,
+        "risk": 0.25,
+        "social": 0.66
+      },
+      {
+        "name": "Bryn",
+        "role": "analyst",
+        "skill": 0.57,
+        "risk": 0.35,
+        "social": 0.3
+      },
+      {
+        "name": "Uma",
+        "role": "rusher",
+        "skill": 0.63,
+        "risk": 0.45,
+        "social": 0.42
+      },
+      {
+        "name": "Vera",
+        "role": "medic",
+        "skill": 0.69,
+        "risk": 0.55,
+        "social": 0.54
+      }
+    ],
+    "city": {
+      "roadWidth": 9,
+      "boulevardOffset": 19,
+      "districtSize": 24,
+      "buildingHeightMin": 12,
+      "buildingHeightMax": 40,
+      "damageRate": 0.45,
+      "palette": ["#344f57", "#596c70", "#87908a"]
+    },
+    "exterior": {
+      "buildingName": "KRDW 91.3 COMMUNITY RADIO",
+      "buildingSubtitle": "STUDIOS • RECORD LIBRARY",
+      "quarantineTitle": "SIGNAL CORDON",
+      "quarantineSubtitle": "DISTRICT EVACUATION",
+      "skyline": {
+        "minHeight": 40,
+        "maxHeight": 110,
+        "damageRate": 0.4
+      }
+    },
+    "pacing": {
+      "swarmInterval": 3.8,
+      "swarmBatch": 1,
+      "swarmCap": 150,
+      "npcThinkingScale": 0.3,
+      "firstHelicopter": 540,
+      "helicopterInterval": 180
+    },
+    "relationships": [
+      {
+        "from": "Inez",
+        "to": "Cal",
+        "kind": "colleague",
+        "detail": "They catalogued damaged exhibits together before the evacuation."
+      },
+      {
+        "from": "Rumi",
+        "to": "Dev",
+        "kind": "friend",
+        "detail": "They exchanged small drawings during their lunch breaks."
+      }
+    ],
+    "titleCard": {
+      "title": {
+        "font": "bebas-neue",
+        "color": "#ff5a45",
+        "size": 72
+      },
+      "story": {
+        "font": "ibm-plex-mono",
+        "color": "#e9e1cc",
+        "size": 18
+      }
+    },
+    "setting": {
+      "venue": "broadcast",
+      "interior": {
+        "roomFloor": "studioCarpet",
+        "hallFloor": "terrazzo",
+        "roomTint": "#2b2f3a",
+        "hallTint": "#d8cfbd",
+        "wall": "#4a5560",
+        "trim": "#c9a45c"
+      },
+      "exterior": {
+        "facade": "brick",
+        "facadeColor": "#8a4a36",
+        "trimColor": "#e8dcc0",
+        "windows": "punched",
+        "canopy": "marquee",
+        "canopyGlow": "#ff4a3a",
+        "roofFeatures": [
+          {
+            "kind": "mast",
+            "x": 0.1,
+            "y": 0.1
+          },
+          {
+            "kind": "dish",
+            "x": 0.9,
+            "y": 0.15
+          },
+          {
+            "kind": "beacon",
+            "x": 0.95,
+            "y": 0.95
+          },
+          {
+            "kind": "vent",
+            "x": 0.05,
+            "y": 0.9
+          }
+        ]
+      },
+      "terminal": {
+        "style": "console",
+        "body": "#3a3d42",
+        "accent": "#d63a2f",
+        "screen": "#7fe8d6"
+      },
+      "objects": [],
+      "props": [],
+      "surroundings": {
+        "ground": "asphalt",
+        "groundColor": "#3b3f44",
+        "pathColor": "#2b2e33",
+        "sky": {
+          "zenith": "#0d1622",
+          "horizon": "#3a4656"
+        },
+        "fog": {
+          "color": "#1c2430",
+          "density": 0.2
+        },
+        "neighbors": "buildings",
+        "neighborColor": "#4a4f57",
+        "weather": "rain",
+        "scenery": []
+      },
+      "filler": null,
+      "form": "enclosed",
+      "outdoors": {
+        "version": 1,
+        "bounds": {
+          "left": -40,
+          "right": 90,
+          "top": -30,
+          "bottom": 96
+        },
+        "ground": "regolith",
+        "enclosure": "dome",
+        "backdrop": "dunes",
+        "regions": [
+          {
+            "kind": "dome-wall",
+            "shape": "ring",
+            "x": 22,
+            "y": 30,
+            "r": 54,
+            "thickness": 1,
+            "gaps": [
+              {
+                "angle": 0,
+                "width": 6
+              }
+            ],
+            "height": 14,
+            "color": "#bcd6e0"
+          }
+        ]
+      }
+    }
+  },
+  "entities": [
+    {
+      "id": "human",
+      "kind": "player",
+      "x": 22.5,
+      "y": 30.5
+    }
+  ],
+  "deleted": [],
+  "maps": [],
+  "actions": [
+    {
+      "tick": 1,
+      "type": "walkTo",
+      "id": "human",
+      "x": 22,
+      "y": 92
+    }
+  ],
+  "checks": [
+    {
+      "name": "The player walks from the entrance across the drawn outdoors",
+      "mode": "eventually",
+      "query": {
+        "type": "property",
+        "id": "human",
+        "field": "y"
+      },
+      "op": "gte",
+      "expected": 80
+    },
+    {
+      "name": "The drawn outdoors leaves the building and all floor portals intact",
+      "mode": "always",
+      "query": {
+        "type": "buildingLayoutErrors"
+      },
+      "op": "eq",
+      "expected": 0
+    },
+    {
+      "name": "The dome wall stops the player where there is no airlock",
+      "mode": "always",
+      "query": {
+        "type": "property",
+        "id": "human",
+        "field": "y"
+      },
+      "op": "lte",
+      "expected": 84.2
+    },
+    {
+      "name": "A drawn outdoors seeds no horde",
+      "mode": "always",
+      "query": {
+        "type": "count",
+        "kind": "zombie"
+      },
+      "op": "eq",
+      "expected": 0
+    }
+  ]
+}

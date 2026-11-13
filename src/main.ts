@@ -94,7 +94,7 @@ import {
   useItem,
   vault,
 } from "./engine";
-import { isOpenSite } from "./open-site";
+import { isOpenSite, siteFormOf } from "./open-site";
 import { renderEnvironmentObservations } from "./environment-ui";
 import { itemInfo } from "./equipment";
 import { canRunWorkspace, runWorkspace } from "./execution";
@@ -928,6 +928,69 @@ function begin() {
     startRun();
   })();
 }
+/** Designs already summarised on this page: one "run-design" entry per game. */
+const loggedRunDesigns = new Set<string>();
+/** What a design was built from, read defensively: it is validated blueprint
+ * data, but an old save may lack any of it. */
+function recordRunDesign(g: Game) {
+  if (loggedRunDesigns.has(g.id)) return;
+  loggedRunDesigns.add(g.id);
+  const saved = g.design as unknown as
+    { source?: unknown; design?: unknown } | undefined;
+  const design = saved?.design as
+    | {
+        title?: unknown;
+        setting?: {
+          venue?: unknown;
+          surroundings?: {
+            ground?: unknown;
+            neighbors?: unknown;
+            weather?: unknown;
+          };
+        };
+      }
+    | undefined;
+  const setting = design?.setting,
+    surroundings = setting?.surroundings,
+    spec = (
+      g.escape as unknown as
+        { catastrophe?: { title?: unknown; behaviours?: unknown } } | undefined
+    )?.catastrophe,
+    behaviours = (Array.isArray(spec?.behaviours) ? spec.behaviours : []) as {
+      kind?: unknown;
+      count?: unknown;
+    }[],
+    surfaces = (
+      g.floors[0] as unknown as
+        { environment?: { surfaces?: unknown } } | undefined
+    )?.environment?.surfaces;
+  runLogs.record(g, "run-design", {
+    title: design?.title ?? null,
+    source: saved?.source ?? null,
+    form: siteFormOf(design),
+    venue: setting?.venue ?? null,
+    neighbors: surroundings?.neighbors ?? null,
+    ground: surroundings?.ground ?? null,
+    weather: surroundings?.weather ?? null,
+    catastrophe: spec
+      ? {
+          title: spec.title ?? null,
+          behaviours: behaviours.map((b) => b.kind ?? null),
+          hunters: behaviours.reduce(
+            (sum, b) => sum + (b.kind === "hunter" ? Number(b.count) || 0 : 0),
+            0,
+          ),
+        }
+      : null,
+    exteriorSigns: Array.isArray(surfaces)
+      ? (surfaces as { scope?: unknown; role?: unknown }[]).filter(
+          (s) =>
+            s.scope === "exterior" &&
+            (s.role === "storefront-sign" || s.role === "street-sign"),
+        ).length
+      : null,
+  });
+}
 function startRun() {
   document.body.classList.remove("agent-tools");
   game.status = "playing";
@@ -941,6 +1004,7 @@ function startRun() {
   $("#start-card").classList.remove("title-card");
   quietNotice();
   focusWorld(true);
+  recordRunDesign(game);
   persist();
 }
 const HUMAN_EVIDENCE_KINDS = [
@@ -2583,10 +2647,19 @@ $("#chat-form").onsubmit = (ev) => {
   if (
     !text.trim() ||
     (tab === "tutor" && e.tutorRequests?.some((j) => j.state === "pending"))
-  )
+  ) {
+    runLogs.record(game, "terminal-message-blocked", {
+      channel: tab,
+      reason: !text.trim() ? "empty" : "tutor-pending",
+    });
     return;
+  }
   input.value = "";
   e.chatDraft = "";
+  runLogs.record(game, "terminal-message", {
+    channel: tab,
+    chars: text.length,
+  });
   void send(game, e, tab, text, roadmap).then(() => {
     persist();
     renderTerminal();
@@ -3796,6 +3869,7 @@ installPlayerChat({
   game: () => game,
   yaw: () => firstPersonControls.yaw,
   keyboardBusy: () => ownsKeyboard(document.activeElement),
+  log: (type, data) => runLogs.record(game, type, data),
 });
 ui();
 requestAnimationFrame(frame);

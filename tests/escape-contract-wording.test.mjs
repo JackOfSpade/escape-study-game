@@ -29,11 +29,9 @@ const ARRAY_FIELDS = {
     rooms: /rooms is a JSON array of 3 to 12 entries/,
     people: /people is a JSON array of 0 to 12 entries/,
   },
-  "escape-catastrophe": {
-    behaviours: /behaviours is a JSON array of 1 to 3 entries/,
-    phases: /phases is a JSON array of 2 to 6 entries/,
-    omens: /omens is a JSON array of 5 to 10 entries/,
-  },
+  // Its reply is structured output: the schema, not the prose, declares the
+  // behaviours, phases and omens arrays (tests/catastrophe-schema.test.ts).
+  "escape-catastrophe": {},
 };
 
 const describedArrays = (contract) =>

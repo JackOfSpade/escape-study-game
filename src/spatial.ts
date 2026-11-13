@@ -1,5 +1,5 @@
 import { fieldAllows } from "./force-fields";
-import { citySolid, cityWall } from "./city-layout";
+import { cityObstaclesNear, citySolid, cityWall } from "./city-layout";
 import { boxBounds, boxesOverlap, localPoint } from "./furniture-geometry";
 import {
   type Actor,
@@ -515,7 +515,13 @@ export function canPlace(
     )
       return false;
     if (
-      f.city.obstacles.some((obstacle) => boxesOverlap(box, obstacle, margin))
+      cityObstaclesNear(
+        f.city,
+        p.x - bounds.w / 2 - margin,
+        p.x + bounds.w / 2 + margin,
+        p.y - bounds.h / 2 - margin,
+        p.y + bounds.h / 2 + margin,
+      ).some((obstacle) => boxesOverlap(box, obstacle, margin))
     )
       return false;
   }

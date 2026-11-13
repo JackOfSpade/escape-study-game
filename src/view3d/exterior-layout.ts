@@ -410,6 +410,15 @@ export interface CityGroundRectangle {
   d: number;
 }
 
+/** How far the ground runs past the city bounds: to the horizon, except
+ * where a drawn outdoors ends at the sea, whose shore is the bounds edge. */
+function groundReach(floor: Floor) {
+  return floor.city?.source === "authored" &&
+    floor.setting?.outdoors?.backdrop === "sea"
+    ? 0
+    : 700;
+}
+
 /** The city owns the ground outside the real footprint. Cutting out the whole
  * footprint avoids a second nearly coplanar asphalt layer under room floors.
  * Consecutive identical edges share a rectangle; there are no overlapping tops.
@@ -421,10 +430,10 @@ export function cityGroundRectangles(floor: Floor): CityGroundRectangle[] {
   // texture continues underneath it; only stamped shells are still cut out.
   if (floor.open === true) return multiSiteGround(floor, undefined);
   if (floor.shells?.length) return multiSiteGround(floor, b);
-  const minX = floor.city ? floor.city.bounds.left - 700 : -118,
-    maxX = floor.city ? floor.city.bounds.right + 700 : 162,
-    minZ = floor.city ? floor.city.bounds.top - 700 : -124,
-    maxZ = floor.city ? floor.city.bounds.bottom + 700 : 156,
+  const minX = floor.city ? floor.city.bounds.left - groundReach(floor) : -118,
+    maxX = floor.city ? floor.city.bounds.right + groundReach(floor) : 162,
+    minZ = floor.city ? floor.city.bounds.top - groundReach(floor) : -124,
+    maxZ = floor.city ? floor.city.bounds.bottom + groundReach(floor) : 156,
     rectangles: CityGroundRectangle[] = [
       {
         x: (minX + maxX) / 2,
@@ -473,10 +482,10 @@ function multiSiteGround(
     ...(start ? [start] : []),
     ...(floor.shells ?? []).map((s) => s.boundary),
   ];
-  const minX = floor.city ? floor.city.bounds.left - 700 : -118,
-    maxX = floor.city ? floor.city.bounds.right + 700 : 162,
-    minZ = floor.city ? floor.city.bounds.top - 700 : -124,
-    maxZ = floor.city ? floor.city.bounds.bottom + 700 : 156,
+  const minX = floor.city ? floor.city.bounds.left - groundReach(floor) : -118,
+    maxX = floor.city ? floor.city.bounds.right + groundReach(floor) : 162,
+    minZ = floor.city ? floor.city.bounds.top - groundReach(floor) : -124,
+    maxZ = floor.city ? floor.city.bounds.bottom + groundReach(floor) : 156,
     top = prints.length ? Math.min(...prints.map((p) => p.top)) : minZ,
     bottom = prints.length ? Math.max(...prints.map((p) => p.bottom)) : maxZ,
     out: CityGroundRectangle[] = [

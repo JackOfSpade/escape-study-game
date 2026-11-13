@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { fallbackCatastrophe } from "../src/catastrophe";
+import {
+  CATASTROPHE_HISTORY_KEY,
+  summarizeCatastrophe,
+} from "../src/catastrophe-history";
 import { epiloguePacket, fallbackEpilogue } from "../src/escape-log";
 import {
   endLoop,
@@ -228,4 +232,168 @@ test("every prepare helper is a no-op without g.escape", async () => {
   assert.equal(await epilogueForNewGame(plain), undefined);
   assert.equal(calls.length, 0);
   resetEscapeRequest();
+});
+
+/* Physical setting, recent history and the repeated-signature retry. */
+
+const withStorage = async (
+  run: (store: Map<string, string>) => Promise<void>,
+) => {
+  const store = new Map<string, string>();
+  const original = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => void store.set(key, value),
+      removeItem: (key: string) => void store.delete(key),
+    },
+  });
+  try {
+    await run(store);
+  } finally {
+    if (original) Object.defineProperty(globalThis, "localStorage", original);
+    else Reflect.deleteProperty(globalThis, "localStorage");
+    resetEscapeRequest();
+  }
+};
+
+test("prepareCatastrophe sends the physical setting and an outdoors summary", async () => {
+  await withStorage(async () => {
+    const { game, live } = makeGame();
+    Object.assign(live.design.design, {
+      setting: {
+        venue: "lighthouse",
+        form: "enclosed",
+        surroundings: {
+          ground: "rock",
+          neighbors: "rocks",
+          weather: "storm",
+          sky: { zenith: "#000000", horizon: "#111111" },
+        },
+        outdoors: {
+          enclosure: "open-sky",
+          backdrop: "sea",
+          ground: "rock",
+          regions: [
+            { kind: "water", shape: "ring" },
+            { kind: "path", shape: "rect" },
+            { kind: "water", shape: "disc" },
+          ],
+        },
+      },
+    });
+    const calls = fake(() => ({ spec: validSpec() }));
+    await prepareCatastrophe(game);
+    const setting = (calls[0]!.payload as { setting: Record<string, unknown> })
+      .setting;
+    assert.equal(setting.venue, "lighthouse");
+    assert.equal(setting.form, "enclosed");
+    assert.deepEqual(setting.surroundings, {
+      ground: "rock",
+      neighbors: "rocks",
+      weather: "storm",
+    });
+    assert.deepEqual(setting.outdoors, {
+      enclosure: "open-sky",
+      backdrop: "sea",
+      ground: "rock",
+      regionKinds: ["path", "water"],
+    });
+  });
+});
+
+test("prepareCatastrophe sends recent history and records the accepted spec", async () => {
+  await withStorage(async (store) => {
+    const { game } = makeGame();
+    const calls = fake(() => ({ spec: validSpec() }));
+    await prepareCatastrophe(game);
+    assert.deepEqual((calls[0]!.payload as { recent: unknown[] }).recent, []);
+    const stored = JSON.parse(store.get(CATASTROPHE_HISTORY_KEY)!);
+    assert.equal(stored.length, 1);
+    assert.equal(stored[0].title, validSpec().title);
+    assert.equal(JSON.stringify(stored).includes(validSpec().premise), false);
+  });
+});
+
+test("a repeated behaviour signature is asked for once more and the second answer is kept", async () => {
+  await withStorage(async (store) => {
+    const repeat = validSpec();
+    store.set(
+      CATASTROPHE_HISTORY_KEY,
+      JSON.stringify([summarizeCatastrophe(repeat)]),
+    );
+    const different = {
+      ...validSpec(),
+      title: "The tide that came indoors",
+      // Same timeline (two behaviour slots), a different mechanism.
+      behaviours: [
+        {
+          kind: "perception-rule" as const,
+          trigger: "makes-sound" as const,
+          threshold: 4,
+          effect: "instant-death" as const,
+          warning: "ringing" as const,
+        },
+        {
+          kind: "collapse" as const,
+          targets: ["structure" as const],
+          cadence: 120,
+        },
+      ],
+    };
+    const { game, live } = makeGame();
+    let n = 0;
+    const calls = fake(() => ({ spec: n++ === 0 ? repeat : different }));
+    await prepareCatastrophe(game);
+    assert.equal(calls.length, 2);
+    const second = calls[1]!.payload as {
+      requestId: string;
+      repeated: { title: string };
+    };
+    assert.equal(second.requestId, "cat-game-1-2");
+    assert.equal(second.repeated.title, repeat.title);
+    assert.equal(live.escape.catastrophe, different);
+    const stored = JSON.parse(store.get(CATASTROPHE_HISTORY_KEY)!);
+    assert.deepEqual(
+      stored.map((s: { title: string }) => s.title),
+      [different.title, repeat.title],
+    );
+  });
+});
+
+test("the second answer is accepted even when it repeats too", async () => {
+  await withStorage(async (store) => {
+    const repeat = validSpec();
+    store.set(
+      CATASTROPHE_HISTORY_KEY,
+      JSON.stringify([summarizeCatastrophe(repeat)]),
+    );
+    const { game, live } = makeGame();
+    const again = { ...validSpec(), title: "Renamed again" };
+    let n = 0;
+    const calls = fake(() => ({ spec: n++ === 0 ? repeat : again }));
+    await prepareCatastrophe(game);
+    assert.equal(calls.length, 2);
+    assert.equal(live.escape.catastrophe, again);
+  });
+});
+
+test("a failed second request keeps the valid first answer", async () => {
+  await withStorage(async (store) => {
+    const repeat = validSpec();
+    store.set(
+      CATASTROPHE_HISTORY_KEY,
+      JSON.stringify([summarizeCatastrophe(repeat)]),
+    );
+    const { game, live } = makeGame();
+    let n = 0;
+    const calls = fake(() => {
+      if (n++ === 0) return { spec: repeat };
+      throw Error("bridge offline");
+    });
+    await prepareCatastrophe(game);
+    assert.equal(calls.length, 2);
+    assert.equal(live.escape.catastrophe, repeat);
+  });
 });

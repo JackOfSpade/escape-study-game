@@ -2,16 +2,30 @@ import type { BuildingFootprint, Floor, Game, Point } from "./model";
 import { sitesOf } from "./site";
 import { STAIR_ROUTE_WIDTH } from "./stair-route";
 import type { RunDesign } from "./run-design-contract.mjs";
+import {
+  outdoorSolids,
+  regionRectangles,
+  subtractRectangle,
+  isWalkableKind,
+  type OutdoorPlan,
+  type OutdoorSite,
+  type OutdoorSolidKind,
+} from "./outdoor-plan.mjs";
 
 export interface CityRectangle extends Point {
   w: number;
   h: number;
 }
 export interface CityObstacle extends CityRectangle {
-  kind: "building" | "rubble" | "vehicle" | "stair-base";
+  kind: "building" | "rubble" | "vehicle" | "stair-base" | OutdoorSolidKind;
   height: number;
   color: string;
   damaged: boolean;
+  /** False for water, fences and low walls: they stop bodies, not sight.
+   * Absent means opaque, as every generated city obstacle is. */
+  opaque?: boolean;
+  /** For an authored outdoor plan: the index of the region it came from. */
+  region?: number;
 }
 export interface CityApproach {
   id: string;
@@ -26,6 +40,11 @@ export interface CityPlan {
   roads: CityRectangle[];
   obstacles: CityObstacle[];
   approaches: CityApproach[];
+  /** Set when the plan was compiled from a design's `setting.outdoors`. */
+  source?: "authored";
+  /** Authored paths and plazas, for drawing only: walking is decided by
+   * `roads` (the whole bounds) minus `obstacles`. */
+  paths?: (CityRectangle & { region: number })[];
 }
 
 function randomStream(seed: number) {
@@ -313,6 +332,164 @@ export function createCityPlan(
   return { version: 1, seed, bounds, roads, obstacles, approaches };
 }
 
+/** The start site as an outdoor plan sees it: the building's extent, the
+ * door's outside face, and the ground the stairs and service routes need. */
+export function outdoorSite(floor: Floor): OutdoorSite {
+  const b = floor.boundary;
+  if (!b) throw Error("An outdoor plan needs a building footprint");
+  const rows = b.rows.slice(b.top, b.bottom),
+    left = Math.min(...rows.map((r) => r.left)),
+    right = Math.max(...rows.map((r) => r.right)),
+    door = floor.furniture.find((o) => o.id === "main-gate");
+  return {
+    building: { left, right, top: b.top, bottom: b.bottom },
+    entrance: {
+      x: door?.x ?? 22,
+      y: (door?.y ?? b.bottom + 0.5) + (door?.h ?? 1) / 2 + 0.42,
+    },
+    keepClear: [
+      // The exterior fire stair and its landing run up the east face.
+      {
+        x: right + 5,
+        y: (b.top + b.bottom) / 2,
+        w: 10,
+        h: b.bottom - b.top + 4,
+      },
+      // The north stair well is authored just beyond the main shell.
+      { x: 22, y: b.top - 2, w: 8, h: 4 },
+    ],
+  };
+}
+
+/** The exterior stair base every start building stands beside. */
+function stairBase(floor: Floor, right: number): CityObstacle {
+  const b = floor.boundary!;
+  return {
+    x: right + 3,
+    y: Math.min(b.top, floor.stairs.y) - 2 + 3.6,
+    w: STAIR_ROUTE_WIDTH + 0.12,
+    h: 7.2,
+    kind: "stair-base",
+    height: 3.6,
+    color: "#87988e",
+    damaged: false,
+  };
+}
+
+/** A design's drawn outdoors as the rectangle plan every system reads. The
+ * whole bounds is walkable road; solids (after walkable regions carve them)
+ * are the obstacles; paths and plazas are kept separately for drawing. */
+export function compileOutdoorPlan(
+  floor: Floor,
+  plan: OutdoorPlan,
+  seed: number,
+): CityPlan {
+  const site = outdoorSite(floor),
+    b = plan.bounds;
+  return {
+    version: 1,
+    seed,
+    source: "authored",
+    bounds: { ...b },
+    roads: [
+      {
+        x: (b.left + b.right) / 2,
+        y: (b.top + b.bottom) / 2,
+        w: b.right - b.left,
+        h: b.bottom - b.top,
+      },
+    ],
+    obstacles: [
+      stairBase(floor, site.building.right),
+      ...outdoorSolids(plan).map((s) => ({
+        x: s.x,
+        y: s.y,
+        w: s.w,
+        h: s.h,
+        kind: s.kind,
+        height: s.height,
+        color: s.color,
+        damaged: false,
+        opaque: s.opaque,
+        region: s.region,
+      })),
+    ],
+    approaches: [],
+    paths: plan.regions.flatMap((r, region) =>
+      isWalkableKind(r.kind)
+        ? regionRectangles(r).map((rect) => ({ ...rect, region }))
+        : [],
+    ),
+  };
+}
+
+const INDEX_CELL = 16;
+interface ObstacleIndex {
+  left: number;
+  top: number;
+  cols: number;
+  rows: number;
+  cells: number[][];
+}
+const indexes = new WeakMap<CityPlan, ObstacleIndex>();
+/** A uniform bucket grid over a plan's obstacles, built once per plan. Plans
+ * are replaced, never edited in place, so the cache stays exact. */
+function obstacleIndex(plan: CityPlan): ObstacleIndex {
+  let index = indexes.get(plan);
+  if (index) return index;
+  const b = plan.bounds,
+    cols = Math.max(1, Math.ceil((b.right - b.left) / INDEX_CELL)),
+    rows = Math.max(1, Math.ceil((b.bottom - b.top) / INDEX_CELL)),
+    cells: number[][] = Array.from({ length: cols * rows }, () => []);
+  index = { left: b.left, top: b.top, cols, rows, cells };
+  plan.obstacles.forEach((o, n) => {
+    const [x0, x1, y0, y1] = cellRange(
+      index!,
+      o.x - o.w / 2,
+      o.x + o.w / 2,
+      o.y - o.h / 2,
+      o.y + o.h / 2,
+    );
+    for (let y = y0; y <= y1; y++)
+      for (let x = x0; x <= x1; x++) cells[y * cols + x].push(n);
+  });
+  indexes.set(plan, index);
+  return index;
+}
+function cellRange(
+  index: ObstacleIndex,
+  minX: number,
+  maxX: number,
+  minY: number,
+  maxY: number,
+) {
+  const clamp = (n: number, hi: number) => Math.max(0, Math.min(hi, n));
+  return [
+    clamp(Math.floor((minX - index.left) / INDEX_CELL), index.cols - 1),
+    clamp(Math.floor((maxX - index.left) / INDEX_CELL), index.cols - 1),
+    clamp(Math.floor((minY - index.top) / INDEX_CELL), index.rows - 1),
+    clamp(Math.floor((maxY - index.top) / INDEX_CELL), index.rows - 1),
+  ];
+}
+/** Obstacles whose box may touch the given rectangle, in plan order. Small
+ * generated cities are scanned directly; authored plans use the index. */
+export function cityObstaclesNear(
+  plan: CityPlan,
+  minX: number,
+  maxX: number,
+  minY: number,
+  maxY: number,
+): readonly CityObstacle[] {
+  if (plan.obstacles.length <= 48) return plan.obstacles;
+  const index = obstacleIndex(plan),
+    [x0, x1, y0, y1] = cellRange(index, minX, maxX, minY, maxY),
+    seen = new Set<number>();
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++)
+      for (const n of index.cells[y * index.cols + x]) seen.add(n);
+  return [...seen].sort((a, c) => a - c).map((n) => plan.obstacles[n]);
+}
+
 /** Undefined means the existing office/stair geometry owns this position. */
 export function cityWall(
   floor: Floor,
@@ -323,12 +500,28 @@ export function cityWall(
     return undefined;
   return (
     !floor.city.roads.some((r) => inCityRectangle(r, x, y)) ||
-    floor.city.obstacles.some((o) => inCityRectangle(o, x, y))
+    cityObstaclesNear(floor.city, x, x, y, y).some((o) =>
+      inCityRectangle(o, x, y),
+    )
   );
 }
 
 export function cityCollisionBoxes(plan: CityPlan): CityRectangle[] {
-  return plan.obstacles.map(({ x, y, w, h }) => ({ x, y, w, h }));
+  const boxes = plan.obstacles.map(({ x, y, w, h }) => ({ x, y, w, h }));
+  if (plan.source !== "authored") return boxes;
+  // A generated city fills to its bounds with blocks; an authored plan is
+  // open ground, so its edge gets real walls.
+  const b = plan.bounds,
+    w = b.right - b.left,
+    h = b.bottom - b.top,
+    t = 1;
+  return [
+    ...boxes,
+    { x: b.left - t / 2, y: b.top + h / 2, w: t, h: h + 2 * t },
+    { x: b.right + t / 2, y: b.top + h / 2, w: t, h: h + 2 * t },
+    { x: b.left + w / 2, y: b.top - t / 2, w: w + 2 * t, h: t },
+    { x: b.left + w / 2, y: b.bottom + t / 2, w: w + 2 * t, h: t },
+  ];
 }
 
 /** Match the native body's circle against the exact visible city footprints;
@@ -349,7 +542,13 @@ export function citySolid(
     p.y + radius > b.bottom
   )
     return true;
-  return floor.city.obstacles.some((o) => {
+  return cityObstaclesNear(
+    floor.city,
+    p.x - radius,
+    p.x + radius,
+    p.y - radius,
+    p.y + radius,
+  ).some((o) => {
     const dx = Math.max(0, Math.abs(p.x - o.x) - o.w / 2),
       dy = Math.max(0, Math.abs(p.y - o.y) - o.h / 2);
     return radius === 0
@@ -374,7 +573,9 @@ export function cityRayDistance(
     maxX = Math.max(p.x, endX),
     minY = Math.min(p.y, endY),
     maxY = Math.max(p.y, endY);
-  for (const o of floor.city.obstacles) {
+  for (const o of cityObstaclesNear(floor.city, minX, maxX, minY, maxY)) {
+    // Water, fences and low walls stop bodies, not eyes or ears.
+    if (o.opaque === false) continue;
     if (
       o.x + o.w / 2 < minX ||
       o.x - o.w / 2 > maxX ||
@@ -448,6 +649,7 @@ export function terrainCityPlan(
   g: Pick<Game, "floors" | "sites" | "seed">,
 ): CityPlan {
   const old = g.floors.find((f) => f.index === 0)?.city;
+  if (old?.source === "authored") return stampedOutdoorPlan(g, old);
   let area: Bounds | undefined = old ? { ...old.bounds } : undefined;
   for (const site of sitesOf(g))
     area = union(area, footprintBounds(site.boundary));
@@ -473,5 +675,81 @@ export function terrainCityPlan(
     ],
     obstacles: [],
     approaches: [],
+  };
+}
+
+/** Clear ground kept around every stamped site, and the band joining them. */
+const SITE_CLEARANCE = 8;
+/**
+ * A drawn outdoors after more sites are stamped into it. The design's terrain
+ * stays where it was; only each site's plot (plus a margin) and the band of
+ * ground between neighbouring sites are cleared, and the bounds grow to hold
+ * the new buildings. The start building's stair base is never carved.
+ */
+function stampedOutdoorPlan(
+  g: Pick<Game, "floors" | "sites" | "seed">,
+  old: CityPlan,
+): CityPlan {
+  const plots = sitesOf(g)
+      .map((site) => footprintBounds(site.boundary))
+      .filter((b): b is Bounds => !!b)
+      .sort((a, b) => a.left - b.left),
+    rect = (l: number, t: number, r: number, b: number) => ({
+      x: (l + r) / 2,
+      y: (t + b) / 2,
+      w: r - l,
+      h: b - t,
+    }),
+    m = SITE_CLEARANCE,
+    start = footprintBounds(g.floors.find((f) => f.index === 0)?.boundary),
+    isStart = (p: Bounds) =>
+      !!start &&
+      p.left === start.left &&
+      p.right === start.right &&
+      p.top === start.top &&
+      p.bottom === start.bottom,
+    // The start building's own surroundings were validated with the design;
+    // only newly stamped plots need clearing.
+    clear = plots
+      .filter((p) => !isStart(p))
+      .map((p) => rect(p.left - m, p.top - m, p.right + m, p.bottom + m));
+  for (let i = 1; i < plots.length; i++) {
+    const a = plots[i - 1],
+      b = plots[i];
+    clear.push(
+      rect(
+        a.right,
+        Math.max(a.top, b.top),
+        b.left,
+        Math.min(a.bottom, b.bottom) + m,
+      ),
+    );
+  }
+  let bounds: Bounds = { ...old.bounds };
+  for (const p of plots)
+    bounds = union(bounds, {
+      left: p.left - 20,
+      right: p.right + 20,
+      top: p.top - 20,
+      bottom: p.bottom + 20,
+    })!;
+  const obstacles: CityObstacle[] = [];
+  for (const o of old.obstacles) {
+    if (o.kind === "stair-base") {
+      obstacles.push(o);
+      continue;
+    }
+    let pieces: CityRectangle[] = [o];
+    for (const c of clear)
+      if (c.w > 0 && c.h > 0)
+        pieces = pieces.flatMap((piece) => subtractRectangle(piece, c));
+    for (const piece of pieces)
+      obstacles.push({ ...o, x: piece.x, y: piece.y, w: piece.w, h: piece.h });
+  }
+  return {
+    ...old,
+    bounds,
+    roads: [rect(bounds.left, bounds.top, bounds.right, bounds.bottom)],
+    obstacles,
   };
 }

@@ -5,6 +5,16 @@
 // parts. The engine still owns geometry, collisions, physics and access rules.
 
 import { PROP_CATALOG, SCENE_FURNITURE_KINDS } from "./scene-catalog.mjs";
+import { GROUNDS } from "./grounds.mjs";
+import {
+  OUTDOOR_BACKDROPS,
+  OUTDOOR_ENCLOSURES,
+  OUTDOOR_LIMITS,
+  OUTDOOR_LOW_KINDS,
+  OUTDOOR_OPAQUE_KINDS,
+  OUTDOOR_WALKABLE_KINDS,
+  parseOutdoorPlan,
+} from "./outdoor-plan.mjs";
 
 export const VENUES = Object.freeze(["office", "broadcast", "custom"]);
 /** What kind of place the premise is. An enclosed site is a building with the
@@ -121,22 +131,8 @@ export const PROP_OBJECT_LIMITS = Object.freeze({
   totalParts: 160,
   size: 0.6,
 });
-/** The world around the building. Streets, blocks and obstacles keep their
- * gameplay shape; these choices restyle how they look. */
-export const GROUNDS = Object.freeze([
-  "asphalt",
-  "cobble",
-  "sand",
-  "snow",
-  "grass",
-  "rock",
-  "regolith",
-  "seabed",
-  "ice",
-  "moss",
-  "mud",
-  "tile",
-]);
+/** The world around the building (shared with src/outdoor-plan.mjs). */
+export { GROUNDS } from "./grounds.mjs";
 export const NEIGHBOR_STYLES = Object.freeze([
   "buildings",
   "ruins",
@@ -581,13 +577,14 @@ export function parseSetting(value, path = "setting") {
       "interior",
       "exterior",
       "surroundings",
+      "outdoors",
       "terminal",
       "objects",
       "props",
       "filler",
     ],
     path,
-    ["form"],
+    ["form", "outdoors"],
   );
   choice(value.venue, VENUES, `${path}.venue`);
   // Optional so older saved designs stay valid; a fresh design names it.
@@ -700,6 +697,9 @@ export function parseSetting(value, path = "setting") {
     `${path}.props use more than ${PROP_OBJECT_LIMITS.totalParts} parts in total`,
   );
   parseSurroundings(value.surroundings, ids, `${path}.surroundings`);
+  // Optional so older saved designs keep the engine's street grid.
+  if (Object.hasOwn(value, "outdoors"))
+    parseOutdoorPlan(value.outdoors, `${path}.outdoors`);
   if (value.venue === "custom") {
     object(value.filler, ROOM_FUNCTIONS, `${path}.filler`);
     for (const fn of ROOM_FUNCTIONS) {
@@ -769,12 +769,14 @@ const meanings = Object.entries(VENUE_ROOM_MEANINGS)
   )
   .join(". ");
 
+/** How a design draws its outdoors (src/outdoor-plan.mjs). */
+const OUTDOOR_GUIDANCE = `{version:1,bounds:{left,right,top,bottom},ground:${list(GROUNDS)},enclosure:${list(OUTDOOR_ENCLOSURES)},backdrop:${list(OUTDOOR_BACKDROPS)},regions:0..${OUTDOOR_LIMITS.regions} Region} draws the actual ground around the building: there is no street grid unless you draw one. Coordinates are metres in the building's frame: the building occupies x 0..44 and y 0..34, y grows south, and the main entrance is on the south face at about x 22, y 29. bounds is the playable rectangle (left and top between -${OUTDOOR_LIMITS.reach} and -${OUTDOOR_LIMITS.margin}, right between ${44 + OUTDOOR_LIMITS.margin} and ${44 + OUTDOOR_LIMITS.reach}, bottom between ${34 + OUTDOOR_LIMITS.margin} and ${34 + OUTDOOR_LIMITS.reach}); its edge is a hard wall and the backdrop is the unreachable view beyond it. ground is the walkable surface everywhere you draw nothing. Region is {kind,shape,x,y,...,color}: shape rect {x,y centre,w,h}, disc {x,y centre,r} or ring {x,y centre,r,thickness,gaps:0..${OUTDOOR_LIMITS.gaps} {angle degrees, 0 east and 90 south,width ${OUTDOOR_LIMITS.gapWidth.join("..")} m}}; a ring is a circular wall with doorways. Walkable kinds ${list(OUTDOOR_WALKABLE_KINDS)} take an optional ground and carve through any solid under them, so draw a mass of rock, water or stalls and cut lanes, causeways and doorways through it. Solid kinds need height in metres: ${list(OUTDOOR_OPAQUE_KINDS)} block movement and sight; ${list(OUTDOOR_LOW_KINDS)} block movement but can be seen across. building draws a street building with shopfronts and signs, so use it only where the place really has buildings; cliff is tall rock; dome-wall is a glazed wall (a ring of it with an airlock gap makes a dome colony edge); structure is any other solid mass (silos, hangars, pylons, wrecks). enclosure dome puts a transparent dome over the bounds and cavern a rock roof; backdrop picks what lies beyond: skyline (city towers), mountains, sea, dunes, forest, ice-field, stars, cavern-wall or none. Rules the engine enforces: nothing solid within 1.5 m of the building, an open apron ${OUTDOOR_LIMITS.apron[0]} m wide and ${OUTDOOR_LIMITS.apron[1]} m deep south of the entrance, an open strip 10 m wide along the building's east face and around the north stair (x 18..26, y -2..2), at least ${OUTDOOR_LIMITS.minWalkable} m² of ground reachable from the entrance, and at most ${OUTDOOR_LIMITS.compiled} collision rectangles (a disc costs about one per 2 m of diameter, a ring one per 4 m of circumference). Draw the real place: a market street is a cobbled lane between rows of tents, structure stalls and a few buildings; an island light station is rock ground with water filling the bounds edges, a causeway path and rock outcrops under a sea backdrop; a Mars colony is regolith inside a dome-wall ring with an airlock gap, structure habitats and vehicle rovers, dome enclosure and dunes backdrop; a forest camp is moss with trees masses and a clearing; a city block keeps asphalt, building regions and a skyline backdrop. Leave room east of the building (x beyond 60) for neighbouring sites the story may add later.`;
 export const SETTING_GUIDANCE = `Include setting at the top level of every new design (optional only so older designs stay valid). The building must physically be the place the premise describes, inside and out, never a generic office with themed names. The place may be real or fantastical, historical, futuristic or surreal; the same tools build all of them. setting:{venue:${list(VENUES)},form:${list(SITE_FORMS)} (enclosed builds a building; open is an open-air place),interior:{roomFloor:${list(FLOOR_FINISHES)},hallFloor:same choices,roomTint:hex color blended into the room floor finish,hallTint:hex color blended into the hall floor,wall:hex interior wall color,trim:hex skirting and door-frame color,wallFinish:${list(WALL_FINISHES)} (plaster is the plain painted wall; brick, stone, wood, metal and tile clad it),light:hex color of the lit ceiling lights, omit for the current warm #f2d7a3 (candle amber, neon magenta, bioluminescent teal, emergency red; never near-black, the brightest channel at least 0x60)},exterior:{facade:${list(FACADES)},facadeColor:hex,trimColor:hex,windows:${list(WINDOW_STYLES)},canopy:${list(CANOPY_STYLES)},canopyGlow:hex color of the entrance light,roofFeatures:0..${ROOF_FEATURE_LIMIT} {kind:${list(ROOF_FEATURE_KINDS)} or the id of one of your objects,x:0..1,y:0..1}},terminal:{style:${list(TERMINAL_STYLES)},body:hex main material,accent:hex trim and secondary parts,screen:hex glowing face},objects:0..${OBJECT_LIMITS.objects} CustomObject,filler:null, or for venue custom {${ROOM_FUNCTIONS.join(",")}: each 1..6 furniture names}}.
 venue picks the furniture the engine uses for every room you do not furnish yourself, and the meaning of each floor's roomTypes: ${meanings}. For venue custom, roomTypes keep their functional layout (reception=entry desk area, break=social/kitchen area, cubicles=rows of work positions, meeting=a central gathering table, storage=shelving and stores, manager=a private command or office space) and you say what each becomes through filler: the furniture names (built-in kinds or your objects' ids) the engine arranges there. List the room's signature piece first and include at least one seat and one surface; the engine arranges by role: seats around surfaces, storage along the walls, dividers between the work positions of cubicles (a divider is a thin piece, at most 0.6 m deep), equipment and display pieces beside them. Choose broadcast for radio, television, podcast, recording or transmission premises; office only when the premise really is an office; custom for every other place.
 form must match what the premise implies: open for an open-air place (an open-air market, a festival field, a campsite, a plaza, a harbour dock, ruins without a roof), enclosed for a building. An open-air market is open, never a market hall, and a covered building stays enclosed. An open design authors exactly one floor, the ground plan, and its rooms become outdoor zones (stall rows, plazas, pens, terraces) bounded by low fences, stalls and kerbs instead of walls; its terminals stand in the open and roofName names the ground extraction point. Fresh designs always name form; omitting it only keeps older designs valid and means enclosed.
 CustomObject lets you invent the premise's own furniture when no built-in kind fits: {id:lowercase slug 2..24 not a built-in kind,name:1..32 shown to the player,role:${list(OBJECT_ROLES)},weight:light|medium|heavy,size:{w:${OBJECT_LIMITS.size.w.join("..")},d:${OBJECT_LIMITS.size.d.join("..")},h:${OBJECT_LIMITS.size.h.join("..")}} metres,surface:boolean,parts:1..${OBJECT_LIMITS.parts} Part}. role says what the piece is for (seat to sit on, surface to work or eat at, storage, equipment, display, divider between work positions, bed, decor, light) and nothing else decides how it is placed. Part={shape:${list(OBJECT_SHAPES)},axis:${list(OBJECT_AXES)},x,y,z,w,d,h,pitch:-${MOTION_LIMITS.tilt}..${MOTION_LIMITS.tilt},roll:-${MOTION_LIMITS.tilt}..${MOTION_LIMITS.tilt},motion:${list(OBJECT_MOTIONS)},rate:${MOTION_LIMITS.rate.join("..")},color:hex,finish:${list(OBJECT_FINISHES)}} in metres in the object's own frame: x across its width (centre 0, within ±${OBJECT_LIMITS.part.x[1]}), y from back (-d/2, the side against a wall; within ±${OBJECT_LIMITS.part.y[1]}) to front (+d/2, the side people use), z the part's bottom above the floor (0..${OBJECT_LIMITS.part.z[1]}); w,d,h are the part's extents. A cylinder, sphere, cone, wedge, torus, dome, capsule, hexprism or pyramid fills its w×d×h box. axis turns the shape: a cylinder, capsule, hexprism or cone runs up, across the width or along the depth (a lying capsule, pipe or tank is axis across or along; a cone points up, +x or +y); a wedge is a right-triangular prism, full height at the back for axis up (a ramp, roof, hood or chute seen from the front), rising toward +x for across and toward the front for along; a torus is a ring lying flat for axis up (a hoop, tyre, halo or lifebuoy on the floor), standing upright facing the front for along (a porthole, portal or wheel) and facing sideways for across; a dome is a hemisphere whose flat base is at the bottom for axis up, at the back (-y) for along and at -x for across (a cupola, a bowl, a mushroom cap); a capsule is a rounded-end cylinder (a pod, a pillow, a tank), a hexprism a six-sided prism (a crystal, a column, a honeycomb cell) and a pyramid a four-sided pyramid with its apex where a cone's point would be (a spire, a roof, an obelisk); boxes and spheres use axis up. pitch and roll tilt a part in degrees about its own centre (pitch tips it toward the front, roll sideways): a leaning ladder, a cannon aimed upward, a drafting board, a slanted roof. motion animates it at rate cycles per second: spin turns it about its vertical centre line (a fan, a carousel, a radar), bob lifts it up to ${MOTION_LIMITS.bob} m (a floating orb, a buoy), sway rocks it ±${MOTION_LIMITS.sway}° (a hanging lantern, a hammock), pulse breathes a glow part's light and flicker makes it flicker (a candle, a broken sign); use none for still parts. A part must stay inside size in every pose, including its tilt and motion. At least one part stands on the floor (z:0); other parts may rest on parts or float free, for hanging lamps, levitating books, drifting runes or signs on a frame, because parts are visual only and never change collision. glow parts emit their color (screens, status lights, flames, tubes, runes, embers). surface:true needs a flat box, upright cylinder or upright hexprism part at least 0.3 m high covering at least half the footprint (domes, capsules, pyramids, wedges and tori never count); props are then placed on it, packed around any parts standing on that top. The engine derives collision from w×d and health, push resistance and drag from weight (light pieces slide when walked into, heavy ones hold a crowd), so describe only shape and look. Use your objects by their id as scene furniture kind and in filler, alongside built-in kinds. Build recognizable silhouettes from several parts (bases, frames, panels, screens, handles, lights) rather than single boxes, and invent pieces that only this place would have; total parts across objects at most ${OBJECT_LIMITS.totalParts}.
 The study terminals the player uses are the place's own work stations, never a generic office desk with a monitor: a scribe's lectern, a ship console, a ticket kiosk, an altar with a glowing slab, a lab cabinet, a stone pedestal. Pick terminal.style and the body, accent and screen colours to match the place; the screen colour is the glowing face of the terminal. They share one footprint, so style changes only the look.
 props:0..${PROP_OBJECT_LIMITS.props} CustomProp lets you invent the small things that sit on surfaces when no built-in prop fits (an inkwell, a potion, a ship in a bottle, a ration tin): {id:lowercase slug not a built-in prop or one of your objects,name:1..32,size:{w,d,h each up to ${PROP_OBJECT_LIMITS.size} m},parts:1..${PROP_OBJECT_LIMITS.parts} Part} in the same frame and rules as objects, total parts at most ${PROP_OBJECT_LIMITS.totalParts}; use them by id as a scene prop kind on any surface.
-surroundings:{ground:${list(GROUNDS)},groundColor:hex,pathColor:hex for streets and paths,sky:{zenith:hex,horizon:hex},fog:{color:hex,density:0..1 (0 clear, 1 thick murk)},neighbors:${list(NEIGHBOR_STYLES)},neighborColor:hex,weather:${list(WEATHERS)},scenery:0..${SCENERY_LIMIT} ids from setting.objects scattered outside} sets the world around the building. The street grid and neighbouring blocks keep their gameplay shape (they are where the horde comes from and what blocks it) but take this look: a seabed lab could have seabed ground, deep-blue sky and dense blue fog, coral neighbours, bubbles and kelp scenery; a polar station snow, ice neighbours and snowfall; a desert caravanserai sand, dunes and dust; an enchanted grove moss, trees and spores; an ordinary city keeps asphalt and buildings. The rooftop helicopter extraction stays.
+surroundings:{ground:${list(GROUNDS)},groundColor:hex,pathColor:hex for streets and paths,sky:{zenith:hex,horizon:hex},fog:{color:hex,density:0..1 (0 clear, 1 thick murk)},neighbors:${list(NEIGHBOR_STYLES)},neighborColor:hex,weather:${list(WEATHERS)},scenery:0..${SCENERY_LIMIT} ids from setting.objects scattered outside} sets the light, air and colours of the world around the building: sky, fog, weather, the colour of paths (pathColor) and of the distant backdrop (neighborColor). neighbors and ground only matter for older designs; with outdoors they are overridden by what you draw. outdoors:${OUTDOOR_GUIDANCE}
 Roof feature x/y are normalized across the building's roof from west to east and north (stairs) to south (entrance); the engine moves each to the nearest free roof spot that keeps the helipad, its approach and the stairs clear. Features are visual only. A roof feature kind may also be the id of one of your objects, drawn from its parts (a lantern room, a dome, a chimney stack, a weathervane, a crow's nest), so the skyline can be as particular as the interior.
 Make the building recognizable from the street and from inside by principle, not by cliche: a silhouette on the skyline (roof features), a few signature pieces whose shape tells the use at a glance, materials and finishes that fit the place (floor, wallFinish, tints, facade, windows), light that suits it (interior.light, glow parts, canopyGlow) and signs and labels in the place's own words. Lighting colour and wall finish are among the strongest cues of a place: a candlelit stone chapel, a neon-lit metal club and a teal-lit tiled lab read apart before a single piece of furniture. Vary widely between runs; the premise decides, for example a lighthouse, a bakery, a wizard's library, a deep-sea lab, a bathhouse, a circus, a monastery, a ferry terminal or an orbital greenhouse each look and furnish nothing alike.`;

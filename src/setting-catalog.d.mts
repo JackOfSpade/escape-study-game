@@ -209,6 +209,9 @@ export interface RunSetting {
   objects: RunCustomObject[];
   props: RunCustomProp[];
   surroundings: RunSurroundings;
+  /** The AI-drawn ground around the building (src/outdoor-plan.mjs). Absent
+   * on older designs, which keep the engine's street grid. */
+  outdoors?: import("./outdoor-plan.mjs").OutdoorPlan;
   /** For venue custom: furniture names (built-in kinds or object ids) that
    * furnish each room function the designer does not furnish itself. */
   filler: Record<RunRoomFunction, string[]> | null;

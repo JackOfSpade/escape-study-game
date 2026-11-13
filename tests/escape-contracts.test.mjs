@@ -855,6 +855,45 @@ test("escape-engage rejects a non-boolean exit flag", () => {
   );
 });
 
+test("escape-catastrophe prose leaves shape to the schema and asks for a new mechanism that fits the place", () => {
+  const prose = ESCAPE_CONTRACTS["escape-catastrophe"];
+  assert.match(prose, /reply schema fixes every field name/);
+  assert.doesNotMatch(prose, /is a JSON array of/);
+  assert.doesNotMatch(prose, /0\.6 to 2\.2|1 to 40|240 to 900/);
+  assert.doesNotMatch(prose, /never reuse or mention any earlier catastrophe/);
+  assert.match(prose, /payload\.setting gives the venue, site form/);
+  assert.match(prose, /payload\.recent lists the last catastrophes/);
+  assert.match(prose, /different threat mechanism, not a renamed/);
+  assert.match(prose, /payload\.repeated/);
+  // Cross-field rules the schema cannot express stay in prose.
+  assert.match(prose, /onset starts at or after it/);
+  assert.match(prose, /makes-sound rule needs threshold/);
+});
+
+test("escape-catastrophe accepts a payload carrying the physical setting and recent history", () => {
+  const payload = {
+    ...catastrophePayload,
+    setting: {
+      ...catastrophePayload.setting,
+      venue: "lighthouse",
+      outdoors: { enclosure: "open-sky", backdrop: "sea" },
+    },
+    recent: [
+      {
+        title: "The Hollow Men",
+        kinds: ["hunter"],
+        hunters: [{ silhouette: "humanoid", spawn: "waves" }],
+        media: [],
+        triggers: [],
+      },
+    ],
+  };
+  assert.deepEqual(
+    validateEscapeAnswer("escape-catastrophe", payload, catastropheAnswer),
+    { requestId: "cat-game-1", spec: catastropheAnswer.spec },
+  );
+});
+
 test("escape-catastrophe answers reach the escape validator", () => {
   let error;
   try {
