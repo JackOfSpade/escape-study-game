@@ -349,8 +349,8 @@ test("a fresh first game asks whose voice it is and starts with a male identity"
   await page.locator("#start").click();
   const dialog = page.locator("#gender-dialog");
   await expect(dialog).toBeVisible();
-  await expect(dialog.locator("#gender-man")).toHaveText("Play as a man");
-  await expect(dialog.locator("#gender-woman")).toHaveText("Play as a woman");
+  await expect(dialog.locator("#gender-man")).toHaveText("Male");
+  await expect(dialog.locator("#gender-woman")).toHaveText("Female");
   expect((await state(page)).status).toBe("ready");
   await dialog.locator("#gender-man").click();
   await expect(dialog).not.toBeVisible();
