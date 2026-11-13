@@ -4,9 +4,36 @@
  * Enter opens a small chat box while the game keeps running, Enter speaks the
  * line in the player's voice and Escape closes the box. Nothing here pauses
  * the simulation.
+ *
+ * The window listener runs in the capture phase, so it sees every keydown
+ * before the input does. `chatKeyAction` decides what that key means; this
+ * module then performs it. Only keys that belong to the input are stopped, and
+ * none of them are prevented, so typing keeps working and the game keeps its
+ * hands off the keyboard while the box is open.
  */
 import type { Game } from "./model";
 import { speakAsPlayer } from "./npc-voice";
+
+/** Speaks a player line; the live voice director (src/npc-voice.ts) fits this. */
+export interface PlayerVoiceSpeaker {
+  speakAsPlayer(
+    game: Game,
+    text: string,
+    yaw: number,
+  ): boolean | Promise<boolean>;
+}
+
+let voiceDirector: PlayerVoiceSpeaker | undefined;
+
+/**
+ * Point player speech at a director. Production leaves this unset: lines then
+ * travel through src/npc-voice.ts's speakAsPlayer to the running director.
+ */
+export function setPlayerVoiceDirector(
+  director: PlayerVoiceSpeaker | undefined,
+) {
+  voiceDirector = director;
+}
 
 export interface PlayerChatHost {
   /** The current game, or undefined while none is running. */
@@ -15,36 +42,74 @@ export interface PlayerChatHost {
   yaw(): number;
   /** True while another text field (a terminal) owns the keyboard. */
   keyboardBusy(): boolean;
-}
-
-/** A director that can speak for the human; main.ts may inject its instance. */
-export interface PlayerVoiceDirector {
-  speakAsPlayer(
-    game: Game,
-    text: string,
-    yaw: number,
-  ): boolean | Promise<boolean>;
-}
-
-let injectedDirector: PlayerVoiceDirector | undefined;
-
-/** Let the running voice director take player lines (optional wiring). */
-export function setPlayerVoiceDirector(
-  director: PlayerVoiceDirector | undefined,
-) {
-  injectedDirector = director;
+  /**
+   * Diagnostics sink. Entries never carry the spoken text: only counts and
+   * outcomes, so the run log holds no player content.
+   */
+  log?(type: string, data?: unknown): void;
 }
 
 export const PLAYER_CHAT_LIMITS = Object.freeze({ characters: 200 });
 
+export type ChatKeyAction = "open" | "send" | "close" | "swallow" | "pass";
+
+export interface ChatKeyState {
+  /** True while the chat box is on screen. */
+  open: boolean;
+  /** True when the keydown's focus is the chat input. */
+  inInput: boolean;
+  key: string;
+  composing: boolean;
+  repeat: boolean;
+  /** Another text field (a terminal) owns the keyboard. */
+  busy: boolean;
+  /** The current game can speak for the player right now. */
+  speakable: boolean;
+}
+
+/**
+ * What a keydown means for the chat box. Pure, so every branch is testable.
+ *
+ * - box closed: Enter (not a repeat, not busy, speakable) opens it; else pass.
+ * - box open, focus in the input: Enter sends, Escape closes, anything else
+ *   is swallowed (stopped, never prevented, so typing still reaches the
+ *   browser's default action and the game stays put).
+ * - box open, focus elsewhere: close and let the key through, so the movement
+ *   key that closed the box also reaches the game.
+ */
+export function chatKeyAction(s: ChatKeyState): ChatKeyAction {
+  if (!s.open) {
+    if (s.key !== "Enter" || s.repeat) return "pass";
+    return !s.busy && s.speakable ? "open" : "pass";
+  }
+  if (!s.inInput) return "close";
+  if (s.key === "Enter") return s.composing ? "swallow" : "send";
+  if (s.key === "Escape") return "close";
+  return "swallow";
+}
+
+/** Why the current game cannot speak for the player, if it cannot. */
+export type ChatBlockedReason =
+  "no-game" | "no-escape" | "not-playing" | "paused" | "voices-off";
+
+/** The first reason this game cannot speak for the player, or undefined. */
+export function chatBlockedReason(
+  game: Game | undefined,
+): ChatBlockedReason | undefined {
+  if (!game) return "no-game";
+  if (!game.escape) return "no-escape";
+  if (game.status !== "playing") return "not-playing";
+  if (game.paused) return "paused";
+  if (game.settings.npcVoices === false) return "voices-off";
+  return undefined;
+}
+
 function gameSpeakable(game: Game | undefined): game is Game {
-  return (
-    !!game &&
-    !!game.escape &&
-    game.status === "playing" &&
-    !game.paused &&
-    game.settings.npcVoices !== false
-  );
+  return !chatBlockedReason(game);
+}
+
+function thenable(value: unknown): value is Promise<unknown> {
+  return !!value && typeof (value as { then?: unknown }).then === "function";
 }
 
 function styleBox(box: HTMLDivElement) {
@@ -86,71 +151,106 @@ export function installPlayerChat(host: PlayerChatHost): () => void {
   let box: HTMLDivElement | undefined;
   let input: HTMLInputElement | undefined;
 
-  const close = () => {
-    if (!box) return;
-    box.remove();
+  const drop = () => {
+    const gone = box;
     box = undefined;
     input = undefined;
+    gone?.remove();
+  };
+
+  /** Close the box, logging why unless the box was already gone. */
+  const close = (reason: "escape" | "focus-lost") => {
+    if (!box) return;
+    drop();
+    host.log?.("chat-close", { reason });
   };
 
   const send = () => {
+    if (!input) return;
+    const text = input.value.trim().slice(0, PLAYER_CHAT_LIMITS.characters);
+    const chars = text.length;
     const game = host.game();
-    const text = (input?.value ?? "")
-      .trim()
-      .slice(0, PLAYER_CHAT_LIMITS.characters);
-    close();
-    if (!text || !gameSpeakable(game)) return;
-    const spoke = injectedDirector
-      ? injectedDirector.speakAsPlayer(game, text, host.yaw())
-      : speakAsPlayer(game, text, host.yaw());
-    void spoke;
+    // The box always closes, even when nothing can be said.
+    drop();
+    if (!text) {
+      host.log?.("chat-send", { chars, dropped: "empty" });
+      return;
+    }
+    const why = chatBlockedReason(game);
+    if (!game || why) {
+      host.log?.("chat-send", {
+        chars,
+        dropped: "not-speakable",
+        why: why ?? "no-game",
+      });
+      return;
+    }
+    let spoke: boolean | Promise<boolean>;
+    try {
+      spoke = voiceDirector
+        ? voiceDirector.speakAsPlayer(game, text, host.yaw())
+        : speakAsPlayer(game, text, host.yaw());
+    } catch {
+      spoke = false;
+    }
+    host.log?.("chat-send", {
+      chars,
+      spoke: thenable(spoke) ? "pending" : Boolean(spoke),
+    });
+    if (thenable(spoke)) void spoke.catch(() => {});
   };
 
   const open = () => {
     if (box) return;
-    box = document.createElement("div");
-    styleBox(box);
-    input = document.createElement("input");
-    styleInput(input);
-    input.maxLength = PLAYER_CHAT_LIMITS.characters;
-    input.placeholder = "Say something…";
-    box.append(input);
-    document.body.append(box);
-    input.focus();
-    input.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        event.stopPropagation();
-        send();
-      } else if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopPropagation();
-        close();
-      }
+    const next = document.createElement("div");
+    const field = document.createElement("input");
+    box = next;
+    input = field;
+    styleBox(next);
+    styleInput(field);
+    field.maxLength = PLAYER_CHAT_LIMITS.characters;
+    field.placeholder = "Say something…";
+    next.append(field);
+    document.body.append(next);
+    // Focus loss (a click back into the world, another panel) closes the box.
+    field.addEventListener("blur", () => {
+      if (input === field) close("focus-lost");
     });
-    input.addEventListener("blur", () => {
-      // Keep the box open unless something else took focus deliberately.
-      if (box && input && !input.isConnected) close();
-    });
+    field.focus();
+    host.log?.("chat-open");
   };
 
   const onKey = (event: KeyboardEvent) => {
-    if (box) {
-      // The chat box owns the keyboard while it is open; the game never sees
-      // Escape, Enter or movement keys, and the world keeps stepping.
-      event.stopPropagation();
-      return;
+    const inInput =
+      !!input && (event.target === input || document.activeElement === input);
+    const action = chatKeyAction({
+      open: !!box,
+      inInput,
+      key: event.key,
+      composing: event.isComposing === true,
+      repeat: event.repeat === true,
+      busy: host.keyboardBusy(),
+      speakable: gameSpeakable(host.game()),
+    });
+    if (action === "pass") return;
+    if (action === "close") {
+      // Focus is in the input: this is Escape. Focus is elsewhere: the key
+      // belongs to the game, so it is neither stopped nor prevented.
+      close(inInput ? "escape" : "focus-lost");
+      if (!inInput) return;
     }
-    if (event.key !== "Enter" || event.repeat) return;
-    if (host.keyboardBusy() || !gameSpeakable(host.game())) return;
     event.preventDefault();
     event.stopPropagation();
-    open();
+    if (action === "send") send();
+    else if (action === "open") open();
   };
 
-  window.addEventListener("keydown", onKey, true);
+  // Keep the window we registered on: the uninstaller may run after the
+  // page's globals are torn down (tests, hot reload).
+  const win = window;
+  win.addEventListener("keydown", onKey, true);
   return () => {
-    window.removeEventListener("keydown", onKey, true);
-    close();
+    win.removeEventListener("keydown", onKey, true);
+    drop();
   };
 }
