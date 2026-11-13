@@ -15,7 +15,7 @@ import {
 import { rayBodyDistance } from "./visibility";
 import { MinHeap } from "./heap";
 import { solidDesks } from "./station-clearance";
-import { cityWall } from "./city-layout";
+import { cityObstaclesNear, cityWall } from "./city-layout";
 export interface NavStep extends Point {
   action?: "door" | "vault";
   obstacle?: string;
@@ -403,7 +403,7 @@ function wallClearance(
   pad: number,
 ) {
   if (f.city)
-    for (const obstacle of f.city.obstacles) {
+    for (const obstacle of cityObstaclesNear(f.city, minX, maxX, minY, maxY)) {
       if (
         obstacle.x + obstacle.w / 2 < minX ||
         obstacle.x - obstacle.w / 2 > maxX ||

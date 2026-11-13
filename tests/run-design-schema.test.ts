@@ -27,6 +27,56 @@ const neutralParts = (objects: { parts: object[] }[]) => {
 structure.setting.interior.wallFinish = "plaster";
 structure.setting.interior.light = "#f2d7a3";
 structure.setting.form = "enclosed";
+// Fresh requests also draw their outdoors; the validator keeps it optional so
+// older designs keep the engine's street grid.
+structure.setting.outdoors = {
+  version: 1,
+  bounds: { left: -40, right: 90, top: -30, bottom: 90 },
+  ground: "asphalt",
+  enclosure: "open-sky",
+  backdrop: "skyline",
+  regions: [
+    {
+      kind: "path",
+      shape: "rect",
+      x: 22,
+      y: 45,
+      w: 8,
+      h: 30,
+      color: "#5a5f63",
+    },
+    {
+      kind: "building",
+      shape: "rect",
+      x: -20,
+      y: 60,
+      w: 24,
+      h: 16,
+      height: 18,
+      color: "#56616a",
+    },
+    {
+      kind: "dome-wall",
+      shape: "ring",
+      x: 70,
+      y: 70,
+      r: 12,
+      thickness: 1,
+      gaps: [{ angle: 180, width: 4 }],
+      height: 6,
+      color: "#bcd6e0",
+    },
+    {
+      kind: "water",
+      shape: "disc",
+      x: -25,
+      y: 20,
+      r: 6,
+      height: 0.3,
+      color: "#1f3f5a",
+    },
+  ],
+};
 const request = (phase: string) => ({
   version: 3,
   phase,
@@ -500,4 +550,21 @@ test("the structure schema lists every new setting option and requires wallFinis
   assert.ok(errors.some((e) => /light is required/.test(e)));
   // ...while the validator keeps accepting the older saved design.
   assert.doesNotThrow(() => parseRunStructure(older));
+});
+
+test("the structure schema requires a drawn outdoors and rejects unknown region kinds", () => {
+  const schema = designReplySchema(request("structure"))!,
+    reply = (s: unknown) => ({ requestId: "req-1", structure: s });
+  assert.deepEqual(schemaErrors(schema, reply(structure)), []);
+  assert.doesNotThrow(() => parseRunStructure(structuredClone(structure)));
+  const missing = structuredClone(structure);
+  delete missing.setting.outdoors;
+  assert.ok(schemaErrors(schema, reply(missing)).length > 0);
+  const lava = structuredClone(structure);
+  lava.setting.outdoors.regions[0].kind = "lava";
+  assert.ok(schemaErrors(schema, reply(lava)).length > 0);
+  assert.throws(() => parseRunStructure(lava), /regions\[0\]\.kind/);
+  const heightless = structuredClone(structure);
+  delete heightless.setting.outdoors.regions[1].height;
+  assert.ok(schemaErrors(schema, reply(heightless)).length > 0);
 });

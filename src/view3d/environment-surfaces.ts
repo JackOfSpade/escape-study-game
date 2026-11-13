@@ -3,6 +3,7 @@ import {
   Group,
   InstancedBufferAttribute,
   LinearFilter,
+  LinearMipmapLinearFilter,
   MeshStandardMaterial,
   PlaneGeometry,
   SRGBColorSpace,
@@ -24,7 +25,15 @@ import { InstancePool } from "./instances";
 import type { InteriorLightmap } from "./interior-lightmap";
 
 export const ENVIRONMENT_ATLAS_EDGE = 2048;
+/** Street signs are read from a distance, so the atlas needs mipmaps and the
+ * steepest anisotropic filtering three.js will clamp to on this device. */
+export const ENVIRONMENT_ATLAS_ANISOTROPY = 8;
 const GUTTER = 4;
+
+/** A view may drop authored slots (for example shop signs above rock lots)
+ * before any atlas space or instance is spent on them. */
+export type SurfaceFilter = (surface: SurfaceSlot) => boolean;
+
 interface Tile {
   surface: SurfaceSlot;
   x: number;
@@ -323,10 +332,12 @@ export class EnvironmentSurfaces {
     environment: EnvironmentManifest,
     scope: SurfaceSlot["scope"],
     lightmap?: InteriorLightmap,
+    /** Applied before pages and instances exist: a hidden slot costs nothing. */
+    include: SurfaceFilter = () => true,
   ) {
     this.group.name = `environment-surfaces-${scope}-${floor.index}`;
     const surfaces = environment.surfaces.filter(
-        (s) => s.floor === floor.index && s.scope === scope,
+        (s) => s.floor === floor.index && s.scope === scope && include(s),
       ),
       content = new Map(
         environment.entries.map((entry) => [entry.surfaceId, entry]),
@@ -361,8 +372,11 @@ export class EnvironmentSurfaces {
           }
           texture = new CanvasTexture(canvas);
           texture.colorSpace = SRGBColorSpace;
-          texture.generateMipmaps = false;
-          texture.minFilter = texture.magFilter = LinearFilter;
+          // Minified street signs alias into noise without mipmaps.
+          texture.generateMipmaps = true;
+          texture.minFilter = LinearMipmapLinearFilter;
+          texture.magFilter = LinearFilter;
+          texture.anisotropy = ENVIRONMENT_ATLAS_ANISOTROPY;
           texture.name = `environment-atlas-${scope}-${floor.index}-${pageIndex}`;
           this.textures.push(texture);
         }

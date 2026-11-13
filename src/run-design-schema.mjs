@@ -30,6 +30,14 @@ import {
   WINDOW_STYLES,
 } from "./setting-catalog.mjs";
 import { ROOM_SHAPES, TITLE_CARD_FONTS } from "./run-design-contract.mjs";
+import {
+  OUTDOOR_BACKDROPS,
+  OUTDOOR_ENCLOSURES,
+  OUTDOOR_LIMITS,
+  OUTDOOR_LOW_KINDS,
+  OUTDOOR_OPAQUE_KINDS,
+  OUTDOOR_WALKABLE_KINDS,
+} from "./outdoor-plan.mjs";
 
 const obj = (properties, required = Object.keys(properties)) => ({
   type: "object",
@@ -131,6 +139,78 @@ const surroundings = obj({
   weather: oneOf(WEATHERS),
   scenery: arr(slug(24), 0, SCENERY_LIMIT),
 });
+// The drawn outdoors (src/outdoor-plan.mjs). Its geometry rules (footprint,
+// apron, reachable ground, collision budget) are checked by the validator.
+const outdoorRegion = (() => {
+  const reach = OUTDOOR_LIMITS.reach,
+    at = { x: num(-reach, 44 + reach), y: num(-reach, 34 + reach) },
+    solid = oneOf([...OUTDOOR_OPAQUE_KINDS, ...OUTDOOR_LOW_KINDS]),
+    walk = oneOf(OUTDOOR_WALKABLE_KINDS),
+    rect = { w: num(...OUTDOOR_LIMITS.size), h: num(...OUTDOOR_LIMITS.size) },
+    radius = { r: num(...OUTDOOR_LIMITS.radius) },
+    height = num(...OUTDOOR_LIMITS.height),
+    walkable = (shape, extent) =>
+      obj(
+        {
+          kind: walk,
+          shape: { const: shape },
+          ...at,
+          ...extent,
+          color: hex,
+          ground: oneOf(GROUNDS),
+        },
+        ["kind", "shape", "x", "y", ...Object.keys(extent), "color"],
+      );
+  return {
+    anyOf: [
+      walkable("rect", rect),
+      walkable("disc", radius),
+      obj({
+        kind: solid,
+        shape: { const: "rect" },
+        ...at,
+        ...rect,
+        color: hex,
+        height,
+      }),
+      obj({
+        kind: solid,
+        shape: { const: "disc" },
+        ...at,
+        ...radius,
+        color: hex,
+        height,
+      }),
+      obj({
+        kind: solid,
+        shape: { const: "ring" },
+        ...at,
+        ...radius,
+        thickness: num(...OUTDOOR_LIMITS.thickness),
+        gaps: arr(
+          obj({ angle: num(0, 360), width: num(...OUTDOOR_LIMITS.gapWidth) }),
+          0,
+          OUTDOOR_LIMITS.gaps,
+        ),
+        color: hex,
+        height,
+      }),
+    ],
+  };
+})();
+const outdoors = obj({
+  version: { const: 1 },
+  bounds: obj({
+    left: num(-OUTDOOR_LIMITS.reach, -OUTDOOR_LIMITS.margin),
+    right: num(44 + OUTDOOR_LIMITS.margin, 44 + OUTDOOR_LIMITS.reach),
+    top: num(-OUTDOOR_LIMITS.reach, -OUTDOOR_LIMITS.margin),
+    bottom: num(34 + OUTDOOR_LIMITS.margin, 34 + OUTDOOR_LIMITS.reach),
+  }),
+  ground: oneOf(GROUNDS),
+  enclosure: oneOf(OUTDOOR_ENCLOSURES),
+  backdrop: oneOf(OUTDOOR_BACKDROPS),
+  regions: arr(outdoorRegion, 0, OUTDOOR_LIMITS.regions),
+});
 const customObject = obj({
   id: slug(24),
   name: str(32),
@@ -184,6 +264,9 @@ const setting = obj({
   objects: arr(customObject, 0, OBJECT_LIMITS.objects),
   props: arr(customProp, 0, PROP_OBJECT_LIMITS.props),
   surroundings,
+  // Required for fresh requests; the validator keeps it optional so older
+  // saved designs keep the engine's street grid.
+  outdoors,
   filler: nullable(
     obj(
       Object.fromEntries(ROOM_FUNCTIONS.map((fn) => [fn, arr(str(24), 1, 6)])),
