@@ -21,6 +21,12 @@ const neutralParts = (objects: { parts: object[] }[]) => {
       rate: 1,
     }));
 };
+// The reply schema only guards fresh requests, where interior wall finish and
+// ceiling light are required; this older fixture omits them. The validator
+// keeps both optional so saved designs stay valid (see venue-setting tests).
+structure.setting.interior.wallFinish = "plaster";
+structure.setting.interior.light = "#f2d7a3";
+structure.setting.form = "enclosed";
 const request = (phase: string) => ({
   version: 3,
   phase,
@@ -371,7 +377,7 @@ test("object roles, wedge and torus parts, larger sizes and roof objects validat
   assert.throws(() => parseRunStructure(tooBig), /size\.w/);
 });
 
-test("wedges and tori never count as a prop surface", () => {
+test("only flat boxes and upright cylinders or hexprisms count as a prop surface", () => {
   const part = (shape: string, axis = "up") => ({
     shape,
     axis,
@@ -388,7 +394,7 @@ test("wedges and tori never count as a prop surface", () => {
     motion: "none",
     rate: 1,
   });
-  for (const shape of ["wedge", "torus"])
+  for (const shape of ["wedge", "torus", "dome", "capsule", "pyramid"])
     assert.equal(
       surfaceTop({
         size: { w: 1, d: 1, h: 0.5 },
@@ -397,13 +403,26 @@ test("wedges and tori never count as a prop surface", () => {
       null,
       shape,
     );
-  assert.equal(
-    surfaceTop({
-      size: { w: 1, d: 1, h: 0.5 },
-      parts: [part("box")],
-    } as never),
-    0.5,
-  );
+  // A lying capsule or hexprism has no flat top either.
+  for (const axis of ["across", "along"])
+    for (const shape of ["capsule", "hexprism"])
+      assert.equal(
+        surfaceTop({
+          size: { w: 1, d: 1, h: 0.5 },
+          parts: [part(shape, axis)],
+        } as never),
+        null,
+        `${shape} ${axis}`,
+      );
+  for (const shape of ["box", "cylinder", "hexprism"])
+    assert.equal(
+      surfaceTop({
+        size: { w: 1, d: 1, h: 0.5 },
+        parts: [part(shape)],
+      } as never),
+      0.5,
+      shape,
+    );
 });
 
 test("the structure schema requires the terminal and accepts every style only", () => {
@@ -429,4 +448,56 @@ test("the structure schema requires the terminal and accepts every style only", 
     schemaErrors(schema, { requestId: "req-1", structure: missing }),
     [],
   );
+});
+
+test("the structure schema lists every new setting option and requires wallFinish and light", () => {
+  const schema = designReplySchema(request("structure"));
+  const setting = schema.properties.structure.properties.setting;
+  const interior = setting.properties.interior;
+  assert.deepEqual(
+    [...interior.properties.wallFinish.enum],
+    ["plaster", "brick", "stone", "wood", "metal", "tile"],
+  );
+  assert.ok(interior.required.includes("wallFinish"));
+  assert.ok(interior.required.includes("light"));
+  assert.deepEqual(interior.properties.light, {
+    type: "string",
+    pattern: "^#[0-9a-fA-F]{6}$",
+  });
+  const floors = interior.properties.roomFloor.enum;
+  for (const finish of [
+    "planks",
+    "flagstone",
+    "checker",
+    "grating",
+    "earth",
+    "mosaic",
+  ])
+    assert.ok(floors.includes(finish), finish);
+  for (const facade of ["stone", "timber"])
+    assert.ok(
+      setting.properties.exterior.properties.facade.enum.includes(facade),
+      facade,
+    );
+  const shapes =
+    setting.properties.objects.items.properties.parts.items.properties.shape
+      .enum;
+  for (const shape of ["dome", "capsule", "hexprism", "pyramid"])
+    assert.ok(shapes.includes(shape), shape);
+  const weather = setting.properties.surroundings.properties.weather.enum;
+  for (const kind of ["fireflies", "petals"])
+    assert.ok(weather.includes(kind), kind);
+  // A fresh request must name both interior fields...
+  const older = structuredClone(structure);
+  delete older.setting.interior.wallFinish;
+  delete older.setting.interior.light;
+  neutralParts(older.setting.objects);
+  const errors = schemaErrors(schema, {
+    requestId: "req-1",
+    structure: older,
+  });
+  assert.ok(errors.some((e) => /wallFinish is required/.test(e)));
+  assert.ok(errors.some((e) => /light is required/.test(e)));
+  // ...while the validator keeps accepting the older saved design.
+  assert.doesNotThrow(() => parseRunStructure(older));
 });

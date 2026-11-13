@@ -10,7 +10,7 @@ import {
   type Roadmap,
   type Zombie,
 } from "../model";
-import { actor, createGame, createPlayableGame } from "../world";
+import { actor, createGame, createPlayableGame, structureGame } from "../world";
 import { runDesignFingerprint } from "../run-design-contract.mjs";
 import type { Scenario, Spawn } from "./schema";
 export function entity(g: Game, id: string) {
@@ -148,15 +148,16 @@ export function createTestWorld(s: Scenario, roadmap: Roadmap) {
         design: s.design,
       }
     : undefined;
-  const g =
-    s.design?.version === 3
+  const g = s.designStructure
+    ? structureGame(s.seed, roadmap, undefined, s.designStructure)
+    : s.design?.version === 3
       ? createPlayableGame(s.seed, roadmap, undefined, saved)
       : createGame(s.seed, roadmap, undefined, {
           layout:
             s.layout === "randomized" ? "forward" : (s.layout ?? "legacy"),
           ...(saved ? { design: saved } : {}),
         });
-  if (s.design?.version === 3 && !s.naturalSpawns) {
+  if ((s.design?.version === 3 || s.designStructure) && !s.naturalSpawns) {
     g.zombies = [];
     g.spawned = 0;
   }
@@ -188,7 +189,11 @@ export function createTestWorld(s: Scenario, roadmap: Roadmap) {
   }
   if (s.template === "arena" && s.naturalSpawns)
     for (let x = 18; x <= 25; x++) g.floors[0].tiles[H - 1][x] = 0;
-  if (s.rules === "force-fields" && s.design?.version !== 3)
+  if (
+    s.rules === "force-fields" &&
+    s.design?.version !== 3 &&
+    !s.designStructure
+  )
     redesign(g, { randomized: s.layout === "randomized" });
   // Scenario identity replaces the factory run ID. Keep private study sessions
   // bound to that same synthetic run, just as they are in a playable game.

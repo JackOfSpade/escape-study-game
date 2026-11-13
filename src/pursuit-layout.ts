@@ -8,6 +8,7 @@ import {
   rand,
 } from "./model";
 import { carveStairwells } from "./stairwell";
+import { isSolidOpenFloor } from "./open-site";
 import { layoutRandom } from "./building-layout";
 import { inRect, sizeFits, type Sector } from "./floor-plan";
 import { carveRoomShapes, cornerCells } from "./room-shapes";
@@ -44,7 +45,7 @@ function topUpHall(g: Game, f: Floor) {
  * office-plan.ts); without one it keeps the historical version 3 bands, each
  * complete transverse room a cut between the rear entry and front stairs. */
 export function pursuitLayout(g: Game, f: Floor) {
-  if (f.index === 4 || !f.stations.length) return;
+  if (isSolidOpenFloor(f) || f.index === 4 || !f.stations.length) return;
   if (f.boundary) {
     topUpHall(g, f);
     planOfficeFloor(
@@ -232,6 +233,16 @@ function floodFrom(
 }
 const contains = (seen: Set<number>, p: Point) =>
   seen.has(Math.floor(p.y) * W + Math.floor(p.x));
+/** Study stations reachable from the entrance without spending a key. */
+export function zeroKeyTerminals(f: Floor): number {
+  const freeStudy = floodFrom(
+    f,
+    f.entry,
+    f.furniture.filter((o) => o.field && !o.field.publicEntry),
+  );
+  return f.stations.filter((s) => contains(freeStudy, s)).length;
+}
+
 /** Terminal checks shared by every fresh floor: credentialed egress with all
  * entrance quotas exhausted, zero-key capacity, clearance and spacing. */
 function stationErrors(g: Game, f: Floor, fields: Furniture[]) {
@@ -240,16 +251,10 @@ function stationErrors(g: Game, f: Floor, fields: Furniture[]) {
     (o) => !o.field!.exit && o.field!.limit !== undefined,
   );
   const egress = floodFrom(f, f.stairs, sealed);
-  const freeStudy = floodFrom(
-    f,
-    f.entry,
-    fields.filter((o) => !o.field!.publicEntry),
-  );
-  let freeCount = 0;
+  const freeCount = zeroKeyTerminals(f);
   for (const s of f.stations) {
     if (!contains(egress, s))
       errors.push(`no credentialed egress from ${s.id}`);
-    if (contains(freeStudy, s)) freeCount++;
     for (const dx of [-0.45, 0.45])
       for (const dy of [-0.45, 0.45])
         if (f.tiles[Math.floor(s.y + dy)]?.[Math.floor(s.x + dx)] !== 0)
@@ -269,6 +274,7 @@ function stationErrors(g: Game, f: Floor, fields: Furniture[]) {
 /** Validate actual generated tiles, openings and destinations before publishing
  * a fresh floor. No learning state or physics engine is involved. */
 export function pursuitLayoutErrors(g: Game, f: Floor): string[] {
+  if (isSolidOpenFloor(f)) return [];
   if (f.generation?.version === 5) return officePlanErrors(g, f);
   const errors: string[] = [];
   const stages = f.generation?.stages;

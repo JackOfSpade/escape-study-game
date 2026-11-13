@@ -3,7 +3,7 @@ import type {
   QualityRunDesignReply,
 } from "./run-quality-contract.mjs";
 export * from "./run-quality-contract.mjs";
-export type { RunSetting } from "./setting-catalog.mjs";
+export type { RunSetting, RunSiteForm } from "./setting-catalog.mjs";
 export type RunFootprintShape =
   | "rectangle"
   | "chamfered"

@@ -18,7 +18,9 @@ import {
   Sprite,
   SpriteMaterial,
   CanvasTexture,
+  CylinderGeometry,
   SRGBColorSpace,
+  Vector2,
   Vector3,
   WebGLRenderer,
 } from "three";
@@ -88,7 +90,9 @@ import {
   floorTexture,
   type FloorFinish,
 } from "./textures";
-import { BuildingShell, isPerimeterWall } from "./building";
+import { wallMaterialParams, wallTexture } from "./wall-textures";
+import { BuildingShell, isPerimeterWall, OPEN_FENCE_HEIGHT } from "./building";
+import { isSolidOpenFloor } from "../open-site";
 import { StairGallery } from "./stair-gallery";
 import { InteriorAtmosphere } from "./interior-atmosphere";
 import { FLOOR_HEIGHT, sampleStairRoute } from "../stair-route";
@@ -397,7 +401,33 @@ const FINISHES: FloorFinish[] = [
   "terrazzo",
   "rubber",
   "polished",
+  "planks",
+  "flagstone",
+  "checker",
+  "grating",
+  "earth",
+  "mosaic",
 ];
+// Wall textures repeat once per world metre; merged wall boxes carry per-face
+// 0..1 UVs, so the wall batch is rescaled from its own vertex positions.
+const wallUV = new Vector2();
+function scaleWallUVs(geometry: BufferGeometry) {
+  const uv = geometry.getAttribute("uv"),
+    position = geometry.getAttribute("position"),
+    normal = geometry.getAttribute("normal");
+  if (!uv || !position) return;
+  for (let i = 0; i < uv.count; i++) {
+    const x = position.getX(i),
+      y = position.getY(i),
+      z = position.getZ(i),
+      vertical = !normal || Math.abs(normal.getY(i)) < 0.5;
+    if (!vertical) wallUV.set(x, z);
+    else if (Math.abs(normal!.getX(i)) > 0.5) wallUV.set(z, y);
+    else wallUV.set(x, y);
+    uv.setXY(i, wallUV.x, wallUV.y);
+  }
+  uv.needsUpdate = true;
+}
 const WHITE = new Color(0xffffff);
 
 /** Presentation only. Each floor is stacked at its real storey elevation. */
@@ -619,15 +649,25 @@ export class FirstPersonView {
     // A designed venue paints its own walls; the surge still pulls them toward
     // the mutation palette. Undesigned floors keep the palette edge untouched.
     const wallHex = floor.setting?.interior.wall,
-      wallKey = `${theme}|${wallHex ?? ""}`;
+      wallFinish = floor.setting?.interior.wallFinish ?? "plaster",
+      wallKey = `${theme}|${wallHex ?? ""}|${wallFinish}`;
     if (wallKey !== this.wallKey) {
       this.wallKey = wallKey;
-      this.materials.wall.color.copy(palette.edge);
+      const material = this.materials.wall,
+        map = wallTexture(wallFinish),
+        params = wallMaterialParams(wallFinish);
+      material.color.copy(palette.edge);
       if (wallHex) {
-        this.materials.wall.color.set(wallHex);
-        if (theme === "mutation")
-          this.materials.wall.color.lerp(palette.edge, 0.45);
+        material.color.set(wallHex);
+        if (theme === "mutation") material.color.lerp(palette.edge, 0.45);
       }
+      // Plaster keeps today's plain material: no map, its original gloss.
+      if (material.map !== map) {
+        material.map = map;
+        material.needsUpdate = true;
+      }
+      material.roughness = params.roughness;
+      material.metalness = params.metalness;
     }
     const fog = this.scene.fog as Fog,
       outside = this.exterior.enabled && outsideBuilding(floor, a.x, a.y);
@@ -650,8 +690,11 @@ export class FirstPersonView {
     }
     fog.color.copy(this.exterior.enabled ? this.exterior.horizon : palette.sky);
     (this.scene.background as Color).copy(fog.color);
-    this.fill.intensity = outside ? 1.1 : 0.95 + (1 - floor.dark) * 0.22;
-    this.moon.intensity = outside ? 0.8 : floor.boundary ? 0.12 : 0.7;
+    // An open site is under the sky on every floor, so its hemisphere fill is
+    // the outdoor level whether or not the player stands inside the boundary.
+    const outdoors = outside || floor.open === true;
+    this.fill.intensity = outdoors ? 1.1 : 0.95 + (1 - floor.dark) * 0.22;
+    this.moon.intensity = outdoors ? 0.8 : floor.boundary ? 0.12 : 0.7;
     const elevation = floor.index * FLOOR_HEIGHT;
     this.moon.target.position.set(a.x, elevation, a.y);
     this.moon.position.set(a.x - 12, elevation + 24, a.y + 8);
@@ -679,16 +722,20 @@ export class FirstPersonView {
     });
     this.building.animate(game.time, game.settings.reducedFlash);
     this.gallery.update(game);
+    // Indoor dust and haze belong to a roofed interior; an open floor keeps the
+    // clear outdoor air and never dims its fill to the interior level. The
+    // group stays visible because it also owns the outdoor lamp posts.
     this.atmosphere.group.visible = !!floor.boundary;
     if (floor.boundary) {
       this.atmosphere.update(game, this.camera, dt);
-      if (!outside)
+      if (!outside && floor.open !== true)
         this.fill.intensity = 0.22 + this.atmosphere.currentLight * 0.22;
     } else this.atmosphere.phone.visible = false;
     // The global fill tracks the player's own zone; the lightmap corrects
     // every other surface to its own zone's power and lamps.
     const lm = this.atmosphere.lightmap.uniforms;
-    lm.interiorLmAmbient.value = floor.boundary && !outside ? 0.22 : 0;
+    lm.interiorLmAmbient.value =
+      floor.boundary && floor.open !== true && !outside ? 0.22 : 0;
     lm.interiorLmPlayer.value = this.atmosphere.currentLight;
     lm.interiorLmPool.value = game.surge.state === "active" ? 0.75 : 1;
     this.sync(game, a, floor, palette);
@@ -786,7 +833,9 @@ export class FirstPersonView {
       this.geometry = context.geometry;
     }
     for (const light of this.localLights) {
-      light.visible = !floor.boundary;
+      // An open site is outdoors: its street-side lamps stay on even though
+      // the ground floor still carries a gameplay boundary.
+      light.visible = !floor.boundary || floor.open === true;
       this.floorRoot.add(light);
     }
   }
@@ -897,20 +946,29 @@ export class FirstPersonView {
     // re-merge the city or recreate its signs in the middle of a stair walk.
     // Value signatures still catch synthetic/editor occupancy changes.
     const shellKey =
-      key + game.floors.map((f) => geometrySignature(f.tiles)).join("|");
+      key +
+      game.floors.map((f) => geometrySignature(f.tiles)).join("|") +
+      (game.extraction
+        ? `|pad:${game.extraction.floor}:${game.extraction.x}:${game.extraction.y}`
+        : "");
     if (shellKey !== this.shellKey) {
-      this.building.build(game.floors);
+      this.building.build(game.floors, game.extraction);
       this.shellKey = shellKey;
     }
   }
 
   private buildStatic(floor: Floor) {
     this.clearStatic();
+    // Floors 1..4 of an open site are solid, unreachable layers that nobody
+    // visits, so there is no scene, shell or furnishing to build for them.
+    if (isSolidOpenFloor(floor)) return;
     if (this.run) this.updateArchitecture(this.run);
     else {
       this.exterior.build(floor);
       this.building.build([floor]);
     }
+    const open = floor.open === true,
+      wallHeight = open ? OPEN_FENCE_HEIGHT : 2.8;
     const boxes: BufferGeometry[] = [];
     const interiorTiles = exteriorWallTiles(floor).map((row, z) =>
       row.map((tile, x) =>
@@ -928,19 +986,25 @@ export class FirstPersonView {
     // smooth chamfer or curve instead of stepped blocks.
     if (floor.generation?.corners?.length) {
       for (const c of carvedCells(floor)) interiorTiles[c.y][c.x] = 0;
-      boxes.push(...cornerWallGeometries(floor));
+      const corners = cornerWallGeometries(floor);
+      // A carved corner is part of the same partition run, so an open floor's
+      // chamfer drops to fence height with the rest of the stall row.
+      if (open)
+        for (const corner of corners) corner.scale(1, wallHeight / 2.8, 1);
+      boxes.push(...corners);
     }
     for (const r of wallRectangles(interiorTiles))
       boxes.push(
-        new BoxGeometry(r.w, 2.8, r.h).translate(
+        new BoxGeometry(r.w, wallHeight, r.h).translate(
           r.x + r.w / 2,
-          1.4,
+          wallHeight / 2,
           r.y + r.h / 2,
         ),
       );
     // A carved doorway is an open simulation tile, but the architectural wall
     // continues above its frame. Anchor lintels to the fixed frame, not its leaf.
-    for (const object of floor.furniture) {
+    // An open floor has no ceiling to carry, so its partitions need no lintels.
+    for (const object of open ? [] : floor.furniture) {
       if (!(
         object.door ||
         object.field ||
@@ -961,6 +1025,9 @@ export class FirstPersonView {
         ).translate(cx, (2.8 + 2.49) / 2, cz),
       );
     }
+    // Only the wall batch is rescaled: its boxes each carry 0..1 face UVs, so a
+    // finished wall would otherwise stretch one tile over every block.
+    for (const box of boxes) scaleWallUVs(box);
     this.addMerged(boxes, this.materials.wall, "walls", true);
     const surfaces = new Map<string, BufferGeometry[]>();
     // A designed venue tints room and hall floors differently. The legacy zone
@@ -1014,6 +1081,7 @@ export class FirstPersonView {
           uv.setXY(i, position.getX(i), position.getZ(i));
         surfaceList(key).push(plane);
         if (
+          !open &&
           floor.index < CONFIG.floors &&
           finish !== "concrete" &&
           finish !== "roof"
@@ -1028,6 +1096,7 @@ export class FirstPersonView {
     for (const [key, planes] of surfaces)
       this.addMerged(planes, this.floorMaterial(key), "floor", false);
     this.addMerged(ceilings, this.materials.ceiling, "ceiling", false);
+    this.buildExtractionPad(floor);
     const treads: BufferGeometry[] = [];
     for (const kind of ["up", "down"] as const) {
       if (
@@ -1094,6 +1163,40 @@ export class FirstPersonView {
     this.staticWorld.add(mesh);
   }
 
+  /** An open site's pickup stands on the ground, where a building wears its
+   * roof helipad: draw the same H disc on the floor finish instead. */
+  private buildExtractionPad(floor: Floor) {
+    const pad = this.run?.extraction;
+    if (!pad || pad.floor !== floor.index) return;
+    const r = Math.max(0.4, pad.radius),
+      bar = r * 0.55,
+      width = Math.max(0.16, r * 0.16);
+    this.addMerged(
+      [new CylinderGeometry(r, r, 0.02, 32).translate(pad.x, 0.005, pad.y)],
+      this.materials.stairs,
+      "ground-extraction-pad",
+      false,
+    );
+    this.addMerged(
+      [
+        new BoxGeometry(width, 0.02, bar).translate(
+          pad.x - r * 0.26,
+          0.02,
+          pad.y,
+        ),
+        new BoxGeometry(width, 0.02, bar).translate(
+          pad.x + r * 0.26,
+          0.02,
+          pad.y,
+        ),
+        new BoxGeometry(bar, 0.02, width).translate(pad.x, 0.02, pad.y),
+      ],
+      this.materials.head,
+      "ground-extraction-marking",
+      false,
+    );
+  }
+
   private buildPanels(floor: Floor) {
     const add = (x: number, y: number) => {
       const ix = Math.floor(x),
@@ -1123,7 +1226,9 @@ export class FirstPersonView {
   }
 
   private syncPanels(game: Game, a: Actor, floor: Floor) {
-    if (floor.boundary) {
+    // Open floors light their lamps from the sky, not from ceiling panels, so
+    // the boundary does not extinguish the outdoor fill lights there.
+    if (floor.boundary && floor.open !== true) {
       for (const light of this.localLights) light.intensity = 0;
       return;
     }

@@ -11,6 +11,7 @@ import {
 } from "three";
 import {
   ambientTexels,
+  DEFAULT_LIT_FIXTURE,
   fixturePools,
   LIGHTMAP_RES,
   type FixturePool,
@@ -76,6 +77,8 @@ export class InteriorLightmap {
   private sidesData = new Uint16Array(this.cols * this.rows * BANDS * 4);
   private overData = new Uint16Array(this.cols * this.rows * BANDS * 4);
   private bands = new Map<number, Band>();
+  /** Lit-lamp colour currently loaded into `interiorLmWarm`. */
+  private warmColour = DEFAULT_LIT_FIXTURE;
 
   constructor() {
     const texture = (data: Uint16Array, name: string) => {
@@ -104,6 +107,14 @@ export class InteriorLightmap {
   private markUploaded() {
     for (const map of [this.texture, this.sidesTexture, this.overTexture])
       map.needsUpdate = true;
+  }
+
+  /** One atlas is shared by every floor, so the warm tint of the baked lamps
+   * follows the floor in view. The uniform's Color is reused, never rebuilt. */
+  setWarmColour(colour: string) {
+    if (colour === this.warmColour) return;
+    this.warmColour = colour;
+    this.uniforms.interiorLmWarm.value.set(colour);
   }
 
   /** Grow the atlas so a floor larger than the legacy raster fits. Bands baked
@@ -231,6 +242,7 @@ export class InteriorLightmap {
 
   reset() {
     this.bands.clear();
+    this.setWarmColour(DEFAULT_LIT_FIXTURE);
     for (const data of [this.data, this.sidesData, this.overData]) data.fill(0);
     this.markUploaded();
   }

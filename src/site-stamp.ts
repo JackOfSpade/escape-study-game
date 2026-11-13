@@ -9,6 +9,7 @@
  */
 import { terrainCityPlan } from "./city-layout";
 import type { BuildingFootprint, Floor, Game, Point } from "./model";
+import { groundExtractionPad, isOpenSite } from "./open-site";
 import {
   START_SITE,
   floorCols,
@@ -61,10 +62,14 @@ function shifted<T extends Point | undefined>(p: T, o: Point): T {
 export function stampSite(g: Game, source: Game, opts: StampOptions): Site {
   const { id, origin } = opts;
   const prefix = (value: string) => `${id}:${value}`;
+  // An open site is ground only: what stands above its ground floor is solid
+  // layer, not storeys, so nothing above floor 0 is stamped into the world.
+  const open = isOpenSite(source);
   const floors: number[] = [],
     stairs: Record<number, Point> = {},
     entry: Record<number, Point> = {};
   for (const f of g.floors) {
+    if (open && f.index !== 0) continue;
     const s = source.floors.find((x) => x.index === f.index);
     // Only floors that exist on both sides carry a stamped storey.
     if (!s) continue;
@@ -158,7 +163,18 @@ export function stampSite(g: Game, source: Game, opts: StampOptions): Site {
     gate: ground.furniture.some((o) => o.id === "main-gate")
       ? prefix("main-gate")
       : undefined,
-    localFloors: structuredClone(source.floors),
+    // An open site's own pickup is the ground pad its stair marker marks,
+    // translated into world coordinates like every other stamped point.
+    ...(open
+      ? {
+          extraction: {
+            ...groundExtractionPad(ground),
+            x: ground.stairs.x + origin.x,
+            y: ground.stairs.y + origin.y,
+          },
+        }
+      : {}),
+    localFloors: structuredClone(open ? [ground] : source.floors),
   };
   g.sites = [...(g.sites ?? []), site];
   for (const index of floors) {

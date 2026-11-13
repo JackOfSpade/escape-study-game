@@ -59,11 +59,10 @@ import {
   CONFIG,
   furnitureName,
   furnitureSpec,
-  HELIPAD,
-  HELIPAD_RADIUS,
   distance,
   event,
   rand,
+  type ExtractionPoint,
 } from "./model";
 import { survivorPath, walkSegment } from "./navigation";
 import { humanActive, markEnded, simulationActive } from "./simulation-state";
@@ -120,11 +119,13 @@ import { STAIRWELL_RADIUS, stairwell } from "./stairwell";
 import {
   floorCols,
   floorRows,
+  extractionPoints,
   siteAt,
   sitesOf,
   stairMarkers,
   type Site,
 } from "./site";
+import { isOpenSite } from "./open-site";
 import { GATE_APRON, homeArea, inFootprint, stationAtHome } from "./site-stamp";
 import { actorOnFloor } from "./stair-route";
 import {
@@ -398,16 +399,54 @@ export function tickSurge(g: Game) {
 export function stairs(g: Game, a: Actor, down = false) {
   return beginStairs(g, a, down);
 }
+/** The pickup every hard-coded roof assumption becomes: the start site's own
+ * extraction first — an open site's ground pad or a building's roof helipad —
+ * then any stamped site's pickup. */
+export function primaryExtraction(g: Game): ExtractionPoint {
+  return extractionPoints(g)[0];
+}
+/** The floor the run's pickup sits on, which is also the level an actor boards
+ * at: the roof of an enclosed building, the ground of an open site. */
+export function extractionFloor(g: Game) {
+  return primaryExtraction(g).floor;
+}
+/** The pickup covering this point, if the actor stands inside one. */
+export function extractionAt(
+  g: Game,
+  floor: number,
+  point: Point,
+): ExtractionPoint | undefined {
+  return extractionPoints(g).find(
+    (e) => e.floor === floor && distance(point, e) <= e.radius,
+  );
+}
+/** True when an actor stands inside a pickup on that pickup's floor. */
+export function onExtraction(
+  g: Game,
+  a: Pick<Actor, "floor" | "x" | "y">,
+): boolean {
+  return !!extractionAt(g, a.floor, a);
+}
 export function canBoard(g: Game, a: Actor) {
   return (
     !a.stairTravel &&
-    a.floor === CONFIG.floors &&
     a.alive &&
     !a.escaped &&
-    distance(a, HELIPAD) <= HELIPAD_RADIUS &&
+    onExtraction(g, a) &&
     g.time < g.helicopter.until &&
     g.helicopter.passengers.length < 4
   );
+}
+/**
+ * True when a survivor should walk to the pickup instead of a staircase.
+ * An enclosed building's roof is the top of the climb, so standing there
+ * always qualifies. An open site's ground pad shares its only floor with the
+ * start, so its survivors keep working until the credential that would have
+ * sent them upstairs arrives, then head for the pad and wait there.
+ */
+function extractionReady(g: Game, a: Actor) {
+  if (a.floor !== extractionFloor(g)) return false;
+  return !isOpenSite(g) || a.access.includes(a.floor);
 }
 export function board(g: Game, a: Actor) {
   if (!canBoard(g, a)) return false;
@@ -1674,7 +1713,7 @@ function npc(g: Game, a: Actor, dt: number) {
   }
   // Taking an already available escape wins over retreating from a nearby
   // threat. Boarding still uses the same physical range and atomic seat check.
-  if (a.floor === CONFIG.floors && board(g, a)) {
+  if (board(g, a)) {
     a.activity = "climbing";
     return;
   }
@@ -1770,8 +1809,10 @@ function npc(g: Game, a: Actor, dt: number) {
   ];
   let attention = 0.4;
   delete a.handling;
+  // A pickup is only worth dropping a retreat for on the level it departs
+  // from: the roof of an enclosed building, the ground pad of an open site.
   const pickup =
-    a.floor === CONFIG.floors &&
+    a.floor === extractionFloor(g) &&
     g.time < g.helicopter.until &&
     g.helicopter.passengers.length < 4;
   if (pickup && a.pickupTrip !== g.helicopter.trip) {
@@ -1872,10 +1913,15 @@ function npc(g: Game, a: Actor, dt: number) {
     }
   } else if (yieldFurniture(g, a, dt)) {
     attention = 0.2;
-  } else if (a.floor === CONFIG.floors) {
+  } else if (extractionReady(g, a)) {
+    // The climb ends at the run's pickup. An enclosed building reaches it on
+    // the roof; an open site's ground pad is also its ground floor, so its
+    // survivors only turn for the pad once their credential would have sent
+    // them up a staircase, and nobody ever has a reason to climb higher.
+    const pickup = primaryExtraction(g);
     a.activity = "climbing";
     delete a.station;
-    follow(g, a, HELIPAD, dt);
+    follow(g, a, pickup, dt);
     board(g, a);
   } else if (a.access.includes(a.floor)) {
     a.activity = "climbing";
@@ -2846,10 +2892,11 @@ function zombie(
   }
   // Stamped sites carry their own stair markers per floor; a legacy game has
   // only the floor's own `stairs`, which is exactly what the marker lookup
-  // returns for it.
+  // returns for it. An open site's "stairs" marker is its extraction pad, not
+  // a way up, and its upper layers are solid, so nothing climbs there.
   const climb = g.sites?.length
     ? nearestStairMarker(g, z, "up")
-    : z.floor < CONFIG.floors
+    : z.floor < CONFIG.floors && !isOpenSite(g)
       ? f.stairs
       : undefined;
   if (
@@ -3270,11 +3317,13 @@ function advanceStep(
     h.passengers = [];
     h.until = g.time + CONFIG.boardingWindow;
     h.next = g.time + helicopterInterval(g);
+    // The trip clock announces the pickup where survivors actually board: the
+    // roof helipad of an enclosed building, the ground pad of an open site.
     event(
       g,
       "helicopter",
       "A four-seat helicopter is boarding.",
-      CONFIG.floors,
+      extractionFloor(g),
     );
   }
 }

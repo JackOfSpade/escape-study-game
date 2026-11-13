@@ -286,6 +286,22 @@ export function buildingClipRows(floor: Floor): BuildingClipRow[] {
   return rows;
 }
 
+/** Where a run's extraction pad stands. An open start site keeps its pickup on
+ * its own ground floor (`g.extraction`); a building keeps the rooftop helipad on
+ * the top floor. Absent means the floor draws no pad marking at all. */
+export function extractionPad(
+  g: Pick<Game, "extraction" | "helicopter" | "time">,
+  floorIndex: number,
+): { x: number; y: number; radius: number; rooftop: boolean } | undefined {
+  const pad = g.extraction;
+  if (pad) {
+    if (pad.floor !== floorIndex) return undefined;
+    return { x: pad.x, y: pad.y, radius: pad.radius, rooftop: false };
+  }
+  if (floorIndex !== CONFIG.floors) return undefined;
+  return { x: HELIPAD.x, y: HELIPAD.y, radius: 3.8, rooftop: true };
+}
+
 export function render(
   canvas: HTMLCanvasElement,
   g: Game,
@@ -444,23 +460,23 @@ export function render(
   };
   const wellVisible = (well: Stairwell) =>
     visible(well.mouth) || visible(well.marker);
-  if (floorIndex === CONFIG.floors) {
-    if (visible(HELIPAD)) {
-      ctx.strokeStyle = p.accent;
-      ctx.lineWidth = 0.15;
-      ctx.beginPath();
-      ctx.arc(HELIPAD.x, HELIPAD.y, 3.8, 0, Math.PI * 2);
-      ctx.stroke();
-      label("H", HELIPAD.x, 11.4, p.accent, 2.5);
-      if (g.time < g.helicopter.until) {
-        ctx.fillStyle = p.edge;
-        ctx.fillRect(17.8, 8.5, 7.4, 1.5);
-        ctx.fillStyle = p.ink;
-        ctx.fillRect(21, 5.5, 0.3, 8);
-        label(`${4 - g.helicopter.passengers.length} SEATS`, HELIPAD.x, 14.7);
-      }
+  const pad = extractionPad(g, floorIndex);
+  if (pad && visible(pad)) {
+    ctx.strokeStyle = p.accent;
+    ctx.lineWidth = 0.15;
+    ctx.beginPath();
+    ctx.arc(pad.x, pad.y, pad.radius, 0, Math.PI * 2);
+    ctx.stroke();
+    label("H", pad.x, pad.y + 0.9, p.accent, 2.5);
+    if (pad.rooftop && g.time < g.helicopter.until) {
+      ctx.fillStyle = p.edge;
+      ctx.fillRect(17.8, 8.5, 7.4, 1.5);
+      ctx.fillStyle = p.ink;
+      ctx.fillRect(21, 5.5, 0.3, 8);
+      label(`${4 - g.helicopter.passengers.length} SEATS`, HELIPAD.x, 14.7);
     }
-  } else {
+  }
+  if (floorIndex !== CONFIG.floors) {
     const well = stairwell(f, "up");
     if (wellVisible(well)) {
       drawStairs(well);

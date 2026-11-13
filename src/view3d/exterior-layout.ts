@@ -417,6 +417,9 @@ export interface CityGroundRectangle {
 export function cityGroundRectangles(floor: Floor): CityGroundRectangle[] {
   const b = floor.boundary;
   if (!b) return [];
+  // An open site has no shell covering its ground, so the outdoor ground
+  // texture continues underneath it; only stamped shells are still cut out.
+  if (floor.open === true) return multiSiteGround(floor, undefined);
   if (floor.shells?.length) return multiSiteGround(floor, b);
   const minX = floor.city ? floor.city.bounds.left - 700 : -118,
     maxX = floor.city ? floor.city.bounds.right + 700 : 162,
@@ -463,15 +466,19 @@ export function cityGroundRectangles(floor: Floor): CityGroundRectangle[] {
  */
 function multiSiteGround(
   floor: Floor,
-  start: NonNullable<Floor["boundary"]>,
+  start: NonNullable<Floor["boundary"]> | undefined,
 ): CityGroundRectangle[] {
-  const prints = [start, ...(floor.shells ?? []).map((s) => s.boundary)];
+  // An open site passes no start footprint: its ground belongs to the city.
+  const prints = [
+    ...(start ? [start] : []),
+    ...(floor.shells ?? []).map((s) => s.boundary),
+  ];
   const minX = floor.city ? floor.city.bounds.left - 700 : -118,
     maxX = floor.city ? floor.city.bounds.right + 700 : 162,
     minZ = floor.city ? floor.city.bounds.top - 700 : -124,
     maxZ = floor.city ? floor.city.bounds.bottom + 700 : 156,
-    top = Math.min(...prints.map((p) => p.top)),
-    bottom = Math.max(...prints.map((p) => p.bottom)),
+    top = prints.length ? Math.min(...prints.map((p) => p.top)) : minZ,
+    bottom = prints.length ? Math.max(...prints.map((p) => p.bottom)) : maxZ,
     out: CityGroundRectangle[] = [
       {
         x: (minX + maxX) / 2,

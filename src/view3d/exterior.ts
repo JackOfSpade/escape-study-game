@@ -765,6 +765,31 @@ export class ExteriorDressing {
       box(lit, entrance, 2.735, front + 0.48, 3.7, 0.035, 0.7, "#e1c68e");
     }
     box(opaque, entrance, 3.22, front + 0.46, 3.8, 0.6, 0.14, "#27383c");
+    // An open site has no facade for the canopy to hang from: it becomes a
+    // freestanding awning over the main gate, carried by two posts.
+    if (floor.open === true)
+      for (const side of [-1, 1]) {
+        box(
+          opaque,
+          entrance + side * 2.1,
+          1.5,
+          front + 0.55,
+          0.14,
+          3,
+          0.14,
+          "#42575c",
+        );
+        box(
+          opaque,
+          entrance + side * 2.1,
+          0.07,
+          front + 0.55,
+          0.32,
+          0.14,
+          0.32,
+          "#334549",
+        );
+      }
     const sign = new Mesh(new PlaneGeometry(3.55, 0.74), this.signMaterial);
     sign.position.set(entrance, 3.22, front + 0.56);
     sign.name = "entrance-sign";

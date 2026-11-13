@@ -3,6 +3,7 @@ import type {
   RunCustomObject,
   RunObjectPart,
   RunTerminal,
+  RunWallFinish,
 } from "./setting-catalog.mjs";
 import { partReach } from "./setting-catalog.mjs";
 import { inRect, sectorAt } from "./floor-plan";
@@ -44,6 +45,12 @@ interface Materials {
   terrazzo: [string, string];
   rubber: string;
   polished: string;
+  planks: [string, string];
+  flagstone: [string, string];
+  checker: [string, string];
+  grating: string;
+  earth: string;
+  mosaic: string;
 }
 const MATERIALS: Record<Theme, Materials> = {
   normal: {
@@ -77,6 +84,12 @@ const MATERIALS: Record<Theme, Materials> = {
     terrazzo: ["#b9b4a8", "#4f5a5e"],
     rubber: "#2b2d2f",
     polished: "#6c7072",
+    planks: ["#8a6640", "#77542f"],
+    flagstone: ["#8b8b84", "#3a3833"],
+    checker: ["#c9c2b2", "#3b4147"],
+    grating: "#2f3438",
+    earth: "#5f4c36",
+    mosaic: "#b0b4aa",
   },
   mutation: {
     carpet: ["#3a2a48", "#42304f"],
@@ -109,6 +122,12 @@ const MATERIALS: Record<Theme, Materials> = {
     terrazzo: ["#bcaab0", "#5a4a60"],
     rubber: "#32282f",
     polished: "#75676f",
+    planks: ["#98624e", "#83503f"],
+    flagstone: ["#8f848c", "#402f38"],
+    checker: ["#cbbcab", "#43303f"],
+    grating: "#342a34",
+    earth: "#66503f",
+    mosaic: "#b6a6ae",
   },
 };
 const PX = 40; // terrain pixels per world unit
@@ -131,7 +150,13 @@ type Zone =
   | "parquet"
   | "terrazzo"
   | "rubber"
-  | "polished";
+  | "polished"
+  | "planks"
+  | "flagstone"
+  | "checker"
+  | "grating"
+  | "earth"
+  | "mosaic";
 /** Which floor finish a cell has: carpeted rooms, vinyl circulation, outside
  * paving. A designed run's setting swaps the room and circulation finishes. */
 export function floorZone(f: Floor, x: number, y: number): Zone {
@@ -362,6 +387,146 @@ function paintFloorCell(
     if (y % 2 === 0) c.fillRect(px, py, PX, 1);
     return;
   }
+  if (zone === "planks") {
+    // Wide floorboards running east-west with staggered butt joints.
+    const [a, b] = m.planks,
+      rows = 4,
+      rh = PX / rows;
+    for (let j = 0; j < rows; j++) {
+      c.fillStyle = hash(x * 3, y * 4 + j, seed + 61) > 0.5 ? a : b;
+      c.fillRect(px, py + j * rh, PX, rh);
+      for (let k = 0; k < 4; k++) {
+        const o = hash(x * 5 + k, y * 7 + j, seed + 63);
+        c.fillStyle = k % 2 ? "rgba(255,230,190,0.08)" : "rgba(25,12,2,0.1)";
+        c.fillRect(
+          px + o * PX * 0.75,
+          py + j * rh + 2 + k * (rh / 9),
+          PX * 0.22,
+          1,
+        );
+      }
+      c.fillStyle = "rgba(30,16,4,0.3)";
+      c.fillRect(px, py + j * rh, PX, 1);
+      const joint = hash(x, y + j, seed + 65);
+      c.fillStyle = "rgba(20,10,2,0.5)";
+      c.fillRect(px + joint * PX, py + j * rh, 1, rh);
+    }
+    c.fillStyle = m.seam;
+    c.fillRect(px, py, 1, PX);
+    return;
+  }
+  if (zone === "flagstone") {
+    // An irregular grey slab per cell, bedded in dark mortar.
+    const [slab, mortar] = m.flagstone,
+      j = (k: number) => hash(x * 13 + k, y * 7 + k, seed + 71);
+    c.fillStyle = mortar;
+    c.fillRect(px, py, PX, PX);
+    c.beginPath();
+    c.moveTo(px + j(1) * 5, py + j(2) * 5);
+    c.lineTo(px + PX - j(3) * 5, py + j(4) * 5);
+    c.lineTo(px + PX - j(5) * 5, py + PX - j(6) * 5);
+    c.lineTo(px + j(7) * 5, py + PX - j(8) * 5);
+    c.closePath();
+    c.fillStyle = slab;
+    c.fill();
+    c.strokeStyle = "rgba(255,255,255,0.1)";
+    c.lineWidth = 1;
+    c.stroke();
+    for (let k = 0; k < 12; k++) {
+      const r = hash(x * 7 + k, y * 11, seed + 73);
+      c.fillStyle = k % 3 ? "rgba(40,40,36,0.16)" : "rgba(240,240,232,0.14)";
+      c.fillRect(
+        px + 3 + r * (PX - 8),
+        py + hash(x + k, y * 3, seed + 75) * (PX - 8),
+        2,
+        1,
+      );
+    }
+    return;
+  }
+  if (zone === "checker") {
+    // Checkerboard at 0.5 m squares with grey grout between them.
+    const [light, dark] = m.checker,
+      half = PX / 2;
+    for (let j = 0; j < 2; j++)
+      for (let i = 0; i < 2; i++) {
+        c.fillStyle = (x * 2 + i + y * 2 + j) % 2 ? dark : light;
+        c.fillRect(px + i * half, py + j * half, half, half);
+      }
+    c.fillStyle = "rgba(150,146,136,0.5)";
+    c.fillRect(px + half, py, 1, PX);
+    c.fillRect(px, py + half, PX, 1);
+    c.fillStyle = m.seam;
+    c.fillRect(px, py, 1, PX);
+    c.fillRect(px, py, PX, 1);
+    return;
+  }
+  if (zone === "grating") {
+    // Metal deck grating: bearing bars with a fine grid of dark slots.
+    c.fillStyle = m.grating;
+    c.fillRect(px, py, PX, PX);
+    c.fillStyle = "rgba(0,0,0,0.55)";
+    for (let k = 0; k < 4; k++) c.fillRect(px + k * 10 + 4, py, 5, PX);
+    c.fillStyle = "rgba(255,255,255,0.12)";
+    for (let k = 0; k < 4; k++) c.fillRect(px + k * 10, py, 1, PX);
+    c.fillStyle = "rgba(0,0,0,0.4)";
+    for (let k = 0; k < 8; k++) c.fillRect(px, py + k * 5 + 4, PX, 1);
+    c.fillStyle = m.seam;
+    c.fillRect(px, py, PX, 1);
+    c.fillRect(px, py, 1, PX);
+    return;
+  }
+  if (zone === "earth") {
+    // Packed dirt with straw and grit flecks.
+    c.fillStyle = m.earth;
+    c.fillRect(px, py, PX, PX);
+    for (let k = 0; k < 26; k++) {
+      const r = hash(x * 7 + k, y * 11, seed + 81);
+      c.fillStyle = r > 0.6 ? "rgba(130,106,72,0.45)" : "rgba(40,28,16,0.3)";
+      c.fillRect(
+        px + hash(x, y * 5 + k, seed + 83) * PX,
+        py + hash(x * 3 + k, y, seed + 85) * PX,
+        2 + r * 4,
+        1 + r * 2,
+      );
+    }
+    for (let k = 0; k < 8; k++) {
+      const r = hash(x * 3 + k, y * 5 + k, seed + 87);
+      c.strokeStyle =
+        r > 0.5 ? "rgba(210,190,130,0.5)" : "rgba(160,138,86,0.45)";
+      c.lineWidth = 1;
+      c.beginPath();
+      c.moveTo(px + r * PX, py + hash(x + k, y + k, seed + 89) * PX);
+      c.lineTo(px + r * PX + 3 + r * 3, py + 2 + r * 3);
+      c.stroke();
+    }
+    c.fillStyle = m.seam;
+    c.fillRect(px, py, PX, 1);
+    c.fillRect(px, py, 1, PX);
+    return;
+  }
+  if (zone === "mosaic") {
+    // Ceramic tesserae about 5 cm across, set in pale grout.
+    const cell = PX / 16,
+      grout = "rgba(196,194,184,0.9)",
+      tones = ["#8fa8a2", "#c8b49a", "#9aa6b8"];
+    c.fillStyle = grout;
+    c.fillRect(px, py, PX, PX);
+    for (let j = 0; j < 16; j++)
+      for (let i = 0; i < 16; i++) {
+        const r = hash(x * 16 + i, y * 16 + j, seed + 91),
+          tone = tones[Math.min(2, Math.floor(r * 3))],
+          px2 = px + i * cell,
+          py2 = py + j * cell;
+        c.fillStyle = mixHex(m.mosaic, tone, 0.55);
+        c.fillRect(px2, py2, cell - 0.5, cell - 0.5);
+        if (r > 0.88) {
+          c.fillStyle = "rgba(255,255,255,0.18)";
+          c.fillRect(px2, py2, 1, 1);
+        }
+      }
+    return;
+  }
   c.fillStyle = zone === "roof" ? m.roof : m.concrete;
   c.fillRect(px, py, PX, PX);
   for (let k = 0; k < 22; k++) {
@@ -420,11 +585,72 @@ function mixHex(base: string, tint: string, t: number) {
 }
 
 let terrain: { key: string; canvas: HTMLCanvasElement } | undefined;
+/** A faint wall-surface pattern for a designed finish, drawn over the wall cap
+ * so the plan agrees with the 3D wall. Plaster and undesigned floors stay plain. */
+function paintWallFinish(
+  c: CanvasRenderingContext2D,
+  m: Materials,
+  finish: RunWallFinish,
+  px: number,
+  py: number,
+  x: number,
+  y: number,
+) {
+  if (finish === "plaster") return;
+  c.save();
+  c.globalAlpha = 0.22;
+  c.strokeStyle = m.wallShadow;
+  c.lineWidth = 1;
+  c.beginPath();
+  if (finish === "brick") {
+    for (const o of [PX / 3, (2 * PX) / 3]) {
+      c.moveTo(px, py + o);
+      c.lineTo(px + PX, py + o);
+    }
+    const off = (x + y) % 2 ? 0 : PX / 4;
+    for (let bx = off; bx <= PX; bx += PX / 2) {
+      c.moveTo(px + bx, py);
+      c.lineTo(px + bx, py + PX);
+    }
+  } else if (finish === "stone") {
+    c.moveTo(px, py + PX / 2);
+    c.lineTo(px + PX, py + PX / 2);
+    for (const bx of [PX / 3, (2 * PX) / 3]) {
+      c.moveTo(px + bx, py);
+      c.lineTo(px + bx, py + PX / 2);
+    }
+    c.moveTo(px + ((x + y) % 2 ? 10 : 30), py + PX / 2);
+    c.lineTo(px + ((x + y) % 2 ? 10 : 30), py + PX);
+  } else if (finish === "wood") {
+    for (let k = 1; k < 4; k++) {
+      c.moveTo(px + (k * PX) / 4, py);
+      c.lineTo(px + (k * PX) / 4, py + PX);
+    }
+  } else if (finish === "metal") {
+    c.moveTo(px, py + PX / 2);
+    c.lineTo(px + PX, py + PX / 2);
+    for (const [dx, dy] of [
+      [10, 10],
+      [30, 30],
+    ]) {
+      c.moveTo(px + dx + 2, py + dy);
+      c.arc(px + dx, py + dy, 2, 0, Math.PI * 2);
+    }
+  } else {
+    // Glazed tiles: a grout cross every half metre.
+    c.moveTo(px + PX / 2, py);
+    c.lineTo(px + PX / 2, py + PX);
+    c.moveTo(px, py + PX / 2);
+    c.lineTo(px + PX, py + PX / 2);
+  }
+  c.stroke();
+  c.restore();
+}
 /** Whole-floor floor/wall texture, rebuilt only when walls or the theme change. */
 export function terrainCanvas(f: Floor, theme: Theme, seed: number) {
   const s = f.setting?.interior,
     look = s
-      ? `${f.setting!.venue}/${s.roomFloor}/${s.hallFloor}/${s.wall}/${s.trim}/${s.roomTint}/${s.hallTint}/`
+      ? `${f.setting!.venue}/${s.roomFloor}/${s.hallFloor}/${s.wall}/${s.trim}/${s.roomTint}/${s.hallTint}/${s.wallFinish ?? ""}/`
       : "";
   const corners = f.generation?.corners ?? [],
     shapes = corners.length ? JSON.stringify(corners) : "";
@@ -432,7 +658,7 @@ export function terrainCanvas(f: Floor, theme: Theme, seed: number) {
     ground = outdoor ? `ground:${outdoor}/` : "";
   const cols = floorCols(f),
     rows = floorRows(f),
-    key = `${f.index}/${cols}x${rows}/${theme}/${seed}/${f.generation?.version ?? 0}/${look}${ground}${shapes}${f.tiles.map((r) => r.join("")).join("")}`;
+    key = `${f.index}/${f.open ? "open/" : ""}${cols}x${rows}/${theme}/${seed}/${f.generation?.version ?? 0}/${look}${ground}${shapes}${f.tiles.map((r) => r.join("")).join("")}`;
   if (terrain?.key === key) return terrain.canvas;
   const canvas = terrain?.canvas ?? document.createElement("canvas");
   canvas.width = cols * PX;
@@ -472,15 +698,30 @@ export function terrainCanvas(f: Floor, theme: Theme, seed: number) {
     x < 0 || y < 0 || x >= cols || y >= rows || !!f.tiles[y][x];
   // Wall caps with a lit rim on faces that border a room, and a soft contact
   // shadow cast onto the floor along the wall's south and east faces.
+  // An open site's walls are low fences, drawn here as light see-through rails.
+  const fence = f.open === true;
   for (let y = 0; y < rows; y++)
     for (let x = 0; x < cols; x++) {
       if (!f.tiles[y][x] || carved.has(y * cols + x)) continue;
       const px = x * PX,
         py = y * PX;
+      if (fence) {
+        c.globalAlpha = 0.28;
+        c.fillStyle = wallTop;
+        c.fillRect(px, py, PX, PX);
+        c.globalAlpha = 1;
+        c.fillStyle = wallEdge;
+        c.fillRect(px, py + PX * 0.14, PX, PX * 0.1);
+        c.fillRect(px, py + PX * 0.76, PX, PX * 0.1);
+        if ((x + y) % 2 === 0)
+          c.fillRect(px + PX * 0.42, py + PX * 0.14, PX * 0.16, PX * 0.72);
+        continue;
+      }
       c.fillStyle = wallTop;
       c.fillRect(px, py, PX, PX);
       c.fillStyle = "rgba(255,255,255,0.04)";
       if ((x + y) % 2) c.fillRect(px, py, PX, PX);
+      if (s?.wallFinish) paintWallFinish(c, m, s.wallFinish, px, py, x, y);
       c.fillStyle = wallEdge;
       const rim = 3;
       if (!solidAt(x, y - 1)) c.fillRect(px, py, PX, rim);
@@ -1143,13 +1384,19 @@ function paintCustomObject(
       shade = Math.min(1, top / height),
       base = /^#[0-9a-f]{6}$/i.test(part.color) ? part.color : "#808080",
       fill = mixHex(base, "#000000", 0.4 * (1 - shade)),
-      // From above, upright round parts are ellipses; lying cylinders and
-      // cones show their side as a rectangle.
+      // From above, upright round parts are ellipses; lying cylinders, cones,
+      // capsules and prisms show their side as a rectangle.
+      upright = part.axis !== "across" && part.axis !== "along",
       round =
         part.shape === "sphere" ||
-        ((part.shape === "cylinder" || part.shape === "cone") &&
-          part.axis !== "across" &&
-          part.axis !== "along"),
+        (upright &&
+          (part.shape === "cylinder" ||
+            part.shape === "cone" ||
+            part.shape === "dome" ||
+            part.shape === "capsule")),
+      // A upright six-sided prism reads as a hexagon from above.
+      hex = part.shape === "hexprism" && upright,
+      capsule = part.shape === "capsule" && !upright,
       outline = mixHex(base, "#000000", 0.55),
       // A flat torus is a ring seen from above; upright ones are thin slabs.
       ring = part.shape === "torus" && part.axis === "up";
@@ -1170,7 +1417,26 @@ function paintCustomObject(
             Math.PI * 2,
           );
         }
-      } else c.rect(part.x - part.w / 2, part.y - part.d / 2, part.w, part.d);
+      } else if (hex) {
+        // Hexagon inscribed in the w×d box: flats left and right.
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2,
+            hx = part.x + Math.cos(a) * (part.w / 2),
+            hy = part.y + Math.sin(a) * (part.d / 2);
+          if (i) c.lineTo(hx, hy);
+          else c.moveTo(hx, hy);
+        }
+        c.closePath();
+      } else if (capsule)
+        // A capsule on its side shows a stadium: rectangle with round ends.
+        c.roundRect(
+          part.x - part.w / 2,
+          part.y - part.d / 2,
+          part.w,
+          part.d,
+          Math.min(part.w, part.d) * 0.5,
+        );
+      else c.rect(part.x - part.w / 2, part.y - part.d / 2, part.w, part.d);
     };
     if (part.finish === "glow") {
       const r = Math.max(part.w, part.d) * 0.9;
@@ -1201,6 +1467,56 @@ function paintCustomObject(
     c.strokeStyle = outline;
     c.lineWidth = 0.02;
     c.stroke();
+    if ((part.shape === "dome" || part.shape === "capsule") && round) {
+      // A dome or upright capsule reads as a round solid with a highlight.
+      c.fillStyle = mixHex(base, "#ffffff", 0.35);
+      c.beginPath();
+      c.ellipse(
+        part.x - part.w * 0.12,
+        part.y - part.d * 0.12,
+        part.w * 0.22,
+        part.d * 0.22,
+        0,
+        0,
+        Math.PI * 2,
+      );
+      c.fill();
+    }
+    if (part.shape === "hexprism" && !upright) {
+      // A prism on its side shows two long facet lines along the top.
+      c.strokeStyle = outline;
+      c.lineWidth = 0.02;
+      c.beginPath();
+      if (part.axis === "across") {
+        for (const dy of [-part.d / 4, part.d / 4]) {
+          c.moveTo(part.x - part.w / 2, part.y + dy);
+          c.lineTo(part.x + part.w / 2, part.y + dy);
+        }
+      } else {
+        for (const dx of [-part.w / 4, part.w / 4]) {
+          c.moveTo(part.x + dx, part.y - part.d / 2);
+          c.lineTo(part.x + dx, part.y + part.d / 2);
+        }
+      }
+      c.stroke();
+    }
+    if (part.shape === "pyramid") {
+      // Square base with diagonals meeting at the apex point.
+      c.strokeStyle = outline;
+      c.lineWidth = 0.02;
+      c.beginPath();
+      for (const [dx, dy] of [
+        [-1, -1],
+        [1, -1],
+        [1, 1],
+        [-1, 1],
+      ]) {
+        c.moveTo(part.x + (dx * part.w) / 2, part.y + (dy * part.d) / 2);
+        c.lineTo(part.x, part.y);
+      }
+      c.stroke();
+      disc(c, part.x, part.y, Math.min(part.w, part.d) * 0.12, outline);
+    }
     if (part.shape === "cone" && round) {
       // Apex at the centre reads as a point from above.
       disc(c, part.x, part.y, Math.min(part.w, part.d) * 0.12, outline);

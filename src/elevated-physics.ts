@@ -105,6 +105,9 @@ function perimeterWall(f: Floor, x: number, y: number) {
 
 function carvedWell(f: Floor, x: number, y: number) {
   const b = f.boundary;
+  // An open site has no stairwell: its only marker is the ground pad, so no
+  // well may be carved through the market's floor plate.
+  if (f.open === true) return false;
   return (
     !!b &&
     x >= 21 &&

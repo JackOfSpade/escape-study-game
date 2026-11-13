@@ -1,0 +1,548 @@
+{
+  "version": 3,
+  "title": "Lantern Market Lanes",
+  "premise": "A night market on the old quay has become the last safe place to study the uplink. The stalls stand empty, the lanterns still burn, and the crowd that never left is coming back through the lanes.",
+  "opening": "The gate at the lane's end is chained. The lantern-lit stalls hide the study terminals you need.",
+  "footprint": {
+    "shape": "rectangle",
+    "width": 38,
+    "top": 3,
+    "inset": 3,
+    "mirrored": false,
+    "shoulder": 12
+  },
+  "roofName": "Quay pickup",
+  "floors": [
+    {
+      "name": "Lantern Market Lanes",
+      "family": "stack",
+      "roomOrder": [0, 1, 3],
+      "layoutSeed": 20260214,
+      "roomTypes": ["reception", "cubicles", "meeting", "storage"],
+      "subroomKinds": ["meeting", "storage"],
+      "furnitureDensity": 1,
+      "fieldQuotas": [2, 2, 3, 2],
+      "power": ["dim", "lit", "lit", "outage"],
+      "brokenGuard": { "segment": 3, "bay": 1 },
+      "scene": {
+        "version": 2,
+        "rooms": [
+          {
+            "room": 0,
+            "title": "Gate Stall",
+            "description": "The chained gate stall, its counter scrubbed clean and one lantern box left on top.",
+            "owner": null,
+            "palette": {
+              "surface": "#6b4a2f",
+              "metal": "#8d8a80",
+              "accent": "#c9a227"
+            },
+            "condition": "kept",
+            "furniture": [
+              {
+                "id": "gate-counter",
+                "kind": "reception",
+                "at": { "x": 0.5, "y": 0.55 },
+                "angle": 0,
+                "color": "#6b4a2f",
+                "condition": "intact",
+                "owner": null,
+                "props": [
+                  {
+                    "id": "gate-box",
+                    "kind": "box",
+                    "at": { "x": 0, "y": 0 },
+                    "angle": 0,
+                    "scale": 1,
+                    "color": "#c9a227",
+                    "accent": "#6b4a2f",
+                    "condition": "intact",
+                    "owner": null
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "room": 1,
+            "title": "Skewer Row",
+            "description": "A row of cooking counters under paper lanterns, one bottle still standing where the cook left it.",
+            "owner": null,
+            "palette": {
+              "surface": "#7a5230",
+              "metal": "#9a958a",
+              "accent": "#ffb347"
+            },
+            "condition": "worn",
+            "furniture": [
+              {
+                "id": "skewer-stall",
+                "kind": "stall-counter",
+                "at": { "x": 0.5, "y": 0.5 },
+                "angle": 90,
+                "color": "#7a5230",
+                "condition": "worn",
+                "owner": null,
+                "props": [
+                  {
+                    "id": "skewer-bottle",
+                    "kind": "bottle",
+                    "at": { "x": 0, "y": 0 },
+                    "angle": 0,
+                    "scale": 1,
+                    "color": "#3f6b4a",
+                    "accent": "#c9a227",
+                    "condition": "intact",
+                    "owner": null
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "room": 2,
+            "title": "Lantern Square",
+            "description": "The meeting square under a ring of lantern posts, a cafe table left mid-hand of cards.",
+            "owner": null,
+            "palette": {
+              "surface": "#8a6b3d",
+              "metal": "#9a958a",
+              "accent": "#ffb347"
+            },
+            "condition": "worn",
+            "furniture": [
+              {
+                "id": "square-table",
+                "kind": "cafeTable",
+                "at": { "x": 0.45, "y": 0.5 },
+                "angle": 0,
+                "color": "#8a6b3d",
+                "condition": "worn",
+                "owner": null,
+                "props": [
+                  {
+                    "id": "square-mug",
+                    "kind": "mug",
+                    "at": { "x": 0, "y": 0 },
+                    "angle": 0,
+                    "scale": 1,
+                    "color": "#d9c9a3",
+                    "accent": "#6b4a2f",
+                    "condition": "intact",
+                    "owner": null
+                  }
+                ]
+              },
+              {
+                "id": "square-post",
+                "kind": "lantern-post",
+                "at": { "x": 0.6, "y": 0.45 },
+                "angle": 0,
+                "color": "#2f2a26",
+                "condition": "intact",
+                "owner": null,
+                "props": []
+              }
+            ]
+          },
+          {
+            "room": 3,
+            "title": "Crate Yard",
+            "description": "The storage yard behind the lanes, crates stacked against a shelf that survived the rush.",
+            "owner": null,
+            "palette": {
+              "surface": "#a5834b",
+              "metal": "#8d8a80",
+              "accent": "#6b4a2f"
+            },
+            "condition": "ransacked",
+            "furniture": [
+              {
+                "id": "yard-shelf",
+                "kind": "shelf",
+                "at": { "x": 0.5, "y": 0.55 },
+                "angle": 0,
+                "color": "#8a6b3d",
+                "condition": "damaged",
+                "owner": null,
+                "props": [
+                  {
+                    "id": "yard-box",
+                    "kind": "box",
+                    "at": { "x": 0, "y": 0 },
+                    "angle": 0,
+                    "scale": 1,
+                    "color": "#a5834b",
+                    "accent": "#6b4a2f",
+                    "condition": "worn",
+                    "owner": null
+                  }
+                ]
+              },
+              {
+                "id": "yard-crates",
+                "kind": "crate-stack",
+                "at": { "x": 0.4, "y": 0.45 },
+                "angle": 0,
+                "color": "#8a6b3d",
+                "condition": "worn",
+                "owner": null,
+                "props": []
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "roster": [
+    {
+      "name": "Maya Okonkwo",
+      "role": "builder",
+      "skill": 0.45,
+      "risk": 0.25,
+      "social": 0.55
+    },
+    {
+      "name": "Theo Vance",
+      "role": "analyst",
+      "skill": 0.62,
+      "risk": 0.3,
+      "social": 0.4
+    },
+    {
+      "name": "June Park",
+      "role": "builder",
+      "skill": 0.55,
+      "risk": 0.35,
+      "social": 0.6
+    },
+    {
+      "name": "Idris Bello",
+      "role": "analyst",
+      "skill": 0.7,
+      "risk": 0.2,
+      "social": 0.35
+    },
+    {
+      "name": "Sora Tan",
+      "role": "builder",
+      "skill": 0.5,
+      "risk": 0.4,
+      "social": 0.65
+    },
+    {
+      "name": "Alex Reyes",
+      "role": "analyst",
+      "skill": 0.58,
+      "risk": 0.45,
+      "social": 0.5
+    },
+    {
+      "name": "Priya Nair",
+      "role": "builder",
+      "skill": 0.66,
+      "risk": 0.3,
+      "social": 0.45
+    },
+    {
+      "name": "Finn Larsen",
+      "role": "analyst",
+      "skill": 0.44,
+      "risk": 0.5,
+      "social": 0.7
+    },
+    {
+      "name": "Lena Fischer",
+      "role": "builder",
+      "skill": 0.72,
+      "risk": 0.25,
+      "social": 0.3
+    },
+    {
+      "name": "Omar Haddad",
+      "role": "analyst",
+      "skill": 0.53,
+      "risk": 0.4,
+      "social": 0.5
+    },
+    {
+      "name": "Kit Moreau",
+      "role": "builder",
+      "skill": 0.48,
+      "risk": 0.55,
+      "social": 0.6
+    },
+    {
+      "name": "Nia Adeyemi",
+      "role": "analyst",
+      "skill": 0.64,
+      "risk": 0.35,
+      "social": 0.4
+    },
+    {
+      "name": "Remy Dubois",
+      "role": "builder",
+      "skill": 0.57,
+      "risk": 0.45,
+      "social": 0.55
+    },
+    {
+      "name": "Ash Kimura",
+      "role": "analyst",
+      "skill": 0.69,
+      "risk": 0.3,
+      "social": 0.35
+    },
+    {
+      "name": "Val Petrov",
+      "role": "builder",
+      "skill": 0.42,
+      "risk": 0.6,
+      "social": 0.75
+    },
+    {
+      "name": "Bo Nakamura",
+      "role": "analyst",
+      "skill": 0.61,
+      "risk": 0.4,
+      "social": 0.45
+    },
+    {
+      "name": "Rae Sylva",
+      "role": "builder",
+      "skill": 0.75,
+      "risk": 0.2,
+      "social": 0.3
+    },
+    {
+      "name": "Sam Okafor",
+      "role": "analyst",
+      "skill": 0.51,
+      "risk": 0.5,
+      "social": 0.65
+    },
+    {
+      "name": "Zoe Marchetti",
+      "role": "builder",
+      "skill": 0.59,
+      "risk": 0.35,
+      "social": 0.5
+    }
+  ],
+  "relationships": [
+    {
+      "from": "Maya Okonkwo",
+      "to": "Theo Vance",
+      "kind": "friend",
+      "detail": "They ran the quay stall together before the lanes emptied and still split every find down the middle."
+    },
+    {
+      "from": "Lena Fischer",
+      "to": "Rae Sylva",
+      "kind": "mentor",
+      "detail": "Rae taught Lena to read the uplink handshake behind the lantern row; neither has said why they stopped talking."
+    }
+  ],
+  "city": {
+    "roadWidth": 8,
+    "boulevardOffset": 16,
+    "districtSize": 20,
+    "buildingHeightMin": 12,
+    "buildingHeightMax": 30,
+    "damageRate": 0.2,
+    "palette": ["#3a2f26", "#6b4a2f", "#8d8a80", "#c9a227"]
+  },
+  "exterior": {
+    "buildingName": "LANTERN MARKET",
+    "buildingSubtitle": "QUAY PICKUP",
+    "quarantineTitle": "LANES CLOSED",
+    "quarantineSubtitle": "STUDY THE UPLINK BEFORE THE SWARM",
+    "skyline": { "minHeight": 30, "maxHeight": 90, "damageRate": 0.15 }
+  },
+  "pacing": {
+    "swarmInterval": 3,
+    "swarmBatch": 1,
+    "swarmCap": 160,
+    "npcThinkingScale": 0.3,
+    "firstHelicopter": 480,
+    "helicopterInterval": 180
+  },
+  "setting": {
+    "venue": "custom",
+    "form": "open",
+    "terminal": {
+      "style": "kiosk",
+      "body": "#6b4a2f",
+      "accent": "#c9a227",
+      "screen": "#ffb347"
+    },
+    "interior": {
+      "roomFloor": "flagstone",
+      "hallFloor": "earth",
+      "roomTint": "#6b4a2f",
+      "hallTint": "#5c5750",
+      "wall": "#3a2f26",
+      "trim": "#8d8a80",
+      "wallFinish": "wood",
+      "light": "#ffb347"
+    },
+    "exterior": {
+      "facade": "timber",
+      "facadeColor": "#6b4a2f",
+      "trimColor": "#c9a227",
+      "windows": "slit",
+      "canopy": "marquee",
+      "canopyGlow": "#ffb347",
+      "roofFeatures": []
+    },
+    "surroundings": {
+      "ground": "cobble",
+      "groundColor": "#5c5750",
+      "pathColor": "#6d675d",
+      "sky": { "zenith": "#0d1322", "horizon": "#3a2f3d" },
+      "fog": { "color": "#1a2230", "density": 0.35 },
+      "neighbors": "tents",
+      "neighborColor": "#4a3a2c",
+      "weather": "fireflies",
+      "scenery": []
+    },
+    "objects": [
+      {
+        "id": "stall-counter",
+        "name": "Stall Counter",
+        "role": "surface",
+        "weight": "medium",
+        "size": { "w": 1.8, "d": 0.7, "h": 1.0 },
+        "surface": true,
+        "parts": [
+          {
+            "shape": "box",
+            "axis": "up",
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "w": 1.7,
+            "d": 0.6,
+            "h": 0.85,
+            "pitch": 0,
+            "roll": 0,
+            "motion": "none",
+            "rate": 1,
+            "color": "#6b4a2f",
+            "finish": "matte"
+          },
+          {
+            "shape": "box",
+            "axis": "up",
+            "x": 0,
+            "y": 0,
+            "z": 0.85,
+            "w": 1.8,
+            "d": 0.7,
+            "h": 0.15,
+            "pitch": 0,
+            "roll": 0,
+            "motion": "none",
+            "rate": 1,
+            "color": "#c9a227",
+            "finish": "metal"
+          }
+        ]
+      },
+      {
+        "id": "lantern-post",
+        "name": "Lantern Post",
+        "role": "light",
+        "weight": "light",
+        "size": { "w": 0.5, "d": 0.5, "h": 2.4 },
+        "surface": false,
+        "parts": [
+          {
+            "shape": "cylinder",
+            "axis": "up",
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "w": 0.12,
+            "d": 0.12,
+            "h": 2.0,
+            "pitch": 0,
+            "roll": 0,
+            "motion": "none",
+            "rate": 1,
+            "color": "#2f2a26",
+            "finish": "metal"
+          },
+          {
+            "shape": "sphere",
+            "axis": "up",
+            "x": 0,
+            "y": 0,
+            "z": 2.0,
+            "w": 0.28,
+            "d": 0.28,
+            "h": 0.28,
+            "pitch": 0,
+            "roll": 0,
+            "motion": "flicker",
+            "rate": 1.2,
+            "color": "#ffb347",
+            "finish": "glow"
+          }
+        ]
+      },
+      {
+        "id": "crate-stack",
+        "name": "Crate Stack",
+        "role": "storage",
+        "weight": "medium",
+        "size": { "w": 1.0, "d": 1.0, "h": 1.1 },
+        "surface": false,
+        "parts": [
+          {
+            "shape": "box",
+            "axis": "up",
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "w": 0.9,
+            "d": 0.9,
+            "h": 0.5,
+            "pitch": 0,
+            "roll": 0,
+            "motion": "none",
+            "rate": 1,
+            "color": "#8a6b3d",
+            "finish": "matte"
+          },
+          {
+            "shape": "box",
+            "axis": "up",
+            "x": 0.05,
+            "y": 0,
+            "z": 0.5,
+            "w": 0.8,
+            "d": 0.8,
+            "h": 0.55,
+            "pitch": 0,
+            "roll": 0,
+            "motion": "none",
+            "rate": 1,
+            "color": "#a5834b",
+            "finish": "matte"
+          }
+        ]
+      }
+    ],
+    "props": [],
+    "filler": {
+      "break": ["stall-counter", "cafeTable", "plant"],
+      "cubicles": ["desk", "officeChair", "stall-counter"],
+      "meeting": ["table", "chair", "lantern-post"],
+      "storage": ["crate-stack", "shelf", "cabinet"],
+      "reception": ["reception", "chair", "lantern-post"],
+      "manager": ["desk", "officeChair", "shelf"]
+    }
+  }
+}

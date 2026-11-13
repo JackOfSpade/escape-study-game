@@ -14,6 +14,7 @@ import {
 } from "./model";
 import { npcProfile } from "./npc-cognition";
 import { npcCanHearSpeech } from "./npc-hearing";
+import { isOpenSite } from "./open-site";
 import { rememberedThreats, THREAT_MEMORY } from "./npc-threat-memory";
 import {
   buildInteriorLighting,
@@ -227,6 +228,15 @@ function buildingPhrase(g: Game) {
     return name ? `a building called ${bounded(name, 60)}` : "a building";
   if (floor?.setting?.venue !== "broadcast") return "an office building";
   return `a broadcast station${name ? ` (${bounded(name, 60)})` : ""}`;
+}
+/** Open ground has no rooftop: name the place the crew gathers on instead of a
+ * building they would climb. */
+function openGroundPhrase(g: Game) {
+  const floor = g.floors[0];
+  const name = floor?.exteriorDesign?.buildingName;
+  return floor?.setting?.venue === "custom" && name
+    ? `the open ground at ${bounded(name, 60)}`
+    : "the open ground";
 }
 const round = (n: number) => Math.round(n * 10) / 10;
 const health = (ratio: number): HealthBand =>
@@ -518,7 +528,8 @@ function lightingObservation(g: Game, a: Actor) {
         a.y >= b.bottom ||
         a.x < row.left ||
         a.x >= row.right);
-  if (outside || floor.index >= CONFIG.floors)
+  // An open site has no ceilings to light: its ground layer is outdoors too.
+  if (outside || floor.open === true || floor.index >= CONFIG.floors)
     return {
       key: "exterior",
       text: "You are outside the building's ceiling-light circuits.",
@@ -961,7 +972,9 @@ export function buildNpcChatterContext(
     runId: g.id,
     actorId: a.id,
     capturedAt: g.time,
-    setting: `A zombie outbreak has overrun the surrounding city. Survivors are climbing ${buildingPhrase(g)} toward rooftop extraction.`,
+    setting: isOpenSite(g)
+      ? `A zombie outbreak has overrun the surrounding city. Survivors are gathering at the ground pickup on ${openGroundPhrase(g)}.`
+      : `A zombie outbreak has overrun the surrounding city. Survivors are climbing ${buildingPhrase(g)} toward rooftop extraction.`,
     self: {
       id: a.id,
       name: bounded(a.name, 80),

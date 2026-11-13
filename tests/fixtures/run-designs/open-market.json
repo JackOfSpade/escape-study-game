@@ -1,0 +1,3896 @@
+{
+  "version": 3,
+  "title": "Lantern Market Lanes",
+  "premise": "A night market on the old quay has become the last safe place to study the uplink. The stalls stand empty, the lanterns still burn, and the crowd that never left is coming back through the lanes.",
+  "opening": "The gate at the lane's end is chained. The lantern-lit stalls hide the study terminals you need.",
+  "footprint": {
+    "shape": "rectangle",
+    "width": 38,
+    "top": 3,
+    "inset": 3,
+    "mirrored": false,
+    "shoulder": 12
+  },
+  "roofName": "Quay pickup",
+  "floors": [
+    {
+      "name": "Lantern Market Lanes",
+      "family": "stack",
+      "roomOrder": [0, 1, 3],
+      "layoutSeed": 20260214,
+      "roomTypes": ["reception", "cubicles", "meeting", "storage"],
+      "subroomKinds": ["meeting", "storage"],
+      "furnitureDensity": 1,
+      "fieldQuotas": [2, 2, 3, 2],
+      "power": ["dim", "lit", "lit", "outage"],
+      "brokenGuard": {
+        "segment": 3,
+        "bay": 1
+      },
+      "scene": {
+        "version": 2,
+        "rooms": [
+          {
+            "room": 0,
+            "title": "Gate Stall",
+            "description": "The chained gate stall, its counter scrubbed clean and one lantern box left on top.",
+            "owner": null,
+            "palette": {
+              "surface": "#6b4a2f",
+              "metal": "#8d8a80",
+              "accent": "#c9a227"
+            },
+            "condition": "kept",
+            "furniture": [
+              {
+                "id": "gate-counter",
+                "kind": "reception",
+                "at": {
+                  "x": 0.5,
+                  "y": 0.55
+                },
+                "angle": 0,
+                "color": "#6b4a2f",
+                "condition": "intact",
+                "owner": null,
+                "props": [
+                  {
+                    "id": "gate-box",
+                    "kind": "box",
+                    "at": {
+                      "x": 0,
+                      "y": 0
+                    },
+                    "angle": 0,
+                    "scale": 1,
+                    "color": "#c9a227",
+                    "accent": "#6b4a2f",
+                    "condition": "intact",
+                    "owner": null
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "room": 1,
+            "title": "Skewer Row",
+            "description": "A row of cooking counters under paper lanterns, one bottle still standing where the cook left it.",
+            "owner": null,
+            "palette": {
+              "surface": "#7a5230",
+              "metal": "#9a958a",
+              "accent": "#ffb347"
+            },
+            "condition": "worn",
+            "furniture": [
+              {
+                "id": "skewer-stall",
+                "kind": "stall-counter",
+                "at": {
+                  "x": 0.5,
+                  "y": 0.5
+                },
+                "angle": 90,
+                "color": "#7a5230",
+                "condition": "worn",
+                "owner": null,
+                "props": [
+                  {
+                    "id": "skewer-bottle",
+                    "kind": "bottle",
+                    "at": {
+                      "x": 0,
+                      "y": 0
+                    },
+                    "angle": 0,
+                    "scale": 1,
+                    "color": "#3f6b4a",
+                    "accent": "#c9a227",
+                    "condition": "intact",
+                    "owner": null
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "room": 2,
+            "title": "Lantern Square",
+            "description": "The meeting square under a ring of lantern posts, a cafe table left mid-hand of cards.",
+            "owner": null,
+            "palette": {
+              "surface": "#8a6b3d",
+              "metal": "#9a958a",
+              "accent": "#ffb347"
+            },
+            "condition": "worn",
+            "furniture": [
+              {
+                "id": "square-table",
+                "kind": "cafeTable",
+                "at": {
+                  "x": 0.45,
+                  "y": 0.5
+                },
+                "angle": 0,
+                "color": "#8a6b3d",
+                "condition": "worn",
+                "owner": null,
+                "props": [
+                  {
+                    "id": "square-mug",
+                    "kind": "mug",
+                    "at": {
+                      "x": 0,
+                      "y": 0
+                    },
+                    "angle": 0,
+                    "scale": 1,
+                    "color": "#d9c9a3",
+                    "accent": "#6b4a2f",
+                    "condition": "intact",
+                    "owner": null
+                  }
+                ]
+              },
+              {
+                "id": "square-post",
+                "kind": "lantern-post",
+                "at": {
+                  "x": 0.6,
+                  "y": 0.45
+                },
+                "angle": 0,
+                "color": "#2f2a26",
+                "condition": "intact",
+                "owner": null,
+                "props": []
+              }
+            ]
+          },
+          {
+            "room": 3,
+            "title": "Crate Yard",
+            "description": "The storage yard behind the lanes, crates stacked against a shelf that survived the rush.",
+            "owner": null,
+            "palette": {
+              "surface": "#a5834b",
+              "metal": "#8d8a80",
+              "accent": "#6b4a2f"
+            },
+            "condition": "ransacked",
+            "furniture": [
+              {
+                "id": "yard-shelf",
+                "kind": "shelf",
+                "at": {
+                  "x": 0.5,
+                  "y": 0.55
+                },
+                "angle": 0,
+                "color": "#8a6b3d",
+                "condition": "damaged",
+                "owner": null,
+                "props": [
+                  {
+                    "id": "yard-box",
+                    "kind": "box",
+                    "at": {
+                      "x": 0,
+                      "y": 0
+                    },
+                    "angle": 0,
+                    "scale": 1,
+                    "color": "#a5834b",
+                    "accent": "#6b4a2f",
+                    "condition": "worn",
+                    "owner": null
+                  }
+                ]
+              },
+              {
+                "id": "yard-crates",
+                "kind": "crate-stack",
+                "at": {
+                  "x": 0.4,
+                  "y": 0.45
+                },
+                "angle": 0,
+                "color": "#8a6b3d",
+                "condition": "worn",
+                "owner": null,
+                "props": []
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "roster": [
+    {
+      "name": "Maya Okonkwo",
+      "role": "builder",
+      "skill": 0.45,
+      "risk": 0.25,
+      "social": 0.55
+    },
+    {
+      "name": "Theo Vance",
+      "role": "analyst",
+      "skill": 0.62,
+      "risk": 0.3,
+      "social": 0.4
+    },
+    {
+      "name": "June Park",
+      "role": "builder",
+      "skill": 0.55,
+      "risk": 0.35,
+      "social": 0.6
+    },
+    {
+      "name": "Idris Bello",
+      "role": "analyst",
+      "skill": 0.7,
+      "risk": 0.2,
+      "social": 0.35
+    },
+    {
+      "name": "Sora Tan",
+      "role": "builder",
+      "skill": 0.5,
+      "risk": 0.4,
+      "social": 0.65
+    },
+    {
+      "name": "Alex Reyes",
+      "role": "analyst",
+      "skill": 0.58,
+      "risk": 0.45,
+      "social": 0.5
+    },
+    {
+      "name": "Priya Nair",
+      "role": "builder",
+      "skill": 0.66,
+      "risk": 0.3,
+      "social": 0.45
+    },
+    {
+      "name": "Finn Larsen",
+      "role": "analyst",
+      "skill": 0.44,
+      "risk": 0.5,
+      "social": 0.7
+    },
+    {
+      "name": "Lena Fischer",
+      "role": "builder",
+      "skill": 0.72,
+      "risk": 0.25,
+      "social": 0.3
+    },
+    {
+      "name": "Omar Haddad",
+      "role": "analyst",
+      "skill": 0.53,
+      "risk": 0.4,
+      "social": 0.5
+    },
+    {
+      "name": "Kit Moreau",
+      "role": "builder",
+      "skill": 0.48,
+      "risk": 0.55,
+      "social": 0.6
+    },
+    {
+      "name": "Nia Adeyemi",
+      "role": "analyst",
+      "skill": 0.64,
+      "risk": 0.35,
+      "social": 0.4
+    },
+    {
+      "name": "Remy Dubois",
+      "role": "builder",
+      "skill": 0.57,
+      "risk": 0.45,
+      "social": 0.55
+    },
+    {
+      "name": "Ash Kimura",
+      "role": "analyst",
+      "skill": 0.69,
+      "risk": 0.3,
+      "social": 0.35
+    },
+    {
+      "name": "Val Petrov",
+      "role": "builder",
+      "skill": 0.42,
+      "risk": 0.6,
+      "social": 0.75
+    },
+    {
+      "name": "Bo Nakamura",
+      "role": "analyst",
+      "skill": 0.61,
+      "risk": 0.4,
+      "social": 0.45
+    },
+    {
+      "name": "Rae Sylva",
+      "role": "builder",
+      "skill": 0.75,
+      "risk": 0.2,
+      "social": 0.3
+    },
+    {
+      "name": "Sam Okafor",
+      "role": "analyst",
+      "skill": 0.51,
+      "risk": 0.5,
+      "social": 0.65
+    },
+    {
+      "name": "Zoe Marchetti",
+      "role": "builder",
+      "skill": 0.59,
+      "risk": 0.35,
+      "social": 0.5
+    }
+  ],
+  "relationships": [
+    {
+      "from": "Maya Okonkwo",
+      "to": "Theo Vance",
+      "kind": "friend",
+      "detail": "They ran the quay stall together before the lanes emptied and still split every find down the middle."
+    },
+    {
+      "from": "Lena Fischer",
+      "to": "Rae Sylva",
+      "kind": "mentor",
+      "detail": "Rae taught Lena to read the uplink handshake behind the lantern row; neither has said why they stopped talking."
+    }
+  ],
+  "city": {
+    "roadWidth": 8,
+    "boulevardOffset": 16,
+    "districtSize": 20,
+    "buildingHeightMin": 12,
+    "buildingHeightMax": 30,
+    "damageRate": 0.2,
+    "palette": ["#3a2f26", "#6b4a2f", "#8d8a80", "#c9a227"]
+  },
+  "exterior": {
+    "buildingName": "LANTERN MARKET",
+    "buildingSubtitle": "QUAY PICKUP",
+    "quarantineTitle": "LANES CLOSED",
+    "quarantineSubtitle": "STUDY THE UPLINK BEFORE THE SWARM",
+    "skyline": {
+      "minHeight": 30,
+      "maxHeight": 90,
+      "damageRate": 0.15
+    }
+  },
+  "pacing": {
+    "swarmInterval": 3,
+    "swarmBatch": 1,
+    "swarmCap": 160,
+    "npcThinkingScale": 0.3,
+    "firstHelicopter": 480,
+    "helicopterInterval": 180
+  },
+  "setting": {
+    "venue": "custom",
+    "form": "open",
+    "terminal": {
+      "style": "kiosk",
+      "body": "#6b4a2f",
+      "accent": "#c9a227",
+      "screen": "#ffb347"
+    },
+    "interior": {
+      "roomFloor": "flagstone",
+      "hallFloor": "earth",
+      "roomTint": "#6b4a2f",
+      "hallTint": "#5c5750",
+      "wall": "#3a2f26",
+      "trim": "#8d8a80",
+      "wallFinish": "wood",
+      "light": "#ffb347"
+    },
+    "exterior": {
+      "facade": "timber",
+      "facadeColor": "#6b4a2f",
+      "trimColor": "#c9a227",
+      "windows": "slit",
+      "canopy": "marquee",
+      "canopyGlow": "#ffb347",
+      "roofFeatures": []
+    },
+    "surroundings": {
+      "ground": "cobble",
+      "groundColor": "#5c5750",
+      "pathColor": "#6d675d",
+      "sky": {
+        "zenith": "#0d1322",
+        "horizon": "#3a2f3d"
+      },
+      "fog": {
+        "color": "#1a2230",
+        "density": 0.35
+      },
+      "neighbors": "tents",
+      "neighborColor": "#4a3a2c",
+      "weather": "fireflies",
+      "scenery": []
+    },
+    "objects": [
+      {
+        "id": "stall-counter",
+        "name": "Stall Counter",
+        "role": "surface",
+        "weight": "medium",
+        "size": {
+          "w": 1.8,
+          "d": 0.7,
+          "h": 1
+        },
+        "surface": true,
+        "parts": [
+          {
+            "shape": "box",
+            "axis": "up",
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "w": 1.7,
+            "d": 0.6,
+            "h": 0.85,
+            "pitch": 0,
+            "roll": 0,
+            "motion": "none",
+            "rate": 1,
+            "color": "#6b4a2f",
+            "finish": "matte"
+          },
+          {
+            "shape": "box",
+            "axis": "up",
+            "x": 0,
+            "y": 0,
+            "z": 0.85,
+            "w": 1.8,
+            "d": 0.7,
+            "h": 0.15,
+            "pitch": 0,
+            "roll": 0,
+            "motion": "none",
+            "rate": 1,
+            "color": "#c9a227",
+            "finish": "metal"
+          }
+        ]
+      },
+      {
+        "id": "lantern-post",
+        "name": "Lantern Post",
+        "role": "light",
+        "weight": "light",
+        "size": {
+          "w": 0.5,
+          "d": 0.5,
+          "h": 2.4
+        },
+        "surface": false,
+        "parts": [
+          {
+            "shape": "cylinder",
+            "axis": "up",
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "w": 0.12,
+            "d": 0.12,
+            "h": 2,
+            "pitch": 0,
+            "roll": 0,
+            "motion": "none",
+            "rate": 1,
+            "color": "#2f2a26",
+            "finish": "metal"
+          },
+          {
+            "shape": "sphere",
+            "axis": "up",
+            "x": 0,
+            "y": 0,
+            "z": 2,
+            "w": 0.28,
+            "d": 0.28,
+            "h": 0.28,
+            "pitch": 0,
+            "roll": 0,
+            "motion": "flicker",
+            "rate": 1.2,
+            "color": "#ffb347",
+            "finish": "glow"
+          }
+        ]
+      },
+      {
+        "id": "crate-stack",
+        "name": "Crate Stack",
+        "role": "storage",
+        "weight": "medium",
+        "size": {
+          "w": 1,
+          "d": 1,
+          "h": 1.1
+        },
+        "surface": false,
+        "parts": [
+          {
+            "shape": "box",
+            "axis": "up",
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "w": 0.9,
+            "d": 0.9,
+            "h": 0.5,
+            "pitch": 0,
+            "roll": 0,
+            "motion": "none",
+            "rate": 1,
+            "color": "#8a6b3d",
+            "finish": "matte"
+          },
+          {
+            "shape": "box",
+            "axis": "up",
+            "x": 0.05,
+            "y": 0,
+            "z": 0.5,
+            "w": 0.8,
+            "d": 0.8,
+            "h": 0.55,
+            "pitch": 0,
+            "roll": 0,
+            "motion": "none",
+            "rate": 1,
+            "color": "#a5834b",
+            "finish": "matte"
+          }
+        ]
+      }
+    ],
+    "props": [],
+    "filler": {
+      "break": ["stall-counter", "cafeTable", "plant"],
+      "cubicles": ["desk", "officeChair", "stall-counter"],
+      "meeting": ["table", "chair", "lantern-post"],
+      "storage": ["crate-stack", "shelf", "cabinet"],
+      "reception": ["reception", "chair", "lantern-post"],
+      "manager": ["desk", "officeChair", "shelf"]
+    }
+  },
+  "environment": {
+    "version": 1,
+    "surfaceFingerprint": "f3eed2330b72a6d5",
+    "surfaces": [
+      {
+        "id": "building:entrance-sign",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "building-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 22,
+          "y": 29.584999999999997,
+          "z": 3.22,
+          "width": 3.55,
+          "height": 0.74,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  LANTERN MARKET. QUAY PICKUP",
+        "maxTitle": 48,
+        "maxBody": 100,
+        "allowsArt": true
+      },
+      {
+        "id": "building:quarantine-sign",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "quarantine-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 26,
+          "y": 29.06,
+          "z": 1.8,
+          "width": 3.2,
+          "height": 0.65,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  LANES CLOSED. STUDY THE UPLINK BEFORE THE SWARM",
+        "maxTitle": 48,
+        "maxBody": 100,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-1716d029-9d31fb9e:horizontal:-1:11:0:-1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": -71.57058823529412,
+          "y": 47.885,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -3.141592653589793,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-1716d029-9d31fb9e:horizontal:-1:12:0:-1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": -54.01647058823529,
+          "y": 47.885,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -3.141592653589793,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-1716d029-9d31fb9e:horizontal:-1:13:0:-1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": -36.46235294117646,
+          "y": 47.885,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -3.141592653589793,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-1716d029-9d31fb9e:horizontal:-1:14:0:-1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": -18.908235294117667,
+          "y": 47.885,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -3.141592653589793,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-1716d029-9d31fb9e:horizontal:-1:14:0:-1:street",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "street-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": -18.908235294117667,
+          "y": 47.9,
+          "z": 3.05,
+          "width": 2.5,
+          "height": 0.38,
+          "yaw": -3.141592653589793,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Street-name sign at this physical address.",
+        "maxTitle": 36,
+        "maxBody": 0,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-1716d029-9d31fb9e:horizontal:-1:15:0:-1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": -1.3541176470588063,
+          "y": 47.885,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -3.141592653589793,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-1716d029-9d31fb9e:horizontal:-1:16:0:-1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 16.199999999999967,
+          "y": 47.885,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -3.141592653589793,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-1716d029-9d31fb9e:horizontal:-1:16:1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 18.114999999999966,
+          "y": 49.8,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-1716d029-9d31fb9e:horizontal:1:16:1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 18.114999999999966,
+          "y": 55.8,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-1ae64a0c-c1d68ac3:horizontal:-1:16:1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": -6.885000000000006,
+          "y": -2.8,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-1ae64a0c-c1d68ac3:horizontal:1:16:0:1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": -8.800000000000006,
+          "y": 10.615,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-1ae64a0c-c1d68ac3:horizontal:1:16:1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": -6.885000000000006,
+          "y": 8.7,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-1ae64a0c-c1d68ac3:vertical:1:0:1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": -6.885000000000001,
+          "y": 2.7,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-21bc04d6-e05dad6c:horizontal:-1:16:0:-1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": -8.800000000000006,
+          "y": 15.385,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -3.141592653589793,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-21bc04d6-e05dad6c:horizontal:-1:16:1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": -6.885000000000006,
+          "y": 19.7,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-21bc04d6-e05dad6c:horizontal:1:13:0:1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": -61.63882352941177,
+          "y": 40.115,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-21bc04d6-e05dad6c:horizontal:1:14:0:1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": -44.025882352941174,
+          "y": 40.115,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-21bc04d6-e05dad6c:horizontal:1:15:0:1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": -26.412941176470607,
+          "y": 40.115,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-21bc04d6-e05dad6c:horizontal:1:16:0:1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": -8.800000000000006,
+          "y": 40.115,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-21bc04d6-e05dad6c:horizontal:1:16:1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": -6.885000000000006,
+          "y": 35.8,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-21bc04d6-e05dad6c:vertical:1:0:1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": -6.885000000000001,
+          "y": 32.2,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-2e0a4aa7-4071d617:horizontal:1:16:0:1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": -6.428648648648555,
+          "y": -6.885000000000001,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-2e0a4aa7-4071d617:horizontal:1:16:0:1:street",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "street-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": -6.428648648648555,
+          "y": -6.9,
+          "z": 3.05,
+          "width": 2.5,
+          "height": 0.38,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Street-name sign at this physical address.",
+        "maxTitle": 36,
+        "maxBody": 0,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-2e0a4aa7-4071d617:horizontal:1:17:0:1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 11.323783783783886,
+          "y": -6.885000000000001,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-2e0a4aa7-4071d617:horizontal:1:18:0:1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 22,
+          "y": -6.885000000000001,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-2e0a4aa7-4071d617:horizontal:1:18:0:1:street",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "street-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 22,
+          "y": -6.9,
+          "z": 3.05,
+          "width": 2.5,
+          "height": 0.38,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Street-name sign at this physical address.",
+        "maxTitle": 36,
+        "maxBody": 0,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-2e0a4aa7-4071d617:horizontal:1:19:0:1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 32.67621621621628,
+          "y": -6.885000000000001,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-2e0a4aa7-4071d617:horizontal:1:20:0:1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 50.428648648648725,
+          "y": -6.885000000000001,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-62ba157e-e911dbed:horizontal:-1:0:-1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 25.885,
+          "y": 69.8,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-62ba157e-e911dbed:vertical:-1:0:-1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 25.885,
+          "y": 75.8,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-62ba157e-e911dbed:vertical:-1:1:-1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 25.885,
+          "y": 93.49466666666666,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-62ba157e-e911dbed:vertical:-1:1:-1:0:street",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "street-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 25.900000000000002,
+          "y": 93.49466666666666,
+          "z": 3.05,
+          "width": 2.5,
+          "height": 0.38,
+          "yaw": 1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Street-name sign at this physical address.",
+        "maxTitle": 36,
+        "maxBody": 0,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-62ba157e-e911dbed:vertical:-1:2:-1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 25.885,
+          "y": 111.18933333333332,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-6d6fe655-b8d0ab70:horizontal:-1:0:-1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 25.885000000000005,
+          "y": 49.8,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-6d6fe655-b8d0ab70:horizontal:-1:0:0:-1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 27.800000000000004,
+          "y": 47.885,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -3.141592653589793,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-6d6fe655-b8d0ab70:horizontal:-1:1:0:-1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 45.354117647058814,
+          "y": 47.885,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -3.141592653589793,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-6d6fe655-b8d0ab70:horizontal:-1:1:0:-1:street",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "street-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 45.354117647058814,
+          "y": 47.9,
+          "z": 3.05,
+          "width": 2.5,
+          "height": 0.38,
+          "yaw": -3.141592653589793,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Street-name sign at this physical address.",
+        "maxTitle": 36,
+        "maxBody": 0,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-6d6fe655-b8d0ab70:horizontal:-1:2:0:-1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 62.908235294117645,
+          "y": 47.885,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -3.141592653589793,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-6d6fe655-b8d0ab70:horizontal:-1:3:0:-1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 80.46235294117646,
+          "y": 47.885,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -3.141592653589793,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-6d6fe655-b8d0ab70:horizontal:-1:3:0:-1:street",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "street-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 80.46235294117646,
+          "y": 47.9,
+          "z": 3.05,
+          "width": 2.5,
+          "height": 0.38,
+          "yaw": -3.141592653589793,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Street-name sign at this physical address.",
+        "maxTitle": 36,
+        "maxBody": 0,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-6d6fe655-b8d0ab70:horizontal:-1:4:0:-1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 98.0164705882353,
+          "y": 47.885,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -3.141592653589793,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-6d6fe655-b8d0ab70:horizontal:-1:5:0:-1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 115.57058823529411,
+          "y": 47.885,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -3.141592653589793,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-6d6fe655-b8d0ab70:horizontal:1:0:-1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 25.885000000000005,
+          "y": 55.8,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-71ff805c-a74c1522:horizontal:-1:16:1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 18.115,
+          "y": 61.8,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-71ff805c-a74c1522:horizontal:-1:16:1:0:street",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "street-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 18.099999999999998,
+          "y": 61.8,
+          "z": 3.05,
+          "width": 2.5,
+          "height": 0.38,
+          "yaw": -1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Street-name sign at this physical address.",
+        "maxTitle": 36,
+        "maxBody": 0,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-71ff805c-a74c1522:horizontal:1:16:1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 18.115,
+          "y": 65.8,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-71ff805c-a74c1522:horizontal:1:16:1:0:street",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "street-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 18.099999999999998,
+          "y": 65.8,
+          "z": 3.05,
+          "width": 2.5,
+          "height": 0.38,
+          "yaw": -1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Street-name sign at this physical address.",
+        "maxTitle": 36,
+        "maxBody": 0,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-a3f8d0fb-fb671b34:horizontal:-1:0:-1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 50.885,
+          "y": -2.8,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-a3f8d0fb-fb671b34:horizontal:1:0:-1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 50.885,
+          "y": 11.7,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-a3f8d0fb-fb671b34:horizontal:1:0:-1:0:street",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "street-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 50.9,
+          "y": 11.7,
+          "z": 3.05,
+          "width": 2.5,
+          "height": 0.38,
+          "yaw": 1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Street-name sign at this physical address.",
+        "maxTitle": 36,
+        "maxBody": 0,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-a3f8d0fb-fb671b34:horizontal:1:0:0:1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 52.8,
+          "y": 13.615,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-a3f8d0fb-fb671b34:horizontal:1:0:0:1:street",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "street-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 52.8,
+          "y": 13.6,
+          "z": 3.05,
+          "width": 2.5,
+          "height": 0.38,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Street-name sign at this physical address.",
+        "maxTitle": 36,
+        "maxBody": 0,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-a3f8d0fb-fb671b34:vertical:-1:0:-1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 50.885,
+          "y": 5.7,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-c00f5dc1-e9c75ae8:horizontal:-1:0:-1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 50.885,
+          "y": 22.7,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-c00f5dc1-e9c75ae8:horizontal:-1:0:0:-1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 52.8,
+          "y": 18.385,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -3.141592653589793,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-c00f5dc1-e9c75ae8:horizontal:1:0:-1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 50.885,
+          "y": 35.8,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-c00f5dc1-e9c75ae8:horizontal:1:0:0:1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 52.8,
+          "y": 40.115,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-c00f5dc1-e9c75ae8:horizontal:1:1:0:1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 70.41294117647058,
+          "y": 40.115,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-c00f5dc1-e9c75ae8:horizontal:1:2:0:1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 88.02588235294117,
+          "y": 40.115,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-c00f5dc1-e9c75ae8:horizontal:1:3:0:1:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 105.63882352941177,
+          "y": 40.115,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-c00f5dc1-e9c75ae8:vertical:-1:0:-1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 50.885,
+          "y": 32.2,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-d3811fa1-219620eb:horizontal:-1:18:1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 18.115,
+          "y": 69.8,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-d3811fa1-219620eb:horizontal:-1:18:1:0:street",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "street-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 18.099999999999998,
+          "y": 69.8,
+          "z": 3.05,
+          "width": 2.5,
+          "height": 0.38,
+          "yaw": -1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Street-name sign at this physical address.",
+        "maxTitle": 36,
+        "maxBody": 0,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-d3811fa1-219620eb:vertical:1:0:1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 18.115,
+          "y": 75.8,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-d3811fa1-219620eb:vertical:1:1:1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 18.115,
+          "y": 92.95125,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-d3811fa1-219620eb:vertical:1:1:1:0:street",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "street-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 18.099999999999998,
+          "y": 92.95125,
+          "z": 3.05,
+          "width": 2.5,
+          "height": 0.38,
+          "yaw": -1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Street-name sign at this physical address.",
+        "maxTitle": 36,
+        "maxBody": 0,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-d3811fa1-219620eb:vertical:1:2:1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 18.115,
+          "y": 110.1025,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": -1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-d3811fa1-219620eb:vertical:1:2:1:0:street",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "street-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 18.099999999999998,
+          "y": 110.1025,
+          "z": 3.05,
+          "width": 2.5,
+          "height": 0.38,
+          "yaw": -1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Street-name sign at this physical address.",
+        "maxTitle": 36,
+        "maxBody": 0,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-f1ef3d4f-a8d3b758:horizontal:-1:0:-1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 25.885,
+          "y": 61.8,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "city:block-f1ef3d4f-a8d3b758:horizontal:1:0:-1:0:shop",
+        "floor": 0,
+        "scope": "exterior",
+        "role": "storefront-sign",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 25.885,
+          "y": 65.8,
+          "z": 2.05,
+          "width": 3.05,
+          "height": 0.6,
+          "yaw": 1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes.  Individual street-facing shop or office address sign.",
+        "maxTitle": 48,
+        "maxBody": 80,
+        "allowsArt": true
+      },
+      {
+        "id": "f0-lobby-break0-cafeTable1:papers",
+        "floor": 0,
+        "scope": "interior",
+        "role": "desk-papers",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "furniture",
+          "furnitureId": "f0-lobby-break0-cafeTable1",
+          "x": -0.186,
+          "y": -0.15300000000000002,
+          "z": 0.8285,
+          "width": 0.2375,
+          "height": 0.27549999999999997,
+          "yaw": 0,
+          "pitch": -1.5707963267948966
+        },
+        "context": "Lantern Market Lanes.  Top sheet of this desk's paper stack.",
+        "maxTitle": 28,
+        "maxBody": 100,
+        "allowsArt": true
+      },
+      {
+        "id": "f0-lobby-break2-cafeTable0:papers",
+        "floor": 0,
+        "scope": "interior",
+        "role": "desk-papers",
+        "room": null,
+        "owner": null,
+        "binding": {
+          "kind": "furniture",
+          "furnitureId": "f0-lobby-break2-cafeTable0",
+          "x": -0.186,
+          "y": -0.15300000000000002,
+          "z": 0.8285,
+          "width": 0.2375,
+          "height": 0.27549999999999997,
+          "yaw": 0,
+          "pitch": -1.5707963267948966
+        },
+        "context": "Lantern Market Lanes.  Top sheet of this desk's paper stack.",
+        "maxTitle": 28,
+        "maxBody": 100,
+        "allowsArt": true
+      },
+      {
+        "id": "f0-room0-reception0-reception0:note",
+        "floor": 0,
+        "scope": "interior",
+        "role": "desk-note",
+        "room": 0,
+        "owner": null,
+        "binding": {
+          "kind": "furniture",
+          "furnitureId": "f0-room0-reception0-reception0",
+          "x": -0.528,
+          "y": -0.1652,
+          "z": 1.128,
+          "width": 0.205,
+          "height": 0.23779999999999996,
+          "yaw": 0,
+          "pitch": -1.5707963267948966
+        },
+        "context": "Lantern Market Lanes. Gate Stall Personal note on this desk's paper stack.",
+        "maxTitle": 28,
+        "maxBody": 100,
+        "allowsArt": true
+      },
+      {
+        "id": "f0-room0-reception0-reception0:photo",
+        "floor": 0,
+        "scope": "interior",
+        "role": "desk-photo",
+        "room": 0,
+        "owner": null,
+        "binding": {
+          "kind": "furniture",
+          "furnitureId": "f0-room0-reception0-reception0",
+          "x": 0.528,
+          "y": -0.1565,
+          "z": 1.22,
+          "width": 0.136,
+          "height": 0.176,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes. Gate Stall Framed desk photograph. Illustrate the people or scene; any caption belongs to this frame.",
+        "maxTitle": 24,
+        "maxBody": 60,
+        "allowsArt": true
+      },
+      {
+        "id": "f0-room1-cubicles0-desk0:papers",
+        "floor": 0,
+        "scope": "interior",
+        "role": "desk-papers",
+        "room": 1,
+        "owner": null,
+        "binding": {
+          "kind": "furniture",
+          "furnitureId": "f0-room1-cubicles0-desk0",
+          "x": -0.47200000000000003,
+          "y": -0.17200000000000001,
+          "z": 0.8685,
+          "width": 0.2375,
+          "height": 0.27549999999999997,
+          "yaw": 0,
+          "pitch": -1.5707963267948966
+        },
+        "context": "Lantern Market Lanes. Skewer Row Top sheet of this desk's paper stack.",
+        "maxTitle": 28,
+        "maxBody": 100,
+        "allowsArt": true
+      },
+      {
+        "id": "f0-room1-cubicles0-desk0:photo",
+        "floor": 0,
+        "scope": "interior",
+        "role": "desk-photo",
+        "room": 1,
+        "owner": null,
+        "binding": {
+          "kind": "furniture",
+          "furnitureId": "f0-room1-cubicles0-desk0",
+          "x": 0.48400000000000004,
+          "y": -0.1755,
+          "z": 0.9700000000000001,
+          "width": 0.136,
+          "height": 0.176,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes. Skewer Row Framed desk photograph. Illustrate the people or scene; any caption belongs to this frame.",
+        "maxTitle": 24,
+        "maxBody": 60,
+        "allowsArt": true
+      },
+      {
+        "id": "f0-scene-room0-gate-counter-gate-box:face",
+        "floor": 0,
+        "scope": "interior",
+        "role": "prop-face",
+        "room": 0,
+        "owner": null,
+        "binding": {
+          "kind": "prop",
+          "furnitureId": "f0-scene-room0-gate-counter",
+          "propId": "f0-scene-room0-gate-counter-gate-box",
+          "x": 0,
+          "y": 0,
+          "z": 0.1576,
+          "width": 0.1824,
+          "height": 0.15600000000000003,
+          "yaw": 0,
+          "pitch": -1.5707963267948966
+        },
+        "context": "Lantern Market Lanes. Gate Stall box face. intact condition. Give this individual object its own authored writing or illustration.",
+        "maxTitle": 28,
+        "maxBody": 100,
+        "allowsArt": true
+      },
+      {
+        "id": "f0-scene-room0-gate-counter:label",
+        "floor": 0,
+        "scope": "interior",
+        "role": "furniture-label",
+        "room": 0,
+        "owner": null,
+        "binding": {
+          "kind": "furniture",
+          "furnitureId": "f0-scene-room0-gate-counter",
+          "x": 0,
+          "y": 0.454,
+          "z": 1.05,
+          "width": 0.5,
+          "height": 0.075,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes. Gate Stall reception ownership or purpose tag.",
+        "maxTitle": 24,
+        "maxBody": 0,
+        "allowsArt": true
+      },
+      {
+        "id": "f0-scene-room1-skewer-stall-skewer-bottle:face",
+        "floor": 0,
+        "scope": "interior",
+        "role": "prop-face",
+        "room": 1,
+        "owner": null,
+        "binding": {
+          "kind": "prop",
+          "furnitureId": "f0-scene-room1-skewer-stall",
+          "propId": "f0-scene-room1-skewer-stall-skewer-bottle",
+          "x": 0,
+          "y": 0.043649999999999994,
+          "z": 0.085,
+          "width": 0.063,
+          "height": 0.075,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes. Skewer Row bottle face. intact condition. Give this individual object its own authored writing or illustration.",
+        "maxTitle": 28,
+        "maxBody": 100,
+        "allowsArt": true
+      },
+      {
+        "id": "f0-scene-room1-skewer-stall:label",
+        "floor": 0,
+        "scope": "interior",
+        "role": "furniture-label",
+        "room": 1,
+        "owner": null,
+        "binding": {
+          "kind": "furniture",
+          "furnitureId": "f0-scene-room1-skewer-stall",
+          "x": 0,
+          "y": 0.354,
+          "z": 0.9249999999999999,
+          "width": 0.5,
+          "height": 0.09,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes. Skewer Row Stall Counter ownership or purpose tag.",
+        "maxTitle": 24,
+        "maxBody": 0,
+        "allowsArt": true
+      },
+      {
+        "id": "f0-scene-room2-square-post:label",
+        "floor": 0,
+        "scope": "interior",
+        "role": "furniture-label",
+        "room": 2,
+        "owner": null,
+        "binding": {
+          "kind": "furniture",
+          "furnitureId": "f0-scene-room2-square-post",
+          "x": 0,
+          "y": 0.254,
+          "z": 1.44,
+          "width": 0.3,
+          "height": 0.15,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes. Lantern Square Lantern Post ownership or purpose tag.",
+        "maxTitle": 24,
+        "maxBody": 0,
+        "allowsArt": true
+      },
+      {
+        "id": "f0-scene-room2-square-table-square-mug:face",
+        "floor": 0,
+        "scope": "interior",
+        "role": "prop-face",
+        "room": 2,
+        "owner": null,
+        "binding": {
+          "kind": "prop",
+          "furnitureId": "f0-scene-room2-square-table",
+          "propId": "f0-scene-room2-square-table-square-mug",
+          "x": -0.0096,
+          "y": 0.05436,
+          "z": 0.06300000000000001,
+          "width": 0.066,
+          "height": 0.0504,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes. Lantern Square mug face. intact condition. Give this individual object its own authored writing or illustration.",
+        "maxTitle": 28,
+        "maxBody": 100,
+        "allowsArt": true
+      },
+      {
+        "id": "f0-scene-room2-square-table:label",
+        "floor": 0,
+        "scope": "interior",
+        "role": "furniture-label",
+        "room": 2,
+        "owner": null,
+        "binding": {
+          "kind": "furniture",
+          "furnitureId": "f0-scene-room2-square-table",
+          "x": 0,
+          "y": 0.454,
+          "z": 0.76,
+          "width": 0.5,
+          "height": 0.075,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes. Lantern Square cafeTable ownership or purpose tag.",
+        "maxTitle": 24,
+        "maxBody": 0,
+        "allowsArt": true
+      },
+      {
+        "id": "f0-scene-room3-yard-crates:label",
+        "floor": 0,
+        "scope": "interior",
+        "role": "furniture-label",
+        "room": 3,
+        "owner": null,
+        "binding": {
+          "kind": "furniture",
+          "furnitureId": "f0-scene-room3-yard-crates",
+          "x": 0,
+          "y": 0.454,
+          "z": 0.25,
+          "width": 0.5,
+          "height": 0.15,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes. Crate Yard Crate Stack ownership or purpose tag.",
+        "maxTitle": 24,
+        "maxBody": 0,
+        "allowsArt": true
+      },
+      {
+        "id": "f0-scene-room3-yard-shelf-yard-box:face",
+        "floor": 0,
+        "scope": "interior",
+        "role": "prop-face",
+        "room": 3,
+        "owner": null,
+        "binding": {
+          "kind": "prop",
+          "furnitureId": "f0-scene-room3-yard-shelf",
+          "propId": "f0-scene-room3-yard-shelf-yard-box",
+          "x": 0,
+          "y": 0,
+          "z": 0.1576,
+          "width": 0.1824,
+          "height": 0.15600000000000003,
+          "yaw": 0,
+          "pitch": -1.5707963267948966
+        },
+        "context": "Lantern Market Lanes. Crate Yard box face. worn condition. Give this individual object its own authored writing or illustration.",
+        "maxTitle": 28,
+        "maxBody": 100,
+        "allowsArt": true
+      },
+      {
+        "id": "f0-scene-room3-yard-shelf:label",
+        "floor": 0,
+        "scope": "interior",
+        "role": "furniture-label",
+        "room": 3,
+        "owner": null,
+        "binding": {
+          "kind": "furniture",
+          "furnitureId": "f0-scene-room3-yard-shelf",
+          "x": 0,
+          "y": 0.504,
+          "z": 1.8800000000000001,
+          "width": 0.5,
+          "height": 0.05,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes. Crate Yard shelf ownership or purpose tag.",
+        "maxTitle": 24,
+        "maxBody": 0,
+        "allowsArt": true
+      },
+      {
+        "id": "f0:graffiti:10:9:-1:0",
+        "floor": 0,
+        "scope": "interior",
+        "role": "graffiti",
+        "room": 3,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 9.986,
+          "y": 9.5,
+          "z": 1.15,
+          "width": 1.2,
+          "height": 0.65,
+          "yaw": 1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes. Crate Yard Paint or marker graffiti on this solid wall; transparent art background is allowed.",
+        "maxTitle": 36,
+        "maxBody": 100,
+        "allowsArt": true
+      },
+      {
+        "id": "f0:graffiti:13:19:0:1",
+        "floor": 0,
+        "scope": "interior",
+        "role": "graffiti",
+        "room": 2,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 13.5,
+          "y": 20.014,
+          "z": 1.15,
+          "width": 1.2,
+          "height": 0.65,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes. Lantern Square Paint or marker graffiti on this solid wall; transparent art background is allowed.",
+        "maxTitle": 36,
+        "maxBody": 100,
+        "allowsArt": true
+      },
+      {
+        "id": "f0:graffiti:40:19:0:1",
+        "floor": 0,
+        "scope": "interior",
+        "role": "graffiti",
+        "room": 2,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 40.5,
+          "y": 20.014,
+          "z": 1.15,
+          "width": 1.2,
+          "height": 0.65,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes. Lantern Square Paint or marker graffiti on this solid wall; transparent art background is allowed.",
+        "maxTitle": 36,
+        "maxBody": 100,
+        "allowsArt": true
+      },
+      {
+        "id": "f0:graffiti:7:26:1:0",
+        "floor": 0,
+        "scope": "interior",
+        "role": "graffiti",
+        "room": 2,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 8.014,
+          "y": 26.5,
+          "z": 1.15,
+          "width": 1.2,
+          "height": 0.65,
+          "yaw": -1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes. Lantern Square Paint or marker graffiti on this solid wall; transparent art background is allowed.",
+        "maxTitle": 36,
+        "maxBody": 100,
+        "allowsArt": true
+      },
+      {
+        "id": "f0:room:0:plaque",
+        "floor": 0,
+        "scope": "interior",
+        "role": "room-plaque",
+        "room": 0,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 3.5,
+          "y": 16.014,
+          "z": 1.65,
+          "width": 1.12,
+          "height": 0.5,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes. Gate Stall Gate Stall. The chained gate stall, its counter scrubbed clean and one lantern box left on top.",
+        "maxTitle": 48,
+        "maxBody": 180,
+        "allowsArt": true
+      },
+      {
+        "id": "f0:room:1:plaque",
+        "floor": 0,
+        "scope": "interior",
+        "role": "room-plaque",
+        "room": 1,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 3.5,
+          "y": 12.014,
+          "z": 1.65,
+          "width": 1.12,
+          "height": 0.5,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes. Skewer Row Skewer Row. A row of cooking counters under paper lanterns, one bottle still standing where the cook left it.",
+        "maxTitle": 48,
+        "maxBody": 180,
+        "allowsArt": true
+      },
+      {
+        "id": "f0:room:2:plaque",
+        "floor": 0,
+        "scope": "interior",
+        "role": "room-plaque",
+        "room": 2,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 3.5,
+          "y": 20.014,
+          "z": 1.65,
+          "width": 1.12,
+          "height": 0.5,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes. Lantern Square Lantern Square. The meeting square under a ring of lantern posts, a cafe table left mid-hand of cards.",
+        "maxTitle": 48,
+        "maxBody": 180,
+        "allowsArt": true
+      },
+      {
+        "id": "f0:room:3:plaque",
+        "floor": 0,
+        "scope": "interior",
+        "role": "room-plaque",
+        "room": 3,
+        "owner": null,
+        "binding": {
+          "kind": "fixed",
+          "x": 19.986,
+          "y": 3.5,
+          "z": 1.65,
+          "width": 1.12,
+          "height": 0.5,
+          "yaw": 1.5707963267948966,
+          "pitch": 0
+        },
+        "context": "Lantern Market Lanes. Crate Yard Crate Yard. The storage yard behind the lanes, crates stacked against a shelf that survived the rush.",
+        "maxTitle": 48,
+        "maxBody": 180,
+        "allowsArt": true
+      }
+    ],
+    "fragments": [],
+    "entries": [
+      {
+        "surfaceId": "building:entrance-sign",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xq xt xv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "building:quarantine-sign",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xr xa xi"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-1716d029-9d31fb9e:horizontal:-1:11:0:-1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xs xh xrv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-1716d029-9d31fb9e:horizontal:-1:12:0:-1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xt xo xri"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-1716d029-9d31fb9e:horizontal:-1:13:0:-1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xu xrv xsv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-1716d029-9d31fb9e:horizontal:-1:14:0:-1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xv xrc xsi"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-1716d029-9d31fb9e:horizontal:-1:14:0:-1:street",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xw xrj xtv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-1716d029-9d31fb9e:horizontal:-1:15:0:-1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xx xsq xti"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-1716d029-9d31fb9e:horizontal:-1:16:0:-1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xy xsx xuv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-1716d029-9d31fb9e:horizontal:-1:16:1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xz xse xui"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-1716d029-9d31fb9e:horizontal:1:16:1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xa xsl xvv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-1ae64a0c-c1d68ac3:horizontal:-1:16:1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xb xts xvi"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-1ae64a0c-c1d68ac3:horizontal:1:16:0:1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xc xtz xwv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-1ae64a0c-c1d68ac3:horizontal:1:16:1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xd xtg xwi"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-1ae64a0c-c1d68ac3:vertical:1:0:1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xe xtn xxv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-21bc04d6-e05dad6c:horizontal:-1:16:0:-1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xf xuu xxi"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-21bc04d6-e05dad6c:horizontal:-1:16:1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xg xub xyv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-21bc04d6-e05dad6c:horizontal:1:13:0:1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xh xui xyi"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-21bc04d6-e05dad6c:horizontal:1:14:0:1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xi xup xzv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-21bc04d6-e05dad6c:horizontal:1:15:0:1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xj xvw xzi"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-21bc04d6-e05dad6c:horizontal:1:16:0:1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xk xvd xav"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-21bc04d6-e05dad6c:horizontal:1:16:1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xl xvk xai"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-21bc04d6-e05dad6c:vertical:1:0:1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xm xwr xbv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-2e0a4aa7-4071d617:horizontal:1:16:0:1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xn xwy xbi"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-2e0a4aa7-4071d617:horizontal:1:16:0:1:street",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xo xwf xcv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-2e0a4aa7-4071d617:horizontal:1:17:0:1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xp xwm xci"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-2e0a4aa7-4071d617:horizontal:1:18:0:1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xrq xxt xdv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-2e0a4aa7-4071d617:horizontal:1:18:0:1:street",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xrr xxa xdi"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-2e0a4aa7-4071d617:horizontal:1:19:0:1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xrs xxh xev"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-2e0a4aa7-4071d617:horizontal:1:20:0:1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xrt xxo xei"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-62ba157e-e911dbed:horizontal:-1:0:-1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xru xyv xfv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-62ba157e-e911dbed:vertical:-1:0:-1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xrv xyc xfi"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-62ba157e-e911dbed:vertical:-1:1:-1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xrw xyj xgv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-62ba157e-e911dbed:vertical:-1:1:-1:0:street",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xrx xzq xgi"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-62ba157e-e911dbed:vertical:-1:2:-1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xry xzx xhv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-6d6fe655-b8d0ab70:horizontal:-1:0:-1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xrz xze xhi"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-6d6fe655-b8d0ab70:horizontal:-1:0:0:-1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xra xzl xiv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-6d6fe655-b8d0ab70:horizontal:-1:1:0:-1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xrb xas xii"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-6d6fe655-b8d0ab70:horizontal:-1:1:0:-1:street",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xrc xaz xjv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-6d6fe655-b8d0ab70:horizontal:-1:2:0:-1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xrd xag xji"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-6d6fe655-b8d0ab70:horizontal:-1:3:0:-1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xre xan xkv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-6d6fe655-b8d0ab70:horizontal:-1:3:0:-1:street",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xrf xbu xki"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-6d6fe655-b8d0ab70:horizontal:-1:4:0:-1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xrg xbb xlv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-6d6fe655-b8d0ab70:horizontal:-1:5:0:-1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xrh xbi xli"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-6d6fe655-b8d0ab70:horizontal:1:0:-1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xri xbp xmv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-71ff805c-a74c1522:horizontal:-1:16:1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xrj xcw xmi"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-71ff805c-a74c1522:horizontal:-1:16:1:0:street",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xrk xcd xnv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-71ff805c-a74c1522:horizontal:1:16:1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xrl xck xni"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-71ff805c-a74c1522:horizontal:1:16:1:0:street",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xrm xdr xov"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-a3f8d0fb-fb671b34:horizontal:-1:0:-1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xrn xdy xoi"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-a3f8d0fb-fb671b34:horizontal:1:0:-1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xro xdf xpv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-a3f8d0fb-fb671b34:horizontal:1:0:-1:0:street",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xrp xdm xpi"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-a3f8d0fb-fb671b34:horizontal:1:0:0:1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xsq xet xrqv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-a3f8d0fb-fb671b34:horizontal:1:0:0:1:street",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xsr xea xrqi"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-a3f8d0fb-fb671b34:vertical:-1:0:-1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xss xeh xrrv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-c00f5dc1-e9c75ae8:horizontal:-1:0:-1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xst xeo xrri"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-c00f5dc1-e9c75ae8:horizontal:-1:0:0:-1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xsu xfv xrsv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-c00f5dc1-e9c75ae8:horizontal:1:0:-1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xsv xfc xrsi"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-c00f5dc1-e9c75ae8:horizontal:1:0:0:1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xsw xfj xrtv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-c00f5dc1-e9c75ae8:horizontal:1:1:0:1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xsx xgq xrti"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-c00f5dc1-e9c75ae8:horizontal:1:2:0:1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xsy xgx xruv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-c00f5dc1-e9c75ae8:horizontal:1:3:0:1:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xsz xge xrui"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-c00f5dc1-e9c75ae8:vertical:-1:0:-1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xsa xgl xrvv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-d3811fa1-219620eb:horizontal:-1:18:1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xsb xhs xrvi"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-d3811fa1-219620eb:horizontal:-1:18:1:0:street",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xsc xhz xrwv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-d3811fa1-219620eb:vertical:1:0:1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xsd xhg xrwi"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-d3811fa1-219620eb:vertical:1:1:1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xse xhn xrxv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-d3811fa1-219620eb:vertical:1:1:1:0:street",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xsf xiu xrxi"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-d3811fa1-219620eb:vertical:1:2:1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xsg xib xryv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-d3811fa1-219620eb:vertical:1:2:1:0:street",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xsh xii xryi"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-f1ef3d4f-a8d3b758:horizontal:-1:0:-1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xsi xip xrzv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "city:block-f1ef3d4f-a8d3b758:horizontal:1:0:-1:0:shop",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xsj xjw xrzi"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "f0-lobby-break0-cafeTable1:papers",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xsk xjd xrav"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "f0-lobby-break2-cafeTable0:papers",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xsl xjk xrai"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "f0-room0-reception0-reception0:note",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xsm xkr xrbv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "f0-room0-reception0-reception0:photo",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xsn xky xrbi"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "f0-room1-cubicles0-desk0:papers",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xso xkf xrcv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "f0-room1-cubicles0-desk0:photo",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xsp xkm xrci"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "f0-scene-room0-gate-counter-gate-box:face",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xtq xlt xrdv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "f0-scene-room0-gate-counter:label",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xtr xla xrdi"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "f0-scene-room1-skewer-stall-skewer-bottle:face",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xts xlh xrev"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "f0-scene-room1-skewer-stall:label",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xtt xlo xrei"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "f0-scene-room2-square-post:label",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xtu xmv xrfv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "f0-scene-room2-square-table-square-mug:face",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xtv xmc xrfi"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "f0-scene-room2-square-table:label",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xtw xmj xrgv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "f0-scene-room3-yard-crates:label",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xtx xnq xrgi"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "f0-scene-room3-yard-shelf-yard-box:face",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xty xnx xrhv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "f0-scene-room3-yard-shelf:label",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xtz xne xrhi"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "f0:graffiti:10:9:-1:0",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xta xnl xriv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "f0:graffiti:13:19:0:1",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xtb xos xrii"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "f0:graffiti:40:19:0:1",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xtc xoz xrjv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "f0:graffiti:7:26:1:0",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xtd xog xrji"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "f0:room:0:plaque",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xte xon xrkv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "f0:room:1:plaque",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xtf xpu xrki"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "f0:room:2:plaque",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xtg xpb xrlv"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      },
+      {
+        "surfaceId": "f0:room:3:plaque",
+        "layout": "text",
+        "title": [
+          {
+            "text": "xth xpi xrli"
+          }
+        ],
+        "body": [],
+        "description": "",
+        "drawing": null
+      }
+    ]
+  }
+}

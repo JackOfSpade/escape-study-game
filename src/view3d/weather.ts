@@ -33,7 +33,10 @@ interface Style {
   streak?: number;
 }
 
-const STYLES: Record<Exclude<RunWeather, "none">, Style> = {
+/** The weather kinds a run design can carry. */
+export type WeatherKind = Exclude<RunWeather, "none">;
+
+const STYLES: Record<WeatherKind, Style> = {
   rain: {
     count: 560,
     vy: -24,
@@ -119,6 +122,31 @@ const STYLES: Record<Exclude<RunWeather, "none">, Style> = {
     opacity: 0.95,
     glow: false,
   },
+  // Sparse, slow and glowing: motes that drift rather than fall, so the field
+  // reads as alive air over a night garden.
+  fireflies: {
+    count: 120,
+    vy: 0.02,
+    wind: [0.08, 0.05],
+    wobble: 0.85,
+    size: 0.1,
+    color: "#e8ff8a",
+    color2: "#9dff5a",
+    opacity: 0.85,
+    glow: true,
+  },
+  // Petals tumble down gently on a sideways breeze, pink and white together.
+  petals: {
+    count: 350,
+    vy: -0.8,
+    wind: [1, 0.4],
+    wobble: 0.9,
+    size: 0.16,
+    color: "#ffc2d4",
+    color2: "#fdf4f7",
+    opacity: 0.9,
+    glow: false,
+  },
 };
 
 const hash = (i: number) => {
@@ -136,7 +164,7 @@ const HEIGHT = 16;
  * nothing is allocated per frame and a reload looks identical. */
 export class WeatherField {
   readonly group = new Group();
-  private kind: RunWeather = "none";
+  private kind: RunWeather | WeatherKind = "none";
   private style?: Style;
   private points?: Points<BufferGeometry, PointsMaterial>;
   private lines?: LineSegments<BufferGeometry, LineBasicMaterial>;
@@ -159,7 +187,7 @@ export class WeatherField {
     return this.style?.count ?? 0;
   }
 
-  setKind(kind: RunWeather) {
+  setKind(kind: RunWeather | WeatherKind) {
     if (kind === this.kind) return;
     this.clear();
     this.kind = kind;

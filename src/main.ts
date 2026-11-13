@@ -81,6 +81,7 @@ import {
   board,
   canReachStation,
   claimStation,
+  extractionFloor,
   human,
   nearbyDoor,
   nearestGrip,
@@ -93,6 +94,7 @@ import {
   useItem,
   vault,
 } from "./engine";
+import { isOpenSite } from "./open-site";
 import { renderEnvironmentObservations } from "./environment-ui";
 import { itemInfo } from "./equipment";
 import { canRunWorkspace, runWorkspace } from "./execution";
@@ -1336,7 +1338,7 @@ function syncSpectatorBar() {
 }
 function setView(next: SpectatorView) {
   const changedFloor = next.floor !== view?.floor;
-  view = clampView(next);
+  view = clampView(next, game);
   if (changedFloor) {
     renderSpectatorBar();
     ui();
@@ -1347,7 +1349,7 @@ function renderSpectatorBar() {
   const floors = $("#spectator-floors"),
     current = view.floor;
   if (!floors.childElementCount)
-    floors.innerHTML = spectatorFloors()
+    floors.innerHTML = spectatorFloors(game)
       .map(
         (f) =>
           `<button type="button" class="quiet" data-floor="${f.floor}" title="${escape(f.title)}">${escape(f.label)}</button>`,
@@ -1692,7 +1694,7 @@ async function interact() {
     closeTerminal();
     return;
   }
-  if (a.floor === CONFIG.floors && board(game, a)) return;
+  if (board(game, a)) return;
   const target = firstPersonPlaying()
     ? lookTarget(game, firstPersonControls.yaw)
     : undefined;
@@ -3316,7 +3318,7 @@ function ui() {
   $("#bridge-label").textContent =
     `${status().label} · ${game.study.profile ?? "development"} profile`;
   const shown = spectating(game) && view ? view.floor : a.floor;
-  $("#floor-label").textContent = floorTitle(shown);
+  $("#floor-label").textContent = floorTitle(shown, game);
   $("#floor-name").textContent = game.floors[shown].name;
   $("#health").textContent = String(Math.ceil(a.hp));
   $("#health-fill").style.width = `${a.hp}%`;
@@ -3336,12 +3338,14 @@ function ui() {
   $("#rescued").textContent = String(game.stats.rescued);
   $("#lost").textContent = String(game.stats.deaths);
   syncNotice();
+  // The pickup level of this run: a building's roof, an open site's ground.
+  const pickupFloor = extractionFloor(game);
   $("#next-title").textContent =
     game.status === "escaped"
       ? "Extraction confirmed."
       : game.status === "dead"
         ? "Escape attempt ended."
-        : a.floor === CONFIG.floors
+        : a.floor === pickupFloor
           ? "Hold for extraction."
           : a.y > 28
             ? "Make it inside."
@@ -3355,8 +3359,10 @@ function ui() {
         ? game.rules === "force-fields"
           ? `Swarm begins in ${Math.ceil(spawnGrace(game) - game.time)}s. Press E to open a green-lit door; it closes behind you. E uses a key on a red-lit door.`
           : `Zombies spawn in ${Math.ceil(spawnGrace(game) - game.time)}s. E releases a door latch; move to push it open.`
-        : a.floor === CONFIG.floors
-          ? "Reach the helipad and press E while a helicopter is boarding. Four seats per trip."
+        : a.floor === pickupFloor
+          ? isOpenSite(game)
+            ? "Reach the ground pad and press E while a helicopter is boarding. Four seats per trip."
+            : "Reach the helipad and press E while a helicopter is boarding. Four seats per trip."
           : a.access.includes(a.floor)
             ? "Your credential is personal. Walk into the staircase at the north edge of the floor. Space jumps; watch for broken guards."
             : game.rules === "force-fields"
@@ -3367,7 +3373,7 @@ function ui() {
       ? `PICKUP ${game.helicopter.trip} · EXTRACTED`
       : game.status === "dead"
         ? ""
-        : a.floor === CONFIG.floors
+        : a.floor === pickupFloor
           ? game.time < game.helicopter.until
             ? `BOARDING · ${4 - game.helicopter.passengers.length} seats · ${Math.ceil(game.helicopter.until - game.time)}s`
             : `NEXT PICKUP · ${Math.ceil(game.helicopter.next - game.time)}s`

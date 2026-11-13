@@ -451,7 +451,24 @@ export interface BuildingFootprint {
   bottom: number;
   rows: { left: number; right: number }[];
 }
+/**
+ * One extraction pickup in the world. The start building keeps today's
+ * rooftop helipad; an open site's pickup stands on its ground floor.
+ */
+export interface ExtractionPoint {
+  /** Floor index the pickup stands on. */
+  floor: number;
+  /** World position: a site's origin is already applied. */
+  x: number;
+  y: number;
+  radius: number;
+  /** Site id when the point belongs to an extra site rather than the start. */
+  site?: string;
+}
 export interface Floor {
+  /** Set on every floor of an open site (src/open-site.ts); absent means the
+   * enclosed building this game has always generated. */
+  open?: true;
   /** This floor's exact accepted surfaces/entries and shared fragments. Its
    * fingerprint identifies the full canonical run inventory in Game.design. */
   environment?: import("./environment-contract.mjs").EnvironmentManifest;
@@ -716,6 +733,9 @@ export interface Settings {
 export interface Game {
   /** First-start preview awaiting a completed, reviewed AI design. */
   preparingRun?: boolean;
+  /** An open site's ground pickup (src/open-site.ts). Absent keeps today's
+   * rooftop helipad for the start building. */
+  extraction?: ExtractionPoint;
   /** Accepted AI blueprint and provenance. Loading never requests a replacement. */
   design?: import("./run-design-contract.mjs").SavedRunDesign;
   /** Continuous world: buildings stamped into these floors besides the start building (src/site.ts). */

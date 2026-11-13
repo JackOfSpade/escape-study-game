@@ -19,7 +19,11 @@ import {
   SCENE_LIMITS,
   type ScenePropDesign,
 } from "../scene-catalog.mjs";
-import type { RunObjectAxis, RunObjectMotion } from "../setting-catalog.mjs";
+import type {
+  RunObjectAxis,
+  RunObjectMotion,
+  RunObjectShape,
+} from "../setting-catalog.mjs";
 import type { ResolvedSceneProp } from "../authored-scene";
 import {
   AXIS_SHAPES,
@@ -461,11 +465,11 @@ export class AuthoredScene {
         Record<Finish, MeshStandardMaterial | MeshBasicMaterial>
       > = {},
       composedPool = (
-        shape: Shape | "wedge" | "torus",
+        shape: RunObjectShape,
         axis: RunObjectAxis,
         finish: Finish,
       ) => {
-        const key = `${shape}:${AXIS_SHAPES.includes(shape as never) ? axis : "up"}:${finish}`;
+        const key = `${shape}:${AXIS_SHAPES.includes(shape) ? axis : "up"}:${finish}`;
         let pool = composedPools.get(key);
         if (!pool) {
           let material = composedMaterials[finish];
@@ -491,10 +495,7 @@ export class AuthoredScene {
           }
           pool = new InstancePool(
             this.group,
-            objectGeometry(
-              shape,
-              AXIS_SHAPES.includes(shape as never) ? axis : "up",
-            ),
+            objectGeometry(shape, AXIS_SHAPES.includes(shape) ? axis : "up"),
             material,
             composedTotal,
             false,

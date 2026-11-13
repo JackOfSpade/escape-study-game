@@ -15,6 +15,7 @@ import {
   propSurfaceFace,
 } from "./environment-faces";
 import { cityWall } from "./city-layout";
+import { isSolidOpenFloor } from "./open-site";
 import { PROP_CATALOG } from "./scene-catalog.mjs";
 import { streetLayout } from "./view3d/exterior-layout";
 
@@ -207,10 +208,11 @@ export function assertDesignedEnvironment(game: Game) {
     "surface fingerprint mismatch",
   );
   // Stamped extra sites keep their own storeys and environment content; only
-  // the start site's floors belong to the accepted run design.
+  // the start site's floors belong to the accepted run design. An open site's
+  // solid upper layers author no surfaces, so no manifest is expected there.
   const startFloors = new Set(startSite(game).floors);
   for (const floor of game.floors)
-    if (startFloors.has(floor.index))
+    if (startFloors.has(floor.index) && !isSolidOpenFloor(floor))
       requireThat(
         same(floor.environment, floorManifest(environment, floor.index)),
         `floor ${floor.index} manifest differs from the accepted run`,
