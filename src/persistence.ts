@@ -1,6 +1,7 @@
 import { ensureDoor } from "./doors";
 import { displayScale } from "./display-scale";
 import { createCheckpointQueue } from "./checkpoint-queue";
+import { isEscapeState } from "./escape-state";
 import { fnv1a } from "./hash";
 import { reconcileKnowledgeGaps } from "./knowledge-probe";
 import { type Game } from "./model";
@@ -13,6 +14,7 @@ import {
 import { readDurable, writeDurable } from "./storage";
 import { parseSavedRunDesign } from "./run-design-contract.mjs";
 import { sceneSaveErrors } from "./authored-scene";
+import { startSite } from "./site";
 import {
   assertDesignedEnvironment,
   bindDesignedEnvironment,
@@ -78,8 +80,12 @@ export function decode(text: string): Game {
   }
   // A run without a design cannot own composed furniture.
   if (!g.design) rebindComposedObjects(g);
+  const startFloors = new Set(startSite(g).floors);
   for (const floor of g.floors) {
-    const errors = sceneSaveErrors(floor);
+    // Stamped extra sites own their storeys' content; only the start site's
+    // floors carry this save's authored scene.
+    if (g.sites?.length && !startFloors.has(floor.index)) continue;
+    const errors = sceneSaveErrors(floor, g.sites);
     if (errors.length)
       throw Error(
         `Invalid saved scene on floor ${floor.index}: ${errors.join("; ")}`,
@@ -106,7 +112,18 @@ export function decode(text: string): Game {
   for (const floor of g.floors)
     for (const o of floor.furniture)
       if (o.id === "main-gate" && o.kind === "gate") ensureDoor(o, floor);
+  dropInvalidEscape(g);
   return g;
+}
+/**
+ * An escape state this build cannot read (an older or corrupted value) is
+ * dropped and the run continues as a pre-escape save: losing the redesign
+ * state is better than losing the run.
+ */
+function dropInvalidEscape(g: Game) {
+  if (g.escape === undefined || isEscapeState(g.escape)) return;
+  console.warn("Saved escape state failed validation; continuing without it.");
+  delete g.escape;
 }
 let serial = 0;
 const checkpoints = createCheckpointQueue<{
@@ -251,6 +268,7 @@ function interruptPending(
   }
 }
 export function recover(g: Game) {
+  dropInvalidEscape(g);
   g.settings.displayScale = displayScale(g.settings.displayScale);
   interruptPending(
     g.study.roadmapReconciliations,

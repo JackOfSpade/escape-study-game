@@ -1,4 +1,5 @@
-import type { Floor, Point } from "./model";
+import type { BuildingFootprint, Floor, Game, Point } from "./model";
+import { sitesOf } from "./site";
 import { STAIR_ROUTE_WIDTH } from "./stair-route";
 import type { RunDesign } from "./run-design-contract.mjs";
 
@@ -44,9 +45,7 @@ export function inCityRectangle(r: CityRectangle, x: number, y: number) {
 }
 
 /** The office and its one-cell masonry ring keep their authored grid. */
-function authoredBuilding(floor: Floor, x: number, y: number) {
-  const b = floor.boundary;
-  if (!b) return true;
+function insideShell(b: BuildingFootprint, x: number, y: number) {
   for (let yy = Math.floor(y) - 1; yy <= Math.floor(y) + 1; yy++) {
     const row = b.rows[yy];
     if (
@@ -60,6 +59,17 @@ function authoredBuilding(floor: Floor, x: number, y: number) {
     )
       return true;
   }
+  return false;
+}
+
+function authoredBuilding(floor: Floor, x: number, y: number) {
+  const b = floor.boundary;
+  if (b && insideShell(b, x, y)) return true;
+  // Stamped sites own their own shell and one-cell ring, so their raster
+  // decides walls exactly like the start building's.
+  for (const shell of floor.shells ?? [])
+    if (shell.boundary && insideShell(shell.boundary, x, y)) return true;
+  if (!b) return true;
   // The north stair well is authored beyond the main shell.
   return x >= 20 && x < 24 && y >= b.top - 2 && y < b.top && floor.index === 0;
 }
@@ -393,4 +403,75 @@ export function cityRayDistance(
     if (near <= far && far >= 0) hit = Math.min(hit, Math.max(0, near));
   }
   return hit;
+}
+
+interface Bounds {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
+function footprintBounds(b: BuildingFootprint | undefined): Bounds | undefined {
+  if (!b) return undefined;
+  let left = Infinity,
+    right = -Infinity;
+  for (let y = b.top; y < b.bottom; y++) {
+    const row = b.rows[y];
+    if (!row) continue;
+    left = Math.min(left, row.left);
+    right = Math.max(right, row.right);
+  }
+  return Number.isFinite(left) && Number.isFinite(right)
+    ? { left, right, top: b.top, bottom: b.bottom }
+    : undefined;
+}
+
+function union(a: Bounds | undefined, b: Bounds | undefined) {
+  if (!a) return b;
+  if (!b) return a;
+  return {
+    left: Math.min(a.left, b.left),
+    right: Math.max(a.right, b.right),
+    top: Math.min(a.top, b.top),
+    bottom: Math.max(a.bottom, b.bottom),
+  };
+}
+
+/**
+ * Open ground between sites: everything inside the union of every footprint
+ * (plus the previous neighbourhood's bounds) is one walkable road rectangle.
+ * Assigning this plan replaces the outdoor solids; floors of stamped sites
+ * keep deciding their own cells because they are authored shells.
+ */
+export function terrainCityPlan(
+  g: Pick<Game, "floors" | "sites" | "seed">,
+): CityPlan {
+  const old = g.floors.find((f) => f.index === 0)?.city;
+  let area: Bounds | undefined = old ? { ...old.bounds } : undefined;
+  for (const site of sitesOf(g))
+    area = union(area, footprintBounds(site.boundary));
+  const base = area ?? { left: 0, right: 0, top: 0, bottom: 0 },
+    margin = 20,
+    bounds: Bounds = {
+      left: base.left - margin,
+      right: base.right + margin,
+      top: base.top - margin,
+      bottom: base.bottom + margin,
+    };
+  return {
+    version: 1,
+    seed: old?.seed ?? g.seed,
+    bounds,
+    roads: [
+      {
+        x: (bounds.left + bounds.right) / 2,
+        y: (bounds.top + bounds.bottom) / 2,
+        w: bounds.right - bounds.left,
+        h: bounds.bottom - bounds.top,
+      },
+    ],
+    obstacles: [],
+    approaches: [],
+  };
 }

@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect as baseExpect, test, type Page } from "./helpers/offline-test";
+import { chooseVoiceIfAsked } from "./helpers/voice-prompt";
 import { qualityFixtureReply } from "../helpers/quality-design";
 import { qualityContentBatches } from "../../src/run-quality-contract.mjs";
 
@@ -87,6 +88,10 @@ async function designer(page: Page) {
       });
     if (url.pathname === "/api/bridge" && request.method() === "POST") {
       const body = request.postDataJSON();
+      // No fixture answers escape narration: fail fast so the game falls back
+      // offline instead of waiting on a request nothing will complete.
+      if (String(body.operation ?? "").startsWith("escape-"))
+        return json({ error: "Synthetic fixture has no escape model" }, 503);
       if (body.operation !== "design-run")
         return json({ error: "Unexpected synthetic operation" }, 400);
       calls.push(body);
@@ -208,9 +213,14 @@ async function prepared(page: Page) {
   await expect(page.locator("#start-card")).toBeVisible();
   await expect(page.locator("#start")).toHaveText("Start game ↗");
 }
+/** Start is where a run without escape state asks whose voice the player has. */
+async function startRun(page: Page) {
+  await page.locator("#start").click();
+  await chooseVoiceIfAsked(page);
+}
 async function startPrepared(page: Page) {
   await prepared(page);
-  await page.locator("#start").click();
+  await startRun(page);
   await expect.poll(async () => (await state(page)).status).toBe("playing");
 }
 async function flush(page: Page) {
@@ -231,7 +241,7 @@ test("prepared runs wait for an explicit Start before gameplay and across reload
   const relay = await designer(page);
   relay.setHeld(true);
   await open(page);
-  await page.locator("#start").click();
+  await startRun(page);
   await expect.poll(() => relay.calls.length).toBe(1);
   await expect(page.locator("#run-design-dialog")).toBeVisible();
   await expect(page.locator("#run-design-dialog")).toHaveAttribute(
@@ -275,7 +285,7 @@ test("prepared runs wait for an explicit Start before gameplay and across reload
     path: ".artifacts/handoff/design/ai-design-ready-narrow.png",
   });
   await page.setViewportSize(viewport);
-  await page.locator("#start").click();
+  await startRun(page);
   await expect.poll(async () => (await state(page)).status).toBe("playing");
   await expect
     .poll(async () => (await gameplayState(page)).time)
@@ -288,7 +298,7 @@ test("new-game AI design reaches the full app and a saved reload keeps the exact
   const relay = await designer(page);
   await open(page);
   expect((await state(page)).preparing).toBe(true);
-  await page.locator("#start").click();
+  await startRun(page);
   await startPrepared(page);
   await pause(page);
   const before = await state(page);
@@ -325,6 +335,47 @@ test("new-game AI design reaches the full app and a saved reload keeps the exact
   await expect(page.locator("#run-design-dialog")).toHaveCount(0);
 });
 
+test("a fresh first game asks whose voice it is and starts with a male identity", async ({
+  page,
+}) => {
+  const relay = await designer(page);
+  await open(page);
+  // A fresh save prepares its authored design first; the run starts after that.
+  expect((await state(page)).preparing).toBe(true);
+  await startRun(page);
+  await prepared(page);
+  expect(relay.calls.length).toBeGreaterThan(0);
+  // The first Start of the prepared run asks for the voice and waits for it.
+  await page.locator("#start").click();
+  const dialog = page.locator("#gender-dialog");
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator("#gender-man")).toHaveText("Play as a man");
+  await expect(dialog.locator("#gender-woman")).toHaveText("Play as a woman");
+  expect((await state(page)).status).toBe("ready");
+  await dialog.locator("#gender-man").click();
+  await expect(dialog).not.toBeVisible();
+  await expect.poll(async () => (await state(page)).status).toBe("playing");
+  const voices = await page.evaluate(() => {
+    const identity = (window as any).__deadAir.game.escape?.voices;
+    return identity
+      ? {
+          gender: identity.playerGender,
+          player: identity.player,
+          pa: identity.pa,
+        }
+      : undefined;
+  });
+  expect(voices?.gender).toBe("male");
+  expect(voices?.player).toEqual(expect.any(String));
+  // The player's slot has to come from the male narrator group.
+  expect(
+    await page.evaluate(async (player) => {
+      const { genderOfSlot } = await import("/src/voice-identity.ts" as string);
+      return player ? genderOfSlot(player) : undefined;
+    }, voices?.player),
+  ).toBe("male");
+});
+
 test("an offline first launch can only retry or cancel until a reviewed design is ready", async ({
   page,
 }) => {
@@ -332,7 +383,7 @@ test("an offline first launch can only retry or cancel until a reviewed design i
   relay.setCapable(false);
   await open(page);
   const before = await state(page);
-  await page.locator("#start").click();
+  await startRun(page);
   await expect(page.locator("#run-design-status")).toContainText("unavailable");
   await expect(page.locator("#run-design-procedural")).toHaveCount(0);
   expect(await state(page)).toEqual(before);
@@ -345,7 +396,7 @@ test("an offline first launch can only retry or cancel until a reviewed design i
   await page.locator("#run-design-cancel").click();
   await expect(page.locator("#run-design-dialog")).toHaveCount(0);
   expect(await state(page)).toEqual(before);
-  await page.locator("#start").click();
+  await startRun(page);
   await expect(page.locator("#run-design-status")).toContainText("unavailable");
   relay.setCapable(true);
   await page.locator("#run-design-retry").click();
@@ -362,7 +413,7 @@ test("restart replays the saved level with no model call until a new level compl
 }) => {
   const relay = await designer(page);
   await open(page);
-  await page.locator("#start").click();
+  await startRun(page);
   await startPrepared(page);
   const before = await state(page);
   const calls = relay.calls.length;
@@ -377,12 +428,13 @@ test("restart replays the saved level with no model call until a new level compl
   await flush(page);
   await page.reload();
   await expect(page.locator("#start")).toBeVisible();
-  await page.locator("#start").click();
+  await startRun(page);
   await expect.poll(async () => (await state(page)).status).toBe("playing");
   await pause(page);
 
   // A cancelled generation changes nothing for later restarts.
   await page.locator("#generate-run").click();
+  await chooseVoiceIfAsked(page);
   await expect(page.locator("#run-design-dialog")).toBeVisible();
   await page.locator("#run-design-cancel").click();
   await expect(page.locator("#run-design-dialog")).toHaveCount(0);
@@ -391,20 +443,21 @@ test("restart replays the saved level with no model call until a new level compl
   await expect.poll(async () => (await state(page)).id).not.toBe(replay.id);
   expect((await state(page)).seed).toBe(before.seed);
   expect((await state(page)).design).toEqual(before.design);
-  await page.locator("#start").click();
+  await startRun(page);
   await pause(page);
 
   // A completed generation replaces the level, and restarts then replay that.
   relay.setCapable(true);
   relay.setAnswer(() => orchard);
   await page.locator("#generate-run").click();
+  await chooseVoiceIfAsked(page);
   await expect
     .poll(async () => (await state(page)).design?.design.title)
     .toBe(orchard.title);
   const generated = await state(page);
   expect(generated.tiles).not.toEqual(before.tiles);
   const afterGeneration = relay.calls.length;
-  await page.locator("#start").click();
+  await startRun(page);
   await pause(page);
   await page.locator("#restart-game").click();
   await expect.poll(async () => (await state(page)).id).not.toBe(generated.id);
@@ -420,12 +473,13 @@ test("an offline generation preserves the accepted run until the replacement pas
 }) => {
   const relay = await designer(page);
   await open(page);
-  await page.locator("#start").click();
+  await startRun(page);
   await startPrepared(page);
   await pause(page);
   const before = await state(page);
   relay.setCapable(false);
   await page.locator("#generate-run").click();
+  await chooseVoiceIfAsked(page);
   await expect(page.locator("#run-design-status")).toContainText("unavailable");
   await expect(page.locator("#run-design-procedural")).toHaveCount(0);
   expect(await state(page)).toEqual(before);
@@ -434,6 +488,7 @@ test("an offline generation preserves the accepted run until the replacement pas
   await expect(page.locator("#pause-menu")).toBeVisible();
   expect(await state(page)).toEqual(before);
   await page.locator("#generate-run").click();
+  await chooseVoiceIfAsked(page);
   await expect(page.locator("#run-design-status")).toContainText("unavailable");
   expect(await state(page)).toEqual(before);
   relay.setAnswer(() => orchard);
@@ -469,7 +524,7 @@ test("reloading a pending design retries the same captured request rather than r
   relay.setHeld(true);
   await open(page);
   const originalId = (await state(page)).id;
-  await page.locator("#start").click();
+  await startRun(page);
   await expect.poll(() => relay.calls.length).toBe(1);
   await flush(page);
   const first = structuredClone(relay.calls[0]);
@@ -477,7 +532,7 @@ test("reloading a pending design retries the same captured request rather than r
   await page.reload();
   await page.waitForFunction(() => !!(window as any).__deadAir);
   expect((await state(page)).id).toBe(originalId);
-  await page.locator("#start").click();
+  await startRun(page);
   await expect.poll(() => relay.calls.length).toBe(2);
   expect(relay.calls[1]).toEqual(first);
   relay.finish(first);
@@ -494,7 +549,7 @@ test("reloading while individual writing is pending retains the exact object inv
   relay.setHeld(true, "content-batch");
   await open(page);
   const original = await state(page);
-  await page.locator("#start").click();
+  await startRun(page);
   await expect
     .poll(() => relay.calls.at(-1)?.payload.phase)
     .toBe("content-batch");
@@ -506,7 +561,7 @@ test("reloading while individual writing is pending retains the exact object inv
   await flush(page);
   await page.reload();
   await page.waitForFunction(() => !!(window as any).__deadAir);
-  await page.locator("#start").click();
+  await startRun(page);
   await expect.poll(() => relay.calls.length).toBe(index + 2);
   expect(relay.calls[index + 1]).toEqual(captured);
   expect((await state(page)).id).toBe(original.id);
@@ -525,11 +580,12 @@ test("generating a new level sends recent fictional designs and repairs a repeat
   const relay = await designer(page);
   relay.setAnswer((body) => (body.payload.repair ? orchard : harbor));
   await open(page);
-  await page.locator("#start").click();
+  await startRun(page);
   await startPrepared(page);
   const before = await state(page);
   await pause(page);
   await page.locator("#generate-run").click();
+  await chooseVoiceIfAsked(page);
   await expect
     .poll(async () => (await state(page)).design?.design.title)
     .toBe(orchard.title);
@@ -606,7 +662,7 @@ test("editorial review resumes exactly after reload and revises only its identif
   relay.setHeld(true, "content-review");
   await open(page);
   const original = await state(page);
-  await page.locator("#start").click();
+  await startRun(page);
   await expect
     .poll(() => relay.calls.at(-1)?.payload.phase)
     .toBe("content-review");
@@ -619,7 +675,7 @@ test("editorial review resumes exactly after reload and revises only its identif
   await flush(page);
   await page.reload();
   await page.waitForFunction(() => !!(window as any).__deadAir);
-  await page.locator("#start").click();
+  await startRun(page);
   await expect.poll(() => relay.calls.length).toBe(reviewIndex + 2);
   expect(relay.calls.at(-1)).toEqual(captured);
   expect((await state(page)).id).toBe(original.id);
@@ -650,14 +706,14 @@ test("a late result from a cancelled design cannot replace the current run or th
   relay.setHeld(true);
   await open(page);
   const before = await state(page);
-  await page.locator("#start").click();
+  await startRun(page);
   await expect.poll(() => relay.calls.length).toBe(1);
   const cancelled = relay.calls[0];
   await page.locator("#run-design-cancel").click();
   await expect(page.locator("#run-design-dialog")).toHaveCount(0);
   relay.finish(cancelled, harbor);
   expect(await state(page)).toEqual(before);
-  await page.locator("#start").click();
+  await startRun(page);
   await expect.poll(() => relay.calls.length).toBe(2);
   const current = relay.calls[1];
   expect(current.payload.requestId).not.toBe(cancelled.payload.requestId);
@@ -684,13 +740,13 @@ test("cancelling before the bridge replies ignores that delayed reply while anot
   relay.setHeld(true);
   await open(page);
   const before = await state(page);
-  await page.locator("#start").click();
+  await startRun(page);
   await expect.poll(() => relay.calls.length).toBe(1);
   const cancelled = relay.calls[0];
   await page.locator("#run-design-cancel").click();
   await expect(page.locator("#run-design-dialog")).toHaveCount(0);
   expect(await state(page)).toEqual(before);
-  await page.locator("#start").click();
+  await startRun(page);
   await expect.poll(() => relay.calls.length).toBe(2);
   const current = relay.calls[1];
   relay.finish(cancelled, harbor);
@@ -723,7 +779,7 @@ test("settled design failures keep the captured draft until Cancel or Escape wit
   await open(page);
   const before = await state(page);
   for (const dismissal of ["cancel", "escape"]) {
-    await page.locator("#start").click();
+    await startRun(page);
     await expect(page.locator("#run-design-status")).toContainText(
       "Synthetic design request interrupted",
     );
@@ -747,7 +803,7 @@ test("settled design failures keep the captured draft until Cancel or Escape wit
   }
   expect((await state(page)).status).toBe("ready");
   expect((await state(page)).preparing).toBe(true);
-  await page.locator("#start").click();
+  await startRun(page);
   await expect(page.locator("#run-design-status")).toContainText(
     "Synthetic design request interrupted",
   );
@@ -777,7 +833,7 @@ test("a prepared run opens on a black title card in the designer's typography", 
       : response,
   );
   await open(page);
-  await page.locator("#start").click();
+  await startRun(page);
   await prepared(page);
   const { design } = await state(page);
   expect(design.design.titleCard).toEqual(titleCard);
@@ -809,7 +865,7 @@ test("a prepared run opens on a black title card in the designer's typography", 
   expect(startBox.y).toBeGreaterThan(storyBox.y + storyBox.height);
   await card.screenshot({ path: ".artifacts/handoff/design/title-card.png" });
 
-  await page.locator("#start").click();
+  await startRun(page);
   await expect.poll(async () => (await state(page)).status).toBe("playing");
   await expect(card).toBeHidden();
   // The opening story is not repeated over the game, and key help is only

@@ -294,6 +294,7 @@ export function createQualityDraft(identity: {
   seed: number;
   recent: RunDesignSummary[];
   recentContent: EnvironmentSummary[];
+  place?: { name: string; brief: string };
 }): QualityDesignDraft {
   return parseQualityDraft({
     version: 3,
@@ -307,6 +308,7 @@ export function createQualityDraft(identity: {
       seed: identity.seed,
       recent: identity.recent,
       recentContent: identity.recentContent,
+      ...(identity.place ? { place: identity.place } : {}),
     },
     attempts: 1,
     failure: { fingerprint: null, repeats: 0 },
@@ -343,9 +345,24 @@ export function retryQualityDraft(draft: QualityDesignDraft) {
 }
 
 function base(request: QualityRunDesignRequest) {
-  const { version, designVersion, generationId, seed, recent, recentContent } =
-    request;
-  return { version, designVersion, generationId, seed, recent, recentContent };
+  const {
+    version,
+    designVersion,
+    generationId,
+    seed,
+    recent,
+    recentContent,
+    place,
+  } = request;
+  return {
+    version,
+    designVersion,
+    generationId,
+    seed,
+    recent,
+    recentContent,
+    ...(place ? { place } : {}),
+  };
 }
 function world(request: WorldRequest) {
   const {

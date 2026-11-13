@@ -9,6 +9,7 @@ import {
 } from "./model";
 import { npcReasoningAvailable, npcThinkingRate } from "./npc-cognition";
 import { npcThinkingScale } from "./study-pacing";
+import { stationAtHome } from "./site-stamp";
 import { walkSegment } from "./navigation";
 import { solid, stationSpot } from "./spatial";
 import { sectorBounds } from "./floor-plan";
@@ -100,6 +101,8 @@ function usable(g: Game, a: Actor, s: Station) {
   const e = g.encounters[s.encounter];
   return (
     !!e &&
+    // A person only works at its own building's terminals.
+    stationAtHome(a, s) &&
     e.floor === a.floor &&
     e.reward === "stairs" &&
     e.state !== "consumed" &&

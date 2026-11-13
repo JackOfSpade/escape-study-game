@@ -21,6 +21,7 @@ import {
 } from "../src/npc-voice";
 import { npcSpeechBubble } from "../src/speech-bubbles";
 import { actor, createGame } from "../src/world";
+import { npcVoiceSlot } from "../src/voice-identity";
 
 const roadmap: Roadmap = JSON.parse(
   readFileSync("public/curriculum.json", "utf8"),
@@ -1835,4 +1836,58 @@ test("narrator voices pick gender evenly, then a uniform slot in the group", () 
       );
     }
   }
+});
+
+test("escape games speak prompts and greetings one speaker at a time", async () => {
+  const f = fixture(),
+    npc = f.g.survivors[1]!,
+    human = f.g.survivors[0]!;
+  const identity = {
+    playerGender: "female",
+    player: "bright-f",
+    pa: "announcer",
+    npcs: {},
+  };
+  f.g.escape = {
+    loop: 0,
+    prompts: [{ npcId: npc.id, reason: "warn the player", at: 0 }],
+    announcements: [],
+    areas: { start: "office", current: "office", areas: {}, portals: [] },
+    ledger: { facts: [], journal: [], seq: 0 },
+    voices: identity,
+  } as never;
+  const voices: string[] = [];
+  const synthesize = f.transport.synthesize;
+  f.transport.synthesize = async (reply, voice, signal) => {
+    voices.push(voice);
+    return synthesize(reply, voice, signal);
+  };
+  f.transport.converse = async (payload) => ({
+    requestId: payload.requestId,
+    speakerId: payload.speaker.id,
+    text: "Watch the corridor.",
+    outcome: { kind: "none" },
+  });
+  f.director.update(f.g);
+  await flush();
+  f.g.time = 8;
+  f.director.update(f.g);
+  await flush();
+  f.director.update(f.g);
+  await until(() => f.calls.play.length === 1);
+  assert.equal(f.calls.play[0]!.actorId, npc.id);
+  assert.equal(npcSpeechBubble(f.g, npc.id)?.text, "Watch the corridor.");
+  assert.equal((npc as unknown as { noiseLevel?: number }).noiseLevel, 5);
+  assert.equal(voices[0], npcVoiceSlot(identity as never, npc.id, f.g.seed));
+  f.g.time = 9;
+  f.director.update(f.g);
+  await flush();
+  assert.equal(f.calls.play.length, 1, "one speaker at a time");
+  f.end();
+  f.g.time = 20;
+  f.director.update(f.g);
+  await until(() => f.calls.play.length === 2);
+  assert.equal(f.calls.play[1]!.actorId, npc.id);
+  assert.equal(voices[1], voices[0]);
+  assert.deepEqual([npc.lookAt?.x, npc.lookAt?.y], [human.x, human.y]);
 });

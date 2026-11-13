@@ -2,6 +2,7 @@ import { loadSfx, SFX, type SoundSample } from "./sfx";
 import { type Game } from "./model";
 import { npcSpeechHearingRange, type NpcSpeechDelivery } from "./npc-hearing";
 import { surfacePoint } from "./furniture-geometry";
+import { createPaChain, paChime } from "./pa-audio";
 import {
   captureHordeAcoustics,
   hordeSound,
@@ -38,6 +39,14 @@ interface Voice {
   /** Speech only: the distance at which this delivery stops carrying. */
   range?: number;
 }
+export interface AnnouncementPlayback {
+  id: string;
+  /** Shown as a caption; the PA has no speech bubble. */
+  text: string;
+  buffer: AudioBuffer;
+  onEnded?: (completed?: boolean) => void;
+}
+
 export interface SpeechPlayback {
   id: string;
   actorId: string;
@@ -90,6 +99,10 @@ export class AudioDirector {
   private mixer?: ReturnType<typeof spatialMixer>;
   private nextSpatial = 0;
   private hordeAcoustics?: HordeAcoustics;
+  private paChain?: { input: AudioNode; output: AudioNode; ctx: AudioContext };
+  private paVoice?: { source: AudioBufferSourceNode; gain: GainNode };
+  private paCaption = "";
+  private paCaptionUntil = 0;
 
   constructor(
     private createContext: () => AudioContext = () =>
@@ -223,7 +236,10 @@ export class AudioDirector {
       return false;
     const actor = g.survivors.find(
       (a) =>
-        a.id === speech.actorId && a.id !== "human" && a.alive && !a.escaped,
+        a.id === speech.actorId &&
+        (a.id !== "human" || !!g.escape) &&
+        a.alive &&
+        !a.escaped,
     );
     if (!actor) return false;
     const origin = actorSoundOrigin(g, actor),
@@ -268,6 +284,95 @@ export class AudioDirector {
     for (const voice of [...this.voices])
       if (voice.channel === "speech" && (!id || voice.id === id))
         this.finish(voice, true);
+  }
+
+  /** PA announcements are non-spatial: they play at the same level everywhere
+   * indoors on the announcement's area, through the loudspeaker chain. */
+  canAnnounce(g: Game) {
+    return (
+      !!this.ctx &&
+      !!this.master &&
+      this.ctx.state === "running" &&
+      this.game === g &&
+      !g.paused &&
+      !g.studyWorkspace?.enabled &&
+      g.status === "playing" &&
+      g.settings.volume > 0
+    );
+  }
+
+  speakAnnouncement(g: Game, announcement: AnnouncementPlayback) {
+    if (
+      !this.canAnnounce(g) ||
+      !this.validSpeech(announcement.buffer) ||
+      !announcement.id ||
+      announcement.id.length > 128
+    )
+      return false;
+    const c = this.ctx!;
+    if (this.paChain?.ctx !== c) {
+      if (this.paVoice) {
+        try {
+          this.paVoice.source.stop();
+        } catch {}
+        this.paVoice.source.disconnect();
+        this.paVoice.gain.disconnect();
+        this.paVoice = undefined;
+      }
+      const chain = createPaChain(c);
+      chain.output.connect(this.master!);
+      this.paChain = { ...chain, ctx: c };
+    }
+    const chain = this.paChain;
+    if (!chain) return false;
+    if (this.paVoice) {
+      try {
+        this.paVoice.source.stop();
+      } catch {}
+      this.paVoice.source.disconnect();
+      this.paVoice.gain.disconnect();
+      this.paVoice = undefined;
+    }
+    const at = c.currentTime,
+      chime = paChime(c, at),
+      source = c.createBufferSource(),
+      gain = c.createGain(),
+      length = Math.min(MAX_SPEECH_SECONDS, announcement.buffer.duration);
+    chime.connect(chain.input);
+    source.buffer = announcement.buffer;
+    gain.gain.value = 0.9;
+    source.connect(gain);
+    gain.connect(chain.input);
+    source.onended = () => {
+      if (this.paVoice?.source === source) this.paVoice = undefined;
+      source.disconnect();
+      gain.disconnect();
+      try {
+        announcement.onEnded?.(true);
+      } catch {
+        /* Cleanup must not interrupt the game loop. */
+      }
+    };
+    try {
+      source.start(at + 0.9);
+      source.stop(at + 0.9 + length);
+    } catch {
+      return false;
+    }
+    this.paVoice = { source, gain };
+    this.paCaption = announcement.text;
+    this.paCaptionUntil = g.time + 0.9 + length + 0.2;
+    return true;
+  }
+
+  private stopAnnouncement() {
+    if (!this.paVoice) return;
+    try {
+      this.paVoice.source.stop();
+    } catch {}
+    this.paVoice.source.disconnect();
+    this.paVoice.gain.disconnect();
+    this.paVoice = undefined;
   }
 
   private mix(origin: SoundOrigin) {
@@ -420,6 +525,9 @@ export class AudioDirector {
 
   stop() {
     this.cancel();
+    this.stopAnnouncement();
+    this.paCaption = "";
+    this.paCaptionUntil = 0;
     if (this.ctx && this.horde)
       this.horde.gain.setTargetAtTime(0, this.ctx.currentTime, 0.03);
     this.game = undefined;
@@ -510,6 +618,9 @@ export class AudioDirector {
       this.eventCaption = "";
       this.mixCaption = "";
       this.eventCaptionUntil = 0;
+      this.paCaption = "";
+      this.paCaptionUntil = 0;
+      this.stopAnnouncement();
     }
     this.lastTime = g.time;
     this.mixer = undefined;
@@ -525,6 +636,7 @@ export class AudioDirector {
     }
     if (g.paused) {
       this.cancel();
+      this.stopAnnouncement();
       this.cursor = g.seq;
       if (c && this.horde)
         this.horde.gain.setTargetAtTime(0, c.currentTime, 0.03);
@@ -578,6 +690,7 @@ export class AudioDirector {
       surgeCaption(g),
       g.time < this.eventCaptionUntil ? this.eventCaption : "",
       this.mixCaption,
+      g.time < this.paCaptionUntil ? this.paCaption : "",
     ]
       .filter(Boolean)
       .join(" · ");

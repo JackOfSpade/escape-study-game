@@ -100,7 +100,7 @@ export function isNpcDialogueContext(value) {
     !object(value) ||
     !plain(value.requestId, 500) ||
     !plain(value.actorId, 160) ||
-    value.actorId === "human" ||
+    (value.actorId === "human" && value.escape !== true) ||
     !plain(value.runId, 500) ||
     !Number.isFinite(value.capturedAt) ||
     value.capturedAt < 0 ||

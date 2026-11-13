@@ -15,8 +15,6 @@ import {
 import { DOOR_SWING, doorPose, ensureDoor, latchDoor } from "./doors";
 import {
   furnitureSpec,
-  H,
-  W,
   distance,
   type Actor,
   type Floor,
@@ -25,6 +23,7 @@ import {
   type Point,
   type Zombie,
 } from "./model";
+import { floorCols, floorRows } from "./site";
 import { move, solid, STATION_BODY, stationSignature } from "./spatial";
 import { solidDesks } from "./station-clearance";
 import { cityCollisionBoxes, cityWall } from "./city-layout";
@@ -283,14 +282,16 @@ class PhysicsLayer {
       const authoredWall = (x: number, y: number) =>
         cityWall(f, x + 0.5, y + 0.5) === undefined && f.tiles[y]?.[x] !== 0;
       // Merge horizontal runs: fewer fixtures without changing the authored wall silhouette.
-      for (let y = 0; y < H; y++)
-        for (let x = 0; x < W;) {
+      const cols = floorCols(f),
+        rows = floorRows(f);
+      for (let y = 0; y < rows; y++)
+        for (let x = 0; x < cols;) {
           if (!authoredWall(x, y)) {
             x++;
             continue;
           }
           const start = x;
-          while (x < W && authoredWall(x, y)) x++;
+          while (x < cols && authoredWall(x, y)) x++;
           p.walls.createFixture(
             new Box(
               (x - start) / 2 - 0.01,
@@ -303,10 +304,10 @@ class PhysicsLayer {
       const boundaryBoxes = f.city
         ? cityCollisionBoxes(f.city)
         : [
-            { x: -0.5, y: H / 2, w: 1, h: H + 2 },
-            { x: W + 0.5, y: H / 2, w: 1, h: H + 2 },
-            { x: W / 2, y: -0.5, w: W + 2, h: 1 },
-            { x: W / 2, y: H + 0.5, w: W + 2, h: 1 },
+            { x: -0.5, y: rows / 2, w: 1, h: rows + 2 },
+            { x: cols + 0.5, y: rows / 2, w: 1, h: rows + 2 },
+            { x: cols / 2, y: -0.5, w: cols + 2, h: 1 },
+            { x: cols / 2, y: rows + 0.5, w: cols + 2, h: 1 },
           ];
       for (const box of boundaryBoxes)
         p.walls.createFixture(

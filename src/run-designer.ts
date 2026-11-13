@@ -197,6 +197,7 @@ export function newDesignDraft(
   seed: number,
   recent = recentDesigns(),
   recentContent = recentEnvironment(),
+  place?: { name: string; brief: string },
 ): QualityDesignDraft {
   const identity = newAuthoredDesignDraft(
     targetRunId,
@@ -210,6 +211,7 @@ export function newDesignDraft(
     seed,
     recent,
     recentContent,
+    ...(place ? { place } : {}),
   });
 }
 /** Only an explicit UI retry starts another bounded repair cycle. */

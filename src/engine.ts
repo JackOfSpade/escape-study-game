@@ -9,6 +9,7 @@ import { studyLoopDecision } from "./npc-study-loop";
 import {
   SWARM,
   fieldAllows,
+  fieldAccessKey,
   useField,
   canUseField,
   fieldRouteSignature,
@@ -24,9 +25,17 @@ import {
   doorHandle,
   doorPose,
   doorPushDirection,
+  doorSideOf,
   ensureDoor,
   unlatchDoor,
+  unlockDoor,
 } from "./doors";
+import { catastropheTick, hazardSightScale } from "./catastrophe-runtime";
+import {
+  socialStep,
+  socialWorldTick,
+  type SocialMotor,
+} from "./npc-social-runtime";
 import { EQUIPMENT, itemTargets, itemUseIssue } from "./equipment";
 import {
   doorwayGoal,
@@ -108,6 +117,15 @@ import {
   settleElevated,
 } from "./stair-travel";
 import { STAIRWELL_RADIUS, stairwell } from "./stairwell";
+import {
+  floorCols,
+  floorRows,
+  siteAt,
+  sitesOf,
+  stairMarkers,
+  type Site,
+} from "./site";
+import { GATE_APRON, homeArea, inFootprint, stationAtHome } from "./site-stamp";
 import { actorOnFloor } from "./stair-route";
 import {
   chooseRetreat,
@@ -133,6 +151,20 @@ export interface Input {
 /** Zombie walking speed multiplier while the Surge is active. */
 const SURGE_SPEED_MULTIPLIER = 1.35;
 export const human = (g: Game) => g.survivors[0];
+/**
+ * How many decision calls the simulation has made, per actor kind. Tests read
+ * this to show that distance tiers throttle decisions; nothing in the engine
+ * depends on the counts, so they cannot change the simulation.
+ */
+export const decisionCalls = { npc: 0, zombie: 0 };
+/** Perception range after any obscuring hazard front at the actor's cell. */
+export function actorSightRange(
+  g: Game,
+  a: { floor: number; x: number; y: number },
+  base = sightRadius(g.floors[a.floor]),
+) {
+  return g.escape ? base * hazardSightScale(g, a) : base;
+}
 export function nearestFurniture(g: Game, a: Actor, grip = false) {
   return g.floors[a.floor].furniture
     .filter(
@@ -198,6 +230,28 @@ export function toggleDoor(g: Game, a: Actor, id: string, open?: boolean) {
   )
     return false;
   if (open === false) return false;
+  if (door.lock) {
+    if (doorSideOf(door, a) === door.lock.side) {
+      event(
+        g,
+        "door-locked",
+        `${a.name} found the door locked from this side.`,
+        a.floor,
+        a.id,
+        door.id,
+      );
+      return false;
+    }
+    unlockDoor(door);
+    event(
+      g,
+      "door-unlock",
+      `${a.name} unlocked the door.`,
+      a.floor,
+      a.id,
+      door.id,
+    );
+  }
   if (door.field) return useField(g, a, door);
   ensureDoor(door, f); // Closing is a physical push back into the latch.
   if (!unlatchDoor(door)) return true;
@@ -244,6 +298,7 @@ export function releaseStation(a: Actor) {
 function death(g: Game, a: Actor, cause?: string) {
   a.alive = false;
   a.hp = 0;
+  if (g.escape) a.downAt ??= g.time;
   delete a.stairTravel;
   g.stats.deaths++;
   g.surge.lastDeath = g.time;
@@ -863,6 +918,45 @@ function faceStation(a: Actor, station: Point) {
   const d = distance(a, station) || 1;
   a.heading = { x: (station.x - a.x) / d, y: (station.y - a.y) / d };
 }
+/** The furniture-only part of a floor's route geometry, compared once per
+ * floor per tick and remembered as a content hash. The token is saved with
+ * each actor (`routeGeometry`), so it must depend only on the geometry, never
+ * on process history: a reloaded game must compute the same token. */
+interface FloorGeometry {
+  tick: number;
+  key: string;
+  version: string;
+}
+const geometryVersions = new WeakMap<Floor, FloorGeometry>();
+/** FNV-1a over the key, twice with different seeds, as 16 hex digits. */
+function geometryHash(key: string) {
+  let a = 0x811c9dc5,
+    b = 0x01000193 ^ key.length;
+  for (let i = 0; i < key.length; i++) {
+    const c = key.charCodeAt(i);
+    a = Math.imul(a ^ c, 0x01000193) >>> 0;
+    b = Math.imul(b ^ c, 0x5bd1e995) >>> 0;
+  }
+  return a.toString(16).padStart(8, "0") + b.toString(16).padStart(8, "0");
+}
+function floorGeometryVersion(g: Game, f: Floor) {
+  const tick = g.tick ?? 0,
+    saved = geometryVersions.get(f);
+  if (saved && saved.tick === tick) return saved.version;
+  const key = f.furniture
+    .map(
+      (o) =>
+        `${o.id}/${o.x}/${o.y}/${o.w}/${o.h}/${o.angle ?? 0}/${o.open}/${o.destroyed}/${o.turning < 0}`,
+    )
+    .join(";");
+  if (saved && saved.key === key) {
+    saved.tick = tick;
+    return saved.version;
+  }
+  const version = geometryHash(key);
+  geometryVersions.set(f, { tick, key, version });
+  return version;
+}
 function follow(
   g: Game,
   a: Actor,
@@ -872,12 +966,11 @@ function follow(
 ) {
   const f = g.floors[a.floor];
   if (pullDoorOnRoute(g, a, target, dt)) return;
-  const geometry = f.furniture
-    .map(
-      (o) =>
-        `${o.id}/${o.x}/${o.y}/${o.w}/${o.h}/${o.angle ?? 0}/${o.open}/${o.destroyed}/${o.turning < 0}/${o.field ? fieldAllows(o, a) : ""}`,
-    )
-    .join(";");
+  // Route invalidation needs a token that changes whenever this actor's floor
+  // geometry changes. The furniture part is compared once per floor per tick
+  // and kept as a version number, so following costs one token per NPC instead
+  // of a string of every piece of furniture.
+  const geometry = `${floorGeometryVersion(g, f)}|${fieldAccessKey(f, a)}`;
   if (
     a.routeGeometry !== undefined &&
     a.routeGeometry !== geometry &&
@@ -1296,10 +1389,150 @@ function roomAt(p: Point, f?: Floor) {
     );
   return p.x < 17 ? (p.y < 15 ? 0 : 2) : p.x > 27 ? (p.y < 15 ? 1 : 3) : -1;
 }
+/** The stair marker of one direction that an actor on this floor should head
+ * for: the marker of the site whose footprint holds it, else the nearest one.
+ * With no extra sites this is exactly the floor's own stairs/entry. */
+export function nearestStairMarker(
+  g: Game,
+  a: Pick<Actor, "floor" | "x" | "y">,
+  direction: "up" | "down",
+): Point | undefined {
+  const markers = stairMarkers(g, a.floor).filter(
+    (m) => m.direction === direction,
+  );
+  if (markers.length <= 1) return markers[0]?.at;
+  const here = siteAt(g, a.floor, a),
+    own = here && markers.filter((m) => m.site.id === here.id),
+    pool = own?.length ? own : markers;
+  let best = pool[0];
+  for (const marker of pool)
+    if (distance(a, marker.at) < distance(a, best.at)) best = marker;
+  return best.at;
+}
+/**
+ * Distance-based simulation detail (docs/ESCAPE_REDESIGN.md section 16).
+ * Pure: the tier depends only on the world's sites and the two actors'
+ * positions, floors and ids. With no extra sites every actor is tier 0, which
+ * is exactly the pre-sites simulation.
+ */
+export type DetailTier = 0 | 1 | 2;
+
+/** Tiles between two footprints that still count as neighbouring sites. */
+const SITE_NEIGHBOUR_GAP = 8;
+
+/** A stable, engine-independent hash of an actor id for tick scheduling. */
+export function stableHash(id: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+/** Axis-aligned world extent of a site's footprint. */
+function footprintBox(site: Site) {
+  const b = site.boundary;
+  let left = Infinity,
+    right = -Infinity;
+  for (let y = b?.top ?? 0; y < (b?.bottom ?? 0); y++) {
+    const span = b?.rows?.[y];
+    if (!span) continue;
+    left = Math.min(left, span.left);
+    right = Math.max(right, span.right);
+  }
+  if (!Number.isFinite(left))
+    return {
+      left: site.origin.x,
+      right: site.origin.x,
+      top: site.origin.y,
+      bottom: site.origin.y,
+    };
+  return { left, right, top: b.top, bottom: b.bottom };
+}
+
+/** Shortest distance between two footprint boxes (0 when they touch). */
+function boxGap(
+  a: ReturnType<typeof footprintBox>,
+  b: ReturnType<typeof footprintBox>,
+) {
+  const dx = Math.max(a.left - b.right, b.left - a.right, 0),
+    dy = Math.max(a.top - b.bottom, b.top - a.bottom, 0);
+  return Math.hypot(dx, dy);
+}
+
+/**
+ * The site an actor belongs to on its floor: the site whose footprint holds it,
+ * else the nearest site by footprint centre. Outdoors therefore counts as the
+ * closest building rather than as a site of its own.
+ */
+function siteOfActor(
+  g: Pick<Game, "floors" | "sites">,
+  a: Pick<Actor, "floor" | "x" | "y">,
+): Site | undefined {
+  const inside = siteAt(g, a.floor, a);
+  if (inside) return inside;
+  const all = sitesOf(g),
+    onFloor = all.filter((s) => s.floors.includes(a.floor)),
+    pool = onFloor.length ? onFloor : all;
+  let best: Site | undefined,
+    bestGap = Infinity;
+  for (const site of pool) {
+    const box = footprintBox(site),
+      gap = Math.hypot(
+        a.x - (box.left + box.right) / 2,
+        a.y - (box.top + box.bottom) / 2,
+      );
+    if (gap < bestGap) {
+      bestGap = gap;
+      best = site;
+    }
+  }
+  return best;
+}
+
+/**
+ * How much simulation detail an actor deserves relative to the human:
+ * 0 = the human's own site or within 24 tiles, 1 = a neighbouring site or
+ * within 70 tiles, 2 = everything farther away. Tiers only gate how often
+ * actors think; their bodies keep moving and physics is untouched.
+ */
+export function detailTier(
+  g: Pick<Game, "floors" | "sites">,
+  human: Pick<Actor, "floor" | "x" | "y">,
+  actor: Pick<Actor, "floor" | "x" | "y">,
+): DetailTier {
+  const home = siteOfActor(g, human),
+    here = siteOfActor(g, actor),
+    gap = Math.hypot(actor.x - human.x, actor.y - human.y);
+  if ((home && here && home.id === here.id) || gap <= 24) return 0;
+  if (gap <= 70) return 1;
+  const neighbour =
+    home &&
+    here &&
+    boxGap(footprintBox(home), footprintBox(here)) <= SITE_NEIGHBOUR_GAP;
+  return neighbour ? 1 : 2;
+}
+
+/** How often a tier's actors are allowed to take a new decision. */
+const DETAIL_PERIOD: Record<DetailTier, number> = { 0: 1, 1: 3, 2: 10 };
+
+/** True when this actor takes a decision on the current tick. */
+function decidesThisTick(
+  g: Pick<Game, "tick">,
+  id: string,
+  tier: DetailTier,
+  period = DETAIL_PERIOD[tier],
+) {
+  const ticks = g.tick ?? 0,
+    offset = stableHash(id);
+  return period <= 1 || (ticks + offset) % period === 0;
+}
 function clearExit(g: Game, a: Actor, dt: number, target?: Point) {
   const f = g.floors[a.floor];
   if (a.path.length && a.defensePlan?.encounter !== "egress") return false;
-  const destination = target ?? a.defensePlan?.exit ?? f.stairs;
+  const destination =
+    target ?? a.defensePlan?.exit ?? nearestStairMarker(g, a, "up") ?? f.stairs;
   if (survivorPath(f, a, destination).length) {
     if (a.defensePlan?.encounter === "egress") releaseFurniturePlan(a);
     return false;
@@ -1418,6 +1651,27 @@ function clearExit(g: Game, a: Actor, dt: number, target?: Point) {
   return followFurniturePlan(g, a, dt);
 }
 function npc(g: Game, a: Actor, dt: number) {
+  if (g.escape) {
+    const motor: SocialMotor = {
+      walkTo(target) {
+        if (target.floor !== a.floor) return;
+        follow(g, a, target, dt, false);
+      },
+      stop() {
+        a.path = [];
+        a.repath = 0;
+        delete a.target;
+      },
+      face(target) {
+        a.lookAt = { x: target.x, y: target.y, until: g.time + 0.8 };
+        const dx = target.x - a.x,
+          dy = target.y - a.y,
+          n = Math.hypot(dx, dy);
+        if (n > 1e-6) a.heading = { x: dx / n, y: dy / n };
+      },
+    };
+    if (socialStep(g, a, dt, motor)) return;
+  }
   // Taking an already available escape wins over retreating from a nearby
   // threat. Boarding still uses the same physical range and atomic seat check.
   if (a.floor === CONFIG.floors && board(g, a)) {
@@ -1635,12 +1889,13 @@ function npc(g: Game, a: Actor, dt: number) {
       // A cancelled flight restarts only after stepping out and back in.
       const well = stairwell(f, "up");
       follow(g, a, { x: well.mouth.x, y: well.mouth.y + well.open * 1.0 }, dt);
-    } else follow(g, a, f.stairs, dt);
+    } else follow(g, a, nearestStairMarker(g, a, "up") ?? f.stairs, dt);
     if (!a.stairTravel && !a.stairwell) stairs(g, a);
   } else {
     // Local exploration: choose visible available stations, never use a station remotely.
     const candidates = f.stations.filter(
       (s) =>
+        stationAtHome(a, s) &&
         a.seen.includes(s.id) &&
         g.encounters[s.encounter].state !== "consumed" &&
         (!g.encounters[s.encounter].owner ||
@@ -1709,18 +1964,37 @@ function npc(g: Game, a: Actor, dt: number) {
         delete a.target;
       }
       const standingIn = a.stairTravel ? undefined : stairwellAt(g, a);
+      // Multi-site worlds: exploration stays in the person's own building.
+      const home = g.sites?.length ? homeArea(g, a) : undefined;
+      // Cheap membership test: the home footprint rows, plus (only while the
+      // person stands outdoors) the short apron outside its own gate.
+      const inHome = home
+        ? (p: Point) =>
+            inFootprint(home.site, p) ||
+            (home.outside &&
+              !!home.gate &&
+              Math.abs(p.x - home.gate.x) <= GATE_APRON &&
+              Math.abs(p.y - home.gate.y) <= GATE_APRON &&
+              !siteAt(g, home.floor, p))
+        : undefined;
       if (standingIn) {
         const well = stairwell(f, standingIn);
         a.target = { x: well.mouth.x, y: well.mouth.y + well.open * 1.0 };
-      } else if (f.layout !== "pursuit" && a.y >= 28) {
-        a.target = { ...f.entry };
+      } else if (
+        f.layout !== "pursuit" &&
+        (home ? a.y > home.bounds.bottom - 2 : a.y >= 28)
+      ) {
+        const down =
+          nearestStairMarker(g, a, "down") ?? (home ? undefined : f.entry);
+        if (down) a.target = { ...down };
       }
       if (!a.target) {
         const entry = f.furniture
           .filter(
             (o) =>
               o.kind === "door" &&
-              o.id !== "main-gate" &&
+              !o.id.endsWith("main-gate") &&
+              stationAtHome(a, o) &&
               !a.seen.includes(`entered-door-${o.id}`) &&
               !failed(doorFrame(o)) &&
               canSee(f, a, doorFrame(o), sightRadius(f), o.id),
@@ -1747,11 +2021,40 @@ function npc(g: Game, a: Actor, dt: number) {
       if (!a.target) {
         const visibleRange = f.dark > 0.8 ? 5.4 : f.dark > 0.3 ? 8 : 11;
         const candidates: { point: Point; score: number }[] = [];
-        for (let y = 3; y < 28; y++)
-          for (let x = 3; x < 42; x++) {
+        // A person only samples cells of its own building (plus its gate yard),
+        // and only as far as it could plausibly see.
+        const reach = visibleRange + 1,
+          yFrom = home
+            ? Math.max(0, Math.floor(Math.max(home.bounds.top, a.y - reach)))
+            : 3,
+          yTo = home
+            ? Math.min(
+                floorRows(f),
+                Math.ceil(Math.min(home.bounds.bottom, a.y + reach)),
+              )
+            : 28,
+          xFrom = home
+            ? Math.max(
+                0,
+                Math.floor(
+                  Math.max(home.bounds.left - GATE_APRON, a.x - reach),
+                ),
+              )
+            : 3,
+          xTo = home
+            ? Math.min(
+                floorCols(f),
+                Math.ceil(
+                  Math.min(home.bounds.right + GATE_APRON, a.x + reach),
+                ),
+              )
+            : 42;
+        for (let y = yFrom; y < yTo; y++)
+          for (let x = xFrom; x < xTo; x++) {
             if (!explorationCell(f, x, y)) continue;
             const p = { x: x + 0.5, y: y + 0.5 };
             if (
+              (inHome && !inHome(p)) ||
               distance(a, p) < 1 ||
               distance(a, p) > visibleRange ||
               solid(f, p) ||
@@ -1772,13 +2075,31 @@ function npc(g: Game, a: Actor, dt: number) {
       // Keep this exploration destination until arrival. Recomputing the
       // opposite hall end from current Y flipped direction at the midline.
       if (!a.target) {
-        const preferred = { x: 21.5, y: a.y > 15 ? 10 : 23 };
+        const preferred = home
+          ? (home.gate ?? {
+              x: (home.bounds.left + home.bounds.right) / 2,
+              y: (home.bounds.top + home.bounds.bottom) / 2,
+            })
+          : { x: 21.5, y: a.y > 15 ? 10 : 23 };
         const options: Point[] = [preferred];
-        for (let y = 3; y < 28; y += 2)
-          for (let x = 18; x < 26; x++)
-            options.push({ x: x + 0.5, y: y + 0.5 });
+        if (home) {
+          for (let dy = -6; dy <= 6; dy += 2)
+            for (let dx = -6; dx <= 6; dx += 2) {
+              const p = { x: preferred.x + dx, y: preferred.y + dy };
+              if (inHome?.(p)) options.push(p);
+            }
+        } else
+          for (let y = 3; y < 28; y += 2)
+            for (let x = 18; x < 26; x++)
+              options.push({ x: x + 0.5, y: y + 0.5 });
         a.target = options
-          .filter((p) => !solid(f, p) && !failed(p) && distance(a, p) > 1)
+          .filter(
+            (p) =>
+              !solid(f, p) &&
+              !failed(p) &&
+              distance(a, p) > 1 &&
+              (!inHome || inHome(p)),
+          )
           .sort((b, c) => distance(b, preferred) - distance(c, preferred))[0];
       }
       if (!a.target) return;
@@ -1847,7 +2168,9 @@ function npc(g: Game, a: Actor, dt: number) {
       }
       // Reserve a stable physical station. Re-sorting and indexing on every frame
       // made agents switch destinations whenever their relative distances changed.
-      const stations = f.stations.filter((s) => s.encounter === e!.id);
+      const stations = f.stations.filter(
+        (s) => s.encounter === e!.id && stationAtHome(a, s),
+      );
       const usable = stations.filter(
         (s) =>
           !g.survivors.some(
@@ -2169,7 +2492,19 @@ function strikeSurvivor(
   hit.position = { x: position.x, y: position.y };
   if (floor !== z.floor) hit.stairContact = true;
   z.cooldown = 0.95;
-  damageSurvivor(g, prey, g.surge.state === "active" ? 21 : 14);
+  const hunter =
+    z.hunter !== undefined
+      ? g.escape?.catastrophe.behaviours[z.hunter]
+      : undefined;
+  damageSurvivor(
+    g,
+    prey,
+    hunter?.kind === "hunter"
+      ? hunter.damage
+      : g.surge.state === "active"
+        ? 21
+        : 14,
+  );
 }
 function strikeFurniture(
   g: Game,
@@ -2290,13 +2625,19 @@ function zombie(
   }
   const f = g.floors[z.floor];
   prepareZombieSearch(g, z);
+  const hunter =
+    z.hunter !== undefined
+      ? g.escape?.catastrophe.behaviours[z.hunter]
+      : undefined;
+  const hunterBehaviour = hunter?.kind === "hunter" ? hunter : undefined;
+  const sightRange = actorSightRange(g, z, hunterBehaviour?.sightRange ?? 12);
   let prey = g.survivors
     .filter(
       (a) =>
         actorOnFloor(g, a, z.floor) &&
         a.alive &&
         !a.escaped &&
-        canSee(f, z, a, 12, a.vault?.obstacle),
+        canSee(f, z, a, sightRange, a.vault?.obstacle),
     )
     .sort((a, b) => distance(a, z) - distance(b, z))[0];
   const decoy = g.effects
@@ -2361,9 +2702,11 @@ function zombie(
   }
   const surge = g.surge.state === "active";
   const zombieStep =
-    (g.rules === "force-fields"
-      ? CONFIG.playerSpeed * SWARM.speedRatio
-      : CONFIG.zombieSpeed * (surge ? SURGE_SPEED_MULTIPLIER : 1)) * dt;
+    (hunterBehaviour
+      ? CONFIG.playerSpeed * hunterBehaviour.speed
+      : g.rules === "force-fields"
+        ? CONFIG.playerSpeed * SWARM.speedRatio
+        : CONFIG.zombieSpeed * (surge ? SURGE_SPEED_MULTIPLIER : 1)) * dt;
   if (
     prey &&
     distance(z, prey) < 0.78 &&
@@ -2471,8 +2814,16 @@ function zombie(
         inFurniture(probe, o, 0.23),
       );
     if (ob?.door && !ob.door.latched) {
+      if (ob.lock && doorSideOf(ob, z) === ob.lock.side) return;
       moveZombie(g, z, p, Math.min(zombieStep, d), crowd);
       return;
+    }
+    if (ob?.door && hunterBehaviour) {
+      if (hunterBehaviour.doors === "blocked") return;
+      if (hunterBehaviour.doors === "open") {
+        if (!ob.lock || doorSideOf(ob, z) !== ob.lock.side) unlatchDoor(ob);
+        return;
+      }
     }
     if (ob) {
       const surface = surfacePoint(z, ob);
@@ -2493,9 +2844,17 @@ function zombie(
     }
     moveZombie(g, z, p, Math.min(zombieStep, d), crowd);
   }
+  // Stamped sites carry their own stair markers per floor; a legacy game has
+  // only the floor's own `stairs`, which is exactly what the marker lookup
+  // returns for it.
+  const climb = g.sites?.length
+    ? nearestStairMarker(g, z, "up")
+    : z.floor < CONFIG.floors
+      ? f.stairs
+      : undefined;
   if (
-    z.floor < CONFIG.floors &&
-    distance(z, f.stairs) < (f.layout === "pursuit" ? STAIRWELL_RADIUS : 0.75)
+    climb &&
+    distance(z, climb) < (f.layout === "pursuit" ? STAIRWELL_RADIUS : 0.75)
   ) {
     z.stairUntil = g.time + CONFIG.stairSeconds;
     event(
@@ -2587,6 +2946,59 @@ export function takeLoot(g: Game, a: Actor, id: string, itemId: string) {
   event(g, "loot", `${a.name} collected a ${item.kind}.`, a.floor, a.id, e.id);
   return true;
 }
+const npcPreviousPosition = new WeakMap<Actor, Point & { floor: number }>();
+
+function escortStep(g: Game, a: Actor, dt: number) {
+  const id = a.escortedBy;
+  if (!id) return false;
+  const escort = g.survivors.find(
+    (s) => s.id === id && s.alive && !s.escaped && s.floor === a.floor,
+  );
+  if (!escort || distance(a, escort) > 6) {
+    delete a.escortedBy;
+    return false;
+  }
+  const behind = {
+    x: escort.x - escort.heading.x,
+    y: escort.y - escort.heading.y,
+  };
+  const d = distance(a, behind);
+  a.lookAt = { x: escort.x, y: escort.y, until: g.time + 0.3 };
+  if (d < 0.35) {
+    a.path = [];
+    return true;
+  }
+  const step = Math.min(d, Math.max(0.1, escort.speed) * dt);
+  follow(
+    g,
+    a,
+    {
+      x: a.x + ((behind.x - a.x) / d) * step,
+      y: a.y + ((behind.y - a.y) / d) * step,
+    },
+    dt,
+    false,
+  );
+  return true;
+}
+
+function applyLookAt(g: Game, a: Actor) {
+  const look = a.lookAt;
+  const previous = npcPreviousPosition.get(a);
+  npcPreviousPosition.set(a, { floor: a.floor, x: a.x, y: a.y });
+  if (!look || look.until <= g.time) return;
+  if (
+    !previous ||
+    previous.floor !== a.floor ||
+    Math.hypot(previous.x - a.x, previous.y - a.y) > 0.01
+  )
+    return;
+  const dx = look.x - a.x,
+    dy = look.y - a.y,
+    n = Math.hypot(dx, dy);
+  if (n > 1e-6) a.heading = { x: dx / n, y: dy / n };
+}
+
 export function step(
   g: Game,
   dt: number,
@@ -2627,7 +3039,9 @@ function advanceStep(
   dt = Math.min(dt, 0.1);
   g.time += dt;
   g.tick = (g.tick ?? 0) + 1;
-  tickSurge(g);
+  if (g.escape) catastropheTick(g, dt);
+  else tickSurge(g);
+  socialWorldTick(g, dt);
   for (const e of g.effects.filter((e) => e.until <= g.time))
     if (e.kind === "bubble") {
       for (const z of g.zombies.filter(
@@ -2652,7 +3066,9 @@ function advanceStep(
       if (o.turning > 0) o.turning = Math.max(0, o.turning - dt);
     }
   // Human input ends with the human's run; the world keeps advancing.
-  if (humanActive(g) && a.alive && !a.escaped) {
+  if (humanActive(g) && a.alive && !a.escaped && escortStep(g, a, dt)) {
+    // An escort controls the human's movement for this tick.
+  } else if (humanActive(g) && a.alive && !a.escaped) {
     a.cooldown = Math.max(0, a.cooldown - dt);
     if (input.stairWalk) enterCityStairBase(g, a, input);
     if (!a.elevated || a.elevated.grounded)
@@ -2734,7 +3150,11 @@ function advanceStep(
       }
     } else if (!input.grab && !a.grip) delete a.handling;
   }
-  const thinkingScale = npcThinkingScale(g);
+  const thinkingScale = npcThinkingScale(g),
+    // Distance detail exists only in a continuous world; a single-building
+    // game keeps deciding every tick exactly as before.
+    detail = !!g.sites?.length,
+    lead = g.survivors[0];
   for (const b of g.survivors.slice(1)) {
     if (!b.alive || b.escaped) continue;
     b.cooldown = Math.max(0, b.cooldown - dt);
@@ -2757,16 +3177,34 @@ function advanceStep(
       )
         b.thought +=
           dt * 0.2 * npcThinkingRate(b, g.encounters[b.intent]) * thinkingScale;
-    } else npc(g, b, dt);
+    } else {
+      const tier = detail && lead ? detailTier(g, lead, b) : 0;
+      if (decidesThisTick(g, b.id, tier)) {
+        decisionCalls.npc++;
+        npc(g, b, dt);
+      } else {
+        // A throttled tick takes no new decision but keeps the body walking
+        // along the route the last decision picked.
+        const target = b.fleeTarget ?? b.target ?? b.navTarget;
+        if (target) follow(g, b, target, dt, false);
+      }
+    }
     recordNpcActivity(g, b, previous);
+    applyLookAt(g, b);
   }
-  if ((g.floors[0].city || g.time >= spawnGrace(g)) && g.time >= g.nextSpawn) {
+  if (
+    !g.escape &&
+    (g.floors[0].city || g.time >= spawnGrace(g)) &&
+    g.time >= g.nextSpawn
+  ) {
     const swarm = swarmPacing(g);
     g.nextSpawn =
       g.time +
       (g.rules === "force-fields" ? swarm.interval : CONFIG.spawnInterval);
     if (g.rules === "force-fields")
-      g.zombies = g.zombies.filter((z) => z.hp > 0);
+      g.zombies = g.zombies.filter(
+        (z) => z.hp > 0 || (z.hunter !== undefined && z.downAt !== undefined),
+      );
     const batch =
       g.rules === "force-fields"
         ? Math.min(swarm.batch, Math.max(0, swarm.cap - g.zombies.length))
@@ -2809,11 +3247,25 @@ function advanceStep(
   const contacts = new Map<string, number>();
   const crowd = new ZombieIndex(g.zombies);
   for (const z of g.zombies) {
+    // Hunters are catastrophe-locked on the human and can be throttled by
+    // distance too: tier 2 hunters path on every fourth tick, tier 1 every
+    // third. Ordinary horde bodies always run, as before.
+    const tier: DetailTier =
+        detail && lead && z.hunter !== undefined ? detailTier(g, lead, z) : 0,
+      hunterPeriod = tier === 2 ? 4 : tier === 1 ? 3 : 1;
+    if (!decidesThisTick(g, z.id, tier, hunterPeriod)) {
+      // Timers still run down so a throttled hunter is not frozen mid-cooldown.
+      z.stagger = Math.max(0, z.stagger - dt);
+      z.cooldown = Math.max(0, z.cooldown - dt);
+      crowd.update(z);
+      continue;
+    }
+    decisionCalls.zombie++;
     zombie(g, z, dt, contacts, crowd);
     crowd.update(z);
   }
   const h = g.helicopter;
-  if (g.time >= h.next) {
+  if (!g.escape && g.time >= h.next) {
     h.trip++;
     h.passengers = [];
     h.until = g.time + CONFIG.boardingWindow;

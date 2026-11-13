@@ -1,13 +1,7 @@
 import { localPoint } from "./furniture-geometry";
-import {
-  type Floor,
-  type Furniture,
-  type Point,
-  H,
-  W,
-  distance,
-} from "./model";
+import { type Floor, type Furniture, type Point, distance } from "./model";
 import { inFurniture, wall } from "./spatial";
+import { floorCols, floorRows } from "./site";
 import { cityRayDistance, cityWall } from "./city-layout";
 
 export const VISION = { lit: 11, dim: 8, dark: 5.4, max: 11 };
@@ -122,7 +116,9 @@ export function wallRayDistance(
   range: number,
 ) {
   const dx = Math.cos(angle),
-    dy = Math.sin(angle);
+    dy = Math.sin(angle),
+    cols = floorCols(f),
+    rows = floorRows(f);
   let x = Math.floor(origin.x),
     y = Math.floor(origin.y),
     hit = cityRayDistance(f, origin, dx, dy, Math.max(0, range));
@@ -156,8 +152,8 @@ export function wallRayDistance(
       f.city &&
       (x < 0 ||
         y < 0 ||
-        x >= W ||
-        y >= H ||
+        x >= cols ||
+        y >= rows ||
         cityWall(f, x + 0.5, y + 0.5) !== undefined)
     )
       continue;

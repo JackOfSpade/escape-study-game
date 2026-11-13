@@ -28,13 +28,12 @@ import { human } from "../engine";
 import { doorLeaves, doorSeeThrough, doorStyle } from "../door-style";
 import { fieldAllows } from "../force-fields";
 import { floorSectors } from "../floor-plan";
+import { floorCols, floorRows } from "../site";
 import { carvedCells } from "../room-shapes";
 import { cornerWallGeometries } from "./corner-walls";
 import { readStationFacing } from "../spatial";
 import {
   CONFIG,
-  H,
-  W,
   type Actor,
   type Floor,
   type Furniture,
@@ -885,6 +884,8 @@ export class FirstPersonView {
         f.entry,
         f.city && [f.city.version, f.city.seed, f.city.bounds],
         f.setting,
+        // A stamped building rebuilds the exterior in the frame it appears.
+        f.shells?.map((shell) => [shell.site, shell.origin]),
       ]),
     );
     if (key !== this.architectureKey) {
@@ -984,10 +985,12 @@ export class FirstPersonView {
       if (!list) surfaces.set(key, (list = []));
       return list;
     };
+    const cols = floorCols(floor),
+      rows = floorRows(floor);
     for (const finish of FINISHES) surfaceList(finish);
-    for (let y = 0; y < H; y++) {
+    for (let y = 0; y < rows; y++) {
       let x = 0;
-      while (x < W) {
+      while (x < cols) {
         if (!ownsFinish(x, y)) {
           x++;
           continue;
@@ -996,7 +999,7 @@ export class FirstPersonView {
           key = surfaceKey(finish, x, y),
           start = x;
         while (
-          x < W &&
+          x < cols &&
           floorZone(floor, x, y) === finish &&
           surfaceKey(finish, x, y) === key &&
           ownsFinish(x, y)

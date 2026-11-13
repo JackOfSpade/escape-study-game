@@ -5,9 +5,9 @@ import type {
   RunTerminal,
 } from "./setting-catalog.mjs";
 import { partReach } from "./setting-catalog.mjs";
-import { H, W } from "./model";
 import { inRect, sectorAt } from "./floor-plan";
 import { carvedCells, cornerProfile } from "./room-shapes";
+import { floorCols, floorRows } from "./site";
 
 /** Procedural top-down office art. Floors, walls and every furniture kind are
  * painted once into cached canvases and reused each frame, so the per-frame
@@ -430,18 +430,20 @@ export function terrainCanvas(f: Floor, theme: Theme, seed: number) {
     shapes = corners.length ? JSON.stringify(corners) : "";
   const outdoor = f.setting?.surroundings?.groundColor,
     ground = outdoor ? `ground:${outdoor}/` : "";
-  const key = `${f.index}/${theme}/${seed}/${f.generation?.version ?? 0}/${look}${ground}${shapes}${f.tiles.map((r) => r.join("")).join("")}`;
+  const cols = floorCols(f),
+    rows = floorRows(f),
+    key = `${f.index}/${cols}x${rows}/${theme}/${seed}/${f.generation?.version ?? 0}/${look}${ground}${shapes}${f.tiles.map((r) => r.join("")).join("")}`;
   if (terrain?.key === key) return terrain.canvas;
   const canvas = terrain?.canvas ?? document.createElement("canvas");
-  canvas.width = W * PX;
-  canvas.height = H * PX;
+  canvas.width = cols * PX;
+  canvas.height = rows * PX;
   const c = canvas.getContext("2d")!,
     m = MATERIALS[theme];
   // Carved room corners are drawn as one smooth wall over open-looking floor.
-  const carved = new Set(carvedCells(f).map((p) => p.y * W + p.x));
-  for (let y = 0; y < H; y++)
-    for (let x = 0; x < W; x++)
-      if (!f.tiles[y][x] || carved.has(y * W + x)) {
+  const carved = new Set(carvedCells(f).map((p) => p.y * cols + p.x));
+  for (let y = 0; y < rows; y++)
+    for (let x = 0; x < cols; x++)
+      if (!f.tiles[y][x] || carved.has(y * cols + x)) {
         const zone = floorZone(f, x, y);
         paintFloorCell(c, m, zone, x, y, seed);
         // Outside paving takes the designed ground colour; the cell keeps its
@@ -467,12 +469,12 @@ export function terrainCanvas(f: Floor, theme: Theme, seed: number) {
   const wallTop = s ? mixHex(m.wallTop, s.wall, 0.75) : m.wallTop,
     wallEdge = s ? mixHex(m.wallEdge, s.trim, 0.8) : m.wallEdge;
   const solidAt = (x: number, y: number) =>
-    x < 0 || y < 0 || x >= W || y >= H || !!f.tiles[y][x];
+    x < 0 || y < 0 || x >= cols || y >= rows || !!f.tiles[y][x];
   // Wall caps with a lit rim on faces that border a room, and a soft contact
   // shadow cast onto the floor along the wall's south and east faces.
-  for (let y = 0; y < H; y++)
-    for (let x = 0; x < W; x++) {
-      if (!f.tiles[y][x] || carved.has(y * W + x)) continue;
+  for (let y = 0; y < rows; y++)
+    for (let x = 0; x < cols; x++) {
+      if (!f.tiles[y][x] || carved.has(y * cols + x)) continue;
       const px = x * PX,
         py = y * PX;
       c.fillStyle = wallTop;

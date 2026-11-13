@@ -1,13 +1,15 @@
 import { survivorFloor } from "./force-fields";
 import { doorFrame } from "./doors";
 import { boxBounds, worldPoint } from "./furniture-geometry";
-import { H, W, distance, type Floor, type Point } from "./model";
+import { distance, type Floor, type Point } from "./model";
+import { floorCols, floorRows } from "./site";
 import {
+  STATION_BODY,
   inFurniture,
   inStation,
   solid,
   stationBody,
-  stationSignature,
+  stationStamp,
   wall,
 } from "./spatial";
 import { rayBodyDistance } from "./visibility";
@@ -53,9 +55,12 @@ export function routePose(o: Floor["furniture"][number]) {
   };
 }
 function tilesMatch(tiles: Float64Array, f: Floor) {
-  for (let y = 0; y < H; y++)
-    for (let x = 0; x < W; x++)
-      if (tiles[y * W + x] !== (f.tiles[y]?.[x] ?? 1)) return false;
+  const cols = floorCols(f),
+    rows = floorRows(f);
+  if (tiles.length !== cols * rows) return false;
+  for (let y = 0; y < rows; y++)
+    for (let x = 0; x < cols; x++)
+      if (tiles[y * cols + x] !== (f.tiles[y]?.[x] ?? 1)) return false;
   return true;
 }
 function furnitureMatches(s: Snapshot, f: Floor) {
@@ -79,9 +84,11 @@ function furnitureMatches(s: Snapshot, f: Floor) {
   return true;
 }
 function snapshotTiles(f: Floor) {
-  const tiles = new Float64Array(W * H);
-  for (let y = 0; y < H; y++)
-    for (let x = 0; x < W; x++) tiles[y * W + x] = f.tiles[y]?.[x] ?? 1;
+  const cols = floorCols(f),
+    rows = floorRows(f),
+    tiles = new Float64Array(cols * rows);
+  for (let y = 0; y < rows; y++)
+    for (let x = 0; x < cols; x++) tiles[y * cols + x] = f.tiles[y]?.[x] ?? 1;
   return tiles;
 }
 function snapshotFurniture(f: Floor, tiles: Float64Array): Snapshot {
@@ -103,19 +110,197 @@ function snapshotFurniture(f: Floor, tiles: Float64Array): Snapshot {
     poses,
   };
 }
-interface Graph {
-  city?: Floor["city"];
-  signature: Snapshot;
-  stations: string;
-  points: Point[];
-  edges: Edge[][];
+/** Broad phase: a uniform bucket grid over object bounding boxes, so a segment
+ * test only visits the pieces that could possibly touch it. */
+const CELL = 2;
+interface Bounds {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
 }
-const cache = new WeakMap<Floor, Graph>();
-// Furniture moves invalidate routes, but not the fixed grid's wall clearance.
-const wallEdgeCache = new WeakMap<
+interface BucketIndex {
+  cols: number;
+  rows: number;
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+  count: number;
+  boxes: Float64Array;
+  cells: number[][];
+  stamps: Int32Array;
+  queryId: number;
+  out: number[];
+}
+function buildBuckets(count: number, boxAt: (i: number, b: Bounds) => void) {
+  const boxes = new Float64Array(count * 4),
+    box: Bounds = { x1: 0, y1: 0, x2: 0, y2: 0 };
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
+  for (let i = 0; i < count; i++) {
+    boxAt(i, box);
+    const j = i * 4;
+    boxes[j] = box.x1;
+    boxes[j + 1] = box.y1;
+    boxes[j + 2] = box.x2;
+    boxes[j + 3] = box.y2;
+    if (box.x1 < minX) minX = box.x1;
+    if (box.y1 < minY) minY = box.y1;
+    if (box.x2 > maxX) maxX = box.x2;
+    if (box.y2 > maxY) maxY = box.y2;
+  }
+  if (!count) minX = minY = maxX = maxY = 0;
+  const cols = count ? Math.max(1, Math.ceil((maxX - minX) / CELL) + 1) : 0,
+    rows = count ? Math.max(1, Math.ceil((maxY - minY) / CELL) + 1) : 0,
+    cells = Array.from({ length: cols * rows }, (): number[] => []);
+  for (let i = 0; i < count; i++) {
+    const j = i * 4,
+      x1 = Math.max(0, Math.floor((boxes[j] - minX) / CELL)),
+      x2 = Math.min(cols - 1, Math.floor((boxes[j + 2] - minX) / CELL)),
+      y1 = Math.max(0, Math.floor((boxes[j + 1] - minY) / CELL)),
+      y2 = Math.min(rows - 1, Math.floor((boxes[j + 3] - minY) / CELL));
+    for (let y = y1; y <= y2; y++)
+      for (let x = x1; x <= x2; x++) cells[y * cols + x].push(i);
+  }
+  const index: BucketIndex = {
+    cols,
+    rows,
+    minX,
+    minY,
+    maxX,
+    maxY,
+    count,
+    boxes,
+    cells,
+    stamps: new Int32Array(count),
+    queryId: 0,
+    out: [],
+  };
+  return index;
+}
+/** Candidate item indices for a query rect. The array is the index's scratch
+ * buffer, so consume it before querying the same index again. */
+function queryBuckets(
+  b: BucketIndex,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+) {
+  const out = b.out;
+  out.length = 0;
+  if (!b.count || x2 < b.minX || x1 > b.maxX || y2 < b.minY || y1 > b.maxY)
+    return out;
+  let id = b.queryId + 1;
+  if (id >= 0x7ffffff0) {
+    b.stamps.fill(0);
+    id = 1;
+  }
+  b.queryId = id;
+  const cx1 = Math.max(0, Math.floor((x1 - b.minX) / CELL)),
+    cx2 = Math.min(b.cols - 1, Math.floor((x2 - b.minX) / CELL)),
+    cy1 = Math.max(0, Math.floor((y1 - b.minY) / CELL)),
+    cy2 = Math.min(b.rows - 1, Math.floor((y2 - b.minY) / CELL));
+  for (let y = cy1; y <= cy2; y++)
+    for (let x = cx1; x <= cx2; x++)
+      for (const i of b.cells[y * b.cols + x]) {
+        if (b.stamps[i] === id) continue;
+        b.stamps[i] = id;
+        out.push(i);
+      }
+  return out;
+}
+/** Swept body radius of a terminal's desk: every part of it lies this close to
+ * its centre, so a wider query can never miss a desk a segment really touches. */
+function deskRadius() {
+  return Math.hypot(STATION_BODY.w, STATION_BODY.h) / 2;
+}
+type Desk = ReturnType<typeof solidDesks>[number];
+interface BroadPhase {
+  /** Floor furniture, indexed by the reach box the linear scan rejected on. */
+  furniture: BucketIndex;
+  /** Solid desks, indexed by the circle that bounds their body. */
+  desks: BucketIndex;
+  deskList: Desk[];
+}
+function furnitureBroad(f: Floor) {
+  return buildBuckets(f.furniture.length, (i, b) => {
+    const o = f.furniture[i],
+      r = (o.w + o.h) / 2 + 1e-6;
+    b.x1 = o.x - r;
+    b.y1 = o.y - r;
+    b.x2 = o.x + r;
+    b.y2 = o.y + r;
+  });
+}
+function deskBroad(desks: Desk[]) {
+  return buildBuckets(desks.length, (i, b) => {
+    const s = desks[i],
+      r = deskRadius() + 1e-6;
+    b.x1 = s.x - r;
+    b.y1 = s.y - r;
+    b.x2 = s.x + r;
+    b.y2 = s.y + r;
+  });
+}
+const broadCache = new WeakMap<
   Floor,
-  { tiles: Float64Array; city?: Floor["city"]; edges: Map<string, boolean> }
+  { poses: Float64Array; ids: string[]; stamp: number; broad: BroadPhase }
 >();
+function broadCurrent(
+  saved: { poses: Float64Array; ids: string[]; stamp: number },
+  f: Floor,
+  stamp: number,
+) {
+  if (saved.stamp !== stamp) return false;
+  if (saved.poses.length !== f.furniture.length * 5) return false;
+  const p = saved.poses;
+  for (let i = 0; i < f.furniture.length; i++) {
+    const o = f.furniture[i],
+      j = i * 5;
+    if (
+      saved.ids[i] !== o.id ||
+      p[j] !== o.x ||
+      p[j + 1] !== o.y ||
+      p[j + 2] !== o.w ||
+      p[j + 3] !== o.h ||
+      p[j + 4] !== (o.angle ?? 0)
+    )
+      return false;
+  }
+  return true;
+}
+/** Bucket index for a floor's furniture and desks, reused while they hold still. */
+function broadPhase(f: Floor): BroadPhase {
+  const stamp = stationStamp(f),
+    saved = broadCache.get(f);
+  if (saved && broadCurrent(saved, f, stamp)) return saved.broad;
+  const desks = solidDesks(f),
+    poses = new Float64Array(f.furniture.length * 5);
+  f.furniture.forEach((o, i) => {
+    const j = i * 5;
+    poses[j] = o.x;
+    poses[j + 1] = o.y;
+    poses[j + 2] = o.w;
+    poses[j + 3] = o.h;
+    poses[j + 4] = o.angle ?? 0;
+  });
+  const broad: BroadPhase = {
+    furniture: furnitureBroad(f),
+    desks: deskBroad(desks),
+    deskList: desks,
+  };
+  broadCache.set(f, {
+    poses,
+    ids: f.furniture.map((o) => o.id),
+    stamp,
+    broad,
+  });
+  return broad;
+}
 /** Continuous swept actor footprint, including shallow corner intersections. */
 export function walkSegment(f: Floor, a: Point, b: Point, ignore?: string) {
   return segment(survivorFloor(f, a), a, b, ignore);
@@ -126,6 +311,7 @@ function segment(
   b: Point,
   ignore?: string,
   wallEdges?: Map<string, boolean>,
+  broad?: BroadPhase,
 ) {
   const d = distance(a, b),
     // Leave one centimetre for native contact slop so resting on a leaf does
@@ -142,14 +328,14 @@ function segment(
       y: a.y + ((b.y - a.y) / d) * 0.06,
     };
     if (solid(f, out, pad, ignore, true)) return false;
-    return segment(f, out, b, ignore, wallEdges);
+    return segment(f, out, b, ignore, wallEdges, broad);
   }
   if (d < 1e-9) return true;
   const dx = (b.x - a.x) / d,
     dy = (b.y - a.y) / d;
   const minX = Math.min(a.x, b.x) - pad,
-    maxX = Math.max(a.x, b.x) + pad;
-  const minY = Math.min(a.y, b.y) - pad,
+    maxX = Math.max(a.x, b.x) + pad,
+    minY = Math.min(a.y, b.y) - pad,
     maxY = Math.max(a.y, b.y) + pad;
   const edgeKey = wallEdges ? `${a.x}/${a.y}/${b.x}/${b.y}` : "";
   let clear = wallEdges?.get(edgeKey);
@@ -158,8 +344,12 @@ function segment(
     wallEdges?.set(edgeKey, clear);
   }
   if (!clear) return false;
-  for (const o of f.furniture) {
-    const reach = (o.w + o.h) / 2;
+  // Broad phase: the linear scan rejected every piece whose reach box missed
+  // this padded box, so visiting exactly those buckets tests the same objects.
+  const index = broad ?? broadPhase(f);
+  for (const i of queryBuckets(index.furniture, minX, minY, maxX, maxY)) {
+    const o = f.furniture[i],
+      reach = (o.w + o.h) / 2;
     if (
       o.id === ignore ||
       o.destroyed ||
@@ -183,7 +373,15 @@ function segment(
   }
   // Terminals are approached and left, so a desk at the destination does not
   // block; a body already touching one may leave but not walk through it.
-  for (const s of solidDesks(f)) {
+  const desks = index.deskList;
+  for (const i of queryBuckets(
+    index.desks,
+    minX - deskRadius(),
+    minY - deskRadius(),
+    maxX + deskRadius(),
+    maxY + deskRadius(),
+  )) {
+    const s = desks[i];
     if (inStation(s, b, pad) || inStation(s, a, 1e-6)) continue;
     const clearance = inStation(s, a, pad) ? 0 : pad - 1e-8;
     if (rayBodyDistance(a, dx, dy, stationBody(s), clearance) < d - 1e-7)
@@ -216,14 +414,16 @@ function wallClearance(
       if (rayBodyDistance(a, dx, dy, obstacle, pad - 1e-8) < d - 1e-7)
         return false;
     }
+  const cols = floorCols(f),
+    rows = floorRows(f);
   for (
     let y = Math.max(-1, Math.floor(minY));
-    y <= Math.min(H, Math.floor(maxY));
+    y <= Math.min(rows, Math.floor(maxY));
     y++
   )
     for (
       let x = Math.max(-1, Math.floor(minX));
-      x <= Math.min(W, Math.floor(maxX));
+      x <= Math.min(cols, Math.floor(maxX));
       x++
     )
       if (
@@ -246,28 +446,179 @@ function wallClearance(
         return false;
   return true;
 }
-
+interface Graph {
+  city?: Floor["city"];
+  signature: Snapshot;
+  stamp: number;
+  points: Point[];
+  edges: Edge[][];
+  /** Point indices bucketed by integer cell, so approach links only visit
+   * nearby nodes instead of scanning the whole graph. */
+  buckets: Map<number, number[]>;
+  cols: number;
+}
+/** What survives a furniture nudge: wall clearance, whole edge tests and the
+ * solidity of every route node, each keyed by its own piece of geometry. */
+interface GraphState {
+  city?: Floor["city"];
+  stamp: number;
+  tiles: Float64Array;
+  wallEdges: Map<string, boolean>;
+  edges: Map<string, EdgeTest>;
+  solids: Int8Array;
+  signature?: Snapshot;
+}
+interface EdgeTest {
+  ok: boolean;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+const cache = new WeakMap<Floor, Graph>();
+const states = new WeakMap<Floor, GraphState>();
+/** Big maps would outgrow their usefulness on a floor nobody walks any more. */
+const MAX_EDGE_TESTS = 240000;
+let builds = 0,
+  incrementalBuilds = 0;
+/** How many route graphs this process built, and how many reused a floor's
+ * cached tests after furniture moved. */
+export function routeGraphStats() {
+  return { builds, incremental: incrementalBuilds };
+}
+export function resetRouteGraphStats() {
+  builds = 0;
+  incrementalBuilds = 0;
+}
+function poseAt(s: Snapshot, i: number, o: Floor["furniture"][number]) {
+  const j = i * POSE,
+    pose = routePose(o);
+  return (
+    s.poses[j] === pose.x &&
+    s.poses[j + 1] === pose.y &&
+    s.poses[j + 2] === o.w &&
+    s.poses[j + 3] === o.h &&
+    s.poses[j + 4] === pose.angle &&
+    s.poses[j + 5] === poseFlags(o)
+  );
+}
+/** Drop cached node solidity and edge tests that a moved, added or removed
+ * piece could touch. Everything else keeps its answer. */
+function invalidate(state: GraphState, old: Snapshot, f: Floor) {
+  const rects: number[] = [],
+    before = new Map<string, number>(),
+    live = new Set<string>();
+  old.ids.forEach((id, i) => {
+    if (!before.has(id)) before.set(id, i);
+  });
+  const mark = (x: number, y: number, w: number, h: number) => {
+    // A reach box covers every point of the piece, and the extra tile covers a
+    // segment box or node centre that merely grazes it.
+    const reach = (w + h) / 2 + 0.5;
+    rects.push(x - reach, y - reach, x + reach, y + reach);
+  };
+  for (const o of f.furniture) {
+    live.add(o.id);
+    const i = before.get(o.id);
+    if (i === undefined) {
+      mark(o.x, o.y, o.w, o.h);
+      continue;
+    }
+    if (old.kinds[i] === o.kind && poseAt(old, i, o)) continue;
+    mark(o.x, o.y, o.w, o.h);
+    mark(
+      old.poses[i * POSE],
+      old.poses[i * POSE + 1],
+      old.poses[i * POSE + 2],
+      old.poses[i * POSE + 3],
+    );
+  }
+  for (const [id, i] of before)
+    if (!live.has(id))
+      mark(
+        old.poses[i * POSE],
+        old.poses[i * POSE + 1],
+        old.poses[i * POSE + 2],
+        old.poses[i * POSE + 3],
+      );
+  if (!rects.length) return;
+  for (const [key, e] of state.edges) {
+    for (let q = 0; q < rects.length; q += 4)
+      if (!(
+        rects[q + 2] < e.x1 ||
+        rects[q] > e.x2 ||
+        rects[q + 3] < e.y1 ||
+        rects[q + 1] > e.y2
+      )) {
+        state.edges.delete(key);
+        break;
+      }
+  }
+  const cols = floorCols(f),
+    rows = floorRows(f);
+  for (let q = 0; q < rects.length; q += 4) {
+    const x1 = Math.max(0, Math.floor(rects[q])),
+      x2 = Math.min(cols - 1, Math.ceil(rects[q + 2])),
+      y1 = Math.max(0, Math.floor(rects[q + 1])),
+      y2 = Math.min(rows - 1, Math.ceil(rects[q + 3]));
+    for (let y = y1; y <= y2; y++)
+      for (let x = x1; x <= x2; x++) state.solids[y * cols + x] = -1;
+  }
+}
 function graph(f: Floor): Graph {
-  const saved = cache.get(f);
+  const saved = cache.get(f),
+    stamp = stationStamp(f);
   if (
     saved &&
     saved.city === f.city &&
-    saved.stations === stationSignature(f) &&
+    saved.stamp === stamp &&
     tilesMatch(saved.signature.tiles, f) &&
     furnitureMatches(saved.signature, f)
   )
     return saved;
-  // Wall clearance only depends on tiles, so a furniture move keeps this map.
-  let wallEdges = wallEdgeCache.get(f);
-  let tiles: Float64Array;
-  if (wallEdges && wallEdges.city === f.city && tilesMatch(wallEdges.tiles, f))
-    tiles = wallEdges.tiles;
-  else {
-    tiles = snapshotTiles(f);
-    wallEdges = { tiles, city: f.city, edges: new Map() };
-    wallEdgeCache.set(f, wallEdges);
+  builds++;
+  const cols = floorCols(f),
+    rows = floorRows(f),
+    broad = broadPhase(f);
+  let state = states.get(f);
+  const sameGrid =
+    !!state &&
+    state.city === f.city &&
+    state.stamp === stamp &&
+    state.solids.length === cols * rows &&
+    tilesMatch(state.tiles, f);
+  if (state && sameGrid) {
+    // Tiles, city and terminals held still, so only furniture can have moved.
+    if (state.signature) invalidate(state, state.signature, f);
+    incrementalBuilds++;
+  } else {
+    // Wall clearance is a property of the raster, so reuse it when it held.
+    const tiles =
+      state && tilesMatch(state.tiles, f) ? state.tiles : snapshotTiles(f);
+    state = {
+      city: f.city,
+      stamp,
+      tiles,
+      wallEdges: new Map(),
+      edges: new Map(),
+      solids: new Int8Array(cols * rows).fill(-1),
+    };
+    states.set(f, state);
   }
-  const signature = snapshotFurniture(f, tiles);
+  const signature = snapshotFurniture(f, state.tiles),
+    built = buildGraph(f, state, signature, stamp, broad);
+  if (state.edges.size > MAX_EDGE_TESTS) state.edges.clear();
+  state.signature = signature;
+  cache.set(f, built);
+  return built;
+}
+function buildGraph(
+  f: Floor,
+  state: GraphState,
+  signature: Snapshot,
+  stamp: number,
+  broad: BroadPhase,
+): Graph {
   const points: Point[] = [],
     edges: Edge[][] = [],
     grid = new Map<number, number>();
@@ -287,22 +638,53 @@ function graph(f: Floor): Graph {
     edges[a].push({ to: b, cost, action, obstacle });
     edges[b].push({ to: a, cost, action, obstacle });
   };
-  for (let y = 0; y < H; y++)
-    for (let x = 0; x < W; x++) {
-      const p = { x: x + 0.5, y: y + 0.5 };
-      if (
-        !solid(f, p, 0.22, undefined, true) &&
-        !solidDesks(f).some((s) => inStation(s, p, 0.22))
-      )
-        grid.set(y * W + x, add(p));
+  /** Segment result, remembered with the box it depends on so a far-away
+   * furniture nudge leaves it alone. Nodes are plain points, never actors. */
+  const test = (a: Point, b: Point, ignore?: string) => {
+    const key = `${ignore ?? ""}/${a.x}/${a.y}/${b.x}/${b.y}`,
+      saved = state.edges.get(key);
+    if (saved) return saved.ok;
+    const ok = segment(f, a, b, ignore, state.wallEdges, broad),
+      entry: EdgeTest = {
+        ok,
+        x1: Math.min(a.x, b.x) - 0.25,
+        y1: Math.min(a.y, b.y) - 0.25,
+        x2: Math.max(a.x, b.x) + 0.25,
+        y2: Math.max(a.y, b.y) + 0.25,
+      };
+    state.edges.set(key, entry);
+    return ok;
+  };
+  const cols = floorCols(f),
+    rows = floorRows(f);
+  for (let y = 0; y < rows; y++)
+    for (let x = 0; x < cols; x++) {
+      const key = y * cols + x,
+        p = { x: x + 0.5, y: y + 0.5 };
+      let open = state.solids[key];
+      if (open < 0) {
+        open =
+          !solid(f, p, 0.22, undefined, true) &&
+          !queryBuckets(
+            broad.desks,
+            p.x - deskRadius() - 0.22,
+            p.y - deskRadius() - 0.22,
+            p.x + deskRadius() + 0.22,
+            p.y + deskRadius() + 0.22,
+          ).some((i) => inStation(broad.deskList[i], p, 0.22))
+            ? 1
+            : 0;
+        state.solids[key] = open;
+      }
+      if (open) grid.set(key, add(p));
     }
   for (const [key, index] of grid)
-    for (const neighbor of [key + 1, key + W]) {
+    for (const neighbor of [key + 1, key + cols]) {
       const other = grid.get(neighbor);
       if (
         other !== undefined &&
         distance(points[index], points[other]) < 1.01 &&
-        segment(f, points[index], points[other], undefined, wallEdges.edges)
+        test(points[index], points[other])
       )
         link(index, other);
     }
@@ -310,11 +692,11 @@ function graph(f: Floor): Graph {
     const p = points[index];
     for (let y = Math.floor(p.y) - 2; y <= Math.floor(p.y) + 2; y++)
       for (let x = Math.floor(p.x) - 2; x <= Math.floor(p.x) + 2; x++) {
-        const other = grid.get(y * W + x);
+        const other = grid.get(y * cols + x);
         if (
           other !== undefined &&
           distance(p, points[other]) < 1.8 &&
-          walkSegment(f, p, points[other], ignore)
+          test(p, points[other], ignore)
         )
           link(index, other);
       }
@@ -356,7 +738,7 @@ function graph(f: Floor): Graph {
         for (let j = i + 1; j < nodes.length; j++)
           if (
             distance(points[nodes[i]], points[nodes[j]]) < 3.2 &&
-            walkSegment(f, points[nodes[i]], points[nodes[j]])
+            test(points[nodes[i]], points[nodes[j]])
           )
             link(nodes[i], nodes[j]);
       continue;
@@ -370,7 +752,7 @@ function graph(f: Floor): Graph {
       const b = horizontal
         ? { x: frame.x + frame.w / 2 + 0.55, y: frame.y }
         : { x: frame.x, y: frame.y + frame.h / 2 + 0.55 };
-      if (walkSegment(f, a, b, o.id)) {
+      if (test(a, b, o.id)) {
         const left = add(a),
           right = add(b);
         nearbyGrid(left, o.id);
@@ -402,7 +784,7 @@ function graph(f: Floor): Graph {
         const a = worldPoint({ x: localA.x - o.x, y: localA.y - o.y }, o),
           b = worldPoint({ x: localB.x - o.x, y: localB.y - o.y }, o);
         if (
-          !walkSegment(f, a, b, o.id) ||
+          !test(a, b, o.id) ||
           !inFurniture({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, o)
         )
           continue;
@@ -420,90 +802,159 @@ function graph(f: Floor): Graph {
       }
     }
   }
-  const result = {
+  const buckets = new Map<number, number[]>();
+  for (let i = 0; i < points.length; i++) {
+    const key = Math.floor(points[i].y) * cols + Math.floor(points[i].x),
+      list = buckets.get(key);
+    if (list) list.push(i);
+    else buckets.set(key, [i]);
+  }
+  return {
     signature,
     city: f.city,
-    stations: stationSignature(f),
+    stamp,
     points,
     edges,
+    buckets,
+    cols,
   };
-  cache.set(f, result);
-  return result;
 }
-export function survivorPath(f: Floor, start: Point, end: Point): NavStep[] {
+/** Route to an end that sits on a door leaf: the one case that needs the leaf's
+ * own frame and approach points rather than the shared grid. */
+function doorRoute(f: Floor, start: Point, end: Point): NavStep[] {
+  const door = f.furniture.find(
+    (o) => o.kind === "door" && inFurniture(end, o),
+  );
+  if (!door || (door.field && !door.door)) return [];
+  if (door.door && !door.door.latched && walkSegment(f, start, end, door.id))
+    return [{ ...end, action: "door", obstacle: door.id }];
+  const frame = doorFrame(door);
+  const options = [
+    { x: frame.x - frame.w / 2 - 0.55, y: frame.y },
+    { x: frame.x + frame.w / 2 + 0.55, y: frame.y },
+    { x: frame.x, y: frame.y - frame.h / 2 - 0.55 },
+    { x: frame.x, y: frame.y + frame.h / 2 + 0.55 },
+  ].filter(
+    (p) =>
+      distance(p, frame) < 1.9 &&
+      !solid(f, p, 0.22, undefined, true) &&
+      walkSegment(f, p, frame, door.id),
+  );
+  const routes = options
+    .map((p) => ({ p, route: survivorPaths(f, start, [p])[0] }))
+    .filter((v) => v.route.length || distance(start, v.p) < 0.04);
+  routes.sort(
+    (a, b) =>
+      a.route.reduce(
+        (n, p, i) => n + distance(i ? a.route[i - 1] : start, p),
+        0,
+      ) -
+      b.route.reduce(
+        (n, p, i) => n + distance(i ? b.route[i - 1] : start, p),
+        0,
+      ),
+  );
+  const selected = routes[0];
+  return selected
+    ? [...selected.route, { ...end, action: "door", obstacle: door.id }]
+    : [];
+}
+/** Graph nodes whose cell bucket can hold a point within the 1.8 approach
+ * radius, in ascending index order so links are built exactly as before. */
+function nearbyNodes(g: Graph, p: Point) {
+  const out: number[] = [],
+    x1 = Math.floor(p.x - 1.8),
+    x2 = Math.floor(p.x + 1.8),
+    y1 = Math.floor(p.y - 1.8),
+    y2 = Math.floor(p.y + 1.8);
+  for (let y = y1; y <= y2; y++)
+    for (let x = x1; x <= x2; x++) {
+      const list = g.buckets.get(y * g.cols + x);
+      if (list) for (const i of list) out.push(i);
+    }
+  return out.sort((a, b) => a - b);
+}
+/** Routes from one start to many ends, over one shared graph and a single
+ * Dijkstra. Each entry is the route survivorPath would return for that end. */
+export function survivorPaths(
+  f: Floor,
+  start: Point,
+  ends: Point[],
+): NavStep[][] {
   f = survivorFloor(f, start);
-  if (solid(f, start, 0.22, undefined, true)) return [];
-  if (solid(f, end, 0.22, undefined, true)) {
-    const door = f.furniture.find(
-      (o) => o.kind === "door" && inFurniture(end, o),
-    );
-    if (!door || (door.field && !door.door)) return [];
-    if (door.door && !door.door.latched && walkSegment(f, start, end, door.id))
-      return [{ ...end, action: "door", obstacle: door.id }];
-    const frame = doorFrame(door);
-    const options = [
-      { x: frame.x - frame.w / 2 - 0.55, y: frame.y },
-      { x: frame.x + frame.w / 2 + 0.55, y: frame.y },
-      { x: frame.x, y: frame.y - frame.h / 2 - 0.55 },
-      { x: frame.x, y: frame.y + frame.h / 2 + 0.55 },
-    ].filter(
-      (p) =>
-        distance(p, frame) < 1.9 &&
-        !solid(f, p, 0.22, undefined, true) &&
-        walkSegment(f, p, frame, door.id),
-    );
-    const routes = options
-      .map((p) => ({ p, route: survivorPath(f, start, p) }))
-      .filter((v) => v.route.length || distance(start, v.p) < 0.04);
-    routes.sort(
-      (a, b) =>
-        a.route.reduce(
-          (n, p, i) => n + distance(i ? a.route[i - 1] : start, p),
-          0,
-        ) -
-        b.route.reduce(
-          (n, p, i) => n + distance(i ? b.route[i - 1] : start, p),
-          0,
-        ),
-    );
-    const selected = routes[0];
-    return selected
-      ? [...selected.route, { ...end, action: "door", obstacle: door.id }]
-      : [];
+  const out: NavStep[][] = ends.map(() => []);
+  if (solid(f, start, 0.22, undefined, true)) return out;
+  const pending: number[] = [];
+  for (let k = 0; k < ends.length; k++) {
+    const end = ends[k];
+    if (solid(f, end, 0.22, undefined, true)) {
+      out[k] = doorRoute(f, start, end);
+      continue;
+    }
+    // The direct sight line is both cheapest and exactly what survivorPath
+    // returns for a clear end, so it never enters the graph at all.
+    if (walkSegment(f, start, end)) {
+      out[k] = [{ ...end }];
+      continue;
+    }
+    pending.push(k);
   }
-  if (walkSegment(f, start, end)) return [{ ...end }];
+  if (!pending.length) return out;
   const g = graph(f),
-    points = [...g.points, start, end],
-    from = points.length - 2,
-    to = points.length - 1;
-  const starts: Edge[] = [],
-    ends = new Map<number, number>();
-  for (let i = 0; i < g.points.length; i++) {
+    from = g.points.length,
+    points: Point[] = [...g.points, start];
+  const starts: Edge[] = [];
+  for (const i of nearbyNodes(g, start))
     if (distance(start, points[i]) < 1.8 && walkSegment(f, start, points[i]))
       starts.push({ to: i, cost: distance(start, points[i]) });
-    if (distance(end, points[i]) < 1.8 && walkSegment(f, end, points[i]))
-      ends.set(i, distance(end, points[i]));
-  }
+  // Every end's approach links, grouped by the graph node they leave from.
+  const linkAt = new Map<number, { k: number; cost: number }[]>();
+  pending.forEach((k, i) => {
+    const end = ends[k];
+    for (const n of nearbyNodes(g, end)) {
+      if (distance(end, points[n]) >= 1.8 || !walkSegment(f, end, points[n]))
+        continue;
+      const link = { k: i, cost: distance(end, points[n]) },
+        list = linkAt.get(n);
+      if (list) list.push(link);
+      else linkAt.set(n, [link]);
+    }
+  });
+  // One Dijkstra over the shared graph. Node costs never depend on which ends
+  // are asked for, so a single search prices all of them; only the approach
+  // links differ, and those are read off the finished cost field.
   const costs = new Float64Array(points.length).fill(Infinity),
     previous = new Int32Array(points.length).fill(-1),
     via: (Edge | undefined)[] = [],
-    closed = new Uint8Array(points.length);
+    closed = new Uint8Array(points.length),
+    best = new Float64Array(pending.length).fill(Infinity),
+    bestNode = new Int32Array(pending.length).fill(-1);
   costs[from] = 0;
   const heap = new MinHeap();
   heap.push(from, 0);
+  let open = pending.length,
+    worst = Infinity;
   while (heap.length) {
     const [node, cost] = heap.pop();
+    // Once every end has a route, nodes this far away cannot improve one.
+    if (!open && cost >= worst) break;
     if (closed[node]) continue;
     closed[node] = 1;
-    if (node === to) break;
-    const outgoing =
-      node === from
-        ? starts
-        : [
-            ...g.edges[node],
-            ...(ends.has(node) ? [{ to, cost: ends.get(node)! }] : []),
-          ];
-    for (const e of outgoing)
+    const links = linkAt.get(node);
+    if (links)
+      for (const link of links) {
+        const total = cost + link.cost;
+        if (total >= best[link.k]) continue;
+        best[link.k] = total;
+        bestNode[link.k] = node;
+        open = 0;
+        worst = 0;
+        for (const value of best)
+          if (Number.isFinite(value)) worst = Math.max(worst, value);
+          else open++;
+      }
+    const outward = node === from ? starts : g.edges[node];
+    for (const e of outward)
       if (!closed[e.to] && cost + e.cost < costs[e.to]) {
         costs[e.to] = cost + e.cost;
         previous[e.to] = node;
@@ -511,16 +962,42 @@ export function survivorPath(f: Floor, start: Point, end: Point): NavStep[] {
         heap.push(e.to, costs[e.to]);
       }
   }
-  if (previous[to] < 0) return [];
-  const result: NavStep[] = [];
-  for (let i = to; i !== from; i = previous[i]) {
-    if (i < 0) return [];
-    const edge = via[i];
-    result.push(
-      edge?.action
-        ? { ...points[i], action: edge.action, obstacle: edge.obstacle }
-        : { ...points[i] },
-    );
+  // The tree depends only on the graph and the start, never on which ends were
+  // asked for, so every end gets the route a lone search would give it.
+  pending.forEach((k, i) => {
+    if (bestNode[i] < 0) return;
+    const route: NavStep[] = [];
+    for (let n = bestNode[i]; n !== from; n = previous[n]) {
+      if (n < 0 || route.length > points.length) return;
+      const edge = via[n];
+      route.push(
+        edge?.action
+          ? { ...points[n], action: edge.action, obstacle: edge.obstacle }
+          : { ...points[n] },
+      );
+    }
+    // The approach link into the end is a plain step, as in a lone search.
+    out[k] = [...route.reverse(), { ...ends[k] }];
+  });
+  return out;
+}
+export function survivorPath(f: Floor, start: Point, end: Point): NavStep[] {
+  return survivorPaths(f, start, [end])[0];
+}
+/** Raw route graph for tests: points in build order and every edge. */
+export function routeGraphSnapshot(f: Floor) {
+  const g = graph(f);
+  return {
+    points: g.points.map((p) => ({ ...p })),
+    edges: g.edges.map((list) => list.map((e) => ({ ...e }))),
+  };
+}
+/** Test hook: the graph as built, optionally after dropping every cache. */
+export function __graphForTest(f: Floor, options?: { fresh?: boolean }) {
+  if (options?.fresh) {
+    cache.delete(f);
+    states.delete(f);
+    broadCache.delete(f);
   }
-  return result.reverse();
+  return routeGraphSnapshot(f);
 }

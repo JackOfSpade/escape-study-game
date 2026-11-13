@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -7,7 +7,9 @@ import test from "node:test";
 import { taskProfile } from "../scripts/claude-gateway.mjs";
 import {
   CASES_FILE,
+  readPlaceFile,
   runDesignArm,
+  runDesignSeeds,
   type DesignGatewayFactory,
   type DesignGatewayOptions,
 } from "../scripts/ai-capture/design-arm";
@@ -26,9 +28,15 @@ function fakeFactory({ fail = false } = {}) {
     options: DesignGatewayOptions;
     phases: string[];
     profiles: any[];
+    payloads: any[];
   }[] = [];
   const factory: DesignGatewayFactory = (options) => {
-    const arm = { options, phases: [] as string[], profiles: [] as any[] };
+    const arm = {
+      options,
+      phases: [] as string[],
+      profiles: [] as any[],
+      payloads: [] as any[],
+    };
     arms.push(arm);
     return {
       run: async (operation, payload: any) => {
@@ -36,6 +44,8 @@ function fakeFactory({ fail = false } = {}) {
         const profile = options.profileFor(operation, payload);
         arm.phases.push(payload.phase);
         arm.profiles.push(profile);
+        // Keep the exact request the pipeline sent, so a place can be read back.
+        arm.payloads.push(structuredClone(payload));
         options.usageLog({
           v: 1,
           at: new Date(NOW).toISOString(),
@@ -218,4 +228,159 @@ test("a temporary output directory is refused unless the caller opts in", async 
     }),
     /Refusing output directory/,
   );
+});
+
+/** The place the escape area designer would ask for, as a CLI file holds it. */
+const PLACE = {
+  tag: "kestrel-point",
+  name: "Kestrel Point Light",
+  brief:
+    "A storm-battered lighthouse on a granite spit, kept by two relief keepers.",
+};
+const placeId = (tag: string) => `design-seed-${SEED}-place-${tag}`;
+
+test("a place arm names its case after the place and asks for that place", async () => {
+  const out = join(store(), "run");
+  const { factory, arms } = fakeFactory();
+  const result = await runDesignArm({
+    setting: "sonnet:medium",
+    seed: SEED,
+    out,
+    ephemeral: true,
+    gatewayFactory: factory,
+    now: () => NOW,
+    place: PLACE,
+  });
+  assert.equal(result.skipped, false);
+  assert.equal(result.row.caseId, placeId(PLACE.tag));
+  assert.equal(result.row.outcome, "valid");
+  assert.equal(arms.length, 1);
+  // The first design-run request is the concepts phase, and it carries the place.
+  const [first] = arms[0].payloads;
+  assert.equal(first.phase, "concepts");
+  assert.deepEqual(first.place, { name: PLACE.name, brief: PLACE.brief });
+  for (const payload of arms[0].payloads)
+    assert.deepEqual(payload.place, {
+      name: PLACE.name,
+      brief: PLACE.brief,
+    });
+  const written = readFileSync(join(out, "results.jsonl"), "utf8")
+    .split("\n")
+    .filter(Boolean);
+  assert.deepEqual(
+    written.map((line) => JSON.parse(line).caseId),
+    [placeId(PLACE.tag)],
+  );
+  assert.deepEqual(JSON.parse(readFileSync(join(out, CASES_FILE), "utf8")), [
+    {
+      id: placeId(PLACE.tag),
+      operation: "design-run",
+      payload: {
+        seed: SEED,
+        note: "full pipeline",
+        place: { name: PLACE.name, brief: PLACE.brief },
+      },
+    },
+  ]);
+});
+
+test("a recorded place row is skipped on resume while the plain seed row is not", async () => {
+  const out = join(store(), "run");
+  const { factory, arms } = fakeFactory();
+  const base = {
+    setting: "sonnet:medium",
+    seed: SEED,
+    out,
+    ephemeral: true,
+    gatewayFactory: factory,
+    now: () => NOW,
+  };
+  const recorded = await runDesignArm({ ...base, place: PLACE });
+  assert.equal(recorded.skipped, false);
+  const resumed = await runDesignArm({ ...base, place: PLACE });
+  assert.equal(resumed.skipped, true);
+  assert.equal(resumed.row.caseId, placeId(PLACE.tag));
+  assert.equal(arms.length, 1);
+  // The same seed without a place is a different case, so it still runs.
+  const plain = await runDesignArm(base);
+  assert.equal(plain.skipped, false);
+  assert.equal(plain.row.caseId, `design-seed-${SEED}`);
+  assert.equal(arms.length, 2);
+  const lines = readFileSync(join(out, "results.jsonl"), "utf8")
+    .split("\n")
+    .filter(Boolean);
+  assert.deepEqual(
+    lines.map((line) => JSON.parse(line).caseId),
+    [placeId(PLACE.tag), `design-seed-${SEED}`],
+  );
+  assert.deepEqual(
+    JSON.parse(readFileSync(join(out, CASES_FILE), "utf8")).map(
+      (entry: { id: string }) => entry.id,
+    ),
+    [placeId(PLACE.tag), `design-seed-${SEED}`],
+  );
+  // The seed batch forwards its own place: a fresh tag is not the plain row.
+  const batch = await runDesignSeeds({
+    settings: "sonnet:medium",
+    seeds: String(SEED),
+    out,
+    ephemeral: true,
+    gatewayFactory: factory,
+    now: () => NOW,
+    place: { ...PLACE, tag: "kestrel-point-2" },
+  });
+  assert.equal(batch.length, 1);
+  assert.equal(batch[0].row.caseId, placeId("kestrel-point-2"));
+  assert.equal(arms.length, 3);
+});
+
+test("an invalid place is rejected before any case file or gateway", async () => {
+  const out = join(store(), "run");
+  const { factory, arms } = fakeFactory();
+  await assert.rejects(
+    runDesignArm({
+      setting: "sonnet:medium",
+      seed: SEED,
+      out,
+      ephemeral: true,
+      gatewayFactory: factory,
+      now: () => NOW,
+      place: { ...PLACE, tag: "Kestrel Point" },
+    }),
+    /Place tag must be a lowercase slug/,
+  );
+  await assert.rejects(
+    runDesignSeeds({
+      settings: "sonnet:medium",
+      seeds: String(SEED),
+      out,
+      ephemeral: true,
+      gatewayFactory: factory,
+      now: () => NOW,
+      place: { ...PLACE, tag: "kestrel_point" },
+    }),
+    /Place tag must be a lowercase slug/,
+  );
+  await assert.rejects(
+    runDesignArm({
+      setting: "sonnet:medium",
+      seed: SEED,
+      out,
+      ephemeral: true,
+      gatewayFactory: factory,
+      now: () => NOW,
+      place: { ...PLACE, brief: "" },
+    }),
+    /Place brief must be 1-600 characters/,
+  );
+  assert.equal(arms.length, 0);
+  assert.equal(existsSync(join(out, CASES_FILE)), false);
+  assert.equal(existsSync(join(out, "results.jsonl")), false);
+  // The CLI reads the same validated object from a JSON file.
+  const file = join(store(), "place.json");
+  writeFileSync(file, JSON.stringify(PLACE));
+  assert.deepEqual(readPlaceFile(file), PLACE);
+  const bad = join(store(), "bad-place.json");
+  writeFileSync(bad, JSON.stringify({ ...PLACE, tag: "Kestrel Point" }));
+  assert.throws(() => readPlaceFile(bad), /Place tag must be a lowercase slug/);
 });

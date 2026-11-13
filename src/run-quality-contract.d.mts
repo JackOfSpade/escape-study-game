@@ -39,6 +39,11 @@ export interface QualityContentPlan {
   rooms: QualityRoomPlan[];
   fragments: RepeatFragment[];
 }
+/** The exact place a designed run must be, when the caller names one. */
+export interface QualityPlace {
+  name: string;
+  brief: string;
+}
 interface QualityRequestBase {
   version: 3;
   designVersion: 3;
@@ -47,6 +52,7 @@ interface QualityRequestBase {
   seed: number;
   recent: RunDesignSummary[];
   recentContent: EnvironmentSummary[];
+  place?: QualityPlace;
 }
 export interface QualityConceptsRequest extends QualityRequestBase {
   phase: "concepts";

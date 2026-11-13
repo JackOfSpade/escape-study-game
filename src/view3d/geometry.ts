@@ -16,6 +16,9 @@ export class GeometryChangeCache {
   private floor?: FloorGeometry;
   private rows = new Uint32Array(0);
   private walls = new Uint8Array(0);
+  /** Raster extent of the snapshot; grows when a floor's raster grows. */
+  private cols = -1;
+  private gridRows = -1;
   private index = NaN;
   private stairsX = NaN;
   private stairsY = NaN;
@@ -27,6 +30,12 @@ export class GeometryChangeCache {
     let count = 0,
       changed = this.floor !== floor;
     for (let y = 0; y < tiles.length; y++) count += tiles[y].length;
+    const cols = tiles[0]?.length ?? 0;
+    if (this.cols !== cols || this.gridRows !== tiles.length) {
+      this.cols = cols;
+      this.gridRows = tiles.length;
+      changed = true;
+    }
     if (this.rows.length !== tiles.length || this.walls.length !== count) {
       this.rows = new Uint32Array(tiles.length);
       this.walls = new Uint8Array(count);

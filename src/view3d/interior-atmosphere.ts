@@ -25,9 +25,11 @@ import {
   interiorHash,
   lightAt,
   PhoneLightState,
+  regionAt,
   type InteriorLighting,
 } from "../interior-lighting";
 import { CONFIG, type Floor, type Furniture, type Game } from "../model";
+import type { Site } from "../site";
 import { FLOOR_HEIGHT } from "../stair-route";
 import { playerCanSee } from "../visibility";
 import { furnitureHeightOf } from "./furniture-height";
@@ -64,6 +66,8 @@ interface FloorAtmosphere {
   /** Authored cards belong to this floor; legacy cards stay shared. */
   authoredMaterials?: MeshStandardMaterial[];
   authoredScene?: AuthoredScene;
+  /** Authored scenes of the stamped sites, already offset to their origins. */
+  siteScenes?: AuthoredScene[];
   environmentSurfaces?: EnvironmentSurfaces;
   furnishings: Furnishing[];
 }
@@ -411,14 +415,14 @@ export class InteriorAtmosphere {
     this.group.add(this.dust);
   }
 
-  build(floor: Floor, seed: number) {
+  build(floor: Floor, seed: number, sites: readonly Site[] = []) {
     if (this.disposed) return;
     const previous = this.floors.get(floor);
     if (previous) this.releaseFloor(previous);
     const group = new Group();
     group.name = `office-atmosphere-${floor.index}`;
     group.position.y = floor.index * FLOOR_HEIGHT;
-    const plan = buildInteriorLighting(floor, seed),
+    const plan = buildInteriorLighting(floor, seed, sites),
       authoredMaterials = (
         floor.design && "stories" in floor.design
           ? floor.design.stories
@@ -436,14 +440,14 @@ export class InteriorAtmosphere {
         group,
         new BoxGeometry(1, 1, 1),
         this.solidMaterial,
-        2048,
+        2048 * Math.max(1, sites.length + 1),
         false,
       ),
       tubes = new InstancePool(
         group,
         new BoxGeometry(1, 1, 1),
         this.tubeMaterial,
-        128,
+        128 * Math.max(1, sites.length + 1),
         false,
       ),
       cards = (
@@ -574,6 +578,17 @@ export class InteriorAtmosphere {
     if (floor.scene) {
       context.authoredScene = new AuthoredScene(floor, this.lightmap);
       group.add(context.authoredScene.group);
+    }
+    // A stamped site is dressed from its own local scene, offset to its origin.
+    for (const region of plan.regions ?? []) {
+      if (!region.site || !region.floor.scene) continue;
+      const authored = new AuthoredScene(
+        region.floor,
+        this.lightmap,
+        region.origin,
+      );
+      context.siteScenes = [...(context.siteScenes ?? []), authored];
+      group.add(authored.group);
     }
     if (floor.environment) {
       context.environmentSurfaces = new EnvironmentSurfaces(
@@ -740,6 +755,7 @@ export class InteriorAtmosphere {
     calm?: boolean,
   ) {
     context.authoredScene?.sync(time, calm);
+    for (const scene of context.siteScenes ?? []) scene.sync(time, calm);
     context.environmentSurfaces?.sync();
     for (const { object, details } of context.furnishings) {
       const angle = object.angle ?? 0,
@@ -786,7 +802,7 @@ export class InteriorAtmosphere {
       }
     const player = game.survivors[0],
       floor = game.floors[player.floor];
-    if (!this.floors.has(floor)) this.build(floor, game.seed);
+    if (!this.floors.has(floor)) this.build(floor, game.seed, game.sites ?? []);
     const active = this.floors.get(floor)!;
     for (const [other, context] of this.floors) {
       context.group.visible =
@@ -795,8 +811,9 @@ export class InteriorAtmosphere {
         this.syncFurnishings(context, game.time, !!game.settings.reducedFlash);
     }
     const feet = player.elevated?.feet ?? player.floor * FLOOR_HEIGHT,
+      insideSite = !!regionAt(active.plan, player)?.site,
       indoors =
-        !outsideBuilding(floor, player.x, player.y) &&
+        (insideSite || !outsideBuilding(floor, player.x, player.y)) &&
         feet >= floor.index * FLOOR_HEIGHT - 0.3 &&
         feet < floor.index * FLOOR_HEIGHT + 2.82;
     this.currentLight = indoors ? lightAt(active.plan, player) : 1;
@@ -849,7 +866,8 @@ export class InteriorAtmosphere {
     const player = game.survivors[0],
       enabled =
         floor.index < CONFIG.floors &&
-        !outsideBuilding(floor, player.x, player.y),
+        (!!regionAt(active.plan, player)?.site ||
+          !outsideBuilding(floor, player.x, player.y)),
       range = FIXTURE_RANGE - 0.5,
       fade = 1.5;
     if (this.practicalFloor !== floor.index) {
@@ -947,6 +965,7 @@ export class InteriorAtmosphere {
 
   private releaseFloor(context: FloorAtmosphere) {
     context.authoredScene?.dispose();
+    for (const scene of context.siteScenes ?? []) scene.dispose();
     context.environmentSurfaces?.dispose();
     this.lightmap.clear(context.plan.floor.index);
     for (const pool of [context.solids, context.tubes, ...context.cards])

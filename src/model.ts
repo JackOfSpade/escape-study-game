@@ -281,6 +281,16 @@ export interface Actor extends Point {
     obstacles?: string[];
   };
   seen: string[];
+  /** Escape redesign: this NPC's social state (awareness, model of the player, goal). Reset each loop. */
+  socialState?: import("./escape-types").NpcSocial;
+  /** Escape redesign: world time this actor fell; dead actors stay as bodies and are never removed. */
+  downAt?: number;
+  /** Continuous world: the site this person lives and works in (absent = start building). */
+  home?: string;
+  /** Escape redesign: the NPC escorting this (human) actor; movement follows the escort. */
+  escortedBy?: string;
+  /** Escape redesign: turn to face this point until the given time (speaking to someone). */
+  lookAt?: { x: number; y: number; until: number };
 }
 export interface Zombie extends Point {
   /** Physical city route retained across saves until the zombie reaches the door. */
@@ -297,6 +307,10 @@ export interface Zombie extends Point {
   memory: number;
   stagger: number;
   origin: "outside";
+  /** Escape redesign: a catastrophe hunter (behaviour index into the spec). Hunters are kept as bodies when killed. */
+  hunter?: number;
+  /** Escape redesign: world time a hunter died; its body stays. */
+  downAt?: number;
   stairUntil?: number;
   /** This zombie's own recent search, retained across checkpoints. */
   search?: {
@@ -389,12 +403,16 @@ export interface Furniture extends Point {
   doorStyle?: DoorStyle;
   physics?: PhysicsMotion;
   door?: DoorState;
+  /** Escape redesign: a lock that stops the door being opened from one side. Anyone on the other side can unlock it. */
+  lock?: { side: -1 | 1; by: string; at: number };
   lastMoveTick?: number;
   /** Game time of the last zombie strike; drives the brief 2D impact shake. */
   struckAt?: number;
   initial?: { x: number; y: number; w: number; h: number; angle?: number };
   angle?: number;
   id: string;
+  /** Continuous world: the site this piece was stamped from (absent = start site). */
+  site?: string;
   floor: number;
   kind: FurnitureKind;
   w: number;
@@ -413,6 +431,8 @@ export interface Furniture extends Point {
 }
 export interface Station extends Point {
   id: string;
+  /** Continuous world: the site this station was stamped from (absent = start site). */
+  site?: string;
   encounter: string;
   /** Which way along y the screen faces; settled on first use by `stationFacing`. */
   facing?: 1 | -1;
@@ -446,6 +466,12 @@ export interface Floor {
   /** Persisted physical ground-level streets and urban obstacles for fresh runs. */
   city?: import("./city-layout").CityPlan;
   boundary?: BuildingFootprint;
+  /**
+   * Continuous world: footprints (world coordinates, rows indexed by absolute
+   * y like `boundary`) of the other sites with a storey on this floor, and
+   * each site's origin. The outdoor plan treats them as authored buildings.
+   */
+  shells?: { site: string; boundary: BuildingFootprint; origin: Point }[];
   /** Room functions chosen when the floor was furnished (generation only). */
   office?: { zone: string; type: OfficeRoomType }[];
   blood?: (string | undefined)[];
@@ -692,6 +718,12 @@ export interface Game {
   preparingRun?: boolean;
   /** Accepted AI blueprint and provenance. Loading never requests a replacement. */
   design?: import("./run-design-contract.mjs").SavedRunDesign;
+  /** Continuous world: buildings stamped into these floors besides the start building (src/site.ts). */
+  sites?: import("./site").Site[];
+  /** Escape redesign: which area of the game this is (undefined = the start area). */
+  areaId?: string;
+  /** Escape redesign state (docs/ESCAPE_REDESIGN.md). Absent on older saves, which keep their historical behaviour. */
+  escape?: import("./escape-types").EscapeState;
   /** Study workspace freezes the saved world while a question is open. */
   studyWorkspace?: { enabled: boolean; wasPaused: boolean; encounter?: string };
   fieldPacing?: import("./field-pacing").FieldPacing;

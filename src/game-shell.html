@@ -27,7 +27,7 @@
         </div>
         <canvas
           id="view3d"
-          aria-label="First-person survival game. Move the mouse to look around. Use WASD to move, left/right arrows to turn, up/down arrows to look up and down, E to interact, and Escape to pause and release the mouse."
+          aria-label="First-person survival game. Move the mouse to look around. Use WASD to move, left/right arrows to turn, up/down arrows to look up and down, E to interact, F to try, use or read something, Enter to talk, J for the journal, and Escape to pause and release the mouse."
           tabindex="0"
           hidden
         ></canvas>
@@ -52,7 +52,25 @@
             <span id="reply-pause-detail"></span>
           </div>
         </div>
+        <div id="world-loading" class="reply-pause" hidden>
+          <div class="reply-pause-card">
+            <span class="reply-pause-icon" aria-hidden="true"></span>
+            <strong id="world-loading-text"></strong>
+            <span class="muted">The world is paused while it is built.</span>
+          </div>
+        </div>
         <div id="start-card" class="overlay"></div>
+        <section
+          id="epilogue-panel"
+          class="overlay epilogue"
+          aria-labelledby="epilogue-title"
+          hidden
+        >
+          <span class="eyebrow">LAST GAME</span>
+          <h2 id="epilogue-title">How the last game ended</h2>
+          <div id="epilogue-text" class="epilogue-text"></div>
+          <p class="muted">Preparing a new building…</p>
+        </section>
         <div id="spectator" class="spectator" hidden>
           <span class="eyebrow">SPECTATING</span>
           <div id="spectator-floors" role="group" aria-label="Floor"></div>
@@ -130,6 +148,17 @@
       <section class="feed">
         <span class="eyebrow">BUILDING FREQUENCY</span>
         <div id="event-feed"></div>
+      </section>
+      <section class="escape-task">
+        <span class="eyebrow">TASK</span>
+        <p id="task-indicator" hidden></p>
+      </section>
+      <section id="journal-panel" class="journal" aria-label="Journal" hidden>
+        <div class="section-row">
+          <span class="eyebrow">JOURNAL</span>
+          <span class="muted">J closes</span>
+        </div>
+        <div id="journal-lines"></div>
       </section>
     </aside>
     <section id="terminal" hidden>
@@ -288,7 +317,7 @@
       Restart run · keep learning progress
     </button>
     <button id="generate-run" class="quiet">
-      Generate new level · later restarts use it
+      New game · a new building and a new catastrophe
     </button>
     <button id="save-quit" class="quiet">Save and quit</button>
     <section class="pause-controls" aria-labelledby="pause-controls-title">
@@ -297,6 +326,9 @@
         <li><kbd>WASD</kbd> move</li>
         <li id="arrow-hint"><kbd>←/→</kbd> turn · <kbd>↑/↓</kbd> walk</li>
         <li><kbd>E</kbd> interact</li>
+        <li><kbd>F</kbd> try, use or read something</li>
+        <li><kbd>Enter</kbd> talk out loud</li>
+        <li><kbd>J</kbd> journal</li>
         <li><kbd>Space</kbd> jump barricade</li>
         <li><kbd>Esc</kbd> pause / resume</li>
       </ul>
@@ -424,6 +456,20 @@
         <p id="bridge-detail"></p>
       </div>
       <button id="settings-close">Done</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="gender-dialog" class="gender-dialog" aria-labelledby="gender-title">
+  <div class="gender-card">
+    <span class="eyebrow">NEW GAME</span>
+    <h2 id="gender-title">Whose voice is yours?</h2>
+    <p>
+      Your voice is drawn from this choice and kept for every loop of this game.
+    </p>
+    <div class="gender-actions">
+      <button type="button" id="gender-man">Play as a man</button>
+      <button type="button" id="gender-woman">Play as a woman</button>
     </div>
   </div>
 </dialog>

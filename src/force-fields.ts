@@ -91,6 +91,19 @@ export function fieldRouteSignature(f: Floor, a: Actor) {
     .map((o) => `${o.id}:${fieldAllows(o, a)}`)
     .join(";")}`;
 }
+/** One actor's field access on a floor as a compact token: key possession plus
+ * one admission bit per field in furniture order. Route invalidation and floor
+ * views share it so both read "has this actor's access changed?" the same way
+ * without rebuilding a furniture-wide geometry string. */
+export function fieldAccessKey(
+  f: Floor,
+  a: Pick<Actor, "id" | "access" | "keys">,
+) {
+  let access = (a.keys ?? 0) > 0 ? "k" : "-";
+  for (const o of f.furniture)
+    if (o.field) access += fieldAllows(o, a) ? "1" : "0";
+  return access;
+}
 export function useField(g: Game, a: Actor, o: Furniture) {
   if (!o.field) return false;
   if (fieldAllows(o, a)) {
@@ -368,7 +381,10 @@ function ejectFromField(g: Game, o: Furniture, a: Actor, side: number) {
 
 /** Resolve actual swept first touches atomically after every native physics substep. */
 export function updateFields(g: Game, previous?: ReadonlyMap<string, Point>) {
-  for (const floor of g.floors)
+  for (const floor of g.floors) {
+    // One alive-people list per floor, not per field: the filter used to run
+    // once for every field on the floor.
+    let people: Actor[] | undefined;
     for (const o of floor.furniture) {
       const f = o.field;
       if (!f || o.destroyed) continue;
@@ -379,15 +395,25 @@ export function updateFields(g: Game, previous?: ReadonlyMap<string, Point>) {
         if (f.limit !== undefined) f.used = Math.min(f.limit, f.used);
         f.touchVersion = 1;
       }
-      const people = g.survivors.filter(
+      people ??= g.survivors.filter(
         (a) => a.alive && !a.escaped && a.floor === floor.index,
       );
       f.crossing = f.crossing.filter((id) =>
-        people.some(
+        people!.some(
           (a) => a.id === id && inFurniture(a, o, FIELD_RADIUS + 0.03),
         ),
       );
+      // Anyone whose current and previous position both sit outside this reach
+      // cannot touch or sweep across the field, so they are skipped unexamined.
+      const reach = Math.max(o.w, o.h) / 2 + FIELD_RADIUS + 1;
       const candidates = people
+        .filter((a) => {
+          const from = previous?.get(a.id) ?? a;
+          return (
+            Math.hypot(a.x - o.x, a.y - o.y) <= reach ||
+            Math.hypot(from.x - o.x, from.y - o.y) <= reach
+          );
+        })
         .map((a) => {
           const from = previous?.get(a.id) ?? a;
           const length = Math.hypot(a.x - from.x, a.y - from.y);
@@ -462,6 +488,7 @@ export function updateFields(g: Game, previous?: ReadonlyMap<string, Point>) {
         if (!inFurniture(a, o, FIELD_RADIUS + 0.03))
           f.sides[a.id] = fieldSide(o, a);
     }
+  }
 }
 export const DOOR_LEAF = {
   openSeconds: 0.3,
@@ -611,9 +638,13 @@ export function survivorFloor(f: Floor, p: Point): Floor {
   // The view shares every non-field object by reference, so only fields and
   // the set of objects decide whether it must be rebuilt.
   const keyed = (a.keys ?? 0) > 0;
+  // A view depends only on which fields this actor's access answers the same
+  // way, so actors with the same answer share one view, and with it one route
+  // graph. Keying by id built a private full graph for every NPC.
+  const access = fieldAccessKey(f, a);
   let map = views.get(f);
   if (!map) views.set(f, (map = new Map()));
-  const old = map.get(a.id);
+  const old = map.get(access);
   if (
     old &&
     old.floor.tiles === f.tiles &&
@@ -639,6 +670,6 @@ export function survivorFloor(f: Floor, p: Point): Floor {
       }),
   };
   virtual.add(view);
-  map.set(a.id, { signature: viewSignature(f, a, keyed), floor: view });
+  map.set(access, { signature: viewSignature(f, a, keyed), floor: view });
   return view;
 }

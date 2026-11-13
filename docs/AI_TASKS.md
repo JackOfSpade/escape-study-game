@@ -16,6 +16,13 @@ The operation names, their instructions and the validators that check each answe
 | `reconcile-roadmap`                       | A proposal for reconciling an uploaded roadmap revision                                               |
 | `npc-chatter`, `npc-chatter-review`       | A background NPC line and its critic pass                                                             |
 | `design-run`                              | The staged AI design of a new run (see [AI-authored runs](AI_RUN_DESIGNS.md))                         |
+| `escape-catastrophe`                      | The sealed catastrophe of a new escape game, from the setting only ([escape redesign](ESCAPE_REDESIGN.md)) |
+| `escape-engage`                           | What the player learns from trying or reading something: facts, an optional task or a new area       |
+| `escape-converse`                         | One NPC line in an open conversation, with a structured outcome the game validates                    |
+| `escape-pa`                               | One PA announcement (routine, incident, borderline or escalation)                                     |
+| `escape-intent`                           | Likely player goals, used only to pre-generate areas                                                  |
+| `escape-area`                             | The plan (name, rooms, people) of a newly reached area                                                |
+| `escape-epilogue`                         | What was supposed to happen and what did, written when a loop ends and shown only on New game        |
 
 The gateway does not offer `retrospective-group` or `autonomous-work`.
 
