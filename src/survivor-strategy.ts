@@ -1,12 +1,5 @@
-import {
-  HELIPAD,
-  HELIPAD_RADIUS,
-  distance,
-  rand,
-  type Actor,
-  type Game,
-  type Point,
-} from "./model";
+import { distance, rand, type Actor, type Game, type Point } from "./model";
+import { extractionPoints } from "./site";
 import { survivorPath, walkSegment, type NavStep } from "./navigation";
 import { solid } from "./spatial";
 
@@ -50,6 +43,9 @@ export function chooseRetreat(
   pickup: boolean,
 ) {
   const f = g.floors[a.floor],
+    // The pickup of the run: a building's roof helipad or an open site's
+    // ground pad. Retreating toward it only helps on its own floor.
+    pad = extractionPoints(g)[0],
     options: { point: Point; score: number }[] = [];
   const add = (point: Point, route: Point[], vaults = 0) => {
     if (solid(f, point)) return;
@@ -77,9 +73,8 @@ export function chooseRetreat(
         danger -
         routeContacts(a, route, enemies) * CONTACT_PENALTY -
         vaults * 0.5 +
-        (pickup
-          ? -Math.max(0, distance(point, HELIPAD) - HELIPAD_RADIUS) *
-            (1 + a.risk * 0.4)
+        (pickup && a.floor === pad.floor
+          ? -Math.max(0, distance(point, pad) - pad.radius) * (1 + a.risk * 0.4)
           : 0) +
         (a.access.includes(a.floor) ? -distance(point, f.stairs) * 0.15 : 0) +
         rand(g) * 0.4,
@@ -169,10 +164,13 @@ export function routeContacts(origin: Point, route: Point[], enemies: Point[]) {
 }
 export function unsafeReturn(g: Game, a: Actor, enemies: Point[]) {
   const f = g.floors[a.floor],
-    e = a.intent ? g.encounters[a.intent] : undefined;
+    e = a.intent ? g.encounters[a.intent] : undefined,
+    // The run's pickup replaces the roof assumption: an open site's ground pad
+    // is reached from its own floor, a building's helipad only from the roof.
+    pad = extractionPoints(g)[0];
   const target =
-    a.floor === g.floors.length - 1
-      ? HELIPAD
+    a.floor === pad.floor
+      ? pad
       : a.access.includes(a.floor)
         ? f.stairs
         : e && e.floor === a.floor && e.state !== "consumed"

@@ -12,12 +12,17 @@
 import {
   CONFIG,
   H,
+  HELIPAD,
+  HELIPAD_RADIUS,
   W,
   type BuildingFootprint,
+  type ExtractionPoint,
   type Floor,
   type Game,
   type Point,
 } from "./model";
+
+export type { ExtractionPoint };
 
 /** A building stamped into the shared floors at a world offset. */
 export interface Site {
@@ -42,6 +47,12 @@ export interface Site {
    * sectors, rooms) from here; the simulation uses the stamped shared floors.
    */
   localFloors?: Floor[];
+  /**
+   * Where this site's survivors are picked up, in world coordinates. An open
+   * site extracts on its ground floor; absent means the start building's
+   * rooftop helipad, which the engine assumes for its one building.
+   */
+  extraction?: ExtractionPoint;
 }
 
 /** World position of a point given in a site's local coordinates. */
@@ -154,4 +165,35 @@ export function stairMarkers(
       out.push({ site, direction: "down", at: down });
   }
   return out;
+}
+
+/**
+ * Retained for callers that still widen `Game`; the field itself now lives on
+ * `Game` in src/model.ts and needs no cast.
+ */
+export type GameWithExtraction = Game & { extraction?: ExtractionPoint };
+
+/**
+ * Every extraction point in the world, the start building's first: its own
+ * `extraction` when set, otherwise today's rooftop helipad, then each extra
+ * site's own pickup (already in world coordinates).
+ */
+export function extractionPoints(g: Game): ExtractionPoint[] {
+  const start = g.extraction;
+  const points: ExtractionPoint[] = [
+    start
+      ? { ...start }
+      : {
+          floor: CONFIG.floors,
+          x: HELIPAD.x,
+          y: HELIPAD.y,
+          radius: HELIPAD_RADIUS,
+        },
+  ];
+  for (const site of g.sites ?? []) {
+    const extraction = site.extraction;
+    if (extraction)
+      points.push({ ...extraction, site: extraction.site ?? site.id });
+  }
+  return points;
 }

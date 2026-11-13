@@ -10,12 +10,17 @@ import {
   MeshStandardMaterial,
 } from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
-import { CONFIG, type Floor } from "../model";
+import { CONFIG, type Floor, type Point } from "../model";
 import { FLOOR_HEIGHT } from "../stair-route";
 import { outsideBuilding, siteFootprints } from "./exterior-layout";
-import type { RunFacade, RunWindowStyle } from "../setting-catalog.mjs";
-import { resolveRoofFeatures } from "../venue";
+import type {
+  RunFacade,
+  RunWallFinish,
+  RunWindowStyle,
+} from "../setting-catalog.mjs";
+import { resolveGroundFeatures, resolveRoofFeatures } from "../venue";
 import { PartAnimator, roofFeatureParts } from "./roof-features";
+import { wallMaterialParams, wallTexture } from "./wall-textures";
 
 export interface PerimeterWindow {
   x: number;
@@ -153,6 +158,10 @@ const COURSE: Partial<Record<RunFacade, { height: number; grow: number }>> = {
   brick: { height: 0.28, grow: 0.012 },
   clapboard: { height: 0.23, grow: 0.03 },
   metal: { height: 0.7, grow: 0 },
+  // Heavy ashlar: fewer, taller courses that stand slightly proud of the line.
+  stone: { height: 0.4, grow: 0.015 },
+  // Stacked logs: deep alternating relief between the courses.
+  timber: { height: 0.3, grow: 0.04 },
 };
 
 function noise(a: number, b: number, c: number) {
@@ -167,6 +176,24 @@ function noise(a: number, b: number, c: number) {
 function tone(hex: string, factor: number) {
   return `#${new Color(hex).multiplyScalar(factor).getHexString()}`;
 }
+
+/** Liner UVs measured in metres, one finish repeat per metre, taken along the
+ * face each vertex belongs to so upright and overhead faces agree. */
+function scaleLinerUVs(geometry: BufferGeometry) {
+  const position = geometry.getAttribute("position"),
+    normal = geometry.getAttribute("normal"),
+    uv = geometry.getAttribute("uv");
+  for (let i = 0; i < position.count; i++) {
+    const along = Math.abs(normal.getX(i)) > Math.abs(normal.getZ(i));
+    uv.setXY(i, along ? position.getZ(i) : position.getX(i), position.getY(i));
+  }
+  uv.needsUpdate = true;
+}
+
+/** Height of an open-air site's perimeter fence/stall backs. An open start
+ * site has no shell: its ground perimeter cells are drawn as this tall, so the
+ * site reads as an open enclosure rather than a storey. */
+export const OPEN_FENCE_HEIGHT = 1.1;
 
 /** A persistent whole-building facade. Every storey is present from the street
  * and every real window is an opening through the entire shell thickness. */
@@ -201,6 +228,9 @@ export class BuildingShell {
   });
   private tint = new Color();
   private roofMotion = new PartAnimator();
+  /** A finished inner liner needs its own mapped material; plaster keeps the
+   * shared vertex-coloured facade material and adds no mesh. */
+  private linerMaterial?: MeshStandardMaterial;
   /** Cache key for this shell: tiles, footprints and every stamped shell. */
   private signature = "";
 
@@ -212,6 +242,7 @@ export class BuildingShell {
     return JSON.stringify(
       floors.map((f) => [
         f.index,
+        f.open ?? false,
         f.boundary ?? null,
         f.shells ?? [],
         f.setting ?? null,
@@ -220,7 +251,9 @@ export class BuildingShell {
     );
   }
 
-  build(floors: Floor[]) {
+  /** `pad` is an open site's ground extraction point; it is only used to keep
+   * ground-level floor features clear of the pickup disc. */
+  build(floors: Floor[], pad?: Point & { radius: number }) {
     const signature = BuildingShell.signatureOf(floors);
     if (signature === this.signature) return;
     this.signature = signature;
@@ -251,7 +284,18 @@ export class BuildingShell {
           ? "#657779"
           : "#7e8987";
     const trim = ext?.trimColor ?? "#465e68";
+    // The inner liner shares the facade's vertex-coloured structure material
+    // unless the design asks for a real wall finish; plaster is today's wall.
+    const linerFinish: RunWallFinish = liner
+        ? (setting!.interior.wallFinish ?? "plaster")
+        : "plaster",
+      // An open site has no inner liner to texture: it has no upper storeys.
+      linerTexture =
+        linerFinish === "plaster" || floors[0].open === true
+          ? null
+          : wallTexture(linerFinish);
     const walls: BufferGeometry[] = [],
+      lined: BufferGeometry[] = [],
       frames: BufferGeometry[] = [],
       glass: BufferGeometry[] = [];
     const box = (
@@ -330,6 +374,35 @@ export class BuildingShell {
           factor = 0.93 + 0.09 * ((x + z + k) % 2);
         } else if (facade === "stucco") {
           factor = mid < cut ? 0.78 : 0.96 + 0.06 * noise(x, z, storey);
+        } else if (facade === "stone") {
+          // Coursed ashlar: every course is laid as half blocks, each block
+          // toned on its own, and every fifth course reads as a darker band.
+          const k = Math.floor(mid / cut),
+            shade = noise(x, z, k + storey * 13),
+            band = k % 5 === 4 ? 0.86 : 1,
+            xs = w > 0.5 ? [-1, 1] : [0],
+            zs = d > 0.5 ? [-1, 1] : [0];
+          grow = course!.grow;
+          for (const sx of xs)
+            for (const sz of zs) {
+              const block = noise(x + sx, z + sz, k + storey * 13 + 5);
+              box(
+                walls,
+                cx + (sx * w) / 4,
+                base + mid,
+                cz + (sz * d) / 4,
+                (sx ? w / 2 : w) + grow,
+                b - a,
+                (sz ? d / 2 : d) + grow,
+                tone(color, (0.82 + 0.12 * shade + 0.12 * block) * band),
+              );
+            }
+          continue;
+        } else if (facade === "timber") {
+          // Stacked logs: warm per-course tone and deep alternating relief.
+          const k = Math.floor(mid / cut);
+          factor = 0.9 + 0.14 * noise(x, z, k + storey * 13);
+          grow = k % 2 ? course!.grow : -course!.grow;
         } else if (facade === "glass") {
           factor = mid < 0.85 || mid > 2.35 ? 0.55 : 1.12;
         }
@@ -359,7 +432,7 @@ export class BuildingShell {
       if (!liner) return;
       for (const [dx, dz] of inward)
         box(
-          walls,
+          linerTexture ? lined : walls,
           cx + dx * 0.51 * (w === 1 ? 1 : 0),
           base + yc,
           cz + dz * 0.51 * (d === 1 ? 1 : 0),
@@ -369,6 +442,96 @@ export class BuildingShell {
           liner,
         );
     };
+    // An open-air start site has no shell. Its ground perimeter wall cells are
+    // drawn as low fence/stall backs (posts every ~2 m plus a top rail) so the
+    // site reads as an open enclosure; upper storeys, windows and the roof are
+    // never drawn. Collision is unchanged: this only changes what is rendered.
+    if (floors[0].open === true) {
+      const floor = floors[0],
+        rail = ext ? tone(ext.facadeColor, 0.94) : "#8a9490",
+        post = ext ? ext.trimColor : "#5b6f74",
+        rails: BufferGeometry[] = [],
+        posts: BufferGeometry[] = [],
+        wall = (x: number, z: number) =>
+          x >= 0 &&
+          z >= 0 &&
+          z < floor.tiles.length &&
+          x < floor.tiles[z].length &&
+          isPerimeterWall(floor, x, z),
+        gaps = new Set(
+          floor.furniture
+            .filter((o) => o.kind === "gate" || /gate|entrance/i.test(o.id))
+            .map((o) => `${Math.floor(o.x)}/${Math.floor(o.y)}`),
+        );
+      for (let z = 0; z < floor.tiles.length; z++)
+        for (let x = 0; x < floor.tiles[z].length; x++) {
+          if (!isPerimeterWall(floor, x, z)) continue;
+          const across = wall(x - 1, z) || wall(x + 1, z),
+            along = wall(x, z - 1) || wall(x, z + 1);
+          if (!gaps.has(`${x}/${z}`)) {
+            if (across)
+              box(
+                rails,
+                x + 0.5,
+                OPEN_FENCE_HEIGHT - 0.05,
+                z + 0.5,
+                1,
+                0.1,
+                0.11,
+                rail,
+              );
+            if (along)
+              box(
+                rails,
+                x + 0.5,
+                OPEN_FENCE_HEIGHT - 0.05,
+                z + 0.5,
+                0.11,
+                0.1,
+                1,
+                rail,
+              );
+            if (!across && !along)
+              box(
+                rails,
+                x + 0.5,
+                OPEN_FENCE_HEIGHT - 0.05,
+                z + 0.5,
+                0.9,
+                0.1,
+                0.9,
+                rail,
+              );
+          }
+          if ((x + z) % 2 === 0)
+            box(
+              posts,
+              x + 0.06,
+              OPEN_FENCE_HEIGHT / 2,
+              z + 0.06,
+              0.12,
+              OPEN_FENCE_HEIGHT,
+              0.12,
+              post,
+            );
+        }
+      this.merge(rails, this.structure, "open-site-fence-rails");
+      this.merge(posts, this.structure, "open-site-fence-posts");
+      this.group.userData = {
+        openSite: true,
+        fenceHeight: OPEN_FENCE_HEIGHT,
+        roofFeatures: [],
+      };
+      // No roof exists to carry the authored roof features, so they stand on
+      // free ground cells just inside the fence (visual only).
+      this.buildGroundFeatures(
+        floor,
+        ext?.roofFeatures ?? [],
+        setting?.objects,
+        pad,
+      );
+      return;
+    }
     for (const floor of floors) {
       if (!hasSites(floor)) continue;
       const base = floor.index * FLOOR_HEIGHT,
@@ -488,7 +651,7 @@ export class BuildingShell {
                 if (liner)
                   for (const [dx, dz] of back)
                     box(
-                      walls,
+                      linerTexture ? lined : walls,
                       px + dx * 0.51,
                       base + spec.side[0],
                       pz + dz * 0.51,
@@ -587,9 +750,74 @@ export class BuildingShell {
         }
     }
     this.merge(walls, this.structure, "facade-structure");
+    if (lined.length) {
+      // A finished liner is its own mapped mesh so the facade's shared
+      // vertex-coloured material (and the plaster shell's mesh list) is
+      // untouched.
+      const params = wallMaterialParams(linerFinish);
+      for (const part of lined) scaleLinerUVs(part);
+      this.linerMaterial = new MeshStandardMaterial({
+        vertexColors: true,
+        map: linerTexture,
+        roughness: params.roughness,
+        metalness: params.metalness,
+      });
+      this.merge(lined, this.linerMaterial, "facade-interior-liner");
+    }
     this.merge(frames, this.frames, "facade-window-frames");
     this.merge(glass, this.glass, "facade-glazing");
     if (ext) this.buildRoofFeatures(floors, ext.roofFeatures, setting?.objects);
+  }
+
+  /** An open site's floor features: the same built-in and composed roof
+   * fixtures, standing on free ground cells along the inside of the fence.
+   * They are visual only and never block the pad, gates or terminals. */
+  private buildGroundFeatures(
+    floor: Floor,
+    features: NonNullable<Floor["setting"]>["exterior"]["roofFeatures"],
+    objects: NonNullable<Floor["setting"]>["objects"] = [],
+    pad?: Point & { radius: number },
+  ) {
+    if (!features.length) return;
+    const solid: BufferGeometry[] = [],
+      lamps: BufferGeometry[] = [],
+      kinds: string[] = [],
+      skipped: string[] = [];
+    resolveGroundFeatures(
+      floor,
+      features,
+      pad ? [{ x: pad.x, y: pad.y, radius: pad.radius + 1.6 }] : [],
+    ).forEach((feature, i) => {
+      if (!feature) {
+        skipped.push(features[i]?.kind ?? "unknown");
+        return;
+      }
+      const parts = roofFeatureParts(feature, 0, objects);
+      solid.push(...parts.solid);
+      lamps.push(...parts.lamps);
+      for (const part of parts.animated) {
+        const mesh = new Mesh(
+          part.geometry,
+          part.lamp ? this.roofLamps : this.roofMetal,
+        );
+        mesh.name = "open-site-ground-feature-moving";
+        mesh.position.set(...part.position);
+        this.group.add(mesh);
+        this.roofMotion.add(
+          mesh,
+          mesh.position,
+          part.yaw,
+          part.motion,
+          part.rate,
+          part.phase,
+        );
+      }
+      kinds.push(feature.kind);
+    });
+    this.merge(solid, this.roofMetal, "open-site-ground-feature-structure");
+    this.merge(lamps, this.roofLamps, "open-site-ground-feature-lamps");
+    this.group.userData.roofFeatures = kinds;
+    this.group.userData.skippedRoofFeatures = skipped;
   }
 
   /** Radio masts, dishes, tanks and the like stand on the roof's outer ring,
@@ -657,6 +885,8 @@ export class BuildingShell {
 
   private clear() {
     this.roofMotion.dispose();
+    this.linerMaterial?.dispose();
+    this.linerMaterial = undefined;
     for (const child of [...this.group.children]) {
       (child as Mesh).geometry.dispose();
       child.removeFromParent();

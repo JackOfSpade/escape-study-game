@@ -36,6 +36,12 @@ import {
   ENVIRONMENT_BUILDER_VERSION,
 } from "./environment-surfaces";
 import { bindDesignedEnvironment } from "./environment-save";
+import {
+  groundExtractionPad,
+  isOpenSite,
+  isSolidOpenFloor,
+  siteFormOf,
+} from "./open-site";
 import type { SurfaceSlot } from "./environment-contract.mjs";
 
 type WorldBlueprint = RunDesign | RunStructureV3;
@@ -163,6 +169,9 @@ function buildPlayableGame(
     randomized: true,
     ...(blueprint?.version === 3 ? { blueprint } : {}),
   });
+  // An open site extracts on its ground floor; the stair marker it keeps for
+  // egress validation becomes the pickup pad, so no staircase can be climbed.
+  if (isOpenSite(g)) g.extraction = groundExtractionPad(g.floors[0]);
   // Fresh live runs use the study-friendly world tempo; legacy factories keep
   // historical timing for reproducible fixtures.
   let depth = 1;
@@ -212,6 +221,25 @@ export function previewDesignedRun(
     }) as ProvisionalRun;
   provisionalRuns.set(token, { game, structure, surfaces });
   return token;
+}
+
+/**
+ * The playable game behind a structure proposal, for previews, GameTest runs
+ * and checks that need the built world before an environment is accepted.
+ * Imported data stays validated: the structure goes through parseRunStructure.
+ */
+export function structureGame(
+  seed: number,
+  roadmap: Roadmap,
+  study: StudyState | undefined,
+  proposed: RunStructureV3,
+): Game {
+  return buildPlayableGame(
+    seed,
+    roadmap,
+    study,
+    parseRunStructure(structuredClone(proposed)),
+  );
 }
 
 export function finalizeDesignedRun(
@@ -316,7 +344,9 @@ function buildGame(
   for (let fi = 0; fi <= CONFIG.floors; fi++)
     g.floors.push(generateFloor(g, fi, blueprint));
   if (options.layout === "forward")
-    for (const floor of g.floors) forwardLayout(floor, seed);
+    for (const floor of g.floors)
+      // Open sites have no upper storeys to carve; their layers stay solid.
+      if (!isSolidOpenFloor(floor)) forwardLayout(floor, seed);
   for (const floor of g.floors)
     for (const o of floor.furniture) {
       if (o.id === "main-gate") ensureDoor(o, floor);
@@ -342,14 +372,41 @@ export function loot(g: Game): Item[] {
     charges: 1,
   }));
 }
+/**
+ * A solid, unreachable layer above an open site's ground: no stations,
+ * furniture, rooms, doors, stairs or roof cover, and no authored floor.
+ */
+function solidOpenFloor(index: number, blueprint: WorldBlueprint): Floor {
+  return {
+    open: true,
+    ...("setting" in blueprint && blueprint.setting
+      ? { setting: structuredClone(blueprint.setting) }
+      : {}),
+    index,
+    tiles: Array.from({ length: H }, () => Array(W).fill(1)),
+    stations: [],
+    furniture: [],
+    dark: 0,
+    name:
+      index === CONFIG.floors ? blueprint.roofName : blueprint.floors[0].name,
+    rooms: [],
+    doors: [],
+    stairs: { x: 21.5, y: 3.5 },
+    entry: { x: 21.5, y: 26.5 },
+  };
+}
 function generateFloor(
   g: Game,
   index: number,
   blueprint?: WorldBlueprint,
 ): Floor {
+  const open = siteFormOf(blueprint) === "open";
+  // An open site authors only its ground floor; construction above stays solid.
+  if (open && index > 0) return solidOpenFloor(index, blueprint!);
   const tiles = Array.from({ length: H }, () => Array(W).fill(1));
   for (let y = 2; y < 28; y++) for (let x = 2; x < 42; x++) tiles[y][x] = 0;
   const floor: Floor = {
+    ...(open ? { open: true as const } : {}),
     ...(blueprint && index < CONFIG.floors
       ? { design: structuredClone(blueprint.floors[index]) }
       : {}),

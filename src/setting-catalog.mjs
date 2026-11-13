@@ -7,6 +7,11 @@
 import { PROP_CATALOG, SCENE_FURNITURE_KINDS } from "./scene-catalog.mjs";
 
 export const VENUES = Object.freeze(["office", "broadcast", "custom"]);
+/** What kind of place the premise is. An enclosed site is a building with the
+ * four stacked floors; an open site is an open-air place (a street market, a
+ * plaza, a campsite, a ruined courtyard) with one ground-level floor. Absent
+ * means enclosed so older saved designs stay valid. */
+export const SITE_FORMS = Object.freeze(["enclosed", "open"]);
 export const ROOM_FUNCTIONS = Object.freeze([
   "reception",
   "break",
@@ -29,6 +34,10 @@ export const OBJECT_SHAPES = Object.freeze([
   "sphere",
   "wedge",
   "torus",
+  "dome",
+  "capsule",
+  "hexprism",
+  "pyramid",
 ]);
 /** What an object is for. The furnishing planner arranges pieces by role
  * (seats around surfaces, storage along walls, dividers between work
@@ -150,6 +159,8 @@ export const WEATHERS = Object.freeze([
   "spores",
   "ash",
   "leaves",
+  "fireflies",
+  "petals",
 ]);
 export const SCENERY_LIMIT = 8;
 /** Which way a cylinder or cone runs: up, across the width, or along the depth. */
@@ -180,6 +191,12 @@ export const FLOOR_FINISHES = Object.freeze([
   "rubber",
   "polished",
   "lino",
+  "planks",
+  "flagstone",
+  "checker",
+  "grating",
+  "earth",
+  "mosaic",
 ]);
 export const FACADES = Object.freeze([
   "concrete",
@@ -188,6 +205,17 @@ export const FACADES = Object.freeze([
   "stucco",
   "metal",
   "clapboard",
+  "stone",
+  "timber",
+]);
+/** Painted or clad interior wall surfaces; plaster is the plain painted wall. */
+export const WALL_FINISHES = Object.freeze([
+  "plaster",
+  "brick",
+  "stone",
+  "wood",
+  "metal",
+  "tile",
 ]);
 export const WINDOW_STYLES = Object.freeze([
   "punched",
@@ -251,14 +279,16 @@ const fail = (ok, message) => {
 };
 const record = (value) =>
   value !== null && typeof value === "object" && !Array.isArray(value);
-function object(value, keys, path) {
+/** Required and unknown keys are always checked; keys listed in optional may
+ * be omitted so older saved designs stay valid. */
+function object(value, keys, path, optional = []) {
   fail(record(value), `${path} must be an object`);
   fail(
     Object.keys(value).every((key) => keys.includes(key)),
     `${path} has an unknown field`,
   );
   fail(
-    keys.every((key) => Object.hasOwn(value, key)),
+    keys.every((key) => optional.includes(key) || Object.hasOwn(value, key)),
     `${path} is missing a field`,
   );
 }
@@ -359,7 +389,7 @@ function partErrors(o, path) {
     const top = surfaceTop(o);
     fail(
       top !== null,
-      `${path}.surface needs a flat-topped box or cylinder part covering at least half of the footprint`,
+      `${path}.surface needs a flat-topped box, cylinder or hexprism part covering at least half of the footprint`,
     );
   }
 }
@@ -373,7 +403,10 @@ export function surfaceTop(o) {
   for (const part of o.parts) {
     if (
       (part.shape !== "box" &&
-        !(part.shape === "cylinder" && part.axis === "up")) ||
+        !(
+          (part.shape === "cylinder" || part.shape === "hexprism") &&
+          part.axis === "up"
+        )) ||
       part.pitch ||
       part.roll ||
       part.motion !== "none"
@@ -544,6 +577,7 @@ export function parseSetting(value, path = "setting") {
     value,
     [
       "venue",
+      "form",
       "interior",
       "exterior",
       "surroundings",
@@ -553,8 +587,12 @@ export function parseSetting(value, path = "setting") {
       "filler",
     ],
     path,
+    ["form"],
   );
   choice(value.venue, VENUES, `${path}.venue`);
+  // Optional so older saved designs stay valid; a fresh design names it.
+  if (Object.hasOwn(value, "form"))
+    choice(value.form, SITE_FORMS, `${path}.form`);
   object(
     value.terminal,
     ["style", "body", "accent", "screen"],
@@ -567,9 +605,32 @@ export function parseSetting(value, path = "setting") {
   const i = value.interior;
   object(
     i,
-    ["roomFloor", "hallFloor", "roomTint", "hallTint", "wall", "trim"],
+    [
+      "roomFloor",
+      "hallFloor",
+      "roomTint",
+      "hallTint",
+      "wall",
+      "trim",
+      "wallFinish",
+      "light",
+    ],
     `${path}.interior`,
+    ["wallFinish", "light"],
   );
+  // Optional so older saved designs stay valid; a fresh design names both.
+  if (Object.hasOwn(i, "wallFinish"))
+    choice(i.wallFinish, WALL_FINISHES, `${path}.interior.wallFinish`);
+  if (Object.hasOwn(i, "light")) {
+    color(i.light, `${path}.interior.light`);
+    const brightest = Math.max(
+      ...[1, 3, 5].map((n) => Number.parseInt(i.light.slice(n, n + 2), 16)),
+    );
+    fail(
+      brightest >= 0x60,
+      `${path}.interior.light must not be near-black: its brightest channel needs at least 0x60`,
+    );
+  }
   choice(i.roomFloor, FLOOR_FINISHES, `${path}.interior.roomFloor`);
   choice(i.hallFloor, FLOOR_FINISHES, `${path}.interior.hallFloor`);
   color(i.roomTint, `${path}.interior.roomTint`);
@@ -708,11 +769,12 @@ const meanings = Object.entries(VENUE_ROOM_MEANINGS)
   )
   .join(". ");
 
-export const SETTING_GUIDANCE = `Include setting at the top level of every new design (optional only so older designs stay valid). The building must physically be the place the premise describes, inside and out, never a generic office with themed names. The place may be real or fantastical, historical, futuristic or surreal; the same tools build all of them. setting:{venue:${list(VENUES)},interior:{roomFloor:${list(FLOOR_FINISHES)},hallFloor:same choices,roomTint:hex color blended into the room floor finish,hallTint:hex color blended into the hall floor,wall:hex interior wall color,trim:hex skirting and door-frame color},exterior:{facade:${list(FACADES)},facadeColor:hex,trimColor:hex,windows:${list(WINDOW_STYLES)},canopy:${list(CANOPY_STYLES)},canopyGlow:hex color of the entrance light,roofFeatures:0..${ROOF_FEATURE_LIMIT} {kind:${list(ROOF_FEATURE_KINDS)} or the id of one of your objects,x:0..1,y:0..1}},terminal:{style:${list(TERMINAL_STYLES)},body:hex main material,accent:hex trim and secondary parts,screen:hex glowing face},objects:0..${OBJECT_LIMITS.objects} CustomObject,filler:null, or for venue custom {${ROOM_FUNCTIONS.join(",")}: each 1..6 furniture names}}.
+export const SETTING_GUIDANCE = `Include setting at the top level of every new design (optional only so older designs stay valid). The building must physically be the place the premise describes, inside and out, never a generic office with themed names. The place may be real or fantastical, historical, futuristic or surreal; the same tools build all of them. setting:{venue:${list(VENUES)},form:${list(SITE_FORMS)} (enclosed builds a building; open is an open-air place),interior:{roomFloor:${list(FLOOR_FINISHES)},hallFloor:same choices,roomTint:hex color blended into the room floor finish,hallTint:hex color blended into the hall floor,wall:hex interior wall color,trim:hex skirting and door-frame color,wallFinish:${list(WALL_FINISHES)} (plaster is the plain painted wall; brick, stone, wood, metal and tile clad it),light:hex color of the lit ceiling lights, omit for the current warm #f2d7a3 (candle amber, neon magenta, bioluminescent teal, emergency red; never near-black, the brightest channel at least 0x60)},exterior:{facade:${list(FACADES)},facadeColor:hex,trimColor:hex,windows:${list(WINDOW_STYLES)},canopy:${list(CANOPY_STYLES)},canopyGlow:hex color of the entrance light,roofFeatures:0..${ROOF_FEATURE_LIMIT} {kind:${list(ROOF_FEATURE_KINDS)} or the id of one of your objects,x:0..1,y:0..1}},terminal:{style:${list(TERMINAL_STYLES)},body:hex main material,accent:hex trim and secondary parts,screen:hex glowing face},objects:0..${OBJECT_LIMITS.objects} CustomObject,filler:null, or for venue custom {${ROOM_FUNCTIONS.join(",")}: each 1..6 furniture names}}.
 venue picks the furniture the engine uses for every room you do not furnish yourself, and the meaning of each floor's roomTypes: ${meanings}. For venue custom, roomTypes keep their functional layout (reception=entry desk area, break=social/kitchen area, cubicles=rows of work positions, meeting=a central gathering table, storage=shelving and stores, manager=a private command or office space) and you say what each becomes through filler: the furniture names (built-in kinds or your objects' ids) the engine arranges there. List the room's signature piece first and include at least one seat and one surface; the engine arranges by role: seats around surfaces, storage along the walls, dividers between the work positions of cubicles (a divider is a thin piece, at most 0.6 m deep), equipment and display pieces beside them. Choose broadcast for radio, television, podcast, recording or transmission premises; office only when the premise really is an office; custom for every other place.
-CustomObject lets you invent the premise's own furniture when no built-in kind fits: {id:lowercase slug 2..24 not a built-in kind,name:1..32 shown to the player,role:${list(OBJECT_ROLES)},weight:light|medium|heavy,size:{w:${OBJECT_LIMITS.size.w.join("..")},d:${OBJECT_LIMITS.size.d.join("..")},h:${OBJECT_LIMITS.size.h.join("..")}} metres,surface:boolean,parts:1..${OBJECT_LIMITS.parts} Part}. role says what the piece is for (seat to sit on, surface to work or eat at, storage, equipment, display, divider between work positions, bed, decor, light) and nothing else decides how it is placed. Part={shape:${list(OBJECT_SHAPES)},axis:${list(OBJECT_AXES)},x,y,z,w,d,h,pitch:-${MOTION_LIMITS.tilt}..${MOTION_LIMITS.tilt},roll:-${MOTION_LIMITS.tilt}..${MOTION_LIMITS.tilt},motion:${list(OBJECT_MOTIONS)},rate:${MOTION_LIMITS.rate.join("..")},color:hex,finish:${list(OBJECT_FINISHES)}} in metres in the object's own frame: x across its width (centre 0, within ±${OBJECT_LIMITS.part.x[1]}), y from back (-d/2, the side against a wall; within ±${OBJECT_LIMITS.part.y[1]}) to front (+d/2, the side people use), z the part's bottom above the floor (0..${OBJECT_LIMITS.part.z[1]}); w,d,h are the part's extents. A cylinder, sphere, cone, wedge or torus fills its w×d×h box. axis turns the shape: a cylinder or cone runs up, across the width or along the depth (a lying capsule, pipe or tank is axis across or along; a cone points up, +x or +y); a wedge is a right-triangular prism, full height at the back for axis up (a ramp, roof, hood or chute seen from the front), rising toward +x for across and toward the front for along; a torus is a ring lying flat for axis up (a hoop, tyre, halo or lifebuoy on the floor), standing upright facing the front for along (a porthole, portal or wheel) and facing sideways for across; boxes and spheres use axis up. pitch and roll tilt a part in degrees about its own centre (pitch tips it toward the front, roll sideways): a leaning ladder, a cannon aimed upward, a drafting board, a slanted roof. motion animates it at rate cycles per second: spin turns it about its vertical centre line (a fan, a carousel, a radar), bob lifts it up to ${MOTION_LIMITS.bob} m (a floating orb, a buoy), sway rocks it ±${MOTION_LIMITS.sway}° (a hanging lantern, a hammock), pulse breathes a glow part's light and flicker makes it flicker (a candle, a broken sign); use none for still parts. A part must stay inside size in every pose, including its tilt and motion. At least one part stands on the floor (z:0); other parts may rest on parts or float free, for hanging lamps, levitating books, drifting runes or signs on a frame, because parts are visual only and never change collision. glow parts emit their color (screens, status lights, flames, tubes, runes, embers). surface:true needs a flat box or upright cylinder part at least 0.3 m high covering at least half the footprint (wedges and tori never count); props are then placed on it, packed around any parts standing on that top. The engine derives collision from w×d and health, push resistance and drag from weight (light pieces slide when walked into, heavy ones hold a crowd), so describe only shape and look. Use your objects by their id as scene furniture kind and in filler, alongside built-in kinds. Build recognizable silhouettes from several parts (bases, frames, panels, screens, handles, lights) rather than single boxes, and invent pieces that only this place would have; total parts across objects at most ${OBJECT_LIMITS.totalParts}.
+form must match what the premise implies: open for an open-air place (an open-air market, a festival field, a campsite, a plaza, a harbour dock, ruins without a roof), enclosed for a building. An open-air market is open, never a market hall, and a covered building stays enclosed. An open design authors exactly one floor, the ground plan, and its rooms become outdoor zones (stall rows, plazas, pens, terraces) bounded by low fences, stalls and kerbs instead of walls; its terminals stand in the open and roofName names the ground extraction point. Fresh designs always name form; omitting it only keeps older designs valid and means enclosed.
+CustomObject lets you invent the premise's own furniture when no built-in kind fits: {id:lowercase slug 2..24 not a built-in kind,name:1..32 shown to the player,role:${list(OBJECT_ROLES)},weight:light|medium|heavy,size:{w:${OBJECT_LIMITS.size.w.join("..")},d:${OBJECT_LIMITS.size.d.join("..")},h:${OBJECT_LIMITS.size.h.join("..")}} metres,surface:boolean,parts:1..${OBJECT_LIMITS.parts} Part}. role says what the piece is for (seat to sit on, surface to work or eat at, storage, equipment, display, divider between work positions, bed, decor, light) and nothing else decides how it is placed. Part={shape:${list(OBJECT_SHAPES)},axis:${list(OBJECT_AXES)},x,y,z,w,d,h,pitch:-${MOTION_LIMITS.tilt}..${MOTION_LIMITS.tilt},roll:-${MOTION_LIMITS.tilt}..${MOTION_LIMITS.tilt},motion:${list(OBJECT_MOTIONS)},rate:${MOTION_LIMITS.rate.join("..")},color:hex,finish:${list(OBJECT_FINISHES)}} in metres in the object's own frame: x across its width (centre 0, within ±${OBJECT_LIMITS.part.x[1]}), y from back (-d/2, the side against a wall; within ±${OBJECT_LIMITS.part.y[1]}) to front (+d/2, the side people use), z the part's bottom above the floor (0..${OBJECT_LIMITS.part.z[1]}); w,d,h are the part's extents. A cylinder, sphere, cone, wedge, torus, dome, capsule, hexprism or pyramid fills its w×d×h box. axis turns the shape: a cylinder, capsule, hexprism or cone runs up, across the width or along the depth (a lying capsule, pipe or tank is axis across or along; a cone points up, +x or +y); a wedge is a right-triangular prism, full height at the back for axis up (a ramp, roof, hood or chute seen from the front), rising toward +x for across and toward the front for along; a torus is a ring lying flat for axis up (a hoop, tyre, halo or lifebuoy on the floor), standing upright facing the front for along (a porthole, portal or wheel) and facing sideways for across; a dome is a hemisphere whose flat base is at the bottom for axis up, at the back (-y) for along and at -x for across (a cupola, a bowl, a mushroom cap); a capsule is a rounded-end cylinder (a pod, a pillow, a tank), a hexprism a six-sided prism (a crystal, a column, a honeycomb cell) and a pyramid a four-sided pyramid with its apex where a cone's point would be (a spire, a roof, an obelisk); boxes and spheres use axis up. pitch and roll tilt a part in degrees about its own centre (pitch tips it toward the front, roll sideways): a leaning ladder, a cannon aimed upward, a drafting board, a slanted roof. motion animates it at rate cycles per second: spin turns it about its vertical centre line (a fan, a carousel, a radar), bob lifts it up to ${MOTION_LIMITS.bob} m (a floating orb, a buoy), sway rocks it ±${MOTION_LIMITS.sway}° (a hanging lantern, a hammock), pulse breathes a glow part's light and flicker makes it flicker (a candle, a broken sign); use none for still parts. A part must stay inside size in every pose, including its tilt and motion. At least one part stands on the floor (z:0); other parts may rest on parts or float free, for hanging lamps, levitating books, drifting runes or signs on a frame, because parts are visual only and never change collision. glow parts emit their color (screens, status lights, flames, tubes, runes, embers). surface:true needs a flat box, upright cylinder or upright hexprism part at least 0.3 m high covering at least half the footprint (domes, capsules, pyramids, wedges and tori never count); props are then placed on it, packed around any parts standing on that top. The engine derives collision from w×d and health, push resistance and drag from weight (light pieces slide when walked into, heavy ones hold a crowd), so describe only shape and look. Use your objects by their id as scene furniture kind and in filler, alongside built-in kinds. Build recognizable silhouettes from several parts (bases, frames, panels, screens, handles, lights) rather than single boxes, and invent pieces that only this place would have; total parts across objects at most ${OBJECT_LIMITS.totalParts}.
 The study terminals the player uses are the place's own work stations, never a generic office desk with a monitor: a scribe's lectern, a ship console, a ticket kiosk, an altar with a glowing slab, a lab cabinet, a stone pedestal. Pick terminal.style and the body, accent and screen colours to match the place; the screen colour is the glowing face of the terminal. They share one footprint, so style changes only the look.
 props:0..${PROP_OBJECT_LIMITS.props} CustomProp lets you invent the small things that sit on surfaces when no built-in prop fits (an inkwell, a potion, a ship in a bottle, a ration tin): {id:lowercase slug not a built-in prop or one of your objects,name:1..32,size:{w,d,h each up to ${PROP_OBJECT_LIMITS.size} m},parts:1..${PROP_OBJECT_LIMITS.parts} Part} in the same frame and rules as objects, total parts at most ${PROP_OBJECT_LIMITS.totalParts}; use them by id as a scene prop kind on any surface.
 surroundings:{ground:${list(GROUNDS)},groundColor:hex,pathColor:hex for streets and paths,sky:{zenith:hex,horizon:hex},fog:{color:hex,density:0..1 (0 clear, 1 thick murk)},neighbors:${list(NEIGHBOR_STYLES)},neighborColor:hex,weather:${list(WEATHERS)},scenery:0..${SCENERY_LIMIT} ids from setting.objects scattered outside} sets the world around the building. The street grid and neighbouring blocks keep their gameplay shape (they are where the horde comes from and what blocks it) but take this look: a seabed lab could have seabed ground, deep-blue sky and dense blue fog, coral neighbours, bubbles and kelp scenery; a polar station snow, ice neighbours and snowfall; a desert caravanserai sand, dunes and dust; an enchanted grove moss, trees and spores; an ordinary city keeps asphalt and buildings. The rooftop helicopter extraction stays.
 Roof feature x/y are normalized across the building's roof from west to east and north (stairs) to south (entrance); the engine moves each to the nearest free roof spot that keeps the helipad, its approach and the stairs clear. Features are visual only. A roof feature kind may also be the id of one of your objects, drawn from its parts (a lantern room, a dome, a chimney stack, a weathervane, a crow's nest), so the skyline can be as particular as the interior.
-Make the building recognizable from the street and from inside by principle, not by cliche: a silhouette on the skyline (roof features), a few signature pieces whose shape tells the use at a glance, materials and finishes that fit the place (floor, tints, facade, windows), light that suits it (glow parts, canopyGlow) and signs and labels in the place's own words. Vary widely between runs; the premise decides, for example a lighthouse, a bakery, a wizard's library, a deep-sea lab, a bathhouse, a circus, a monastery, a ferry terminal or an orbital greenhouse each look and furnish nothing alike.`;
+Make the building recognizable from the street and from inside by principle, not by cliche: a silhouette on the skyline (roof features), a few signature pieces whose shape tells the use at a glance, materials and finishes that fit the place (floor, wallFinish, tints, facade, windows), light that suits it (interior.light, glow parts, canopyGlow) and signs and labels in the place's own words. Lighting colour and wall finish are among the strongest cues of a place: a candlelit stone chapel, a neon-lit metal club and a teal-lit tiled lab read apart before a single piece of furniture. Vary widely between runs; the premise decides, for example a lighthouse, a bakery, a wizard's library, a deep-sea lab, a bathhouse, a circus, a monastery, a ferry terminal or an orbital greenhouse each look and furnish nothing alike.`;

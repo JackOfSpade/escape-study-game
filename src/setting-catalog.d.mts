@@ -3,7 +3,16 @@ export type RunRoomFunction =
   "reception" | "break" | "cubicles" | "meeting" | "storage" | "manager";
 export type RunObjectWeight = "light" | "medium" | "heavy";
 export type RunObjectShape =
-  "box" | "cylinder" | "cone" | "sphere" | "wedge" | "torus";
+  | "box"
+  | "cylinder"
+  | "cone"
+  | "sphere"
+  | "wedge"
+  | "torus"
+  | "dome"
+  | "capsule"
+  | "hexprism"
+  | "pyramid";
 export type RunObjectRole =
   | "seat"
   | "surface"
@@ -82,7 +91,9 @@ export type RunWeather =
   | "embers"
   | "spores"
   | "ash"
-  | "leaves";
+  | "leaves"
+  | "fireflies"
+  | "petals";
 /** The world around the building; streets and blocks keep their gameplay
  * shape and only change how they look. */
 export interface RunSurroundings {
@@ -116,10 +127,29 @@ export type RunFloorFinish =
   | "terrazzo"
   | "rubber"
   | "polished"
-  | "lino";
+  | "lino"
+  | "planks"
+  | "flagstone"
+  | "checker"
+  | "grating"
+  | "earth"
+  | "mosaic";
 export type RunFacade =
-  "concrete" | "brick" | "glass" | "stucco" | "metal" | "clapboard";
+  | "concrete"
+  | "brick"
+  | "glass"
+  | "stucco"
+  | "metal"
+  | "clapboard"
+  | "stone"
+  | "timber";
+/** Interior wall surface; plaster is the plain painted wall. */
+export type RunWallFinish =
+  "plaster" | "brick" | "stone" | "wood" | "metal" | "tile";
 export type RunWindowStyle = "punched" | "strip" | "ribbon" | "slit";
+/** Enclosed is a building with four stacked floors; open is an open-air place
+ * (a street market, a plaza, a campsite) with one ground-level floor. */
+export type RunSiteForm = "enclosed" | "open";
 export type RunCanopyStyle = "flat" | "gabled" | "marquee" | "none";
 export type RunRoofFeatureKind =
   | "mast"
@@ -150,6 +180,9 @@ export interface RunTerminal {
 }
 export interface RunSetting {
   venue: RunVenue;
+  /** What kind of place this is; optional so older saved designs stay valid,
+   * where absent means "enclosed". */
+  form?: RunSiteForm;
   interior: {
     roomFloor: RunFloorFinish;
     hallFloor: RunFloorFinish;
@@ -157,6 +190,10 @@ export interface RunSetting {
     hallTint: string;
     wall: string;
     trim: string;
+    /** Optional so older saved designs stay valid; plaster is the default. */
+    wallFinish?: RunWallFinish;
+    /** Ceiling light colour; absent is the current warm #f2d7a3. */
+    light?: string;
   };
   exterior: {
     facade: RunFacade;
@@ -177,6 +214,7 @@ export interface RunSetting {
   filler: Record<RunRoomFunction, string[]> | null;
 }
 export const VENUES: readonly RunVenue[];
+export const SITE_FORMS: readonly RunSiteForm[];
 export const ROOM_FUNCTIONS: readonly RunRoomFunction[];
 export const OBJECT_WEIGHTS: Readonly<
   Record<
@@ -238,6 +276,7 @@ export const WEATHERS: readonly RunWeather[];
 export const SCENERY_LIMIT: number;
 export const FLOOR_FINISHES: readonly RunFloorFinish[];
 export const FACADES: readonly RunFacade[];
+export const WALL_FINISHES: readonly RunWallFinish[];
 export const WINDOW_STYLES: readonly RunWindowStyle[];
 export const CANOPY_STYLES: readonly RunCanopyStyle[];
 export const ROOF_FEATURE_KINDS: readonly RunRoofFeatureKind[];

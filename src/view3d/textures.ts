@@ -10,7 +10,13 @@ export type FloorFinish =
   | "parquet"
   | "terrazzo"
   | "rubber"
-  | "polished";
+  | "polished"
+  | "planks"
+  | "flagstone"
+  | "checker"
+  | "grating"
+  | "earth"
+  | "mosaic";
 
 /** Material tint and gloss per finish. The office finishes keep their original
  * values; the venue finishes are authored near their final colour. */
@@ -28,6 +34,18 @@ export function floorMaterialParams(finish: FloorFinish) {
       return { color: "#a4a8aa", roughness: 0.9 };
     case "polished":
       return { color: "#b4bcc0", roughness: 0.34 };
+    case "planks":
+      return { color: "#b09070", roughness: 0.7 };
+    case "flagstone":
+      return { color: "#9d9c96", roughness: 0.95 };
+    case "checker":
+      return { color: "#c2c0b8", roughness: 0.45 };
+    case "grating":
+      return { color: "#7c8388", roughness: 0.5 };
+    case "earth":
+      return { color: "#8a7355", roughness: 1 };
+    case "mosaic":
+      return { color: "#b6bdb6", roughness: 0.4 };
     default:
       return { color: "#89939b", roughness: 0.98 };
   }
@@ -46,6 +64,12 @@ export function floorTexture(finish: FloorFinish) {
   else if (finish === "terrazzo") terrazzo(c);
   else if (finish === "rubber") rubber(c);
   else if (finish === "polished") polished(c);
+  else if (finish === "planks") planks(c);
+  else if (finish === "flagstone") flagstone(c);
+  else if (finish === "checker") checker(c);
+  else if (finish === "grating") grating(c);
+  else if (finish === "earth") earth(c);
+  else if (finish === "mosaic") mosaic(c);
   else legacy(c, finish);
   const texture = new CanvasTexture(canvas);
   texture.colorSpace = SRGBColorSpace;
@@ -186,6 +210,188 @@ function polished(c: CanvasRenderingContext2D) {
   c.fillRect(0, 0, 1, 64);
   c.fillRect(0, 32, 64, 1);
   c.fillRect(32, 0, 1, 64);
+}
+
+/** Wide wooden floorboards laid along x, with staggered butt joints. */
+function planks(c: CanvasRenderingContext2D) {
+  const woods = ["#8a6440", "#946c46", "#805a38", "#9c744c"];
+  const rowH = 16;
+  for (let row = 0; row < 4; row++) {
+    const board = hash(row * 29);
+    c.fillStyle = woods[(board >>> 5) % woods.length];
+    c.fillRect(0, row * rowH, 64, rowH);
+    // Grain runs along the board; a few fine lines, softly varied.
+    for (let g = 0; g < 3; g++) {
+      const n = hash(row * 13 + g * 7);
+      c.fillStyle = g % 2 ? "rgba(255,225,180,.07)" : "rgba(30,16,4,.12)";
+      c.fillRect(0, row * rowH + 3 + ((n >>> 8) % (rowH - 6)), 64, 1);
+    }
+    c.fillStyle = "rgba(25,12,4,.5)";
+    c.fillRect(0, row * rowH + rowH - 1, 64, 1);
+    // Butt joints stagger by half a board every other row.
+    const offset = row % 2 ? 16 : 48;
+    for (let j = 0; j < 2; j++) {
+      const n = hash(row * 97 + j * 31);
+      const x = (offset + j * 32 + ((n >>> 9) % 5)) % 64;
+      c.fillStyle = "rgba(20,10,2,.55)";
+      c.fillRect(x, row * rowH, 1, rowH - 1);
+    }
+    for (let k = 0; k < 8; k++) {
+      const n = hash(row * 53 + k);
+      c.fillStyle = k % 2 ? "rgba(255,230,190,.06)" : "rgba(20,10,0,.08)";
+      c.fillRect(n % 64, row * rowH + 2 + ((n >>> 10) % (rowH - 4)), 6, 1);
+    }
+  }
+}
+
+/** Irregular grey stone slabs bedded in dark mortar. */
+function flagstone(c: CanvasRenderingContext2D) {
+  c.fillStyle = "#3b3934";
+  c.fillRect(0, 0, 64, 64);
+  const greys = ["#8c8c84", "#83847c", "#95948b", "#797a72", "#9c9b92"];
+  for (let gy = 0; gy < 2; gy++)
+    for (let gx = 0; gx < 2; gx++) {
+      const n = hash(gx * 41 + gy * 17),
+        j = (k: number) => ((hash(n + k) >>> 9) % 5) - 2,
+        x = gx * 32 + 2,
+        y = gy * 32 + 2,
+        w = 27 + ((n >>> 4) % 3),
+        h = 27 + ((n >>> 11) % 3);
+      c.fillStyle = greys[(n >>> 3) % greys.length];
+      c.beginPath();
+      c.moveTo(x + j(1), y + j(2));
+      c.lineTo(x + w + j(3), y + j(4));
+      c.lineTo(x + w + j(5), y + h + j(6));
+      c.lineTo(x + j(7), y + h + j(8));
+      c.closePath();
+      c.fill();
+      c.strokeStyle = "rgba(255,255,255,.1)";
+      c.lineWidth = 1;
+      c.stroke();
+      for (let k = 0; k < 18; k++) {
+        const s = hash(n + k * 13);
+        c.fillStyle = k % 3 ? "rgba(40,40,36,.16)" : "rgba(240,240,232,.12)";
+        c.fillRect(
+          x + 2 + ((s >>> 7) % (w - 4)),
+          y + 2 + ((s >>> 15) % (h - 4)),
+          1 + ((s >>> 21) % 2),
+          1,
+        );
+      }
+    }
+}
+
+/** Two-tone checkerboard tiles at 0.5 m squares with grey grout. */
+function checker(c: CanvasRenderingContext2D) {
+  const light = "#d6cfbf",
+    dark = "#3c4248";
+  for (let y = 0; y < 2; y++)
+    for (let x = 0; x < 2; x++) {
+      c.fillStyle = (x + y) % 2 ? dark : light;
+      c.fillRect(x * 32, y * 32, 32, 32);
+      for (let k = 0; k < 6; k++) {
+        const n = hash(x * 17 + y * 29 + k * 5);
+        c.fillStyle = k % 2 ? "rgba(255,255,255,.05)" : "rgba(0,0,0,.07)";
+        c.fillRect(x * 32 + (n % 28), y * 32 + ((n >>> 9) % 28), 3, 2);
+      }
+    }
+  c.fillStyle = "rgba(150,146,136,.6)";
+  for (const o of [0, 32]) {
+    c.fillRect(o, 0, 1, 64);
+    c.fillRect(0, o, 64, 1);
+  }
+  c.fillStyle = "rgba(255,255,255,.08)";
+  for (const o of [2, 34]) {
+    c.fillRect(o, 0, 1, 64);
+    c.fillRect(0, o, 64, 1);
+  }
+  c.fillStyle = "rgba(0,0,0,.3)";
+  c.fillRect(0, 63, 64, 1);
+  c.fillRect(63, 0, 1, 64);
+}
+
+/** Dark metal deck grating: a fine grid of slots between bearing bars. */
+function grating(c: CanvasRenderingContext2D) {
+  c.fillStyle = "#191c1f";
+  c.fillRect(0, 0, 64, 64);
+  // Bearing bars every 16 cm, cross rods every 8 cm, slots between them.
+  for (let x = 0; x < 64; x += 8) {
+    c.fillStyle = "#3f464b";
+    c.fillRect(x, 0, 3, 64);
+    c.fillStyle = "rgba(255,255,255,.14)";
+    c.fillRect(x, 0, 1, 64);
+    c.fillStyle = "rgba(0,0,0,.45)";
+    c.fillRect(x + 3, 0, 1, 64);
+  }
+  for (let y = 4; y < 64; y += 16) {
+    c.fillStyle = "#4a5157";
+    c.fillRect(0, y, 64, 2);
+    c.fillStyle = "rgba(255,255,255,.1)";
+    c.fillRect(0, y, 64, 1);
+    c.fillStyle = "#101315";
+    c.fillRect(0, y + 2, 64, 2);
+  }
+  for (let i = 0; i < 90; i++) {
+    const n = hash(i * 7);
+    c.fillStyle = i % 2 ? "rgba(200,215,225,.09)" : "rgba(0,0,0,.3)";
+    c.fillRect(n % 64, (n >>> 8) % 64, 1 + ((n >>> 16) % 2), 1);
+  }
+}
+
+/** Packed dirt with straw and grit flecks. */
+function earth(c: CanvasRenderingContext2D) {
+  c.fillStyle = "#5b4a34";
+  c.fillRect(0, 0, 64, 64);
+  for (let i = 0; i < 150; i++) {
+    const n = hash(i * 3 + 1);
+    c.fillStyle = i % 3 ? "rgba(126,102,68,.32)" : "rgba(44,32,20,.38)";
+    c.fillRect(
+      n % 64,
+      (n >>> 8) % 64,
+      2 + ((n >>> 16) % 5),
+      1 + ((n >>> 21) % 3),
+    );
+  }
+  for (let i = 0; i < 60; i++) {
+    const n = hash(i * 11 + 5);
+    c.fillStyle = "rgba(206,196,178,.34)";
+    c.fillRect(n % 64, (n >>> 8) % 64, 1, 1);
+  }
+  for (let i = 0; i < 34; i++) {
+    const n = hash(i * 7 + 3),
+      x = n % 64,
+      y = (n >>> 8) % 64;
+    c.strokeStyle = i % 2 ? "rgba(198,178,118,.55)" : "rgba(150,128,78,.5)";
+    c.lineWidth = 1;
+    c.beginPath();
+    c.moveTo(x, y);
+    c.lineTo(x + 2 + ((n >>> 16) % 3), y - 1 + ((n >>> 19) % 3));
+    c.stroke();
+  }
+}
+
+/** Small ceramic tesserae at roughly 5 cm with pale grout. */
+function mosaic(c: CanvasRenderingContext2D) {
+  c.fillStyle = "#b3aea1";
+  c.fillRect(0, 0, 64, 64);
+  const tiles = [
+    "#a4c2bd",
+    "#c7b198",
+    "#8d9db3",
+    "#d2c7a6",
+    "#9db398",
+    "#bfa2a0",
+  ];
+  for (let y = 0; y < 16; y++)
+    for (let x = 0; x < 16; x++) {
+      const n = hash(x * 23 + y * 41);
+      c.fillStyle = tiles[(n >>> 3) % tiles.length];
+      c.fillRect(x * 4, y * 4, 3, 3);
+      c.fillStyle = "rgba(255,255,255,.16)";
+      c.fillRect(x * 4, y * 4, 1, 1);
+      c.fillStyle = "rgba(0,0,0,.16)";
+      c.fillRect(x * 4 + 2, y * 4 + 2, 1, 1);
+    }
 }
 
 /** The outdoor ground a design may choose, or the compacted-earth variant used

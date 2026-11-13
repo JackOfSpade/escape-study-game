@@ -9,6 +9,7 @@ import {
   createBuildingFootprint,
 } from "./building-layout";
 import { carveStairwells } from "./stairwell";
+import { isSolidOpenFloor } from "./open-site";
 import {
   fieldClearance,
   furnishOffice,
@@ -148,7 +149,9 @@ export function redesign(
       g.seed,
       options.blueprint?.footprint ?? g.design?.design.footprint,
     );
-    for (const f of g.floors) f.boundary = structuredClone(boundary);
+    for (const f of g.floors)
+      // A solid open layer is construction, not a storey: no plan mask.
+      if (!isSolidOpenFloor(f)) f.boundary = structuredClone(boundary);
   }
   for (const a of g.survivors) {
     a.inventory = [];
@@ -208,15 +211,20 @@ export function redesign(
     }
   }
   // The roof's arrival staircase is carved like the ordinary floors' wells.
+  // An open site's layers above ground are solid construction with no roof.
   const roof = g.floors[CONFIG.floors];
-  if (roof && g.floors.some((f) => f.generation?.version === 2)) {
+  if (
+    roof &&
+    !isSolidOpenFloor(roof) &&
+    g.floors.some((f) => f.generation?.version === 2)
+  ) {
     if (roof.boundary) buildingRoof(roof);
     else carveStairwells(roof);
   }
   const designed = Boolean(g.design || options.blueprint);
   const floorErrors: string[] = [];
   for (const floor of g.floors)
-    if (floor.generation?.version === 2) {
+    if (!isSolidOpenFloor(floor) && floor.generation?.version === 2) {
       pursuitLayout(g, floor);
       if (!floor.design)
         moveBlockingDesks(floor, () => !pursuitLayoutErrors(g, floor).length);

@@ -14,11 +14,17 @@ import {
 } from "../src/run-design-contract.mjs";
 import { PROP_CATALOG, SCENE_FURNITURE_KINDS } from "../src/scene-catalog.mjs";
 import {
+  FACADES,
+  FLOOR_FINISHES,
+  OBJECT_SHAPES,
   ROOF_FEATURE_KINDS,
   SETTING_GUIDANCE,
   TERMINAL_STYLES,
   VENUES,
+  WALL_FINISHES,
+  WEATHERS,
   parseSetting,
+  surfaceTop,
 } from "../src/setting-catalog.mjs";
 import { resolveRoofFeatures, settingErrors } from "../src/venue";
 import { createPlayableGame, previewDesignedRun } from "../src/world";
@@ -363,4 +369,184 @@ test("the terminal setting is required and accepts every style but no others", (
   }
   assert.match(SETTING_GUIDANCE, /terminal:\{style:desk\|console/);
   assert.match(SETTING_GUIDANCE, /lectern/);
+});
+
+test("the new floors, facades, weathers, wall finishes and light colours validate", () => {
+  assert.deepEqual(
+    [...WALL_FINISHES],
+    ["plaster", "brick", "stone", "wood", "metal", "tile"],
+  );
+  assert.deepEqual([...FLOOR_FINISHES].slice(-6), [
+    "planks",
+    "flagstone",
+    "checker",
+    "grating",
+    "earth",
+    "mosaic",
+  ]);
+  assert.deepEqual([...FACADES].slice(-2), ["stone", "timber"]);
+  assert.deepEqual([...WEATHERS].slice(-2), ["fireflies", "petals"]);
+  // Older values keep their place at the front of every catalog.
+  assert.equal(FLOOR_FINISHES[0], "carpet");
+  assert.equal(FACADES[0], "concrete");
+  for (const finish of [
+    "planks",
+    "flagstone",
+    "checker",
+    "grating",
+    "earth",
+    "mosaic",
+  ] as const)
+    for (const key of ["roomFloor", "hallFloor"] as const) {
+      const s = setting();
+      s.interior[key] = finish;
+      assert.equal(parseSetting(s).interior[key], finish, `${key} ${finish}`);
+    }
+  for (const facade of ["stone", "timber"] as const) {
+    const s = setting();
+    s.exterior.facade = facade;
+    assert.equal(parseSetting(s).exterior.facade, facade, facade);
+  }
+  for (const weather of ["fireflies", "petals"] as const) {
+    const s = setting();
+    s.surroundings.weather = weather;
+    assert.equal(parseSetting(s).surroundings.weather, weather, weather);
+  }
+  for (const wallFinish of WALL_FINISHES) {
+    const s = setting();
+    s.interior.wallFinish = wallFinish;
+    assert.equal(parseSetting(s).interior.wallFinish, wallFinish, wallFinish);
+  }
+  for (const light of ["#f2d7a3", "#ffb347", "#ff2bd6", "#2ee6c8", "#ff2a2a"]) {
+    const s = setting();
+    s.interior.light = light;
+    assert.equal(parseSetting(s).interior.light, light, light);
+  }
+  // 0x5f is the darkest accepted as "lit"; a brighter channel passes.
+  const dim = setting();
+  dim.interior.light = "#5f5f5f";
+  assert.throws(() => parseSetting(dim), /near-black/);
+  const oneLamp = setting();
+  oneLamp.interior.light = "#600000";
+  assert.equal(parseSetting(oneLamp).interior.light, "#600000");
+  // Both fields are optional so older saved designs stay valid.
+  const older = setting();
+  assert.equal("wallFinish" in older.interior, false);
+  assert.equal("light" in older.interior, false);
+  assert.doesNotThrow(() => parseSetting(older));
+  for (const [mutate, message] of [
+    [
+      (s: any) => (s.interior.wallFinish = "plasterboard"),
+      /interior\.wallFinish must be one of/,
+    ],
+    [(s: any) => (s.interior.light = "candle"), /six-digit hex/],
+    [(s: any) => (s.interior.light = "#101010"), /near-black/],
+    [(s: any) => (s.interior.light = "#00ff00ff"), /six-digit hex/],
+    [(s: any) => (s.interior.wallColor = "#ffffff"), /unknown field/],
+  ] as const) {
+    const s = setting();
+    mutate(s);
+    assert.throws(() => parseSetting(s), message);
+  }
+  for (const phrase of [
+    "wallFinish",
+    "light:hex",
+    "plaster",
+    "tile",
+    "dome",
+    "capsule",
+    "hexprism",
+    "pyramid",
+    "fireflies",
+    "petals",
+    "planks",
+    "mosaic",
+    "timber",
+  ])
+    assert.ok(SETTING_GUIDANCE.includes(phrase), phrase);
+  assert.match(
+    SETTING_GUIDANCE,
+    /Lighting colour and wall finish are among the strongest cues of a place/,
+  );
+});
+
+test("the new part shapes validate and only an upright hexprism top holds props", () => {
+  const piece = (shape: string, axis: string, surface: boolean) => {
+    const s: any = setting();
+    s.venue = "custom";
+    s.filler = {
+      reception: ["desk"],
+      break: ["table"],
+      cubicles: ["desk"],
+      meeting: ["table"],
+      storage: ["shelf"],
+      manager: ["desk"],
+    };
+    s.objects = [
+      {
+        id: "themed-piece",
+        name: "Themed piece",
+        role: "decor",
+        weight: "medium",
+        size: { w: 1.2, d: 1.2, h: 2 },
+        surface,
+        parts: [
+          {
+            shape: "box",
+            axis: "up",
+            x: 0,
+            y: 0,
+            z: 0,
+            w: 1.2,
+            d: 1.2,
+            h: 0.2,
+            color: "#333333",
+            finish: "matte",
+            pitch: 0,
+            roll: 0,
+            motion: "none",
+            rate: 1,
+          },
+          {
+            shape,
+            axis,
+            x: 0,
+            y: 0,
+            z: 0.2,
+            w: 1,
+            d: 1,
+            h: 1,
+            color: "#888888",
+            finish: "matte",
+            pitch: 0,
+            roll: 0,
+            motion: "none",
+            rate: 1,
+          },
+        ],
+      },
+    ];
+    return s;
+  };
+  assert.deepEqual([...OBJECT_SHAPES].slice(-4), [
+    "dome",
+    "capsule",
+    "hexprism",
+    "pyramid",
+  ]);
+  for (const shape of ["dome", "capsule", "hexprism", "pyramid"])
+    for (const axis of ["up", "across", "along"])
+      assert.doesNotThrow(
+        () => parseSetting(piece(shape, axis, false)),
+        `${shape} ${axis}`,
+      );
+  const top = piece("hexprism", "up", true);
+  assert.doesNotThrow(() => parseSetting(top));
+  assert.equal(surfaceTop(top.objects[0]), 1.2);
+  for (const shape of ["dome", "capsule", "pyramid"])
+    assert.throws(
+      () => parseSetting(piece(shape, "up", true)),
+      /surface needs a flat-topped/,
+      shape,
+    );
 });

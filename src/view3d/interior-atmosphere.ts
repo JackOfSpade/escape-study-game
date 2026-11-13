@@ -24,6 +24,7 @@ import {
   hasDeskStory,
   interiorHash,
   lightAt,
+  litFixtureColor,
   PhoneLightState,
   regionAt,
   type InteriorLighting,
@@ -477,6 +478,46 @@ export class InteriorAtmosphere {
       p.mesh.name = `office-story-surface-${i}`;
     });
     for (const fixture of plan.fixtures) {
+      if (floor.open === true) {
+        // An open-air floor hangs nothing from a ceiling: each fixture is a
+        // lamp post standing on the ground with its head at ~2.6 m.
+        solids.set(
+          solids.allocate(),
+          fixture.x,
+          1.3,
+          fixture.y,
+          0.11,
+          2.6,
+          0.11,
+          0,
+          "#4c5c60",
+        );
+        if (fixture.level > 0.2) {
+          tubes.set(
+            tubes.allocate(),
+            fixture.x,
+            2.62,
+            fixture.y,
+            0.36,
+            0.24,
+            0.36,
+            0,
+            fixture.color,
+          );
+          solids.set(
+            solids.allocate(),
+            fixture.x,
+            2.74,
+            fixture.y,
+            0.44,
+            0.04,
+            0.44,
+            0,
+            "#3f4b4a",
+          );
+        }
+        continue;
+      }
       solids.set(
         solids.allocate(),
         fixture.x,
@@ -804,6 +845,9 @@ export class InteriorAtmosphere {
       floor = game.floors[player.floor];
     if (!this.floors.has(floor)) this.build(floor, game.seed, game.sites ?? []);
     const active = this.floors.get(floor)!;
+    // One baked atlas serves every floor, so its warm lamp tint follows the
+    // colour of the floor being viewed; the Color is reused, never rebuilt.
+    this.lightmap.setWarmColour(litFixtureColor(floor));
     for (const [other, context] of this.floors) {
       context.group.visible =
         other === floor || other.index === player.stairTravel?.toFloor;
@@ -813,6 +857,7 @@ export class InteriorAtmosphere {
     const feet = player.elevated?.feet ?? player.floor * FLOOR_HEIGHT,
       insideSite = !!regionAt(active.plan, player)?.site,
       indoors =
+        floor.open !== true &&
         (insideSite || !outsideBuilding(floor, player.x, player.y)) &&
         feet >= floor.index * FLOOR_HEIGHT - 0.3 &&
         feet < floor.index * FLOOR_HEIGHT + 2.82;
@@ -848,7 +893,9 @@ export class InteriorAtmosphere {
     this.updateDust(
       game,
       floor,
-      (this.currentLight < 0.5 && raised > 0.2) || nearby > 0,
+      // Dust is an indoor effect: an open floor keeps the clear outdoor air.
+      floor.open !== true &&
+        ((this.currentLight < 0.5 && raised > 0.2) || nearby > 0),
     );
   }
 

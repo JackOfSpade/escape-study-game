@@ -8,6 +8,7 @@ import {
   type Game,
 } from "./model";
 import { carveStairwells } from "./stairwell";
+import { isSolidOpenFloor } from "./open-site";
 import type { RunDesign } from "./run-design-contract.mjs";
 
 /** Domain-separated streams: adding a floor/layout roll cannot change the
@@ -129,6 +130,8 @@ export function buildingLayoutErrors(g: Game): string[] {
   const errors: string[] = [];
   const extra = g.sites ?? [];
   for (const f of g.floors) {
+    // An open site above ground is solid construction, not a validated storey.
+    if (isSolidOpenFloor(f)) continue;
     // Extra sites can add storeys above the start building's roof; those
     // floors carry their own site's layout, not the start site's shell.
     if (extra.length && f.index > CONFIG.floors) continue;

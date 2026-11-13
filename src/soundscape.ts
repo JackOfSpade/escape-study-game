@@ -1,11 +1,6 @@
 import { type SoundSample } from "./sfx";
-import {
-  type Game,
-  type WorldEvent,
-  type Zombie,
-  HELIPAD,
-  distance,
-} from "./model";
+import { type Game, type WorldEvent, type Zombie, distance } from "./model";
+import { extractionFloor, primaryExtraction } from "./engine";
 import {
   distanceAttenuation,
   listenerPose,
@@ -198,7 +193,7 @@ export function soundEvents(g: Game, after: number): SoundCue[] {
         end: 35,
         caption: "[Main entrance slams shut]",
       };
-    if (e.type === "helicopter" && g.survivors[0].floor === g.floors.length - 1)
+    if (e.type === "helicopter" && g.survivors[0].floor === extractionFloor(g))
       cue = {
         frequency: 130,
         duration: 2,
@@ -239,7 +234,7 @@ export function soundEvents(g: Game, after: number): SoundCue[] {
         : e.type === "completion"
           ? g.floors[e.floor]?.stations.find((s) => s.encounter === e.encounter)
           : e.type === "helicopter"
-            ? HELIPAD
+            ? primaryExtraction(g)
             : g.survivors[0];
       if (position)
         cue.origin = {

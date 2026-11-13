@@ -127,6 +127,17 @@ function read(
       return 1;
     }
   }
+  if (q.type === "atStation") {
+    const a = g.survivors.find((e) => e.id === q.id);
+    return (
+      !!a &&
+      a.alive &&
+      !a.escaped &&
+      !!g.floors[a.floor]?.stations.some(
+        (s) => Math.hypot(s.x - a.x, s.y - a.y) <= 0.7,
+      )
+    );
+  }
   const values =
     q.kind === "zombie"
       ? g.zombies.filter((z) => z.hp > 0)

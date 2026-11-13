@@ -23,8 +23,10 @@ import {
   OBJECT_WEIGHTS,
   ROOF_FEATURE_LIMIT,
   ROOM_FUNCTIONS,
+  SITE_FORMS,
   TERMINAL_STYLES,
   VENUES,
+  WALL_FINISHES,
   WINDOW_STYLES,
 } from "./setting-catalog.mjs";
 import { ROOM_SHAPES, TITLE_CARD_FONTS } from "./run-design-contract.mjs";
@@ -144,6 +146,9 @@ const customObject = obj({
 });
 const setting = obj({
   venue: oneOf(VENUES),
+  // Required for fresh requests; the validator keeps it optional so older
+  // saved designs stay valid, where absent means "enclosed".
+  form: oneOf(SITE_FORMS),
   interior: obj({
     roomFloor: oneOf(FLOOR_FINISHES),
     hallFloor: oneOf(FLOOR_FINISHES),
@@ -151,6 +156,10 @@ const setting = obj({
     hallTint: hex,
     wall: hex,
     trim: hex,
+    // Required for fresh requests; the validator keeps them optional so
+    // older saved designs stay valid.
+    wallFinish: oneOf(WALL_FINISHES),
+    light: hex,
   }),
   exterior: obj({
     facade: oneOf(FACADES),
@@ -277,7 +286,9 @@ const structure = obj(
       mirrored: { type: "boolean" },
       shoulder: int(10, 18),
     }),
-    floors: arr(floor, 4, 4),
+    // Shape only: the validator requires one floor for an open site and
+    // exactly four for an enclosed one.
+    floors: arr(floor, 1, 4),
     roofName: str(48),
     roster: arr(
       obj({

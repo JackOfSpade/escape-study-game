@@ -24,6 +24,18 @@ export interface CeilingFixture extends Point {
   level: number;
   color: string;
 }
+/** Warm default of a lit ceiling lamp, kept for undesigned floors. */
+export const DEFAULT_LIT_FIXTURE = "#f2d7a3";
+/** Dim and outage fixtures keep this cool blue-grey on every floor. */
+export const DIM_FIXTURE = "#9dbfc7";
+/** Colour of a floor's LIT ceiling lamps: the designed
+ * `setting.interior.light` of the floor that owns the fixture, else the warm
+ * default. Dim fixtures never use it. */
+export function litFixtureColor(
+  floor: Pick<Floor, "setting"> | undefined,
+): string {
+  return floor?.setting?.interior.light ?? DEFAULT_LIT_FIXTURE;
+}
 export interface WallStory extends Point {
   /** Normal pointing out of the wall, into the room. */
   nx: number;
@@ -348,6 +360,37 @@ export function buildInteriorLighting(
         level: LEVEL[power],
       });
     }
+  // An open site has no ceiling to hang lamps from, so a sparse row of lamp
+  // posts stands along the zone edges instead, lit by the sky in the design's
+  // own light colour. No fixture is placed over a room's interior.
+  if (floor.open === true) {
+    const lit = litFixtureColor(floor);
+    const addPost = (x: number, y: number, id: string) => {
+      if (
+        plan.fixtures.length >= 64 ||
+        floor.tiles[Math.floor(y)]?.[Math.floor(x)] !== 0 ||
+        !inside(floor, { x, y })
+      )
+        return;
+      if (plan.fixtures.some((f) => Math.hypot(f.x - x, f.y - y) < 5)) return;
+      plan.fixtures.push({ x, y, id, level: 1, color: lit });
+    };
+    for (const zone of plan.zones) {
+      const r = zone.rect;
+      for (let x = r.x1; x <= r.x2; x += 6) {
+        addPost(x + 0.5, r.y1 + 0.5, `lamp-post-${zone.id}-${x}-n`);
+        addPost(x + 0.5, r.y2 + 0.5, `lamp-post-${zone.id}-${x}-s`);
+      }
+      for (let y = r.y1; y <= r.y2; y += 6) {
+        addPost(r.x1 + 0.5, y + 0.5, `lamp-post-${zone.id}-${y}-w`);
+        addPost(r.x2 + 0.5, y + 0.5, `lamp-post-${zone.id}-${y}-e`);
+      }
+    }
+    for (const site of sites) mergeSite(plan, site, seed);
+    return plan;
+  }
+  // A designed interior light dyes this floor's lit lamps; dim ones stay cool.
+  const lit = litFixtureColor(floor);
   const addFixture = (p: Point, id: string) => {
     if (
       plan.fixtures.length >= 128 ||
@@ -362,7 +405,7 @@ export function buildInteriorLighting(
       ...p,
       id,
       level,
-      color: level > 0.5 ? "#f2d7a3" : "#9dbfc7",
+      color: level > 0.5 ? lit : DIM_FIXTURE,
     });
   };
   for (const sector of sectors)
@@ -713,10 +756,14 @@ export function ambientTexels(plan: InteriorLighting) {
     covered = new Uint8Array(w * h);
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
-      const p = { x: (x + 0.5) / R, y: (y + 0.5) / R };
-      if (!regionAt(plan, p)) continue;
+      const p = { x: (x + 0.5) / R, y: (y + 0.5) / R },
+        region = regionAt(plan, p);
+      if (!region) continue;
       covered[y * w + x] = 1;
-      values[y * w + x] = lightAt(plan, p);
+      // An open site stands under the sky, so nothing shades the ground to the
+      // interior zone level; its outdoor lamp posts light up beside it instead.
+      values[y * w + x] =
+        plan.floor.open === true && !region.site ? 1 : lightAt(plan, p);
     }
   fillSolidTexels(plan.floor, values, w, h);
   return { values, covered };

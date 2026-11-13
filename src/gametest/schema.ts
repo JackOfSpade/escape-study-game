@@ -7,7 +7,12 @@ import {
   type Point,
 } from "../model";
 import { isRecord } from "../records";
-import { parseRunDesign, type RunDesign } from "../run-design-contract.mjs";
+import {
+  parseRunDesign,
+  parseRunStructure,
+  type RunDesign,
+  type RunStructureV3,
+} from "../run-design-contract.mjs";
 export const LAB_LIMITS = {
   entities: 512,
   actions: 512,
@@ -83,6 +88,8 @@ export interface Check {
     | { type: "environmentErrors" }
     /** Intact furniture of one kind, on one floor or across the building. */
     | { type: "furnitureCount"; kind: FurnitureKind; floor?: number }
+    /** Whether this actor stands at one of its floor's study terminals. */
+    | { type: "atStation"; id: string }
     | { type: "soundConnected"; floor: number; a: Point; b: Point }
     /** Simulated world time in seconds. */
     | { type: "worldTime" }
@@ -111,6 +118,9 @@ export interface Scenario {
   city?: boolean;
   /** Saved synthetic AI choices; never invokes a model or reads a real run. */
   design?: RunDesign;
+  /** Structure-only v3 proposal (no environment): the same validated data as a
+   * run-design fixture, built through previewDesignedRun's construction. */
+  designStructure?: RunStructureV3;
   simulation: "game" | "physics";
   maxTicks: number;
   startTime: number;
@@ -278,6 +288,7 @@ export function parseScenario(value: string | unknown): Scenario {
     "pacing",
     "city",
     "design",
+    "designStructure",
     "simulation",
     "maxTicks",
     "startTime",
@@ -322,6 +333,10 @@ export function parseScenario(value: string | unknown): Scenario {
   );
   if (s.design !== undefined) {
     requireThat(
+      s.designStructure === undefined,
+      "Choose either a saved design or a structure proposal.",
+    );
+    requireThat(
       s.template === "building" &&
         s.layout === "randomized" &&
         s.rules === "force-fields",
@@ -332,6 +347,15 @@ export function parseScenario(value: string | unknown): Scenario {
       design.version !== 3 || (s.city === true && s.pacing === "study"),
       "Version 3 environment fixtures require the complete physical city and study pacing.",
     );
+  }
+  if (s.designStructure !== undefined) {
+    requireThat(
+      s.template === "building" &&
+        s.layout === "randomized" &&
+        s.rules === "force-fields",
+      "Structure proposals require a randomized force-field building.",
+    );
+    parseRunStructure(s.designStructure);
   }
   requireThat(
     integer(s.maxTicks, 1, LAB_LIMITS.ticks) &&
@@ -517,6 +541,13 @@ export function parseScenario(value: string | unknown): Scenario {
             "absAngle",
           ].includes(String(q.field)),
         "Invalid entity property check.",
+      );
+    else if (q.type === "atStation")
+      requireThat(
+        Object.keys(q).length === 2 &&
+          id(q.id) &&
+          typeof c.expected === "boolean",
+        "Station checks need an actor ID and a boolean expectation.",
       );
     else if (q.type === "count" || q.type === "region") {
       requireThat(

@@ -196,6 +196,22 @@ sides.
   sub-room has exactly one doorway; the existing egress, free-study,
   clearance and spacing checks. Version 3/4 floors keep the existing checks.
 
+## Open sites
+
+A version 3 design with `setting.form: "open"` authors one ground plan instead
+of stacked office floors. It is still generated and validated with the version
+5 layout code, but the result is interpreted as outdoor ground: rooms become
+stall rows, plazas, pens or terraces, boundaries lean on stalls, low fences and
+kerbs rather than full walls, and the floor's stairs marker is the open pad that
+`groundExtractionPad` turns into `Game.extraction` (floor 0, inside the plan,
+shrunk until its disc is walkable). Floors 1 to 4 exist as solid, unreachable
+layers (`Floor.open` on every floor of the start site, `isSolidOpenFloor` for
+indices above 0): they carry no furniture, no interior plan, no roof cover and
+no stairs of their own, so nobody climbs to a rooftop. The renderer draws the
+market ground, canopies and weather on floor 0. Open sites are stamped into a
+shared escape world as their ground floor only, keeping their own
+`Site.extraction` pad.
+
 ## Realism references
 
 Perimeter and core office layouts, central corridors with team clusters,

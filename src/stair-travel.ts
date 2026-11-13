@@ -70,6 +70,8 @@ function refuseStairs(g: Game, a: Actor) {
  * continuous motor before touching the first riser, preserving the actual
  * departure position and requiring exactly the same personal credential. */
 export function enterCityStairBase(g: Game, a: Actor, input: Point) {
+  // Open ground has no stair base to join: the marker is the pickup pad.
+  if (g.floors[0]?.open) return false;
   const base = cityStairBase(g);
   if (
     !base ||
@@ -186,6 +188,9 @@ export function cancelStairs(g: Game, a: Actor) {
     g.notice = "You left the staircase. You are still on this floor.";
 }
 export function beginStairs(g: Game, a: Actor, down = false, walking = false) {
+  // An open site is ground level: its stair marker is the extraction pad, so
+  // no flight ever starts and nobody leaves floor 0.
+  if (g.floors[a.floor]?.open) return false;
   if (!a.alive || a.escaped || a.vault || a.stairTravel) return false;
   const source = g.floors[a.floor],
     marker = stairMarkerAt(g, a, down ? "down" : "up");
@@ -279,6 +284,11 @@ export function advanceStairs(g: Game, a: Actor) {
       travel.toFloor > travel.fromFloor
         ? site.stairs[travel.fromFloor]
         : site.entry[travel.fromFloor];
+  // A flight saved from before an open site reloaded must never land above it.
+  if (source?.open) {
+    cancelStairs(g, a);
+    return false;
+  }
   if (
     !source ||
     !a.alive ||

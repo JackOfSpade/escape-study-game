@@ -14,6 +14,7 @@ import {
 import { readDurable, writeDurable } from "./storage";
 import { parseSavedRunDesign } from "./run-design-contract.mjs";
 import { sceneSaveErrors } from "./authored-scene";
+import { groundExtractionPad, siteFormOf } from "./open-site";
 import { startSite } from "./site";
 import {
   assertDesignedEnvironment,
@@ -93,6 +94,15 @@ export function decode(text: string): Game {
   }
   assertDesignedEnvironment(g);
   bindDesignedEnvironment(g);
+  // An open start site's solid upper layers and its ground pickup are part of
+  // the save. A save written before those optional fields existed is completed
+  // here instead of losing the marked storeys or the extraction point.
+  if (g.design && siteFormOf(g.design.design) === "open") {
+    for (const floor of g.floors)
+      if (startFloors.has(floor.index)) floor.open = true;
+    const ground = g.floors[0];
+    if (!g.extraction && ground) g.extraction = groundExtractionPad(ground);
+  }
   // Discard retired door-hacking state without changing earned keys or field access.
   for (const a of g.survivors) {
     const legacy = a as unknown as Record<string, unknown>;

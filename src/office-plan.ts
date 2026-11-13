@@ -12,6 +12,7 @@ import {
 } from "./model";
 import { footprintTiles } from "./building-layout";
 import { carveStairwells } from "./stairwell";
+import { isSolidOpenFloor } from "./open-site";
 import {
   type Rect,
   type Sector,
@@ -909,6 +910,8 @@ export function planOfficeFloor(
   random: Rng,
   validate: (f: Floor) => string[],
 ) {
+  // An open site's layers above ground are solid, not planned storeys.
+  if (isSolidOpenFloor(f)) return;
   const counts = [0, 1, 2, 3].map(
     (n) =>
       f.stations.filter(
