@@ -80,6 +80,18 @@ A unique creature is a unique combination of body, behaviour parameters and rule
 
 The timeline is deterministic for a game: every restart replays the same schedule, so learning its timing pays off.
 
+### Generation: payload, history and schema (2026-11-13)
+
+`prepareCatastrophe` (`src/escape-prepare.ts`) sends one `escape-catastrophe` request when a new game is generated, never on Restart.
+
+**Payload.** `requestId`, `persona`, `areaIds`, `recent`, and `setting`. `setting` holds the story (`title`, `premise`, `opening`) and the physical place: `venue`, `form`, `surroundings` (`ground`, `neighbors`, `weather`) and, when the design has an authored outdoor plan, `outdoors` (`enclosure`, `backdrop`, `ground` and the sorted distinct `regionKinds`). Every physical field is read defensively and left out when missing, so old saves and designs without `setting.outdoors` still work. The instruction asks for a threat that comes from, travels through and acts on that place, with omens that place could plausibly show.
+
+**History.** `src/catastrophe-history.ts` keeps the player's last 8 accepted catastrophes in `localStorage` (`dead-air-catastrophe-history-v1`), newest first, beside the environment and design histories in `src/run-designer.ts`. Each entry is the mechanism only: `title`, sorted behaviour `kinds`, each hunter's `silhouette` and `spawn`, hazard `media` and perception `triggers`. Premise, omens and public story are never stored, and malformed or extra fields are dropped on read. The list is sent as `recent`, and the instruction asks for a different threat mechanism, not a renamed or recoloured one.
+
+**Repeat check.** The behaviour signature is the sorted kinds plus silhouette and spawn for each hunter (for example `collapse+hunter|humanoid/waves`). When a valid answer's signature equals one of the 3 newest entries, the client asks once more with a new `requestId` (`cat-<game>-2`) and `repeated` (the summary of the first answer). The second answer is accepted if it is valid, even if it repeats too; if it fails, the valid first answer is kept. The accepted spec is then recorded. An offline fallback is not recorded.
+
+**Schema.** The reply uses CLI structured output: `replySchema` in `scripts/claude-gateway.mjs` returns `catastropheReplySchema(payload)` (`src/catastrophe-schema.mjs`) for this operation. The schema fixes field names, enums, string lengths, array sizes and numeric ranges, the exact `requestId`, and the area ids from `payload.areaIds`. A schema call is never streamed. The prose contract keeps the meaning of each field and the cross-field rules the schema cannot express (phase order and grace period, behaviour indexes active after onset, conditional `threshold` and `damagePerSecond`, omen timing and uniqueness). `validateCatastrophe` in `src/catastrophe.ts` stays the authority on bounds and cross-field rules; a spec it rejects keeps the offline catastrophe.
+
 ## 4. Fact ledger and the director
 
 ### The ledger

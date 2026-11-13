@@ -15,6 +15,7 @@ import { delimiter, dirname, join } from "node:path";
 import { taskInstructions, validateAnswer } from "./lib/ai-contracts.mjs";
 import { privateDirectory, writePrivate } from "./lib/private-fs.mjs";
 import { designReplySchema } from "../src/run-design-schema.mjs";
+import { catastropheReplySchema } from "../src/catastrophe-schema.mjs";
 
 /** Every AI task's model and effort: the measured quality knee from the
  * 2026-11-11 and 2026-11-12 ladders (docs/AI_MODEL_SELECTION.md, "Measured
@@ -288,11 +289,15 @@ export function textFieldReader() {
     return out;
   };
 }
-/** Structured output for every quality-flow design stage: the CLI validates
- * the reply's shape against the stage's schema before returning it. Live
- * streamed tasks keep free JSON so their text can appear as it is written. */
+/** Structured output for every quality-flow design stage and for the sealed
+ * escape catastrophe: the CLI validates the reply's shape against the schema
+ * before returning it. Live streamed tasks keep free JSON so their text can
+ * appear as it is written; a schema call is never streamed (see execute). */
 export function replySchema(operation, payload) {
-  return operation === "design-run" ? designReplySchema(payload) : undefined;
+  if (operation === "design-run") return designReplySchema(payload);
+  if (operation === "escape-catastrophe")
+    return catastropheReplySchema(payload);
+  return undefined;
 }
 export function claudeArgs({ model, effort, system, session, stream, schema }) {
   return [
@@ -698,9 +703,12 @@ export function createClaudeGateway({
         `${JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "text", text: user }] } })}\n`,
       );
     });
-  async function execute(operation, payload, signal, onText) {
+  async function execute(operation, payload, signal, streamText) {
     const profile = resolveProfile(operation, payload);
     const schema = replySchema(operation, payload);
+    // A structured reply arrives through the StructuredOutput tool, not as
+    // text deltas, so a schema call is never streamed.
+    const onText = schema ? undefined : streamText;
     const { system, user } = buildPrompt(operation, payload);
     const key = conversationKey(operation, payload);
     const id =
