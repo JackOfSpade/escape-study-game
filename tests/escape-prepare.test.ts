@@ -79,7 +79,8 @@ test("prepareCatastrophe replaces the fallback with a valid spec", async () => {
   const { game, live, fallback } = makeGame();
   const spec = validSpec();
   const calls = fake(() => ({ requestId: "cat-game-1", spec }));
-  await prepareCatastrophe(game);
+  const report = await prepareCatastrophe(game);
+  assert.deepEqual(report, { source: "ai", requests: 1, repeated: 0 });
   assert.equal(calls.length, 1);
   assert.equal(calls[0]!.operation, "escape-catastrophe");
   assert.equal(live.escape.catastrophe, spec);
@@ -90,8 +91,13 @@ test("prepareCatastrophe replaces the fallback with a valid spec", async () => {
 test("prepareCatastrophe ignores an invalid spec", async () => {
   const { game, live, fallback } = makeGame();
   fake(() => ({ spec: { ...validSpec(), title: "x".repeat(81) } }));
-  await prepareCatastrophe(game);
+  const report = await prepareCatastrophe(game);
   assert.deepEqual(live.escape.catastrophe, fallback);
+  // The silent fallback is reported with the validator's first problem.
+  assert.equal(report.source, "offline");
+  assert.equal(report.failure, "invalid");
+  assert.match(report.detail!, /^\d+ problem\(s\): /);
+  assert.ok(report.detail!.length <= 200);
   resetEscapeRequest();
 });
 
@@ -100,8 +106,25 @@ test("prepareCatastrophe keeps the fallback when the request rejects", async () 
   fake(() => {
     throw Error("bridge offline");
   });
-  await prepareCatastrophe(game);
+  const report = await prepareCatastrophe(game);
   assert.deepEqual(live.escape.catastrophe, fallback);
+  assert.deepEqual(report, {
+    source: "offline",
+    requests: 1,
+    repeated: 0,
+    failure: "request-failed",
+    detail: "Error: bridge offline",
+  });
+  resetEscapeRequest();
+});
+
+test("prepareCatastrophe reports an answer without a spec as malformed", async () => {
+  const { game, live, fallback } = makeGame();
+  fake(() => ({ requestId: "cat-game-1" }));
+  const report = await prepareCatastrophe(game);
+  assert.deepEqual(live.escape.catastrophe, fallback);
+  assert.equal(report.source, "offline");
+  assert.equal(report.failure, "malformed");
   resetEscapeRequest();
 });
 

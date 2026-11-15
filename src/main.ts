@@ -181,7 +181,7 @@ import {
   presentWorkspaceProposal,
   reviewWorkspaceProposal,
 } from "./workspace-proposals";
-import { createPlayableGame as createGame } from "./world";
+import { createPlayableGame as createGame, dropHordeNotice } from "./world";
 import { chooseRunDesign, type RunChoice } from "./run-design-ui";
 import { clearDesignDraft, rememberDesign } from "./run-designer";
 import {
@@ -918,15 +918,37 @@ function begin() {
       const gender = await askGender();
       if (!gender || game.status !== "ready") return;
       game.escape = createEscapeState(game, { gender, seed: game.seed });
-      try {
-        await prepareCatastrophe(game);
-      } catch (error) {
-        game.notice = `${game.notice} The catastrophe could not be prepared; the offline plan stays. (${String(error)})`;
-      }
+      dropHordeNotice(game);
+      await prepareLoggedCatastrophe(game);
       await persist();
     }
     startRun();
   })();
+}
+/** Prepares a new game's catastrophe and logs how it went: the AI's answer or
+ * the offline fallback, and the reason for a fallback. A silent fallback is
+ * otherwise indistinguishable from an authored catastrophe after the fact. */
+async function prepareLoggedCatastrophe(g: Game) {
+  const started = performance.now();
+  let report: Record<string, unknown>;
+  try {
+    report = { ...(await prepareCatastrophe(g)) };
+  } catch (error) {
+    g.notice = `${g.notice} The catastrophe could not be prepared; the offline plan stays. (${String(error)})`;
+    report = {
+      source: "offline",
+      requests: 0,
+      repeated: 0,
+      failure: "threw",
+      detail: String(error).slice(0, 200),
+    };
+  }
+  runLogs.record(g, "catastrophe-prepared", {
+    ...report,
+    catastropheId: g.escape?.catastrophe.id ?? null,
+    durationMs: Math.round(performance.now() - started),
+  });
+  void runLogs.flush();
 }
 /** Designs already summarised on this page: one "run-design" entry per game. */
 const loggedRunDesigns = new Set<string>();
@@ -936,7 +958,14 @@ function recordRunDesign(g: Game) {
   if (loggedRunDesigns.has(g.id)) return;
   loggedRunDesigns.add(g.id);
   const saved = g.design as unknown as
-    { source?: unknown; design?: unknown } | undefined;
+    | {
+        source?: unknown;
+        design?: unknown;
+        requestId?: unknown;
+        generationId?: unknown;
+        fingerprint?: unknown;
+      }
+    | undefined;
   const design = saved?.design as
     | {
         title?: unknown;
@@ -954,7 +983,14 @@ function recordRunDesign(g: Game) {
     surroundings = setting?.surroundings,
     spec = (
       g.escape as unknown as
-        { catastrophe?: { title?: unknown; behaviours?: unknown } } | undefined
+        | {
+            catastrophe?: {
+              id?: unknown;
+              title?: unknown;
+              behaviours?: unknown;
+            };
+          }
+        | undefined
     )?.catastrophe,
     behaviours = (Array.isArray(spec?.behaviours) ? spec.behaviours : []) as {
       kind?: unknown;
@@ -972,6 +1008,17 @@ function recordRunDesign(g: Game) {
     neighbors: surroundings?.neighbors ?? null,
     ground: surroundings?.ground ?? null,
     weather: surroundings?.weather ?? null,
+    // Flat copies: the audit keeps only scalar fields, and these let a design
+    // be matched to its generation and its catastrophe after the detail tail
+    // (which snapshots fill within a minute) has dropped this entry.
+    requestId: saved?.requestId ?? null,
+    generationId: saved?.generationId ?? null,
+    fingerprint: saved?.fingerprint ?? null,
+    escape: g.escape ? 1 : 0,
+    loop: Number(g.escape?.loop ?? 0),
+    catastropheId: spec?.id ?? null,
+    catastropheTitle: spec?.title ?? null,
+    catastropheKinds: behaviours.map((b) => String(b.kind ?? "?")).join(","),
     catastrophe: spec
       ? {
           title: spec.title ?? null,
@@ -1123,13 +1170,11 @@ async function fresh(
     // Only a generated game gets escape state, and only once its catastrophe
     // is prepared (or has fallen back to the offline plan).
     game.escape = createEscapeState(game, { gender, seed: game.seed });
-    try {
-      await prepareCatastrophe(game);
-    } catch (error) {
-      game.notice = `${game.notice} The catastrophe could not be prepared; the offline plan stays. (${String(error)})`;
-    }
+    dropHordeNotice(game);
+    await prepareLoggedCatastrophe(game);
   } else if (previous.escape) {
     game.escape = loopReset(previous.escape);
+    dropHordeNotice(game);
     // The fresh world has none of the buildings the last loop reached: stamp
     // every place that was already built before the loop starts again.
     restampSites(game);

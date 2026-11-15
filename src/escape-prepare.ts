@@ -104,27 +104,64 @@ export function physicalSetting(design: unknown): Record<string, unknown> {
   return place;
 }
 
-/** One catastrophe request: the spec when it is valid, otherwise undefined. */
+/** Why a catastrophe request produced no usable spec. */
+type CatastropheFailure = "request-failed" | "malformed" | "invalid";
+/** How a new game's catastrophe was prepared, for the local run log. */
+export interface CatastrophePreparation {
+  /** `offline` means the deterministic fallback already on the game stayed. */
+  source: "ai" | "offline";
+  /** Model requests made (2 when a repeat of a recent threat was re-asked). */
+  requests: number;
+  /** 1 when the first answer repeated a recent catastrophe. */
+  repeated: number;
+  failure?: CatastropheFailure;
+  /** The transport error or first validator problem, bounded. */
+  detail?: string;
+}
+type CatastropheAnswer =
+  | { spec: CatastropheSpec }
+  | { spec?: undefined; failure: CatastropheFailure; detail: string };
+
+/** One catastrophe request: the spec when it is valid, otherwise why not. */
 async function requestCatastrophe(
   payload: Record<string, unknown>,
   areaIds: string[],
-): Promise<CatastropheSpec | undefined> {
+): Promise<CatastropheAnswer> {
   try {
     const answer = await escapeRequest("escape-catastrophe", payload);
-    if (!isRecord(answer) || !("spec" in answer)) return undefined;
-    if (validateCatastrophe(answer.spec, areaIds).length > 0) return undefined;
-    return answer.spec as CatastropheSpec;
-  } catch {
-    return undefined;
+    if (!isRecord(answer) || !("spec" in answer))
+      return { failure: "malformed", detail: "answer has no spec" };
+    const problems = validateCatastrophe(answer.spec, areaIds);
+    if (problems.length > 0)
+      return {
+        failure: "invalid",
+        detail: `${problems.length} problem(s): ${String(problems[0])}`.slice(
+          0,
+          200,
+        ),
+      };
+    return { spec: answer.spec as CatastropheSpec };
+  } catch (error) {
+    return { failure: "request-failed", detail: String(error).slice(0, 200) };
   }
 }
 
 /** Generate the sealed catastrophe for a new game (AI, falling back to an
  * offline spec). Called only when a new game is generated, never on Restart,
- * so each accepted catastrophe is recorded in the player's history once. */
-export async function prepareCatastrophe(g: Game): Promise<void> {
+ * so each accepted catastrophe is recorded in the player's history once.
+ * The returned report says which of the two the game ended up with and why. */
+export async function prepareCatastrophe(
+  g: Game,
+): Promise<CatastrophePreparation> {
   const escape: EscapeState | undefined = g.escape;
-  if (!escape) return;
+  if (!escape)
+    return {
+      source: "offline",
+      requests: 0,
+      repeated: 0,
+      failure: "request-failed",
+      detail: "game has no escape state",
+    };
   const design = g.design?.design;
   const areaIds = Object.keys(escape.areas.areas);
   const recent = recentCatastrophes();
@@ -140,19 +177,41 @@ export async function prepareCatastrophe(g: Game): Promise<void> {
     areaIds,
     recent,
   };
-  let spec = await requestCatastrophe(payload, areaIds);
-  if (!spec) return; // Offline or malformed: keep the catastrophe already on the game.
+  const answer = await requestCatastrophe(payload, areaIds);
+  // Offline or malformed: keep the catastrophe already on the game.
+  if (!answer.spec)
+    return {
+      source: "offline",
+      requests: 1,
+      repeated: 0,
+      failure: answer.failure,
+      detail: answer.detail,
+    };
+  let spec = answer.spec;
+  const report: CatastrophePreparation = {
+    source: "ai",
+    requests: 1,
+    repeated: 0,
+  };
   const first = summarizeCatastrophe(spec);
   if (repeatsRecent(first, recent)) {
     // The same threat under a new name: ask once more and take that answer.
+    report.requests = 2;
+    report.repeated = 1;
     const second = await requestCatastrophe(
       { ...payload, requestId: `cat-${g.id}-2`, repeated: first },
       areaIds,
     );
-    if (second) spec = second;
+    if (second.spec) spec = second.spec;
+    else {
+      // The first answer stays; the log still says the re-ask failed.
+      report.failure = second.failure;
+      report.detail = second.detail;
+    }
   }
   escape.catastrophe = spec;
   rememberCatastrophe(spec);
+  return report;
 }
 
 const packetOutcome = (outcome: EndOutcome): "escaped" | "died" | "quit" =>
