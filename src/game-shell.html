@@ -164,7 +164,12 @@
           <span class="eyebrow" id="terminal-type"></span>
           <h2 id="problem-title">Connecting…</h2>
         </div>
-        <button id="leave" class="quiet">Leave terminal</button>
+        <div class="terminal-heading-actions">
+          <button id="regenerate-question" class="quiet study-app-only" hidden>
+            Regenerate question
+          </button>
+          <button id="leave" class="quiet">Leave terminal</button>
+        </div>
       </div>
       <div id="terminal-provenance" class="provenance"></div>
       <section id="terminal-connect" aria-live="polite" hidden>
@@ -263,7 +268,6 @@
                 id="chat-input"
                 autocomplete="off"
                 aria-label="Message"
-                placeholder="Work through the question here… Enter to send · Shift+Enter for a new line"
               ></textarea>
             </form>
           </aside>
@@ -279,6 +283,7 @@
         Exit study view
       </button>
       <button id="study-map-peek" class="quiet" hidden>Skill map</button>
+      <button class="quiet" data-bug-report>Report a bug</button>
       <button id="study-menu" class="quiet study-app-only">Menu · Esc</button>
     </div>
     <div id="study-progress" class="study-progress"></div>
@@ -466,6 +471,29 @@
   </div>
 </dialog>
 
+<dialog id="bug-report" class="bug-report" aria-labelledby="bug-report-title">
+  <div class="bug-report-card">
+    <h2 id="bug-report-title">Report a bug</h2>
+    <label for="bug-report-description"
+      >What went wrong? <span class="muted">(optional)</span></label
+    >
+    <textarea id="bug-report-description" rows="6" spellcheck="true"></textarea>
+    <label class="bug-report-check"
+      ><input type="checkbox" id="bug-report-include" checked /> Include the
+      current question and conversation</label
+    >
+    <p class="muted">
+      The report adds this browser's diagnostics and this computer's service
+      logs. It is saved on this computer and sent nowhere.
+    </p>
+    <div class="bug-report-actions">
+      <button id="bug-report-copy">Copy to clipboard</button>
+      <button id="bug-report-save" class="quiet">Save to file</button>
+      <button id="bug-report-close" class="quiet">Close</button>
+    </div>
+    <p id="bug-report-status" role="status" aria-live="polite"></p>
+  </div>
+</dialog>
 <dialog id="gender-dialog" class="gender-dialog" aria-labelledby="gender-title">
   <div class="gender-card">
     <span class="eyebrow">NEW GAME</span>

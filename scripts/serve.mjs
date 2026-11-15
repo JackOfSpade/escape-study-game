@@ -4,6 +4,7 @@ import { open, readFile, realpath } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { ensureBridge } from "./bridge-service.mjs";
+import { stampConsole } from "./lib/stamp-console.mjs";
 
 const mime = {
   ".html": "text/html; charset=utf-8",
@@ -148,17 +149,35 @@ if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 ) {
+  stampConsole();
   const port = Number(process.env.PORT ?? 5173);
   if (!Number.isInteger(port) || port < 1 || port > 65535)
     throw Error("Invalid app port");
   // Validate the build before starting or reconnecting any background service.
   const server = await createAppServer({ restartBridge: () => ensureBridge() });
   await ensureBridge();
-  server.listen(port, "127.0.0.1", () =>
-    console.log(`Production game: http://127.0.0.1:${port}`),
-  );
+  // A second copy (a dev server, or an older instance still shutting down) can
+  // hold the port. Crashing here made the supervisor relaunch every ten seconds
+  // and write a stack trace each time; wait for the port instead, saying so once.
+  let waiting = false,
+    retry;
+  server.on("error", (error) => {
+    if (error.code !== "EADDRINUSE") throw error;
+    if (!waiting)
+      console.error(
+        `Port ${port} is already in use by another program; waiting for it to be released`,
+      );
+    waiting = true;
+    retry = setTimeout(() => server.listen(port, "127.0.0.1"), 15_000);
+  });
+  server.on("listening", () => {
+    waiting = false;
+    console.log(`Learning workspace: http://127.0.0.1:${port}`);
+  });
+  server.listen(port, "127.0.0.1");
   for (const signal of ["SIGINT", "SIGTERM"])
     process.once(signal, () => {
+      clearTimeout(retry);
       server.closeAllConnections();
       server.close();
     });

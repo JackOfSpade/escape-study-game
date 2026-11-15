@@ -1,11 +1,13 @@
 import { safeEqual } from "./lib/safe-equal.mjs";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { createClaudeGateway } from "./claude-gateway.mjs";
 import { createStudyBridgeServer } from "./study-bridge-server.mjs";
 import { createNpcSpeechService } from "./npc-speech-service.mjs";
 import { createKokoroRenderer } from "./npc-kokoro-renderer.mjs";
 import { privateDirectory, writePrivate } from "./lib/private-fs.mjs";
+import { createBugReports } from "./bug-report-route.mjs";
+import { stampConsole } from "./lib/stamp-console.mjs";
 
 /** This process owns AI calls, speech and code execution. Game launchers may
  * disconnect without ending it. */
@@ -34,17 +36,39 @@ export async function startBridgeService(boot, options = {}) {
     process.platform === "darwin"
       ? createNpcSpeechService({ render: createKokoroRenderer() })
       : createNpcSpeechService();
+  const usageLog = join(boot.directory, "claude-usage.jsonl");
+  const claude =
+    options.claude ??
+    createClaudeGateway({
+      usageLog,
+      // Opt-in only: a study install keeps no copies of prompts or replies.
+      ...(process.env.ZOMBIE_AI_REPLAY_SAMPLES === "1"
+        ? { replaySamples: join(boot.directory, "ai-replay-samples") }
+        : {}),
+    });
+  // Reports sit beside the service folders (.local/bug-reports in a checkout).
+  const local = dirname(boot.directory);
   const server = createStudyBridgeServer({
     speech,
-    claude:
-      options.claude ??
-      createClaudeGateway({
-        usageLog: join(boot.directory, "claude-usage.jsonl"),
-        // Opt-in only: a study install keeps no copies of prompts or replies.
-        ...(process.env.ZOMBIE_AI_REPLAY_SAMPLES === "1"
-          ? { replaySamples: join(boot.directory, "ai-replay-samples") }
-          : {}),
-      }),
+    claude,
+    reports: createBugReports({
+      directory: join(local, "bug-reports"),
+      usageLog,
+      logs: [
+        {
+          title: "Study bridge log",
+          path: join(boot.directory, "service.log"),
+        },
+        {
+          title: "App server log",
+          path: join(local, "production", "service.log"),
+        },
+      ],
+      status: async () =>
+        !claude?.enabled()
+          ? "gateway-off"
+          : ((await claude.connection?.()) ?? "connected"),
+    }),
     control: {
       route(req, res) {
         if (req.url !== "/_bridge-service") return false;
@@ -100,6 +124,7 @@ export async function startBridgeService(boot, options = {}) {
 export function bootstrapBridge(options = {}) {
   if (!process.send)
     throw Error("Start the bridge through npm run bridge:start");
+  stampConsole();
   process.once("message", async (boot) => {
     try {
       const service = await startBridgeService(boot, options);

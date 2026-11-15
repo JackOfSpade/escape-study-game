@@ -31,3 +31,11 @@ Detailed snapshots identify sampled zombies and their current target/next route 
 Old v1 logs still load. Missing or malformed audit metadata does not discard valid old detail records. Already-evicted history cannot be recovered; a newly observed historical run is marked partial.
 
 Verify with `node --import tsx --test tests/run-logs.test.ts tests/frame-performance.test.ts`. Tests use memory-only synthetic worlds, including long spectator sessions, reloads, late study receipts, timeline compaction, Unicode bursts and repeated run eviction. They do not read real saves or learning history.
+
+## Bug reports
+
+**Report a bug** in the workspace toolbar opens a dialog with an optional description. **Copy to clipboard** posts the browser's part to the study bridge (`POST /api/bug-report`), which writes `.local/bug-reports/bug-report-<time>.md` and returns the path; the clipboard receives that path and the description, never the report body, so an assistant reads the file from disk. **Save to file** downloads the same report instead of saving it. If the bridge does not answer, the browser's part alone is copied or downloaded.
+
+A report holds: the description; page, build, viewport, view and Claude connection; the on-screen status lines; the current question's state, tutor request states and its scheduling/provenance line (which the workspace no longer displays); the question text and conversation unless the learner unticks that box; the run diagnostics above, newest run first (lifecycle events in full, oldest detail entries dropped past 600,000 characters); the newest 60 AI calls from `claude-usage.jsonl` (counts, timings and outcomes only); and the last 120 lines of the bridge and app server logs with repeated blocks collapsed to one copy and a count.
+
+Reports are owner-only files. The newest 20 are kept and anything older than seven days is removed on each write. Service log lines are now timestamped, and `browser-error` / `unhandled-rejection` entries carry the bounded error message. Verify with `node --import tsx --test tests/bug-report.test.ts`.

@@ -284,7 +284,7 @@ export function createStudyWorkspaceView(
       view === "question"
         ? "Skill map"
         : current
-          ? "← Back to the question"
+          ? "Go to question →"
           : "Review the last question";
     mapPeek.dataset.target = view === "question" ? "map" : "question";
     // An unfinished question whose terminal was closed is resumed here, so

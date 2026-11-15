@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { checkBridge, ensureProblem } from "../src/ai";
+import { checkBridge, ensureProblem, regenerateQuestion } from "../src/ai";
 import {
   beginVisit,
   countStudyTurn,
@@ -11,7 +11,11 @@ import {
 import { complete, step } from "../src/engine";
 import { TestRunner } from "../src/gametest/runner";
 import { emptyScenario } from "../src/gametest/schema";
-import { applyLearningAssessment, encounterKey } from "../src/learner";
+import {
+  applyLearningAssessment,
+  encounterKey,
+  initialLearner,
+} from "../src/learner";
 import type { Assessment, Encounter, Roadmap } from "../src/model";
 import { decode, encode, recover } from "../src/persistence";
 import { createPlayableGame } from "../src/world";
@@ -403,4 +407,56 @@ test("skill map stays stable across an unissued question and escapes learner-fac
   assert.ok(!html.includes("<script>"));
   assert.match(html, /&lt;script&gt;/);
   assert.doesNotMatch(html, /study-current-topic|study-review-notes/);
+});
+
+test("regenerating a workspace question keeps its topic and leaves progress untouched", () => {
+  const g = createPlayableGame(124, r);
+  g.study.learner ??= initialLearner(r);
+  const contract = eligible(r, g.study);
+  enterStudyWorkspace(g);
+  const e = nextWorkspaceQuestion(g, r);
+  assert.equal(regenerateQuestion(g, e, r), false); // Nothing to replace yet.
+  e.problem = devProblem({ ...g, rng: g.seed ^ g.study.version }, r, contract);
+  e.state = "in-progress";
+  e.workspace = "draft";
+  e.revision = 3;
+  e.chatDraft = "half typed";
+  e.tutor.push({
+    id: "m1",
+    author: "You",
+    kind: "human",
+    text: "an answer",
+    seq: 1,
+    worldTime: 0,
+    provenance: "human",
+  });
+  const other = { encounter: "another", id: "keep" };
+  g.study.knowledgeGaps = [
+    { encounter: encounterKey(e), id: "drop" },
+    other,
+  ] as never;
+  const ledger = structuredClone(g.study.learner);
+  const assessments = structuredClone(g.study.assessments);
+  // Verified counts only: the "current question" marker rightly changes
+  // while the replacement is being written.
+  const counts = () =>
+    workspaceProgressHtml(g, r).match(/data-(passed|status)="[^"]*"/g);
+  const map = counts();
+  assert.equal(regenerateQuestion(g, e, r), true);
+  assert.equal(e.problem, undefined);
+  assert.deepEqual(e.tutor, []);
+  assert.equal(e.workspace, "");
+  assert.equal(e.revision, 0);
+  assert.equal(e.chatDraft, undefined);
+  assert.equal(e.state, "available");
+  // The saved request pins the same contract, so the same topic is asked.
+  assert.deepEqual(e.pendingGeneration?.payload.contract, contract);
+  assert.deepEqual(g.study.knowledgeGaps, [other]);
+  assert.deepEqual(g.study.learner, ledger);
+  assert.deepEqual(g.study.assessments, assessments);
+  assert.deepEqual(counts(), map);
+  // Still the selected question: no second task is allocated.
+  assert.equal(nextWorkspaceQuestion(g, r), e);
+  e.state = "consumed";
+  assert.equal(regenerateQuestion(g, e, r), false);
 });
