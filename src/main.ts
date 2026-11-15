@@ -3383,25 +3383,24 @@ function ui() {
   // The pickup level of this run: a building's roof, an open site's ground.
   const pickupFloor = extractionFloor(game);
   const escapeNext = escapeRun ? escapeObjective(game) : undefined;
-  // A ghost's next step is not the living player's, whatever the run is.
+  // The title keeps the run's outcome; a ghost's description says what it
+  // now is, whatever the run was.
   const ghostText = ghostActive(game) ? ghostNotice() : undefined;
-  $("#next-title").textContent = ghostText
-    ? ghostText.title
-    : escapeNext
-      ? escapeNext.title
-      : game.status === "escaped"
-        ? "Extraction confirmed."
-        : game.status === "dead"
-          ? "Escape attempt ended."
-          : a.floor === pickupFloor
-            ? "Hold for extraction."
-            : a.y > 28
-              ? "Make it inside."
-              : a.access.includes(a.floor)
-                ? "Find the upward stairs."
-                : "Buy yourself some time.";
+  $("#next-title").textContent = escapeNext
+    ? escapeNext.title
+    : game.status === "escaped"
+      ? "Extraction confirmed."
+      : game.status === "dead"
+        ? "Escape attempt ended."
+        : a.floor === pickupFloor
+          ? "Hold for extraction."
+          : a.y > 28
+            ? "Make it inside."
+            : a.access.includes(a.floor)
+              ? "Find the upward stairs."
+              : "Buy yourself some time.";
   $("#next-description").textContent = ghostText
-    ? ghostText.description
+    ? `${ghostText.title} ${ghostText.description}`
     : escapeNext
       ? escapeNext.description
       : game.status === "escaped" || game.status === "dead"
