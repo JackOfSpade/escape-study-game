@@ -146,7 +146,7 @@ export type RunFacade =
 /** Interior wall surface; plaster is the plain painted wall. */
 export type RunWallFinish =
   "plaster" | "brick" | "stone" | "wood" | "metal" | "tile";
-export type RunWindowStyle = "punched" | "strip" | "ribbon" | "slit";
+export type RunWindowStyle = "punched" | "strip" | "ribbon" | "slit" | "none";
 /** Enclosed is a building with four stacked floors; open is an open-air place
  * (a street market, a plaza, a campsite) with one ground-level floor. */
 export type RunSiteForm = "enclosed" | "open";

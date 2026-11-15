@@ -10,6 +10,7 @@ import {
   type SceneFloorDesign,
 } from "../src/scene-catalog.mjs";
 import {
+  RUN_DESIGN_SUMMARY_LIMIT,
   parseRunDesign,
   parseRunDesignReply,
   parseRunDesignRequest,
@@ -386,7 +387,7 @@ test("scene summaries remain valid recent context with maximum visible room text
   parseRunDesign(design);
   const summary = summarizeRunDesign(design);
   for (const key of ["spatial", "atmosphere", "cast", "tempo"] as const)
-    assert.ok(summary[key].length <= 3500);
+    assert.ok(summary[key].length <= RUN_DESIGN_SUMMARY_LIMIT);
   const request = {
     version: 1,
     designVersion: 2,

@@ -821,3 +821,30 @@ test("speech loudness and range follow the delivery, matching what survivors can
   // Near the edge of its range a line fades rather than cutting off.
   assert.ok(gainAt("calm", 9).gain < gainAt("calm", 7).gain / 2);
 });
+
+test("no footstep plays while the player is in the air, and walking resumes them on landing", async () => {
+  const audio = graph(),
+    g = fixture(),
+    steps = () =>
+      audio.sources.filter((s) =>
+        (s.buffer as unknown as { name?: string })?.name?.startsWith("step"),
+      ).length;
+  audio.director.start();
+  await audio.director.ready;
+  audio.director.update(g);
+  const a = g.survivors[0];
+  a.elevated = { feet: 0.6, vx: 4, vy: 0, vz: 2, peak: 0.6, grounded: false };
+  for (let i = 0; i < 6; i++) {
+    g.time += 0.1;
+    a.x += 0.4;
+    audio.director.update(g);
+  }
+  assert.equal(steps(), 0, "a jump covering 2.4 m makes no footfall");
+  a.elevated = { feet: 0, vx: 0, vy: 0, vz: 0, peak: 0, grounded: true };
+  for (let i = 0; i < 3; i++) {
+    g.time += 0.1;
+    a.x += 0.4;
+    audio.director.update(g);
+  }
+  assert.ok(steps() > 0, "walking after landing is audible again");
+});

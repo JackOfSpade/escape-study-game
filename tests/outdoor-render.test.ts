@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import type { Mesh, Object3D } from "three";
+import type { Mesh, MeshStandardMaterial, Object3D } from "three";
 import { compileOutdoorPlan } from "../src/city-layout";
 import type { Floor, Roadmap } from "../src/model";
 import type { OutdoorPlan } from "../src/outdoor-plan.mjs";
 import type { RunSetting, RunSurroundings } from "../src/setting-catalog.mjs";
 import { ExteriorDressing } from "../src/view3d/exterior";
+import { INTERIOR_CEILING } from "../src/view3d/outdoor-render";
 import { createPlayableGame } from "../src/world";
 
 const roadmap: Roadmap = JSON.parse(
@@ -157,6 +158,30 @@ test("a dome draws its shell over the bounds", () => {
   const { dressing, names } = dressed(dome);
   assert.ok(names.includes("outdoor-enclosure-dome"), names.join(", "));
   assert.ok(!names.includes("authored-water"), "no water in a dry dome");
+  dressing.dispose();
+});
+
+test("an interior enclosure puts a low ceiling in the wall colour over the ground", () => {
+  const { dressing } = dressed({
+    ...base,
+    ground: "tile",
+    enclosure: "interior",
+    backdrop: "none",
+    regions: [],
+  });
+  const ceiling = dressing.group.getObjectByName(
+    "outdoor-enclosure-interior",
+  ) as Mesh | undefined;
+  assert.ok(ceiling, "the ceiling is drawn");
+  ceiling.geometry.computeBoundingBox();
+  assert.ok(
+    Math.abs(ceiling.geometry.boundingBox!.max.y - INTERIOR_CEILING) < 1e-5,
+  );
+  assert.ok(INTERIOR_CEILING < 3.6, "below the next storey");
+  assert.equal(
+    "#" + (ceiling.material as MeshStandardMaterial).color.getHexString(),
+    radio().interior.wall.toLowerCase(),
+  );
   dressing.dispose();
 });
 

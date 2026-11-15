@@ -256,11 +256,15 @@ export function drawBackdrop(
   }
 }
 
-/** A dome or a cave roof over the playable bounds, or nothing. The caller
+/** Height in metres of an `interior` enclosure's ceiling: one storey. */
+export const INTERIOR_CEILING = 3.4;
+/** A dome, a cave roof or a built ceiling over the playable bounds, or nothing. The caller
  * owns and disposes the returned mesh's geometry and material. */
 export function enclosureMesh(
   kind: OutdoorEnclosure,
   plan: CityPlan,
+  /** The colour of an `interior` ceiling: the building's own wall colour. */
+  ceiling = "#d8d2c0",
 ): Mesh | undefined {
   if (kind === "open-sky") return undefined;
   const b = plan.bounds,
@@ -299,15 +303,19 @@ export function enclosureMesh(
     mesh.name = "outdoor-enclosure-dome";
     return mesh;
   }
-  const geometry = new PlaneGeometry(2 * rx + 80, 2 * rz + 80)
+  // A built ceiling one storey up makes the ground around the building read
+  // as more rooms and corridors of the same place; it faces down only, so the
+  // outside stairs and the roof above it are unaffected.
+  const built = kind === "interior",
+    geometry = new PlaneGeometry(2 * rx + 80, 2 * rz + 80)
       .rotateX(Math.PI / 2)
-      .translate(cx, 28, cz),
+      .translate(cx, built ? INTERIOR_CEILING : 28, cz),
     material = new MeshStandardMaterial({
-      color: "#2a2724",
+      color: built ? ceiling : "#2a2724",
       roughness: 1,
       fog: true,
     }),
     mesh = new Mesh(geometry, material);
-  mesh.name = "outdoor-enclosure-cavern";
+  mesh.name = built ? "outdoor-enclosure-interior" : "outdoor-enclosure-cavern";
   return mesh;
 }

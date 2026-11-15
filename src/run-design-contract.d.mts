@@ -358,6 +358,8 @@ export function parseRunContentRepairCandidate(
   value: unknown,
   request: ContentRunDesignRequest,
 ): EnvironmentContent;
+/** The longest spatial, atmosphere, cast or tempo text a request accepts. */
+export declare const RUN_DESIGN_SUMMARY_LIMIT: number;
 export function summarizeRunDesign(
   design: RunDesign | RunStructureV3,
 ): RunDesignSummary;

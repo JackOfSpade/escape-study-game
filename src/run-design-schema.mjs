@@ -459,8 +459,11 @@ const concept = obj({
  * undefined for retained legacy requests (they keep free-form JSON replies). */
 export function designReplySchema(request) {
   if (request?.version !== 3) return undefined;
-  const reply = (properties) =>
-    obj({ requestId: { const: request.requestId }, ...properties });
+  // The schema becomes a tool definition at the very start of the model's
+  // prompt, so it must not change between calls of one conversation: pinning
+  // the request id here made every stage rewrite the whole conversation to the
+  // prompt cache instead of reading it. The reply parser still checks the id.
+  const reply = (properties) => obj({ requestId: str(128), ...properties });
   switch (request.phase) {
     case "concepts":
       return reply({ concepts: arr(concept, 3, 3) });

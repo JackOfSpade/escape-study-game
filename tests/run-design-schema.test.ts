@@ -97,7 +97,15 @@ test("every quality stage has a structured-output schema; legacy requests keep f
     const schema = designReplySchema(request(phase));
     assert.equal(schema?.type, "object", phase);
     assert.equal(schema.additionalProperties, false);
-    assert.deepEqual(schema.properties.requestId, { const: "req-1" });
+    // Identical for every request of a phase: a per-request schema would
+    // change the model's tool list and defeat the prompt cache on each call.
+    assert.deepEqual(
+      designReplySchema({ ...request(phase), requestId: "req-2" }),
+      schema,
+      phase,
+    );
+    assert.ok(!JSON.stringify(schema).includes("req-1"), phase);
+    assert.equal(schema.properties.requestId.type, "string");
   }
   assert.equal(designReplySchema({ version: 1, requestId: "x" }), undefined);
   assert.equal(

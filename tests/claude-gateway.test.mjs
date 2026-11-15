@@ -481,7 +481,7 @@ test("quality design stages require schema-validated structured output", async (
   const schema = JSON.parse(
     calls[0].args[calls[0].args.indexOf("--json-schema") + 1],
   );
-  assert.deepEqual(schema.properties.requestId, { const: "s1" });
+  assert.equal(schema.properties.requestId.type, "string");
   assert.deepEqual(schema.required, ["requestId", "selectedId", "rationale"]);
   // Retained legacy design requests and live tasks keep free-form replies.
   await g.run("design-run", { version: 1, requestId: "old" });

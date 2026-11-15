@@ -544,7 +544,9 @@ export class BuildingShell {
           if (!isPerimeterWall(floor, x, z)) continue;
           const cx = x + 0.5,
             cz = z + 0.5,
-            window = windows.get(`${cx}/${cz}`);
+            // A windowless shell (a bunker, a vault, endless corridors).
+            window =
+              ext?.windows === "none" ? undefined : windows.get(`${cx}/${cz}`);
           const color = roof
             ? ext
               ? tone(ext.facadeColor, 1.12)
