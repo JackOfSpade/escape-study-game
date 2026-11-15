@@ -1419,7 +1419,8 @@ export function fieldClearance(f: Floor): Point[] {
       const across = d.y1 === d.y2;
       for (let y = d.y1; y <= d.y2; y++)
         for (let x = d.x1; x <= d.x2; x++)
-          for (const t of [-1, 0, 1])
+          // Two cells each way: room for a hinged leaf to swing.
+          for (const t of [-2, -1, 0, 1, 2])
             points.push(
               across
                 ? { x: x + 0.5, y: y + 0.5 + t }

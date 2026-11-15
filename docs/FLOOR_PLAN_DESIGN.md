@@ -264,13 +264,26 @@ interface RunFreeFloor {
 }
 interface RunFreeRoom {
   name: string;
-  pattern: "rows" | "clusters" | "counter" | "lounge" | "table" |
-    "shelving" | "display" | "bays" | "desk" | "open";
+  pattern:
+    | "rows"
+    | "clusters"
+    | "counter"
+    | "lounge"
+    | "table"
+    | "shelving"
+    | "display"
+    | "bays"
+    | "desk"
+    | "open";
   filler: string[]; // built-in kinds or setting.objects ids, signature first
-  x: number; y: number; w: number; h: number; // interior, building cells
+  x: number;
+  y: number;
+  w: number;
+  h: number; // interior, building cells
   shape: "rect" | "chamfered" | "rounded" | "octagon";
   power: "lit" | "dim" | "outage";
-  doors: { side: "n" | "s" | "e" | "w"; at: number }[]; // two-cell doorways
+  // two-cell doorways; door is null (open gap) or a hinged door's DoorDesign
+  doors: { side: "n" | "s" | "e" | "w"; at: number; door }[];
   work: number; // study work points placed in the room
   hall: null | { focus; seating; stage; rake; pit; platforms };
 }
@@ -288,7 +301,10 @@ interface RunFreeRoom {
   chain order and no force field except the main gate.
 - **Doorways** are two open cells in a room's wall, recorded in
   `generation.doorways`. A door must face open floor or a room one wall cell
-  away. `fieldClearance` keeps furniture off them.
+  away. `fieldClearance` keeps furniture off them. Each doorway's `door` is
+  null (an open gap) or a `DoorDesign`: then a plain hinged door
+  `f{n}-room{i}-door{d}` (kind `door`, no `field`, the design's style and
+  health) stands latched in it until someone opens it by hand.
 - **Work points** are the floor's study stations: `work` per room, placed on a
   lattice clear of walls and doorways. Stations keep `questionRoom`
   `f{n}-room{i}`.

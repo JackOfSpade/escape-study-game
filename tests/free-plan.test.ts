@@ -269,7 +269,9 @@ test("drawn rooms are furnished by their own pattern and list, not office functi
   const g = build(drawn());
   const ids = (f: Floor, zone: string) =>
     f.furniture
-      .filter((o) => o.id.startsWith(`f${f.index}-${zone}-`))
+      .filter(
+        (o) => o.id.startsWith(`f${f.index}-${zone}-`) && o.kind !== "door",
+      )
       .map((o) => o.object?.id ?? o.kind);
   // Star theatre: rows of the room's own seat facing its west focus.
   const theatre = g.floors[0].furniture.filter(
@@ -343,6 +345,48 @@ test("a drawn hall room has stepped levels, a taller ceiling and its own power",
   );
 });
 
+test("a drawn doorway carries a hinged door or stays an open gap", () => {
+  const structure = drawn(),
+    g = build(structure),
+    f = g.floors[0];
+  // The ticket office door: hinged, latched, styled, and no force field.
+  const door = f.furniture.find((o) => o.id === "f0-room1-door0")!;
+  assert.ok(door, "ticket office door");
+  assert.equal(door.kind, "door");
+  assert.equal(door.field, undefined);
+  assert.ok(door.door?.latched);
+  const authored = structure.floors[0].rooms[1].doors[0].door!;
+  assert.equal(door.maxHp, authored.health);
+  assert.equal(door.doorStyle?.material, authored.material);
+  assert.equal(door.doorStyle?.label, authored.label);
+  // It stands in its doorway.
+  const gap = f.generation!.doorways!.find(
+    (d) => door.door!.frame.x > d.x1 && door.door!.frame.x < d.x2 + 1.01,
+  );
+  assert.ok(gap, "door frame sits in a doorway");
+  // The theatre's wide openings were authored open: no door object there.
+  assert.deepEqual(
+    structure.floors[0].rooms[0].doors.map((d) => d.door),
+    [null, null],
+  );
+  assert.equal(
+    f.furniture.filter((o) => o.id.startsWith("f0-room0-door")).length,
+    0,
+  );
+  // One door object per authored door across the building.
+  for (const [index, design] of structure.floors.entries())
+    assert.equal(
+      g.floors[index].furniture.filter(
+        (o) => o.kind === "door" && o.id !== "main-gate",
+      ).length,
+      design.rooms.flatMap((room) => room.doors).filter((d) => d.door).length,
+    );
+  // A malformed door is rejected by the contract.
+  const bad = drawn();
+  bad.floors[0].rooms[1].doors[0].door = { ...authored, health: 10 };
+  assert.throws(() => parseRunStructure(bad), /health/);
+});
+
 test("drawn floors report every problem a repair needs, by room", () => {
   const change = (edit: (rooms: RunFreeRoom[]) => void) => {
     const s = drawn();
@@ -368,7 +412,7 @@ test("drawn floors report every problem a repair needs, by room", () => {
   assert.match(
     change((rooms) => {
       rooms[1].x = 4;
-      rooms[1].doors = [{ side: "w", at: 0.5 }];
+      rooms[1].doors = [{ side: "w", at: 0.5, door: null }];
     }),
     /door 0 \(w\) opens into a wall/,
   );
@@ -403,7 +447,7 @@ test("a room reached only through another room is still reachable", () => {
   rooms[0].w = 14;
   rooms[1].x = 20;
   rooms[1].w = 14;
-  rooms[1].doors = [{ side: "w", at: 0.5 }];
+  rooms[1].doors = [{ side: "w", at: 0.5, door: null }];
   const g = build(s),
     f = g.floors[1];
   assert.deepEqual(freePlanErrors(g, f), []);

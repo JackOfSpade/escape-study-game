@@ -1,3 +1,5 @@
+import { ensureDoor } from "./doors";
+import type { Furniture } from "./model";
 import { type Floor, type Game, type Point, type Station, H, W } from "./model";
 import { footprintTiles } from "./building-layout";
 import { carveStairwells, stairwellApproach } from "./stairwell";
@@ -251,6 +253,34 @@ export function freePlanLayout(g: Game, f: Floor) {
         return;
       }
       for (const c of cells) f.tiles[c.y][c.x] = 0;
+      if (door.door) {
+        // A plain hinged door filling the doorway: latched until someone
+        // opens it by hand, and never a force field.
+        const across = door.side === "n" || door.side === "s",
+          { health, ...style } = door.door;
+        const leaf: Furniture = {
+          id: `f${f.index}-room${i}-door${d}`,
+          floor: f.index,
+          kind: "door",
+          x: (cells[0].x + cells[1].x + 1) / 2,
+          y: (cells[0].y + cells[1].y + 1) / 2,
+          w: across ? 2 : 1,
+          h: across ? 1 : 2,
+          hp: health,
+          maxHp: health,
+          speed: 0,
+          rotation: 0,
+          destroyed: false,
+          movers: [],
+          moved: 0,
+          credited: [],
+          turning: 0,
+          open: false,
+          doorStyle: style,
+        };
+        ensureDoor(leaf, f);
+        f.furniture.push(leaf);
+      }
       doorways[i].push({
         x1: cells[0].x,
         y1: cells[0].y,

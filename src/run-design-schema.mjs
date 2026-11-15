@@ -377,7 +377,10 @@ const freeFloor = obj({
       h: int(...FREE_PLAN_LIMITS.size),
       shape: oneOf(ROOM_SHAPES),
       power: oneOf(["lit", "dim", "outage"]),
-      doors: arr(obj({ side, at: num(0, 1) }), ...FREE_PLAN_LIMITS.doors),
+      doors: arr(
+        obj({ side, at: num(0, 1), door: nullable(door) }),
+        ...FREE_PLAN_LIMITS.doors,
+      ),
       work: int(...FREE_PLAN_LIMITS.work),
       hall: nullable(obj(hallFeatures)),
     }),

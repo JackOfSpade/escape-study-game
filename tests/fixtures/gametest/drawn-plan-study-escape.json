@@ -67,11 +67,13 @@
             "doors": [
               {
                 "side": "s",
-                "at": 0.5
+                "at": 0.5,
+                "door": null
               },
               {
                 "side": "n",
-                "at": 0.15
+                "at": 0.15,
+                "door": null
               }
             ],
             "work": 8,
@@ -111,7 +113,15 @@
             "doors": [
               {
                 "side": "e",
-                "at": 0.5
+                "at": 0.5,
+                "door": {
+                  "material": "wood",
+                  "color": "#6b4a2f",
+                  "accent": "#c9a66b",
+                  "window": "half",
+                  "label": "Ticket Office door",
+                  "health": 900
+                }
               }
             ],
             "work": 1,
@@ -130,7 +140,15 @@
             "doors": [
               {
                 "side": "w",
-                "at": 0.5
+                "at": 0.5,
+                "door": {
+                  "material": "wood",
+                  "color": "#6b4a2f",
+                  "accent": "#c9a66b",
+                  "window": "half",
+                  "label": "Lamp Workshop door",
+                  "health": 900
+                }
               }
             ],
             "work": 1,
@@ -384,7 +402,15 @@
             "doors": [
               {
                 "side": "s",
-                "at": 0.5
+                "at": 0.5,
+                "door": {
+                  "material": "wood",
+                  "color": "#6b4a2f",
+                  "accent": "#c9a66b",
+                  "window": "half",
+                  "label": "Exhibit Gallery North-We door",
+                  "health": 900
+                }
               }
             ],
             "work": 4,
@@ -403,7 +429,15 @@
             "doors": [
               {
                 "side": "s",
-                "at": 0.5
+                "at": 0.5,
+                "door": {
+                  "material": "wood",
+                  "color": "#6b4a2f",
+                  "accent": "#c9a66b",
+                  "window": "half",
+                  "label": "Exhibit Gallery North-Ea door",
+                  "health": 900
+                }
               }
             ],
             "work": 4,
@@ -422,7 +456,15 @@
             "doors": [
               {
                 "side": "e",
-                "at": 0.3
+                "at": 0.3,
+                "door": {
+                  "material": "wood",
+                  "color": "#6b4a2f",
+                  "accent": "#c9a66b",
+                  "window": "half",
+                  "label": "Exhibit Gallery South-We door",
+                  "health": 900
+                }
               }
             ],
             "work": 2,
@@ -441,7 +483,15 @@
             "doors": [
               {
                 "side": "w",
-                "at": 0.3
+                "at": 0.3,
+                "door": {
+                  "material": "wood",
+                  "color": "#6b4a2f",
+                  "accent": "#c9a66b",
+                  "window": "half",
+                  "label": "Exhibit Gallery South-Ea door",
+                  "health": 900
+                }
               }
             ],
             "work": 2,
@@ -834,7 +884,15 @@
             "doors": [
               {
                 "side": "s",
-                "at": 0.5
+                "at": 0.5,
+                "door": {
+                  "material": "wood",
+                  "color": "#6b4a2f",
+                  "accent": "#c9a66b",
+                  "window": "half",
+                  "label": "Education Wing North-Wes door",
+                  "health": 900
+                }
               }
             ],
             "work": 4,
@@ -853,7 +911,15 @@
             "doors": [
               {
                 "side": "s",
-                "at": 0.5
+                "at": 0.5,
+                "door": {
+                  "material": "wood",
+                  "color": "#6b4a2f",
+                  "accent": "#c9a66b",
+                  "window": "half",
+                  "label": "Education Wing North-Eas door",
+                  "health": 900
+                }
               }
             ],
             "work": 4,
@@ -872,7 +938,15 @@
             "doors": [
               {
                 "side": "e",
-                "at": 0.3
+                "at": 0.3,
+                "door": {
+                  "material": "wood",
+                  "color": "#6b4a2f",
+                  "accent": "#c9a66b",
+                  "window": "half",
+                  "label": "Education Wing South-Wes door",
+                  "health": 900
+                }
               }
             ],
             "work": 2,
@@ -891,7 +965,15 @@
             "doors": [
               {
                 "side": "w",
-                "at": 0.3
+                "at": 0.3,
+                "door": {
+                  "material": "wood",
+                  "color": "#6b4a2f",
+                  "accent": "#c9a66b",
+                  "window": "half",
+                  "label": "Education Wing South-Eas door",
+                  "health": 900
+                }
               }
             ],
             "work": 2,
@@ -1297,7 +1379,15 @@
             "doors": [
               {
                 "side": "s",
-                "at": 0.5
+                "at": 0.5,
+                "door": {
+                  "material": "wood",
+                  "color": "#6b4a2f",
+                  "accent": "#c9a66b",
+                  "window": "half",
+                  "label": "Observatory Offices Nort door",
+                  "health": 900
+                }
               }
             ],
             "work": 4,
@@ -1316,7 +1406,15 @@
             "doors": [
               {
                 "side": "s",
-                "at": 0.5
+                "at": 0.5,
+                "door": {
+                  "material": "wood",
+                  "color": "#6b4a2f",
+                  "accent": "#c9a66b",
+                  "window": "half",
+                  "label": "Observatory Offices Nort door",
+                  "health": 900
+                }
               }
             ],
             "work": 4,
@@ -1335,7 +1433,15 @@
             "doors": [
               {
                 "side": "e",
-                "at": 0.3
+                "at": 0.3,
+                "door": {
+                  "material": "wood",
+                  "color": "#6b4a2f",
+                  "accent": "#c9a66b",
+                  "window": "half",
+                  "label": "Observatory Offices Sout door",
+                  "health": 900
+                }
               }
             ],
             "work": 2,
@@ -1354,7 +1460,15 @@
             "doors": [
               {
                 "side": "w",
-                "at": 0.3
+                "at": 0.3,
+                "door": {
+                  "material": "wood",
+                  "color": "#6b4a2f",
+                  "accent": "#c9a66b",
+                  "window": "half",
+                  "label": "Observatory Offices Sout door",
+                  "health": 900
+                }
               }
             ],
             "work": 2,

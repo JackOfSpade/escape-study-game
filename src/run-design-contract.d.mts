@@ -264,7 +264,12 @@ export interface RunFreeRoom extends RunFurnishing {
   shape: RunRoomShape;
   power: RunPower;
   /** Two-cell doorways: the wall and the position along it (0..1). */
-  doors: { side: RunHallSide; at: number }[];
+  doors: {
+    side: RunHallSide;
+    at: number;
+    /** A hinged door opened by hand, or null for an open doorway. */
+    door: RunDoorDesign | null;
+  }[];
   /** Study work points the engine places in this room. */
   work: number;
   hall: RunHallFeatures | null;
