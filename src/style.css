@@ -603,6 +603,16 @@ body.spectating .inventory {
   border-bottom: 1px solid var(--line);
   gap: 10px;
 }
+.terminal-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+/* The app-only rule would otherwise show a button the page has hidden. */
+#regenerate-question[hidden] {
+  display: none;
+}
 .terminal-heading h2 {
   font-size: 19px;
   margin-bottom: 0;
@@ -617,6 +627,11 @@ body.spectating .inventory {
   letter-spacing: 0.5px;
   padding: 8px 15px;
   border-bottom: 1px solid var(--line);
+}
+/* Where a question came from and how it was scheduled is diagnostic detail:
+   the workspace keeps it in the page for bug reports and shows none of it. */
+.study-app #terminal-provenance {
+  display: none;
 }
 #terminal-body {
   overflow: auto;
@@ -1697,6 +1712,66 @@ body.reduced * {
 body.epilogue-open .dashboard,
 body.epilogue-open .world-top {
   visibility: hidden;
+}
+.bug-report {
+  border: 1px solid var(--line, #303a4a);
+  border-radius: 8px;
+  background: var(--panel, #1a202b);
+  color: var(--ink, #e1e7f0);
+  padding: 0;
+  width: min(520px, 92vw);
+}
+.bug-report::backdrop {
+  background: rgb(0 0 0 / 70%);
+}
+.bug-report-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.bug-report-card h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.bug-report-card p {
+  margin: 0;
+  font-size: 13px;
+}
+.bug-report-card textarea {
+  background: var(--bg, #11151d);
+  color: inherit;
+  border: 1px solid var(--line, #303a4a);
+  border-radius: 6px;
+  padding: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font: inherit;
+}
+.bug-report-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bug-report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+#bug-report-status {
+  overflow-wrap: anywhere;
+}
+#bug-report-status:empty {
+  display: none;
+}
+#bug-report-status[data-kind="ok"] {
+  color: #8fd6a0;
+}
+#bug-report-status[data-kind="error"] {
+  color: #f0b27a;
 }
 .gender-dialog {
   border: 1px solid var(--line, #2a2a2a);

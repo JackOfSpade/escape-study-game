@@ -1,4 +1,5 @@
 import { createStudyWorkspaceView } from "./study-workspace-view";
+import { mountBugReport } from "./bug-report";
 import { providerLabel } from "./provider-label";
 import { NpcVoiceDirector } from "./npc-voice";
 import {
@@ -44,7 +45,9 @@ import {
   releaseRetiredChatRequests,
   closeChat,
   edit,
+  canRegenerate,
   ensureProblem,
+  regenerateQuestion,
   inspectCompletedNpcWork,
   materializeObservedWork,
   presentMessages,
@@ -822,6 +825,75 @@ const studyWorkspaceView = createStudyWorkspaceView(
 function renderStudyWorkspace() {
   studyWorkspaceView.render();
 }
+mountBugReport({
+  log: (type, data) => {
+    runLogs.record(game, type, data);
+    void runLogs.flush();
+  },
+  async collect() {
+    const e =
+      (active ? game.encounters[active] : undefined) ??
+      workspaceSelectedQuestion(game);
+    const shown = (selector: string) => {
+      const node = document.querySelector<HTMLElement>(selector);
+      return node && !node.hidden ? (node.textContent ?? "").trim() : "";
+    };
+    const build = await fetch("/_app-health", {
+      signal: AbortSignal.timeout(3000),
+    })
+      .then((r) => r.json())
+      .then((health) => String(health.build).slice(0, 16))
+      .catch(() => undefined);
+    runLogs.capture(game, true);
+    return {
+      url: location.origin + location.pathname,
+      build,
+      userAgent: navigator.userAgent,
+      viewport: `${innerWidth}×${innerHeight} at ${devicePixelRatio}x`,
+      view: $("#study-workspace").dataset.view ?? "world",
+      terminalOpen: !!active,
+      connection: `${status().mode}${status().reason ? ` (${status().reason})` : ""}: ${status().detail}`,
+      saveError: saveError || undefined,
+      status: Object.fromEntries(
+        (
+          [
+            ["session", "#study-message"],
+            ["save", "#study-save-status"],
+            ["dialogue", "#dialogue-status"],
+            ["tutor request", "#tutor-request-status"],
+            ["submission", "#submission-status"],
+          ] as const
+        )
+          .map(([name, selector]) => [name, shown(selector)])
+          .filter(([, value]) => value),
+      ),
+      question: e
+        ? {
+            title: e.problem?.title ?? "",
+            provenance: $("#terminal-provenance").textContent ?? "",
+            state: e.state,
+            error: e.error,
+            generation: e.generation,
+            part: e.thread
+              ? `${e.thread.segment + 1} of thread ${e.thread.id}`
+              : undefined,
+            prompt: e.problem?.prompt,
+            messages: e.tutor.map(({ kind, author, text }) => ({
+              kind,
+              author,
+              text,
+            })),
+            requests: (e.tutorRequests ?? []).map(({ state, error }) => ({
+              state,
+              error,
+            })),
+            draft: e.chatDraft || undefined,
+          }
+        : undefined,
+      logs: runLogs.export(),
+    };
+  },
+});
 $("#study-only-toggle").onclick = () => setStudyMode(true);
 $("#study-only-menu").onclick = () => setStudyMode(true);
 $("#study-only-exit").onclick = () => setStudyMode(false);
@@ -887,15 +959,25 @@ $("#study-review-retry").onclick = async () => {
   await assess(game, e, roadmap, a.evidenceCutoffSequence, true);
   questionChanged();
 };
+// Error text is code-authored (a thrown message), bounded, and stays in this
+// browser's diagnostics until the learner files a bug report.
+const errorText = (value: unknown) =>
+  String(
+    value instanceof Error ? `${value.name}: ${value.message}` : value,
+  ).slice(0, 300);
 window.addEventListener("error", (event) => {
   runLogs.record(game, "browser-error", {
     file: event.filename.split("/").pop(),
     line: event.lineno,
+    column: event.colno,
+    message: errorText(event.error ?? event.message),
   });
   void runLogs.flush();
 });
-window.addEventListener("unhandledrejection", () => {
-  runLogs.record(game, "unhandled-rejection");
+window.addEventListener("unhandledrejection", (event) => {
+  runLogs.record(game, "unhandled-rejection", {
+    message: errorText(event.reason),
+  });
   void runLogs.flush();
 });
 let designingInitial = false;
@@ -2178,6 +2260,7 @@ function renderTerminal(force = false) {
     return;
   const e = game.encounters[active];
   const locked = connectionLocked(e);
+  $("#regenerate-question").hidden = !(STUDY_APP && canRegenerate(game, e));
   $("#terminal-connect").hidden = !locked;
   $("#terminal-body").hidden = locked;
   if (locked) {
@@ -2197,12 +2280,17 @@ function renderTerminal(force = false) {
   }
   composer.disabled = false;
   tab = terminalChannel(e);
-  setText("#conversation-title", tab === "tutor" ? TUTOR : "Group chat");
+  setText(
+    "#conversation-title",
+    tab !== "tutor" ? "Group chat" : STUDY_APP ? "Answer" : TUTOR,
+  );
+  // The workspace panel is titled "Answer" and needs no further instruction.
+  $("#conversation-context").hidden = STUDY_APP && tab === "tutor";
   setText(
     "#conversation-context",
     tab === "tutor"
       ? STUDY_APP
-        ? "Answer and reason here. Your tutor assumes you already know this and asks one focused question at a time; a good answer can also settle the prerequisites it genuinely depends on. If you do not know something, say so: the gap is recorded for later study."
+        ? ""
         : "Answer and reason here. Terminal AI assumes you already know this and asks one focused question at a time; a good answer can also settle the prerequisites it genuinely depends on. If you do not know something, say so: the gap is recorded for later study and the key is still granted. Access and a key are awarded when it marks the conversation complete."
       : "Discuss with your group. They can read the current answer draft. Chatting does not submit it.",
   );
@@ -2749,6 +2837,23 @@ $("#work-log").ontoggle = () => {
   }
 };
 $("#leave").onclick = leaveTerminal;
+$("#regenerate-question").onclick = () => {
+  const e = active ? game.encounters[active] : undefined;
+  if (!e || !canRegenerate(game, e)) return;
+  if (
+    e.tutor.some((m) => m.kind === "human") &&
+    !confirm(
+      "Write a new question on this topic? This question and your conversation are discarded. Your skill map does not change.",
+    )
+  )
+    return;
+  const title = e.problem?.title;
+  if (!regenerateQuestion(game, e, roadmap)) return;
+  runLogs.record(game, "question-regenerated", { encounter: e.id, title });
+  renderTerminal(true);
+  void prepareQuestion(e).finally(() => void persist());
+  void persist();
+};
 $("#save-button").onclick = async () => {
   await persist();
   game.notice =

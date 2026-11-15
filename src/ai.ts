@@ -574,6 +574,63 @@ async function ensureIndividualProblem(g: Game, e: Encounter, r: Roadmap) {
   }
   if (regenerate) await ensureIndividualProblem(g, e, r);
 }
+/** A workspace question that can be thrown away and written again. */
+const regenerable = (g: Game, e: Encounter) =>
+  !!e.studyOnly &&
+  !!e.problem &&
+  e.state !== "consumed" &&
+  !e.generation &&
+  g.encounters[e.id] === e;
+export const canRegenerate = (g: Game, e: Encounter) =>
+  regenerable(g, e) && live(g) && status().mode === "claude-cli";
+/**
+ * Discard a workspace question and its conversation and ask for a fresh one on
+ * the same scheduled contract, so a change to question writing can be seen
+ * without answering first. Nothing is completed: the visit stays bound to this
+ * encounter, no assessment runs, and what the discarded conversation recorded
+ * about the learner is removed. The caller then prepares the question as usual.
+ */
+export function regenerateQuestion(g: Game, e: Encounter, r: Roadmap) {
+  if (!regenerable(g, e)) return false;
+  const contract = structuredClone(e.problem!.contract);
+  const key = encounterKey(e);
+  const mine = (record: { encounter: string }) =>
+    record.encounter === key || record.encounter === e.id;
+  const study = g.study;
+  if (study.knowledgeGaps)
+    study.knowledgeGaps = study.knowledgeGaps.filter((x) => !mine(x));
+  if (study.knowledgeEstablished)
+    study.knowledgeEstablished = study.knowledgeEstablished.filter(
+      (x) => !mine(x),
+    );
+  if (e.thread && study.thread?.id === e.thread.id) delete study.thread;
+  delete e.problem;
+  delete e.thread;
+  delete e.probe;
+  delete e.tutorRequests;
+  delete e.chatDraft;
+  delete e.executions;
+  delete e.error;
+  delete e.workspaceBase;
+  delete e.problemPresentedSequence;
+  delete e.problemPresentedAt;
+  e.tutor = [];
+  e.history = [];
+  e.submissions = [];
+  e.workspace = "";
+  e.revision = 0;
+  e.state = "available";
+  // A saved generation keeps its contract: the same topic is asked again.
+  const requestId = `gen-${g.id}-${e.id}-${crypto.randomUUID()}`;
+  e.pendingGeneration = {
+    provider: activeProvider(),
+    requestId,
+    payload: structuredClone(
+      generationPayload(g, r, contract, requestId, e.id),
+    ),
+  };
+  return true;
+}
 export function edit(
   g: Game,
   e: Encounter,

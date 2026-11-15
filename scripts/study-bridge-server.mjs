@@ -4,7 +4,12 @@ import { executionRoute } from "./execution-route.mjs";
 import { AI_OPERATIONS } from "./lib/ai-contracts.mjs";
 
 /** Construct the actual loopback relay without launching Vite, for isolated transport verification. */
-export function createStudyBridgeServer({ speech, claude, control } = {}) {
+export function createStudyBridgeServer({
+  speech,
+  claude,
+  control,
+  reports,
+} = {}) {
   return createServer(async (req, res) => {
     res.setHeader("Content-Type", "application/json");
     res.setHeader("Cache-Control", "no-store");
@@ -22,6 +27,7 @@ export function createStudyBridgeServer({ speech, claude, control } = {}) {
     try {
       if (control?.route(req, res)) return;
       if (speech && (await speech.route(req, res))) return;
+      if (reports && (await reports.route(req, res))) return;
       if (req.url === "/api/execute") {
         await executionRoute(req, res);
         return;
