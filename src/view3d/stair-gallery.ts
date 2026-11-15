@@ -217,6 +217,8 @@ export class StairGallery {
         }),
         north = route.points[1],
         south = route.points[5];
+      // An interior stair core has no outside gallery to signpost.
+      if (!south) continue;
       this.sign(
         north.x + 0.65,
         north.y + 1.6,

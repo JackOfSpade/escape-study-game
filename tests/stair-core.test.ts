@@ -29,6 +29,9 @@ import {
 } from "../src/stair-travel";
 import { stairDrawing } from "../src/stairwell";
 import { structureGame } from "../src/world";
+import { Box3 } from "three";
+import { BuildingShell } from "../src/view3d/building";
+import { StairGallery } from "../src/view3d/stair-gallery";
 
 const roadmap: Roadmap = JSON.parse(
   readFileSync("public/curriculum.json", "utf8"),
@@ -278,4 +281,28 @@ test("a stamped neighbour brings its own stair core", () => {
   // Its flights are interior too: one slab per storey beside the start
   // building's forty outside ones.
   assert.equal(exteriorStructure(g).slabs.length, 44);
+});
+
+test("the 3D stair gallery and building shell build for a core and for a short building", () => {
+  for (const storeys of [4, 1]) {
+    const s = drawn();
+    s.floors = s.floors.slice(0, storeys);
+    const game = build(s),
+      gallery = new StairGallery(),
+      shell = new BuildingShell();
+    // Only canvas sign textures need a browser; the geometry does not.
+    (gallery as unknown as { sign: () => void }).sign = () => {};
+    gallery.build(game);
+    shell.build(game.floors, game.extraction);
+    gallery.group.updateMatrixWorld(true);
+    const treads = gallery.group.getObjectByName("stair-decks-and-treads")!;
+    assert.ok(treads, "interior treads are drawn");
+    // The treads stay inside the core and span every storey.
+    const bounds = new Box3().setFromObject(treads);
+    assert.ok(bounds.min.x >= 5 - 0.2 && bounds.max.x <= 9 + 0.2);
+    assert.ok(bounds.min.z >= 11 - 0.2 && bounds.max.z <= 16 + 0.2);
+    assert.ok(Math.abs(bounds.max.y - storeys * 3.6) < 0.25);
+    gallery.dispose();
+    shell.dispose();
+  }
 });
