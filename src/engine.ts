@@ -2414,7 +2414,8 @@ export function complete(
       (a.id === "human" && (g.status === "dead" || g.status === "escaped"))
     )
       continue;
-    if (g.rules === "force-fields") a.keys = (a.keys ?? 0) + 1;
+    // Keys buy passes through field doors; an escape game has neither.
+    if (g.rules === "force-fields" && !g.escape) a.keys = (a.keys ?? 0) + 1;
     if (e.reward === "stairs" && !a.access.includes(e.floor))
       a.access.push(e.floor);
   }

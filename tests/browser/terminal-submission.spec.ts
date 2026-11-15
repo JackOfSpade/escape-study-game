@@ -8,7 +8,7 @@ import {
   openNativeQuestion,
 } from "./study-harness";
 
-test("a reply that cannot be accepted keeps the exact request, and its retry announces one key on the game canvas", async ({
+test("a reply that cannot be accepted keeps the exact request, and its retry completes once without a key", async ({
   page,
 }) => {
   const relay = await mockClaudeStudy(page);
@@ -34,11 +34,10 @@ test("a reply that cannot be accepted keeps the exact request, and its retry ann
   await retry.click();
   await expect.poll(() => relay.tutorCalls().length).toBe(2);
   expect(relay.tutorCalls()[1].payload).toEqual(relay.tutorCalls()[0].payload);
-  await expect(page.locator("#reward-toast")).toBeVisible();
-  await expect(page.locator("#reward-toast")).toHaveText("Key granted");
-  await expect(page.locator("#hud-keys")).toHaveText("1 key");
+  await expect(page.locator("#reward-toast")).toBeHidden();
+  await expect(page.locator("#hud-keys")).toBeHidden();
   const completed = await nativeState(page, id);
-  expect(completed.keys).toBe(1);
+  expect(completed.keys).toBe(0);
   expect(completed.submissions).toBe(1);
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
@@ -49,7 +48,7 @@ test("a reply that cannot be accepted keeps the exact request, and its retry ann
   await flushNativeSave(page);
   await page.reload();
   await page.waitForFunction(() => !!(window as any).__deadAir);
-  await expect(page.locator("#hud-keys")).toHaveText("1 key");
+  await expect(page.locator("#hud-keys")).toBeHidden();
   await expect(page.locator("#reward-toast")).toBeHidden();
   expect((await nativeState(page, id)).submissions).toBe(1);
   expect(relay.tutorCalls()).toHaveLength(2);

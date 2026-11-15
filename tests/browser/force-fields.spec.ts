@@ -2,7 +2,7 @@ import { startDesignedRun } from "./helpers/designed-run";
 import { expect, test } from "@playwright/test";
 import { selectTopDown } from "./helpers/view-mode";
 import { mockClaudeStudy } from "./study-harness";
-test("fresh run uses force fields, personal keys and the embedded Claude terminal", async ({
+test("fresh run has hand-operated doors, no keys and the embedded Claude terminal", async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -60,7 +60,8 @@ test("fresh run uses force fields, personal keys and the embedded Claude termina
   expect(state).toEqual({
     rules: "force-fields",
     solo: true,
-    fields: true,
+    // Every door is a plain hinged leaf, so no object is a field door.
+    fields: false,
     inventory: 0,
     startingKeys: true,
     sameRoomQuestion: true,
