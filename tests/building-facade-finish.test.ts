@@ -300,3 +300,14 @@ test("plaster or no design keeps today's liner geometry and materials", () => {
   plaster.dispose();
   bare.dispose();
 });
+
+test("a windowless design builds a solid shell with no glass or frames", () => {
+  const glazed = shellOf(designed("stone")).shell,
+    setting = designed("stone");
+  setting.exterior.windows = "none";
+  const blind = shellOf(setting).shell;
+  assert.ok(mesh(glazed, "facade-window-frames"), "the control has windows");
+  assert.equal(mesh(blind, "facade-window-frames"), undefined);
+  assert.equal(blind.group.userData.windows, "none");
+  assert.ok(structure(blind), "the wall itself is still built");
+});

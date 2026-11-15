@@ -474,6 +474,7 @@ export class ExteriorDressing {
       this.enclosure = enclosureMesh(
         ground.setting.outdoors.enclosure,
         ground.city,
+        ground.setting.interior.wall,
       );
       if (this.enclosure) this.world.add(this.enclosure);
     }
@@ -1598,7 +1599,9 @@ export class ExteriorDressing {
       notice.name = "evacuation-suspended-sign";
       this.world.add(notice);
     }
-    if (this.routeMaterial) {
+    // An authored place writes its own signs; the fixed outbreak-era route
+    // sign would contradict a story where nothing has happened yet.
+    if (this.routeMaterial && !floor.environment) {
       const route = new Mesh(new PlaneGeometry(2.6, 0.54), this.routeMaterial);
       route.position.set(18, 1.5, city.south + 0.04);
       route.name = "rooftop-assembly-sign";
@@ -2411,9 +2414,12 @@ export class ExteriorDressing {
     route.position.set(entrance - 3, 1.7, front + 1.06);
     suspended.name = "evacuation-suspended-sign";
     suspended.position.set(entrance + 4, 1.8, front + 1.06);
-    this.world.add(route);
-    if (!floor.environment) this.world.add(suspended);
-    else suspended.geometry.dispose();
+    // Authored places carry only the signs their design wrote.
+    if (!floor.environment) this.world.add(route, suspended);
+    else {
+      route.geometry.dispose();
+      suspended.geometry.dispose();
+    }
     this.streetLight.position.set(entrance, 5.2, front + 13);
     this.streetLight.intensity = 32;
     this.streetLight.distance = 28;

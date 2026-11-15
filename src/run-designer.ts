@@ -113,18 +113,28 @@ export function recentEnvironment(): EnvironmentSummary[] {
   }
 }
 export function recentDesigns(): RunDesignSummary[] {
+  let stored: unknown;
   try {
-    const recent = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "[]");
-    return parseRunDesignRequest({
-      version: 1,
-      requestId: "design-history",
-      generationId: "design-history",
-      seed: 0,
-      recent,
-    }).recent;
+    stored = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "[]");
   } catch {
     return [];
   }
+  if (!Array.isArray(stored)) return [];
+  // Each entry is checked on its own: one unreadable summary must not hide
+  // the others, or new designs stop being compared with earlier ones.
+  return stored.slice(0, 5).flatMap((entry) => {
+    try {
+      return parseRunDesignRequest({
+        version: 1,
+        requestId: "design-history",
+        generationId: "design-history",
+        seed: 0,
+        recent: [entry],
+      }).recent;
+    } catch {
+      return [];
+    }
+  });
 }
 export function readDesignDraft(targetRunId: string): DesignDraft | undefined {
   const raw = localStorage.getItem(DRAFT_KEY);

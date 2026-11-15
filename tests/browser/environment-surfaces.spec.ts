@@ -417,7 +417,7 @@ test("every saved environmental surface renders unique writing and structured ar
   );
   expect(proof.hidden).toBe(0);
   expect(proof.disposed).toBe(proof.oldPageCount);
-  expect(proof.fixedRouteVisible).toBe(true);
+  expect(proof.fixedRouteVisible).toBe(false);
   expect(proof.legacyCardCount).toBe(0);
   expect(proof.legacyShopVisible).toBe(false);
   await mkdir(".artifacts/handoff/environment", { recursive: true });

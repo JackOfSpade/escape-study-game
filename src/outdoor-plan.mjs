@@ -41,7 +41,12 @@ export const OUTDOOR_REGION_KINDS = Object.freeze([
 ]);
 export const OUTDOOR_SHAPES = Object.freeze(["rect", "disc", "ring"]);
 /** What closes the sky: nothing, a transparent dome, or a cave roof. */
-export const OUTDOOR_ENCLOSURES = Object.freeze(["open-sky", "dome", "cavern"]);
+export const OUTDOOR_ENCLOSURES = Object.freeze([
+  "open-sky",
+  "dome",
+  "cavern",
+  "interior",
+]);
 /** The unreachable view beyond the playable bounds. */
 export const OUTDOOR_BACKDROPS = Object.freeze([
   "skyline",

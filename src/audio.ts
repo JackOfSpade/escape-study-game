@@ -709,6 +709,8 @@ export class AudioDirector {
       a.alive &&
       !a.escaped &&
       !a.vault &&
+      // No footfalls in the air: a jump or a fall has no feet on the floor.
+      !(a.elevated && !a.elevated.grounded) &&
       (!a.stairTravel || a.stairTravel.walked !== undefined)
     ) {
       const distance = Math.hypot(

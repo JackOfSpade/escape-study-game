@@ -535,3 +535,17 @@ test("the entrance canopy follows the setting while the sign slot and the undesi
       lit++;
   assert.ok(lit > 0, "bulbs use the authored canopyGlow colour");
 });
+
+test("an authored place gets no fixed evacuation or rooftop route signs from the engine", () => {
+  const floor = {
+      ...street(),
+      environment: { surfaces: [], entries: [], fragments: [] },
+    } as unknown as Floor,
+    upper = { ...floor, index: 4 },
+    dressing = syntheticDressing();
+  dressing.build(upper, [floor, upper]);
+  const world = (dressing as any).world as Group;
+  assert.ok(world.getObjectByName("continuous-city-ground"));
+  assert.equal(world.getObjectByName("rooftop-assembly-sign"), undefined);
+  assert.equal(world.getObjectByName("evacuation-suspended-sign"), undefined);
+});

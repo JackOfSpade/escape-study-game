@@ -20,7 +20,7 @@ export type OutdoorLowKind = "water" | "fence" | "low-wall";
 export type OutdoorSolidKind = OutdoorOpaqueKind | OutdoorLowKind;
 export type OutdoorRegionKind = OutdoorWalkableKind | OutdoorSolidKind;
 export type OutdoorShape = "rect" | "disc" | "ring";
-export type OutdoorEnclosure = "open-sky" | "dome" | "cavern";
+export type OutdoorEnclosure = "open-sky" | "dome" | "cavern" | "interior";
 export type OutdoorBackdrop =
   | "skyline"
   | "mountains"
