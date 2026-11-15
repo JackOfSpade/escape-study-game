@@ -6,6 +6,32 @@ Where the settings live: `TASK_PROFILES` in `scripts/claude-gateway.mjs`, one en
 
 No measurement data survive for the choices made before 2026-11-11. The file header says the settings were "chosen by blind quality scoring against cost", but no run logs, prompt sets or per-setting numbers exist in the repository or its history, and until 2026-11-10 the gateway recorded no usage, cost or resolved model (it now does; see How to measure). Every call below is therefore **Needs test** until a 2026-11-11 ladder in Measured results proves it; the old partial note that the `design-run` content batch gained from high effort was retired when the whole-pipeline ladder measured Sonnet medium at every stage without quality loss, then restored the same day when the follow-up checks overturned Sonnet medium.
 
+## Audit after the app became a learning workspace (2026-11-15)
+
+The app now opens only as the learning workspace; the escape game is archived and unreachable from the interface (it runs only in a build made with `VITE_ARCHIVED_GAME=1`). This audit asked whether every call follows one of the two rules under Policy (the quality knee, or the fastest p95 for live NPC replies). No ladder was run for it: nothing that can be tested today was found untested.
+
+**Calls the workspace makes.** All four follow the quality-knee rule: each has a measured knee, `TASK_PROFILES` holds that knee, and no commit has touched their contract, payload or validator since the rows were measured (`git log 68351b2..HEAD` over the prompt files shows only escape-operation registration and the roadmap redesign that was measured afterwards).
+
+| Call                | Setting     | Rule         | Evidence                                                          | Still open                                                                                        |
+| ------------------- | ----------- | ------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `generate`          | Opus medium | Quality knee | Synthetic ladder plus whole-chain judge with `tutor` and `assess` | Real-payload re-check                                                                             |
+| `tutor`             | Sonnet low  | Quality knee | Synthetic ladder, re-checked after the segmented prompts          | Real-payload re-check                                                                             |
+| `assess`            | Haiku high  | Quality knee | Synthetic ladder, re-checked after the segmented prompts          | Real-payload re-check                                                                             |
+| `reconcile-roadmap` | Opus high   | Quality knee | Synthetic reject set and five-case adopt set                      | Adopt cases are synthetic; Opus medium needs a confirmation run before it could replace Opus high |
+
+**Cannot be tested yet.** The real-payload re-check, which is the one remaining gap for these four, needs captured real requests, and there are too few: the replay store holds 19 `generate` payloads from one capture session on 2026-11-11 and one each for `tutor`, `assess` and `reconcile-roadmap`. Capture is also off on the running relay (`ZOMBIE_AI_REPLAY_SAMPLES=1` is not set in the LaunchAgent), so ordinary study adds none. Turn it on, study normally until each call has about a dozen samples, then run the settings one step either side of the knee on them.
+
+**Calls only the archived game makes.** They cannot be reached, so none was tested, and none should be until the game is brought back.
+
+| Call or group                                                                                                            | State                                                                                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `complete`, `group`, `materialize-work`, `materialize-outcome`, `review-environment`                                     | Measured knee in place, prompts unchanged: follow the quality-knee rule                                                                                                                                          |
+| `npc-chatter-review`, `escape-engage`, `escape-converse`, `escape-pa`, `escape-intent`, `escape-epilogue`, `escape-area` | Measured knee in place on synthetic cases (`escape-engage` runs Haiku medium by the user's choice, one step above its strict knee)                                                                               |
+| `npc-chatter` first lines                                                                                                | Measured knee, then a one-sentence payload change on 2026-11-13: unverified                                                                                                                                      |
+| `npc-chatter` and `npc-chatter-review` replies in a conversation                                                         | Do **not** follow the live-reply rule: p95 time to first audible word (model, critic, speech start) was never measured because no harness exists, and the profiles are not split between first lines and replies |
+| `escape-catastrophe`, `design-run`                                                                                       | Changed after their ladders; settings chosen by reasoning (see below)                                                                                                                                            |
+| `escape-plan` (Sonnet low), `escape-truth` (Opus medium)                                                                 | New on 2026-11-15 with the parked plan prototype; chosen by reasoning, never run against a model, no case builder exists                                                                                         |
+
 ## Policy
 
 ### Development phase (from 2026-11-14)
