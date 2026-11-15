@@ -6,7 +6,7 @@ import {
   type EnvironmentContent,
   type EnvironmentSummary,
   type RunDesignSummary,
-  type RunStructureV3,
+  type RunStructure,
   type SavedRunDesign,
 } from "./run-design-contract.mjs";
 import {
@@ -28,7 +28,7 @@ const STALLED_ROUNDS = 2;
 const FINAL_WORLD_PAUSE = "The final saved world could not be prepared";
 type WorldRequest = Extract<
   QualityRunDesignRequest,
-  { structure: RunStructureV3 }
+  { structure: RunStructure }
 >;
 type StructureRequest = Extract<
   QualityRunDesignRequest,
@@ -61,7 +61,7 @@ interface QualityOptions<T> {
   capture: (draft: QualityDesignDraft) => void | Promise<void>;
   progress?: (text: string) => void;
   activity?: (activity: RunDesignActivity) => void;
-  preview?: (seed: number, structure: RunStructureV3) => ProvisionalRun;
+  preview?: (seed: number, structure: RunStructure) => ProvisionalRun;
   finalize?: (candidate: ProvisionalRun, saved: SavedRunDesign) => T;
 }
 type QualitySend = (
@@ -386,7 +386,7 @@ function world(request: WorldRequest) {
 }
 function structureWorld(
   request: StructureRequest,
-  structure: RunStructureV3,
+  structure: RunStructure,
   candidate: ProvisionalRun,
 ) {
   return {
@@ -587,7 +587,7 @@ export async function prepareQualityRun<T>(
     request: QualityRunDesignRequest,
     errors: string[],
     failedValue: unknown,
-    structure?: RunStructureV3,
+    structure?: RunStructure,
   ) => {
     // Correlation IDs change on every semantic repair; they are not a creative
     // change and must not conceal the same repeatedly invalid model result.

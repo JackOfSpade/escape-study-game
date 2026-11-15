@@ -1,3 +1,4 @@
+import { isInventoryDesign } from "./run-design-contract.mjs";
 import { withOriginalDesks } from "./station-clearance";
 import { redesign } from "./force-fields";
 import { forwardLayout } from "./forward-layout";
@@ -29,7 +30,8 @@ import {
   runStructureFingerprint,
   environmentSurfaceFingerprint,
   type RunDesign,
-  type RunStructureV3,
+  type RunFloorDesign,
+  type RunStructure,
   type SavedRunDesign,
 } from "./run-design-contract.mjs";
 import {
@@ -45,7 +47,7 @@ import {
 } from "./open-site";
 import type { SurfaceSlot } from "./environment-contract.mjs";
 
-type WorldBlueprint = RunDesign | RunStructureV3;
+type WorldBlueprint = RunDesign | RunStructure;
 
 /** The drawn outdoors of a version 3 design, if it has one. */
 export function designedOutdoors(
@@ -153,7 +155,7 @@ export function createPlayableGame(
 ): Game {
   const saved = design ? parseSavedRunDesign(design) : undefined;
   let g = buildPlayableGame(seed, r, study, saved?.design, saved);
-  if (saved?.design.version === 3) {
+  if (saved && isInventoryDesign(saved.design)) {
     const expected = saved.design.environment.surfaceFingerprint,
       matches = (game: Game) =>
         environmentSurfaceFingerprint(buildEnvironmentSurfaces(game)) ===
@@ -182,7 +184,7 @@ function buildPlayableGame(
   const g = buildGame(seed, r, study, { layout: "forward" }, blueprint, saved);
   redesign(g, {
     randomized: true,
-    ...(blueprint?.version === 3 ? { blueprint } : {}),
+    ...(isInventoryDesign(blueprint) ? { blueprint } : {}),
   });
   // An open site extracts on its ground floor; the stair marker it keeps for
   // egress validation becomes the pickup pad, so no staircase can be climbed.
@@ -229,14 +231,14 @@ export interface ProvisionalRun {
 }
 const provisionalRuns = new WeakMap<
   ProvisionalRun,
-  { game: Game; structure: RunStructureV3; surfaces: SurfaceSlot[] }
+  { game: Game; structure: RunStructure; surfaces: SurfaceSlot[] }
 >();
 
 export function previewDesignedRun(
   seed: number,
   roadmap: Roadmap,
   study: StudyState | undefined,
-  proposed: RunStructureV3,
+  proposed: RunStructure,
 ): ProvisionalRun {
   const structure = parseRunStructure(proposed),
     game = buildPlayableGame(seed, roadmap, study, structure);
@@ -267,7 +269,7 @@ export function structureGame(
   seed: number,
   roadmap: Roadmap,
   study: StudyState | undefined,
-  proposed: RunStructureV3,
+  proposed: RunStructure,
 ): Game {
   return buildPlayableGame(
     seed,
@@ -285,7 +287,7 @@ export function finalizeDesignedRun(
   if (!candidate)
     throw Error("This provisional run is unavailable or already accepted");
   const saved = parseSavedRunDesign(proposed);
-  if (saved.design.version !== 3)
+  if (!isInventoryDesign(saved.design))
     throw Error("A provisional run requires a complete version 3 design");
   const { environment, ...structure } = saved.design;
   if (
@@ -312,7 +314,7 @@ export function createGame(
   const design = options.design
     ? parseSavedRunDesign(options.design)
     : undefined;
-  if (design?.design.version === 3)
+  if (isInventoryDesign(design?.design))
     throw Error(
       "Version 3 designs require createPlayableGame and their complete physical-city inventory",
     );
@@ -443,7 +445,10 @@ function generateFloor(
   const floor: Floor = {
     ...(open ? { open: true as const } : {}),
     ...(blueprint && index < CONFIG.floors
-      ? { design: structuredClone(blueprint.floors[index]) }
+      ? {
+          // A drawn floor (version 4) shares this slot; see free-design.ts.
+          design: structuredClone(blueprint.floors[index]) as RunFloorDesign,
+        }
       : {}),
     ...(blueprint && index === 0
       ? { exteriorDesign: structuredClone(blueprint.exterior) }

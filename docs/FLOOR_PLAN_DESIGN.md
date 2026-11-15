@@ -246,6 +246,89 @@ room in place of two or three of the gated study rooms (`room0`, `room1`,
   stamped into a shared world as an extra site is flat: stamping does not
   carry `generation.levels`.
 
+## Drawn floors (design version 4, generation version 6)
+
+A version 4 design draws every storey itself, and fresh design requests produce
+version 4. It is a version 3 structure whose `floors[]` entries are
+`RunFreeFloor` instead of chain floors, with `setting.venue: "custom"` and
+`setting.filler: null`. Versions 1 to 3 keep loading and building through the
+chain planner above.
+
+```ts
+interface RunFreeFloor {
+  name: string;
+  furnitureDensity: number;
+  concourse: { pattern; filler }; // the open floor between rooms
+  rooms: RunFreeRoom[]; // 1..8
+  scene: SceneFloorStructure; // one entry per drawn room, room = its index
+}
+interface RunFreeRoom {
+  name: string;
+  pattern:
+    | "rows"
+    | "clusters"
+    | "counter"
+    | "lounge"
+    | "table"
+    | "shelving"
+    | "display"
+    | "bays"
+    | "desk"
+    | "open";
+  filler: string[]; // built-in kinds or setting.objects ids, signature first
+  x: number;
+  y: number;
+  w: number;
+  h: number; // interior, building cells
+  shape: "rect" | "chamfered" | "rounded" | "octagon";
+  power: "lit" | "dim" | "outage";
+  // two-cell doorways; door is null (open gap) or a hinged door's DoorDesign
+  doors: { side: "n" | "s" | "e" | "w"; at: number; door }[];
+  work: number; // study work points placed in the room
+  hall: null | { focus; seating; stage; rake; pit; platforms };
+}
+```
+
+`freePlanLayout` (`src/free-plan.ts`) builds the floor in place of
+`planOfficeFloor`:
+
+- **Shell and markers** are unchanged: the footprint, the entrance lane, the
+  stair wells and markers, and the main gate on the ground floor.
+- **Rooms** are walled rectangles; cells outside the shell are simply solid.
+  Interiors need one cell between them (one cell is a shared wall). Everything
+  not covered is the **concourse**, sector `entry`, order 0. Each room is
+  sector `room{i}` with `room: i` and one block. There is no `lobby`, no
+  chain order and no force field except the main gate.
+- **Doorways** are two open cells in a room's wall, recorded in
+  `generation.doorways`. A door must face open floor or a room one wall cell
+  away. `fieldClearance` keeps furniture off them. Each doorway's `door` is
+  null (an open gap) or a `DoorDesign`: then a plain hinged door
+  `f{n}-room{i}-door{d}` (kind `door`, no `field`, the design's style and
+  health) stands latched in it until someone opens it by hand.
+- **Work points** are the floor's study stations: `work` per room, placed on a
+  lattice clear of walls and doorways. Stations keep `questionRoom`
+  `f{n}-room{i}`.
+- **Shapes** reuse `carveRoomShapes` with each room's `shape`. **Hall
+  features** reuse the levels above: any room with `hall` is a hall sector
+  (`Sector.hall`), so a floor may have several.
+- **Furnishing.** Each room is a zone furnished by `planPattern`
+  (`src/office-layout.ts`) from its own `pattern` and `filler`; concourse
+  blocks at least 4 cells wide and 24 cells in area use `concourse`.
+  `rows`, `display` and `bays` are their own arrangements; the other patterns
+  reuse the arrangement of an office function with the room's own list.
+- **What the engine checks** (`freePlanErrors`, reported per room in one
+  error for the repair loop): rooms inside the interior, not overlapping, not
+  covering the entrance lane or a stair approach; every door opens somewhere;
+  the stairs, every room, every open cell and every work point can be walked
+  to from the entrance; the stairs and one door of every room are reached
+  through passages two cells wide; work points have clearance and spacing;
+  stepped levels are walkable.
+- **What is still fixed:** four storeys for an enclosed site and one for an
+  open one, the shell silhouettes, the entrance and stair positions, the roof
+  and the cast of 19. The legacy study economy (enough free terminals for
+  every survivor) is not guaranteed on a drawn floor; escape games do not use
+  it.
+
 ## Open sites
 
 A version 3 design with `setting.form: "open"` authors one ground plan instead

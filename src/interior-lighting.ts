@@ -1,3 +1,4 @@
+import { freeFloor } from "./free-design";
 import { floorSectors, inRect, type Rect } from "./floor-plan";
 import { roomPowerKey } from "./room-power-key";
 import {
@@ -317,8 +318,14 @@ export function buildInteriorLighting(
         Math.max(1, darkSector.length)
     ]?.id;
   const authoredPower = (id: string) => {
-    const room = /^room([0-3])$/.exec(id);
-    return room ? floor.design?.power[Number(room[1])] : undefined;
+    const room = /^room(\d+)$/.exec(id),
+      design = floor.design;
+    if (!room || !design) return undefined;
+    // A free plan states power on each drawn room; chain floors keep a list.
+    const drawn = freeFloor(floor);
+    return drawn
+      ? drawn.rooms[Number(room[1])]?.power
+      : design.power[Number(room[1])];
   };
   for (const sector of sectors) {
     const roll = interiorHash(seed, floor.index, sector.id),

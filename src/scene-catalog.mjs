@@ -134,6 +134,8 @@ export function parseSceneDesign(
   structural = false,
   objects = [],
   props = [],
+  /** Rooms on this floor: four on chain floors, the drawn count on a free plan. */
+  roomCount = 4,
 ) {
   // A design's own composed objects and props are placeable by their id.
   const custom = new Map(objects.map((o) => [o.id, o])),
@@ -143,7 +145,7 @@ export function parseSceneDesign(
     value.version === (structural ? 2 : 1),
     `${path} has an unsupported scene version`,
   );
-  array(value.rooms, 4, 4, `${path}.rooms`);
+  array(value.rooms, roomCount, roomCount, `${path}.rooms`);
   const rooms = new Set(),
     ids = new Set();
   let furnitureCount = 0,
@@ -182,7 +184,11 @@ export function parseSceneDesign(
       ],
       p,
     );
-    choice(room.room, [0, 1, 2, 3], `${p}.room`);
+    choice(
+      room.room,
+      Array.from({ length: roomCount }, (_, n) => n),
+      `${p}.room`,
+    );
     fail(!rooms.has(room.room), `${p}.room must be unique`);
     rooms.add(room.room);
     text(room.title, 1, 40, `${p}.title`);
@@ -289,6 +295,15 @@ export function parseSceneStructure(
   path = "scene",
   objects = [],
   props = [],
+  roomCount = 4,
 ) {
-  return parseSceneDesign(value, rosterNames, path, true, objects, props);
+  return parseSceneDesign(
+    value,
+    rosterNames,
+    path,
+    true,
+    objects,
+    props,
+    roomCount,
+  );
 }

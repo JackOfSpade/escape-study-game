@@ -1,3 +1,4 @@
+import { isInventoryDesign } from "./run-design-contract.mjs";
 import { furnitureSpec, type Game, type Floor } from "./model";
 import { stampedBySite } from "./building-layout";
 import { startSite } from "./site";
@@ -194,7 +195,7 @@ export function assertDesignedEnvironment(game: Game) {
       !game.floors.some((f) => f.design || f.exteriorDesign),
       "authored geometry is missing its complete accepted run design",
     );
-  if (saved?.design.version !== 3) {
+  if (!isInventoryDesign(saved?.design)) {
     requireThat(
       !game.floors.some((f) => f.environment),
       "environment content on a historical or procedural run",
@@ -229,7 +230,7 @@ export function assertDesignedEnvironment(game: Game) {
 
 /** Call only after complete v3 acceptance, or after validating a loaded save. */
 export function bindDesignedEnvironment(game: Game) {
-  if (game.design?.design.version !== 3) return;
+  if (!isInventoryDesign(game.design?.design)) return;
   const design = game.design.design,
     environment: EnvironmentManifest = design.environment;
   for (const floor of game.floors) {

@@ -96,4 +96,8 @@ export function parseSceneStructure(
   value: unknown,
   rosterNames: readonly string[],
   path?: string,
+  objects?: readonly unknown[],
+  props?: readonly unknown[],
+  /** Rooms on this floor: four on chain floors, the drawn count on a free plan. */
+  roomCount?: number,
 ): SceneFloorStructure;

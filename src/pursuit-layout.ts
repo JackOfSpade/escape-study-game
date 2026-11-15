@@ -14,6 +14,7 @@ import { inRect, sectorRooms, sizeFits, type Sector } from "./floor-plan";
 import { carveRoomShapes, cornerCells } from "./room-shapes";
 import { fieldClearance } from "./office-layout";
 import { buildHallLevels, levelErrors } from "./floor-levels";
+import { freePlanErrors, freePlanLayout, isFreePlan } from "./free-plan";
 import {
   fieldDoor,
   forwardFieldQuota,
@@ -47,6 +48,11 @@ function topUpHall(g: Game, f: Floor) {
  * complete transverse room a cut between the rear entry and front stairs. */
 export function pursuitLayout(g: Game, f: Floor) {
   if (isSolidOpenFloor(f) || f.index === 4 || !f.stations.length) return;
+  if (f.boundary && isFreePlan(f)) {
+    // A version 4 design draws this storey itself: no chain and no fields.
+    freePlanLayout(g, f);
+    return;
+  }
   if (f.boundary) {
     topUpHall(g, f);
     planOfficeFloor(
@@ -279,6 +285,7 @@ function stationErrors(g: Game, f: Floor, fields: Furniture[]) {
  * a fresh floor. No learning state or physics engine is involved. */
 export function pursuitLayoutErrors(g: Game, f: Floor): string[] {
   if (isSolidOpenFloor(f)) return [];
+  if (f.generation?.version === 6) return freePlanErrors(g, f);
   if (f.generation?.version === 5) return officePlanErrors(g, f);
   const errors: string[] = [];
   const stages = f.generation?.stages;

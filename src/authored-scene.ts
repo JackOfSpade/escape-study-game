@@ -613,7 +613,9 @@ export function sceneSaveErrors(
     !Array.isArray(scene.rooms) ||
     !Array.isArray(scene.furniture) ||
     !Array.isArray(scene.props) ||
-    scene.rooms.length !== 4 ||
+    // Four rooms on a chain floor, the drawn count (up to eight) otherwise.
+    scene.rooms.length < 1 ||
+    scene.rooms.length > 8 ||
     scene.furniture.length > 16 ||
     scene.props.length > 48
   )

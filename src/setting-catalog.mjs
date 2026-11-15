@@ -569,7 +569,7 @@ function parseSurroundings(v, objectIds, path) {
 }
 
 /** Validate data only; the builder resolves roof positions against the shell. */
-export function parseSetting(value, path = "setting") {
+export function parseSetting(value, path = "setting", options = {}) {
   object(
     value,
     [
@@ -701,7 +701,13 @@ export function parseSetting(value, path = "setting") {
   // Optional so older saved designs keep the engine's street grid.
   if (Object.hasOwn(value, "outdoors"))
     parseOutdoorPlan(value.outdoors, `${path}.outdoors`);
-  if (value.venue === "custom") {
+  // A drawn design (version 4) lists furniture on each room instead.
+  if (options.rooms) {
+    fail(
+      value.venue === "custom" && value.filler === null,
+      `${path}: a version 4 design uses venue custom and filler null (each room lists its own furniture)`,
+    );
+  } else if (value.venue === "custom") {
     object(value.filler, ROOM_FUNCTIONS, `${path}.filler`);
     for (const fn of ROOM_FUNCTIONS) {
       const list = value.filler[fn];

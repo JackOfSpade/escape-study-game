@@ -473,23 +473,127 @@ export const HALL_LIMITS = Object.freeze({
     height: [0.3, 1.5],
   }),
 });
+/** How a drawn room's own furniture list is arranged (version 4). */
+export const ROOM_PATTERNS = Object.freeze([
+  "rows",
+  "clusters",
+  "counter",
+  "lounge",
+  "table",
+  "shelving",
+  "display",
+  "bays",
+  "desk",
+  "open",
+]);
+/** Bounds of a version 4 floor: rooms drawn in building cells. */
+export const FREE_PLAN_LIMITS = Object.freeze({
+  rooms: [1, 8],
+  size: [3, 40],
+  doors: [1, 4],
+  work: [0, 12],
+  floorWork: [2, 40],
+  filler: [0, 6],
+});
+function parseFurnishing(v, names, p) {
+  choice(v.pattern, ROOM_PATTERNS, `${p}.pattern`);
+  array(v.filler, ...FREE_PLAN_LIMITS.filler, `${p}.filler`, (name, q) =>
+    requireThat(
+      names.has(name),
+      `${q} must name a built-in furniture kind or one of setting.objects`,
+    ),
+  );
+  requireThat(
+    v.pattern === "open" || v.filler.length > 0,
+    `${p}.filler needs at least one entry unless pattern is open`,
+  );
+}
+/** One storey of a version 4 design: rooms drawn inside an open concourse. */
+function parseFreeFloor(f, names, p) {
+  const L = FREE_PLAN_LIMITS;
+  object(f, ["name", "furnitureDensity", "concourse", "rooms", "scene"], p);
+  text(f.name, 48, `${p}.name`);
+  number(f.furnitureDensity, 0.5, 1.5, `${p}.furnitureDensity`);
+  object(f.concourse, ["pattern", "filler"], `${p}.concourse`);
+  parseFurnishing(f.concourse, names, `${p}.concourse`);
+  array(f.rooms, ...L.rooms, `${p}.rooms`, (room, q) => {
+    object(
+      room,
+      [
+        "name",
+        "pattern",
+        "filler",
+        "x",
+        "y",
+        "w",
+        "h",
+        "shape",
+        "power",
+        "doors",
+        "work",
+        "hall",
+      ],
+      q,
+    );
+    text(room.name, 40, `${q}.name`);
+    parseFurnishing(room, names, q);
+    number(room.x, 0, 43, `${q}.x`, true);
+    number(room.y, 0, 33, `${q}.y`, true);
+    number(room.w, ...L.size, `${q}.w`, true);
+    number(room.h, ...L.size, `${q}.h`, true);
+    choice(room.shape, ROOM_SHAPES, `${q}.shape`);
+    choice(room.power, ["lit", "dim", "outage"], `${q}.power`);
+    array(room.doors, ...L.doors, `${q}.doors`, (door, r) => {
+      object(door, ["side", "at", "door"], r);
+      choice(door.side, HALL_LIMITS.sides, `${r}.side`);
+      number(door.at, 0, 1, `${r}.at`);
+      // null is an open doorway; otherwise a hinged door people open by hand.
+      if (door.door !== null) parseDoorDesign(door.door, `${r}.door`);
+    });
+    number(room.work, ...L.work, `${q}.work`, true);
+    if (room.hall !== null) {
+      requireThat(
+        Math.min(room.w, room.h) >= 8,
+        `${q}.hall needs a room at least 8 cells on its shorter side`,
+      );
+      parseHall(room.hall, null, `${q}.hall`);
+    }
+  });
+  const work = f.rooms.reduce((n, room) => n + room.work, 0);
+  requireThat(
+    work >= L.floorWork[0] && work <= L.floorWork[1],
+    `${p}.rooms need ${L.floorWork[0]}..${L.floorWork[1]} work points in total, not ${work}`,
+  );
+}
+/** `roomOrder` is the chain order of a version 3 floor; null for a drawn
+ * room's own hall features, which name no merged rooms. */
 function parseHall(h, roomOrder, p) {
   const L = HALL_LIMITS;
   object(
     h,
-    ["rooms", "focus", "seating", "stage", "rake", "pit", "platforms"],
+    [
+      ...(roomOrder ? ["rooms"] : []),
+      "focus",
+      "seating",
+      "stage",
+      "rake",
+      "pit",
+      "platforms",
+    ],
     p,
   );
-  array(h.rooms, 2, 3, `${p}.rooms`, (n, q) => choice(n, [0, 1, 3], q));
-  requireThat(
-    new Set(h.rooms).size === h.rooms.length,
-    `${p}.rooms must not repeat a room`,
-  );
-  const at = h.rooms.map((n) => roomOrder.indexOf(n)).sort((a, b) => a - b);
-  requireThat(
-    at[at.length - 1] - at[0] === at.length - 1,
-    `${p}.rooms must be next to each other in roomOrder`,
-  );
+  if (roomOrder) {
+    array(h.rooms, 2, 3, `${p}.rooms`, (n, q) => choice(n, [0, 1, 3], q));
+    requireThat(
+      new Set(h.rooms).size === h.rooms.length,
+      `${p}.rooms must not repeat a room`,
+    );
+    const at = h.rooms.map((n) => roomOrder.indexOf(n)).sort((a, b) => a - b);
+    requireThat(
+      at[at.length - 1] - at[0] === at.length - 1,
+      `${p}.rooms must be next to each other in roomOrder`,
+    );
+  }
   choice(h.focus, L.sides, `${p}.focus`);
   choice(h.seating, L.seating, `${p}.seating`);
   if (h.stage !== null) {
@@ -525,7 +629,10 @@ const uint = (v, p) => number(v, 0, 4294967295, p, true);
 const clone = (v) => JSON.parse(JSON.stringify(v));
 
 function parseBlueprint(v, provisional = false) {
-  const v3 = v?.version === 3;
+  // Version 4 is version 3 with floors drawn freely: everything written for
+  // version 3 applies to it except the chain fields of each floor.
+  const v4 = v?.version === 4,
+    v3 = v?.version === 3 || v4;
   bounded(
     v,
     v3 ? (provisional ? 100000 : 900000) : v?.version === 2 ? 100000 : 24000,
@@ -559,11 +666,21 @@ function parseBlueprint(v, provisional = false) {
   );
   if (Object.hasOwn(v, "mainDoor")) parseDoorDesign(v.mainDoor, "mainDoor");
   if (Object.hasOwn(v, "titleCard")) parseTitleCard(v.titleCard, "titleCard");
-  if (v3 && Object.hasOwn(v, "setting")) parseSetting(v.setting);
+  requireThat(
+    !v4 || Object.hasOwn(v, "setting"),
+    "a version 4 design needs setting",
+  );
+  if (v3 && Object.hasOwn(v, "setting"))
+    parseSetting(v.setting, "setting", { rooms: v4 });
   requireThat(
     v.version === 1 || v.version === 2 || v3,
     "unsupported design version",
   );
+  // Names a drawn room may list as furniture.
+  const furnitureNames = new Set([
+    ...SCENE_FURNITURE_KINDS,
+    ...(v.setting?.objects ?? []).map((o) => o.id),
+  ]);
   // Only version 3 knows about site forms; an older design is always enclosed.
   const siteForm = v3 ? (v.setting?.form ?? "enclosed") : "enclosed";
   requireThat(
@@ -596,6 +713,7 @@ function parseBlueprint(v, provisional = false) {
   // An open site is one ground-level plan; an enclosed building keeps four.
   const floorCount = siteForm === "open" ? 1 : 4;
   array(v.floors, floorCount, floorCount, "floors", (f, p) => {
+    if (v4) return parseFreeFloor(f, furnitureNames, p);
     object(
       f,
       [
@@ -695,6 +813,7 @@ function parseBlueprint(v, provisional = false) {
             `floors[${index}].scene`,
             v.setting?.objects ?? [],
             v.setting?.props ?? [],
+            v4 ? floor.rooms.length : 4,
           )
         : parseSceneDesign(
             floor.scene,
@@ -807,8 +926,20 @@ function parseBlueprint(v, provisional = false) {
 export function parseRunDesign(v) {
   return parseBlueprint(v);
 }
+/** Version 3 and later: every writing surface is its own inventory entry, the
+ * cast has relationships and the design carries an environment manifest. */
+export function isInventoryDesign(design) {
+  return design?.version === 3 || design?.version === 4;
+}
+/** Whether a design or structure draws its floors freely (version 4). */
+export function isDrawnDesign(design) {
+  return design?.version === 4;
+}
 export function parseRunStructure(v) {
-  requireThat(v?.version === 3, "a structural proposal must be version 3");
+  requireThat(
+    v?.version === 3 || v?.version === 4,
+    "a structural proposal must be version 3 or 4",
+  );
   return parseBlueprint(v, true);
 }
 export function runStructureFingerprint(v) {
@@ -830,13 +961,34 @@ export function summarizeRunDesign(d) {
       : null,
   ];
   const atmosphere = [
-    d.floors.map((f) => [f.roomTypes, f.furnitureDensity, f.power]),
+    d.floors.map((f) =>
+      // A drawn floor (version 4) is known by what its rooms are furnished as.
+      f.rooms
+        ? [
+            f.rooms.map((r) => [r.pattern, r.filler, r.power]),
+            f.furnitureDensity,
+            f.concourse,
+          ]
+        : [f.roomTypes, f.furnitureDensity, f.power],
+    ),
     d.city.palette,
     d.exterior.skyline,
   ];
   const spatial = [
     footprint,
-    d.floors.map((f) => [f.family, f.roomOrder]),
+    d.floors.map((f) =>
+      // Drawn rooms in quarter-building steps, so a small nudge is no new plan.
+      f.rooms
+        ? f.rooms.map((r) => [
+            Math.round(r.x / 4),
+            Math.round(r.y / 4),
+            Math.round(r.w / 4),
+            Math.round(r.h / 4),
+            r.shape,
+            r.hall ? [r.hall.focus, !!r.hall.stage, !!r.hall.pit] : null,
+          ])
+        : [f.family, f.roomOrder],
+    ),
     d.city.roadWidth,
     d.city.boulevardOffset,
     d.city.districtSize,
@@ -926,7 +1078,7 @@ export function summarizeRunDesign(d) {
     premise: d.premise,
     spatial: summaryText(spatial),
     atmosphere: summaryText(atmosphere),
-    cast: summaryText(d.version === 3 ? [d.roster, d.relationships] : d.roster),
+    cast: summaryText(d.version >= 3 ? [d.roster, d.relationships] : d.roster),
     tempo: summaryText(d.pacing),
   };
 }
@@ -1245,7 +1397,10 @@ export function parseSavedRunDesign(v) {
   return { ...clone(v), design };
 }
 
-export const RUN_DESIGN_GUIDANCE = `${qualityGuidance()}\n\nThe exact captured request selects both version and phase. For request.version:2/designVersion:3/phase:structure, return exactly {requestId,structure:{version:3,...}}. The flattened structure uses the structural fields described below, but OMIT every floors[].stories and exterior.streetLabels. Include relationships:1..24 {from:exact roster name,to:another exact roster name,kind:colleague|friend|relative|mentor|rival,detail:1..120}; one relationship per person pair. Every floor scene has version:2 with the scene layout below, but OMIT furniture.label and prop.label/text. Room title/description and exterior names remain thematic context for later writing. This first phase creates geometry and cast only; never include environment or content. Structure≤100000 UTF-8 bytes. The engine constructs an isolated candidate, then requests content for its exact physical surfaces. For phase:content, follow the following separate content contract instead of returning any structural fields:\n${ENVIRONMENT_GUIDANCE}\n
+const range = ([low, high]) => `${low}..${high}`;
+/** How a version 4 structure draws its floors. */
+export const DRAWN_FLOOR_GUIDANCE = `DRAWN FLOORS (version 4). You draw every storey of the place yourself; nothing about its plan is a template. floors:exactly4 for an enclosed site (ground floor first) and exactly1 for an open one, each {name(1-48),furnitureDensity:0.5..1.5,concourse:{pattern,filler},rooms:${range(FREE_PLAN_LIMITS.rooms)} Room,scene}. A storey is seen from above on a grid of 1 m cells: x grows east and y grows south, the main entrance is in the middle of the south wall and the stairs are in the middle of the north wall. With footprint width W and top T, a room's interior must keep x>=23-W/2, x+w-1<=20+W/2, y>=T+1 and y+h-1<=26; a shaped footprint cuts its corners or sides further and whatever falls outside the shell is simply solid. Everything you do not cover with a room is the concourse: the open floor that joins the entrance to the stairs and to the rooms (a foyer, aisle, cloister, deck, street, yard). Draw the rooms this place really has, at the sizes they would really be: a few large rooms and some small ones, never four equal departments. Room:{name(1-40) what the room is called in this place,pattern,filler,x,y,w,h:integers giving the room's interior (walls are added around it) with w and h ${range(FREE_PLAN_LIMITS.size)},shape:${ROOM_SHAPES.join("|")} how its corners are carved,power:lit|dim|outage,doors:${range(FREE_PLAN_LIMITS.doors)} {side:n|s|e|w,at:0..1 position along that wall,door:null for an open doorway (an arch, a gap, a curtain line) or a DoorDesign (described below) for a hinged door that people open and close by hand and that stays where it is left} each a doorway two cells wide; give real rooms real doors that suit them (a glass foyer door, a steel plant-room door, a wooden office door) and leave wide public openings open,work:integer${range(FREE_PLAN_LIMITS.work)} study work points in this room,hall:null|HallFeatures}. Leave at least one cell between two rooms' interiors: exactly one cell is a shared wall that a door can pass through into the next room, and a wider gap is concourse and must be at least two cells wide to be a passage. Keep x18..25 of rows 25..27 (the entrance lane) and x19..24 of rows T..T+2 (the stair approach) free of rooms and their walls. A door must face the concourse or a room exactly one wall cell away, and every room must be reachable from the entrance through doors; the engine reports each room that is not. Work points are this place's own work stations, styled by setting.terminal; a floor needs ${range(FREE_PLAN_LIMITS.floorWork)} in total across its rooms and each needs about 2 m of clear floor, so a 4 by 4 room holds one. pattern says how the engine arranges that room's filler in the space your scene furniture leaves: rows (rows of the list's seat facing one wall: an auditorium, chapel, classroom, waiting hall), clusters (several work positions, each the first piece with its seat: workshops, labs, desks, benches), counter (one main counter or console with seating before it: reception, bar, ticket office, control desk), lounge (tables with seats around them: mess, cafe, common room), table (one large table ringed with seats: council, dining, briefing), shelving (pieces lining the walls with a few loose in the middle: stores, archive, larder, armoury), display (free-standing pieces with room to walk around each: gallery, showroom, museum, garden), bays (the first piece repeated along the walls, each with its seat: dormitory, ward, stalls, cells, lockers), desk (one desk with its seat and storage: office, booth, study) or open (left empty for your scene furniture alone). filler:${range(FREE_PLAN_LIMITS.filler)} names, each a built-in furniture kind or the id of one of setting.objects, the room's signature piece first; a seat-role object in the list is what people sit on, a divider-role object separates clusters; open needs no filler, every other pattern needs at least one name. Compose the furniture this place would have as setting.objects and list it here; a room furnished with office desks and printers reads as an office. HallFeatures, for a room at least 8 cells on its shorter side that is a real hall (auditorium, star theatre, nave, hangar, arena, court, engine hall, pool): {focus:n|s|e|w the wall the hall faces (its stage, screen, altar or pulpit side),seating:rows|none (rows fills it with rows of the filler's seat facing the focus, whatever the pattern),stage:null|{depth:integer${range(HALL_LIMITS.stage.depth)} metres of flat stage along the focus wall,height:${range(HALL_LIMITS.stage.height)} m},rake:${range(HALL_LIMITS.rake)} m the floor rises from the foot of the stage to the far wall (0 is flat),pit:null|{width:integer${range(HALL_LIMITS.pit.width)},length:integer${range(HALL_LIMITS.pit.length)},drop:${range(HALL_LIMITS.pit.drop)} m} a sunken area in front of the stage,platforms:0..${HALL_LIMITS.platforms} of {side:n|s|e|w,width:integer${range(HALL_LIMITS.platform.width)} along that wall,depth:integer${range(HALL_LIMITS.platform.depth)},height:${range(HALL_LIMITS.platform.height)} m}}. A hall has a 3.4 m ceiling; the engine cuts every level change into 30 cm steps that everyone can walk and keeps the floor flat beside each door. Use hall features wherever the premise has a big room. scene:{version:2,rooms:one entry per drawn room, in any order, with room:that room's index in rooms (0 for the first)}; each scene room is otherwise as described under the scene layout below and furnishes that drawn room, and the concourse takes no scene furniture.`;
+export const RUN_DESIGN_GUIDANCE = `${qualityGuidance()}\n\nThe exact captured request selects both version and phase. For request.version:2/designVersion:3/phase:structure, return exactly {requestId,structure:{version:4,...}}. A version 4 structure uses the structural fields described below for version 3 with two differences: every floors[] entry is a floor you draw yourself, as described under DRAWN FLOORS (it has none of family, roomOrder, layoutSeed, roomTypes, subroomKinds, fieldQuotas, power, brokenGuard, roomShapes, hall, doors or stories), and setting.venue is custom with setting.filler null, because each room lists its own furniture. OMIT exterior.streetLabels. Include relationships:1..24 {from:exact roster name,to:another exact roster name,kind:colleague|friend|relative|mentor|rival,detail:1..120}; one relationship per person pair. Every floor scene has version:2 with the scene layout below, but OMIT furniture.label and prop.label/text. Room title/description and exterior names remain thematic context for later writing. This first phase creates geometry and cast only; never include environment or content. Structure≤100000 UTF-8 bytes. The engine constructs an isolated candidate, then requests content for its exact physical surfaces. \n${DRAWN_FLOOR_GUIDANCE}\nFor phase:content, follow the following separate content contract instead of returning any structural fields:\n${ENVIRONMENT_GUIDANCE}\n
 The remainder describes the shared structural schema and retained legacy requests. For retained request.version:1, return exactly {requestId:the captured requestId,design:{...}} following its designVersion; never upgrade that request. Design a distinctive fictional building for an escape story as JSON, not a study question. The run opens on an ordinary day in this place, before anything has gone wrong; nobody in it knows what is coming. The building is the specific place the premise is set in (a radio station, clinic, hotel, archive, office and so on): its venue, rooms, furniture, finishes, signage and exterior must all read as that place. Do not output code, HTML, URLs, learner claims or mechanical rule changes. The engine realizes your choices as collision-tested geometry. Give every floor its own coherent purpose and story; tie signs and notes to this cast and premise. Vary actual spatial choices, furnishing, cast, atmosphere and tempo, not only names or random seeds. Recent fictional summaries identify designs to avoid. If repair is supplied, correct all listed failures while retaining the intended theme. Do not conceal an invalid plan or claim validation was performed.
 
 For retained request.version:1 only: If payload.designVersion is 2, return design.version:2 and include the scene objects below. If designVersion is absent, return design.version:1 and OMIT scene on every floor. Never upgrade a retained request or downgrade a version 2 request. Version3 structure requests use the exceptions stated above. setting and the tapered, notched and tee silhouettes belong to version 3 structures only: retained version 1 and 2 designs must omit setting and use rectangle, chamfered, stepped or waisted.

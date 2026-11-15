@@ -1,3 +1,4 @@
+import { isInventoryDesign } from "../run-design-contract.mjs";
 import {
   CONFIG,
   FURNITURE,
@@ -11,7 +12,7 @@ import {
   parseRunDesign,
   parseRunStructure,
   type RunDesign,
-  type RunStructureV3,
+  type RunStructure,
 } from "../run-design-contract.mjs";
 export const LAB_LIMITS = {
   entities: 512,
@@ -122,7 +123,7 @@ export interface Scenario {
   design?: RunDesign;
   /** Structure-only v3 proposal (no environment): the same validated data as a
    * run-design fixture, built through previewDesignedRun's construction. */
-  designStructure?: RunStructureV3;
+  designStructure?: RunStructure;
   simulation: "game" | "physics";
   maxTicks: number;
   startTime: number;
@@ -346,7 +347,7 @@ export function parseScenario(value: string | unknown): Scenario {
     );
     const design = parseRunDesign(s.design);
     requireThat(
-      design.version !== 3 || (s.city === true && s.pacing === "study"),
+      !isInventoryDesign(design) || (s.city === true && s.pacing === "study"),
       "Version 3 environment fixtures require the complete physical city and study pacing.",
     );
   }

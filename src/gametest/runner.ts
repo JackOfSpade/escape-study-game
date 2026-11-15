@@ -1,3 +1,4 @@
+import { isInventoryDesign } from "../run-design-contract.mjs";
 import { groundLevel } from "../floor-levels";
 import { EQUIPMENT } from "../equipment";
 import { survivorPath } from "../navigation";
@@ -184,7 +185,7 @@ export class TestRunner {
       if (!this.scenario.naturalSpawns)
         this.game.nextSpawn = Number.MAX_SAFE_INTEGER;
     }
-    if (this.scenario.city && this.scenario.design?.version !== 3) {
+    if (this.scenario.city && !isInventoryDesign(this.scenario.design)) {
       populateCity(this.game, this.scenario.naturalSpawns);
       if (!this.scenario.naturalSpawns)
         this.game.nextSpawn = Number.MAX_SAFE_INTEGER;

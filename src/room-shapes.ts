@@ -142,9 +142,11 @@ export function carveRoomShapes(
   f: Floor,
   validate: (f: Floor) => string[],
   keepClear: Point[],
+  /** Shapes per room index; defaults to the design's floors[].roomShapes. */
+  authored?: string[],
 ): CarvedCorner[] {
   const design = f.design as { roomShapes?: string[] } | undefined,
-    shapes = design?.roomShapes,
+    shapes = authored ?? design?.roomShapes,
     generation = f.generation;
   if (!shapes?.some((s) => s !== "rect") || !generation?.sectors) return [];
   const carved: CarvedCorner[] = [];
