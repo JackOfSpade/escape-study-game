@@ -1,3 +1,4 @@
+import { roofIndexOf } from "./model";
 import { settingErrors } from "./venue";
 import { moveBlockingDesks } from "./station-clearance";
 import { presetDoorStyle } from "./door-style";
@@ -140,7 +141,7 @@ export function redesign(
   g: Game,
   options: {
     randomized?: boolean;
-    blueprint?: import("./run-design-contract.mjs").RunStructureV3;
+    blueprint?: import("./run-design-contract.mjs").RunStructure;
   } = {},
 ) {
   g.rules = "force-fields";
@@ -212,7 +213,7 @@ export function redesign(
   }
   // The roof's arrival staircase is carved like the ordinary floors' wells.
   // An open site's layers above ground are solid construction with no roof.
-  const roof = g.floors[CONFIG.floors];
+  const roof = g.floors[roofIndexOf(g.floors[0])];
   if (
     roof &&
     !isSolidOpenFloor(roof) &&
@@ -290,10 +291,12 @@ export function redesign(
 function applyDoorDesign(
   g: Game,
   floor: Floor,
-  blueprint?: import("./run-design-contract.mjs").RunStructureV3,
+  blueprint?: import("./run-design-contract.mjs").RunStructure,
 ) {
   const design = blueprint ?? g.design?.design;
-  const designed = design?.floors[floor.index]?.doors;
+  // Drawn floors (version 4) style no chain doors.
+  const authored = design?.floors[floor.index];
+  const designed = authored && "doors" in authored ? authored.doors : undefined;
   for (const o of floor.furniture) {
     if (!o.field) continue;
     const room = /room(\d+)-(?:door|forward)$/.exec(o.id)?.[1];

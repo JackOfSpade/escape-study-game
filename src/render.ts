@@ -1,13 +1,16 @@
+import { cellLevel } from "./floor-levels";
 import { doorStyle } from "./door-style";
 import { fieldAllows } from "./force-fields";
 import { drawBlood } from "./blood";
 import { camera } from "./camera";
+import { activePlan, currentStep, stepSpot } from "./escape-plan";
+import { ghostActive, ghostBody } from "./ghost-view";
 import { displayScale } from "./display-scale";
 import { human } from "./engine";
 import { localPoint } from "./furniture-geometry";
 import { HoverLabel } from "./hover-label";
 import {
-  CONFIG,
+  roofIndexOf,
   HELIPAD,
   distance,
   type BuildingFootprint,
@@ -28,7 +31,7 @@ import {
   terrainCanvas,
 } from "./office-art";
 import { spectating, type SpectatorView } from "./spectator";
-import { type Stairwell, stairwell } from "./stairwell";
+import { type Stairwell, stairDrawing } from "./stairwell";
 import { playerCanSee, sightRadius, visibilityPolygon } from "./visibility";
 import { stairContactCues } from "./zombie-stairs";
 import { npcSpeechBubble, speechLines } from "./speech-bubbles";
@@ -38,6 +41,38 @@ const STRIKE_SHAKE_SECONDS = 0.35;
 /** Sideways offset of the 2D impact shake. Only a recent strike shakes an
  * object: lasting damage, including authored wear, shows as cracks and holds
  * still. */
+/** A hall's stepped floor from above: raised cells lighten, sunken cells
+ * darken, and every step edge is a thin line on its lower side. */
+function drawLevels(ctx: CanvasRenderingContext2D, f: Floor) {
+  const levels = f.generation?.levels;
+  if (!levels) return;
+  ctx.save();
+  for (let y = levels.y1; y <= levels.y2; y++)
+    for (let x = levels.x1; x <= levels.x2; x++) {
+      if (f.tiles[y]?.[x] !== 0) continue;
+      const level = cellLevel(f, x, y);
+      if (level) {
+        ctx.fillStyle =
+          level > 0
+            ? `rgba(255,255,255,${Math.min(0.22, level * 0.14)})`
+            : `rgba(0,0,0,${Math.min(0.3, -level * 0.4)})`;
+        ctx.fillRect(x, y, 1, 1);
+      }
+      ctx.fillStyle = "rgba(0,0,0,0.38)";
+      if (f.tiles[y]?.[x + 1] === 0) {
+        const next = cellLevel(f, x + 1, y);
+        if (next !== level)
+          ctx.fillRect(next < level ? x + 1 : x + 0.94, y, 0.06, 1);
+      }
+      if (f.tiles[y + 1]?.[x] === 0) {
+        const next = cellLevel(f, x, y + 1);
+        if (next !== level)
+          ctx.fillRect(x, next < level ? y + 1 : y + 0.94, 1, 0.06);
+      }
+    }
+  ctx.restore();
+}
+
 export function strikeShake(
   o: { struckAt?: number },
   time: number,
@@ -290,7 +325,7 @@ export function buildingClipRows(floor: Floor): BuildingClipRow[] {
  * its own ground floor (`g.extraction`); a building keeps the rooftop helipad on
  * the top floor. Absent means the floor draws no pad marking at all. */
 export function extractionPad(
-  g: Pick<Game, "extraction" | "helicopter" | "time">,
+  g: Pick<Game, "extraction" | "helicopter" | "time" | "floors">,
   floorIndex: number,
 ): { x: number; y: number; radius: number; rooftop: boolean } | undefined {
   const pad = g.extraction;
@@ -298,7 +333,7 @@ export function extractionPad(
     if (pad.floor !== floorIndex) return undefined;
     return { x: pad.x, y: pad.y, radius: pad.radius, rooftop: false };
   }
-  if (floorIndex !== CONFIG.floors) return undefined;
+  if (floorIndex !== roofIndexOf(g.floors[0])) return undefined;
   return { x: HELIPAD.x, y: HELIPAD.y, radius: 3.8, rooftop: true };
 }
 
@@ -402,6 +437,7 @@ export function render(
   );
   if (f.city) ctx.restore();
   ctx.globalAlpha = 1;
+  drawLevels(ctx, f);
   drawBlood(ctx, f);
   const healthBars: {
     x: number;
@@ -476,8 +512,8 @@ export function render(
       label(`${4 - g.helicopter.passengers.length} SEATS`, HELIPAD.x, 14.7);
     }
   }
-  if (floorIndex !== CONFIG.floors) {
-    const well = stairwell(f, "up");
+  if (floorIndex !== roofIndexOf(f)) {
+    const well = stairDrawing(f, "up");
     if (wellVisible(well)) {
       drawStairs(well);
       if (!spectator && !a.access.includes(a.floor))
@@ -491,7 +527,7 @@ export function render(
     }
   }
   if (floorIndex > 0) {
-    const well = stairwell(f, "down");
+    const well = stairDrawing(f, "down");
     if (wellVisible(well)) drawStairs(well);
   }
   for (const room of f.rooms ?? []) {
@@ -643,11 +679,43 @@ export function render(
     ctx.stroke();
     ctx.globalAlpha = 1;
   }
+  /** A fallen body, drawn at the current translate: an ellipse along the floor
+   * with a head circle and a straight limbs line. */
+  const drawFallenBody = () => {
+    ctx.fillStyle = p.danger;
+    ctx.beginPath();
+    ctx.ellipse(
+      0,
+      0,
+      BODY_RADIUS * 1.35,
+      BODY_RADIUS * 0.55,
+      0,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+    ctx.strokeStyle = p.ink;
+    ctx.lineWidth = 0.07;
+    ctx.beginPath();
+    ctx.arc(BODY_RADIUS * 1.1, 0, BODY_RADIUS * 0.45, 0, Math.PI * 2);
+    ctx.moveTo(-BODY_RADIUS, 0);
+    ctx.lineTo(BODY_RADIUS, 0);
+    ctx.stroke();
+  };
   for (const s of g.survivors) {
+    // The human's ghost walks away from the body it left where it died.
+    const ghost = s.id === "human" && ghostActive(g);
+    const body = ghost ? ghostBody(g, floorIndex) : undefined;
+    if (body && visible(body)) {
+      ctx.save();
+      ctx.translate(body.x, body.y);
+      drawFallenBody();
+      ctx.restore();
+    }
     if (s.floor !== floorIndex || s.escaped || !visible(s)) continue;
     ctx.save();
     ctx.translate(s.x, s.y);
-    if (!s.alive && s.downAt !== undefined) {
+    if (!s.alive && s.downAt !== undefined && !ghost) {
       // Escape redesign: fallen bodies stay in the world, drawn along the floor.
       ctx.fillStyle = p.danger;
       ctx.beginPath();
@@ -671,11 +739,17 @@ export function render(
       ctx.restore();
       continue;
     }
-    ctx.fillStyle = s.alive
-      ? s.id === "human"
-        ? p.accent
-        : "#b5c6cf"
-      : p.danger;
+    if (ghost) {
+      // The ghost is the normal player marker at 40% opacity: present but
+      // untouchable.
+      ctx.globalAlpha = 0.4;
+      ctx.fillStyle = p.accent;
+    } else
+      ctx.fillStyle = s.alive
+        ? s.id === "human"
+          ? p.accent
+          : "#b5c6cf"
+        : p.danger;
     ctx.beginPath();
     ctx.arc(0, 0, BODY_RADIUS, 0, Math.PI * 2);
     ctx.fill();
@@ -685,7 +759,7 @@ export function render(
     ctx.moveTo(s.heading.x * 0.1, s.heading.y * 0.1);
     ctx.lineTo(s.heading.x * 0.55, s.heading.y * 0.55);
     ctx.stroke();
-    if (s.id === "human" && s.alive) {
+    if (s.id === "human" && (s.alive || ghost)) {
       ctx.strokeStyle = p.accent;
       ctx.lineWidth = 0.04;
       ctx.beginPath();
@@ -745,6 +819,21 @@ export function render(
     ctx.lineTo(z.x + Math.cos(heading) * 0.55, z.y + Math.sin(heading) * 0.55);
     ctx.stroke();
   }
+  // The spot the current plan step happens at: a ring the player walks to.
+  const planStep = currentStep(activePlan(g.escape)),
+    planSpot =
+      g.status === "playing" && planStep ? stepSpot(g, planStep) : undefined;
+  if (planSpot && planSpot.floor === floorIndex) {
+    ctx.save();
+    ctx.strokeStyle = "#8fd8ff";
+    ctx.lineWidth = 0.09;
+    ctx.globalAlpha = 0.85;
+    ctx.setLineDash([0.28, 0.2]);
+    ctx.beginPath();
+    ctx.arc(planSpot.x, planSpot.y, 0.9, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
   for (const contact of spectator ? [] : stairContactCues(g, a, radius)) {
     ctx.strokeStyle = p.danger;
     ctx.lineWidth = 0.08;
@@ -784,7 +873,12 @@ export function render(
       )
         ob = undefined;
     }
-    if (hoverLabel.update(ob?.id, performance.now()) && ob)
+    // A ghost cannot use anything, so it never sees a thing's name either.
+    if (
+      g.status === "playing" &&
+      hoverLabel.update(ob?.id, performance.now()) &&
+      ob
+    )
       label(
         objectName(ob.kind, ob.object),
         ob.x,

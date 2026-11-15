@@ -329,7 +329,11 @@ test("world keeps advancing after the human is killed in combat; pause still fre
   );
   assert.equal(g.status, "dead");
   assert.equal(h.alive, false);
-  assert.deepEqual({ x: h.x, y: h.y, floor: h.floor, keys: h.keys ?? 0 }, pos);
+  // The body stays where it fell and earns nothing; the ghost walks on the
+  // player's input.
+  assert.deepEqual(h.ghost?.body, { x: pos.x, y: pos.y, floor: pos.floor });
+  assert.equal(h.keys ?? 0, pos.keys);
+  assert.ok(h.x > pos.x + 1, "the ghost walked east on the held input");
   assert.equal(g.endedAt, endedAt);
   const saved = JSON.parse(JSON.stringify(g)) as Game;
   assert.equal(saved.endedAt, endedAt);
@@ -342,7 +346,7 @@ test("world keeps advancing after the human is killed in combat; pause still fre
   assert.ok(g.time > frozen);
 });
 
-test("world keeps advancing after extraction without moving or rewarding the human", () => {
+test("world keeps advancing after extraction without rewarding the human, whose ghost walks on", () => {
   const g = createPlayableGame(19, roadmap());
   g.status = "playing";
   g.nextSpawn = 1e9;
@@ -362,7 +366,10 @@ test("world keeps advancing after extraction without moving or rewarding the hum
   for (let i = 0; i < 40; i++) step(g, 0.1, { x: 0, y: 1, grab: false });
   assert.ok(g.time - t0 > 3.9);
   assert.ok(totalThought(g) > thought0);
-  assert.equal(`${h.x},${h.y},${h.floor}`, pos);
+  // An escaped human leaves no body; its ghost follows the held input.
+  assert.notEqual(`${h.x},${h.y},${h.floor}`, pos);
+  assert.equal(h.floor, CONFIG.floors);
+  assert.deepEqual(h.ghost, {});
   assert.equal(h.keys ?? 0, keys);
   assert.equal(g.status, "escaped");
   assert.equal(g.endedAt, endedAt);

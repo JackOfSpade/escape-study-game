@@ -12,18 +12,11 @@ async function openStudyQuestion(page: Page) {
   await page.locator("#study-next").click();
   await expect(page.locator("#study-terminal-slot #terminal")).toBeVisible();
   await expect(page.locator("#study-terminal-slot #problem")).not.toBeEmpty();
-  // The terminal scrolls onto its own screen once the question is ready.
-  await expect
-    .poll(() =>
-      page.evaluate(() =>
-        Math.abs(
-          document
-            .querySelector("#study-terminal-slot")!
-            .getBoundingClientRect().top,
-        ),
-      ),
-    )
-    .toBeLessThanOrEqual(2);
+  // The open question takes the place of the skill map.
+  await expect(page.locator("#study-workspace")).toHaveAttribute(
+    "data-view",
+    "question",
+  );
 }
 
 /** Replays the reveal on the live map from a hand-made earlier snapshot in
@@ -66,27 +59,27 @@ function playReveal(page: Page, reducedMotion: boolean) {
   }, reducedMotion);
 }
 
-test("the question terminal gets its own screen below the map", async ({
+test("an open question replaces the skill map, and the toolbar switches between them", async ({
   page,
 }) => {
   await openStudyQuestion(page);
-  await expect
-    .poll(() =>
-      page.evaluate(() =>
-        Math.abs(
-          document
-            .querySelector("#study-terminal-slot")!
-            .getBoundingClientRect().top,
-        ),
-      ),
-    )
-    .toBeLessThanOrEqual(2);
-  const map = await page.evaluate(
+  await expect(page.locator(".study-skill-map")).toBeHidden();
+  await expect(page.locator("#study-next")).toBeHidden();
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  const top = await page.evaluate(
     () =>
-      document.querySelector(".study-skill-map")!.getBoundingClientRect()
-        .bottom,
+      document
+        .querySelector("#study-terminal-slot #terminal")!
+        .getBoundingClientRect().top,
   );
-  expect(map).toBeLessThanOrEqual(0);
+  expect(top).toBeLessThan(200);
+  // The map is one click away and the question one click back.
+  await page.locator("#study-map-peek").click();
+  await expect(page.locator(".study-skill-map")).toBeVisible();
+  await expect(page.locator("#study-terminal-slot #terminal")).toBeHidden();
+  await page.locator("#study-map-peek").click();
+  await expect(page.locator("#study-terminal-slot #terminal")).toBeVisible();
+  await expect(page.locator(".study-skill-map")).toBeHidden();
 });
 
 test("the map levels up from its previous state", async ({ page }) => {
@@ -136,7 +129,7 @@ test("reduced motion shows the final state immediately with a banner", async ({
   await expect(page.locator(".study-reveal-particle")).toHaveCount(0);
 });
 
-test("finishing a question scrolls back to the map and plays the reveal once", async ({
+test("finishing a question returns to the map and plays the reveal once", async ({
   page,
 }) => {
   const study = await mockClaudeStudy(page);
@@ -156,32 +149,22 @@ test("finishing a question scrolls back to the map and plays the reveal once", a
   await page.locator("#study-only-toggle").click();
   await page.locator("#study-next").click();
   await expect(page.locator("#study-terminal-slot #problem")).not.toBeEmpty();
-  await expect
-    .poll(() =>
-      page.evaluate(() =>
-        Math.abs(
-          document
-            .querySelector("#study-terminal-slot")!
-            .getBoundingClientRect().top,
-        ),
-      ),
-    )
-    .toBeLessThanOrEqual(2);
+  await expect(page.locator("#study-workspace")).toHaveAttribute(
+    "data-view",
+    "question",
+  );
   study.solve();
   await page.locator("#chat-input").fill("It decides what the index can seek.");
   await page.locator("#chat-input").press("Enter");
   await expect(page.locator(".study-reveal-banner")).toHaveCount(1, {
     timeout: 15000,
   });
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          document.querySelector("#study-progress")!.getBoundingClientRect()
-            .top,
-      ),
-    )
-    .toBeGreaterThanOrEqual(-2);
+  // The finished question gives the screen back to the map.
+  await expect(page.locator("#study-workspace")).toHaveAttribute(
+    "data-view",
+    "map",
+  );
+  await expect(page.locator("#study-progress")).toBeVisible();
   await expect(page.locator("#study-next")).toBeEnabled();
   await expect(page.locator("#study-next")).toHaveText("Start next question");
   // The banner fades out on its own and the reveal does not repeat.

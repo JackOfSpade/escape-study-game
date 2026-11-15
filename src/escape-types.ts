@@ -446,6 +446,128 @@ export interface EscapeEvent {
 /* Everything stored on the game                                       */
 /* ------------------------------------------------------------------ */
 
+/** One NPC's ordinary day in an escape run; see src/npc-daily-life.ts. */
+export interface DailyLife {
+  home: { x: number; y: number; floor: number };
+  state: "staying" | "walking";
+  /** Game time the current stay ends or the current walk gives up. */
+  until: number;
+  target?: { x: number; y: number; floor: number };
+  /** How many walks this NPC has started; also salts the routine hashes. */
+  visits: number;
+}
+
+/* ------------------------------------------------------------------ */
+/* Plans and the sealed truth sheet (docs/ESCAPE_REDESIGN.md section 17) */
+/* ------------------------------------------------------------------ */
+
+/** How a plan gets the player out. The truth sheet rules on each. */
+export const PLAN_MEANS = [
+  "walk-out",
+  "drive",
+  "fly",
+  "sail",
+  "climb",
+  "tunnel",
+  "hide",
+  "call-help",
+  "wait",
+  "other",
+] as const;
+export type PlanMeans = (typeof PLAN_MEANS)[number];
+
+/** What a step depends on. The truth sheet may hold a hidden state for each. */
+export const PLAN_RESOURCES = [
+  "none",
+  "exit",
+  "vehicle",
+  "fuel",
+  "key",
+  "tool",
+  "phone",
+  "radio",
+  "power",
+  "rope",
+  "boat",
+  "aircraft",
+  "weapon",
+  "disguise",
+  "person",
+  "window",
+  "roof",
+  "tunnel",
+  "supplies",
+] as const;
+export type PlanResource = (typeof PLAN_RESOURCES)[number];
+
+/** `reach` arrives; `fetch`, `work` and `ask` take time at the spot. */
+export type PlanStepKind = "reach" | "fetch" | "work" | "ask";
+
+export interface PlanStep {
+  id: string;
+  kind: PlanStepKind;
+  /** What to do, in the character's own words. */
+  text: string;
+  /** Name of the thing or place the step happens at. */
+  label: string;
+  at: { x: number; y: number; floor: number };
+  resource: PlanResource;
+  /** Seconds of standing still at the spot; 0 for `reach`. */
+  seconds: number;
+  /** For `ask`: the person, who is followed wherever they are. */
+  npcId?: string;
+  state: "pending" | "done";
+  progress: number;
+  /** True once the truth sheet has ruled on this step's resource. */
+  resolved?: boolean;
+}
+
+export interface EscapePlan {
+  id: string;
+  loop: number;
+  /** The player's own words. */
+  text: string;
+  means: PlanMeans;
+  steps: PlanStep[];
+  state: "active" | "failed" | "escaped" | "dropped";
+  /** What the world answered when the plan ended. */
+  outcome?: string;
+}
+
+/** A hidden state of something a step needs. */
+export type TruthEntry =
+  | {
+      /** The plan is not dead: one more thing must be done first. */
+      kind: "gap";
+      reveal: string;
+      fix: { text: string; label: string; seconds: number };
+    }
+  | {
+      /** This route is closed in this game. */
+      kind: "wall";
+      reveal: string;
+      /** Health lost on running into it, 0 to 100. */
+      harm?: number;
+    };
+
+/** What happens when the last step of a plan with this means is done. */
+export interface MeansRule {
+  outcome: "escapes" | "wall" | "dies";
+  reveal: string;
+}
+
+/**
+ * The sealed truth of one game, written before the player plans anything. No
+ * prompt that builds a plan or speaks for an NPC ever receives it.
+ */
+export interface TruthSheet {
+  version: 1;
+  resources: Partial<Record<PlanResource, TruthEntry>>;
+  means: Partial<Record<PlanMeans, MeansRule>>;
+  /** A means that is guaranteed to get the player out. */
+  viable: PlanMeans;
+}
+
 export interface EscapeState {
   version: 1;
   /** Who the player is, as told to them. */
@@ -468,6 +590,22 @@ export interface EscapeState {
   prompts: { npcId: string; reason: string; at: number }[];
   /** Mutable room power keyed `${floor}:${roomId}`; overrides the seeded default. Reset each loop. */
   roomPower: Record<string, "lit" | "dim" | "outage">;
+  /**
+   * Per-NPC ordinary-day routine state, keyed by actor id. Optional so saves
+   * made before routines existed still validate.
+   */
+  daily?: Record<string, DailyLife>;
+  /** The sealed truth sheet; kept across loops. Absent on older saves. */
+  truth?: TruthSheet;
+  /** Plans of the current loop, newest last. Dropped on restart. */
+  plans?: EscapePlan[];
+  /**
+   * Where a thing a plan needed was put, keyed by its lower-cased label, so
+   * the same thing stands in the same place in every later loop.
+   */
+  places?: Record<string, { x: number; y: number; floor: number }>;
+  /** A plan request is with the builder; no second one is sent. */
+  planPending?: boolean;
 }
 
 /** An inactive area. The active area's floors live in `Game.floors`. */

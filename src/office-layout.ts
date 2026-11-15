@@ -1,6 +1,7 @@
+import { coreRect } from "./stair-core";
 import { clearFillerAroundDesks } from "./station-clearance";
 import {
-  CONFIG,
+  roofIndexOf,
   FURNITURE,
   furnitureSpec,
   H,
@@ -22,6 +23,12 @@ import { floorSectors, inRect, type Rect } from "./floor-plan";
 import { cornerCells } from "./room-shapes";
 import { realizeAuthoredScene } from "./authored-scene";
 import { floorVenue } from "./venue";
+import { freeFloor } from "./free-design";
+import type {
+  RunFreeFloor,
+  RunFurnishing,
+  RunRoomPattern,
+} from "./run-design-contract.mjs";
 import {
   furnitureRole,
   type RunCustomObject,
@@ -138,6 +145,12 @@ export interface OfficeZone {
   exclude?: Rect[];
   /** Version 5: id of the field through which this zone's sector is entered. */
   gate?: string;
+  /** A hall with seating: rows of seats facing the hall's focus wall. `box`
+   * is the whole hall and `clear` the depth kept free in front of that wall. */
+  rows?: { focus: "n" | "s" | "e" | "w"; box: Rect; clear: number };
+  /** A drawn room or concourse (version 4): its own arrangement pattern and
+   * furniture list instead of a venue's list for an office function. */
+  furnishing?: RunFurnishing;
 }
 const excluded = (zone: OfficeZone, p: Point) =>
   !!zone.exclude?.some((r) => inRect(r, Math.floor(p.x), Math.floor(p.y)));
@@ -827,6 +840,136 @@ function planCustom(
   }
   return groups;
 }
+/** Seats per row segment and the most segments a hall takes at density 1. */
+const ROW_SEATS = 4,
+  ROW_SEGMENTS = 10;
+/** Rows of seats across a hall zone, all facing its focus wall, nearest row
+ * first, in segments of four. Lines are offered every half cell; placement
+ * keeps a walking gap between segments and clear of the terminals, so rows
+ * settle between the terminal lines with aisles between them. */
+function hallRows(zone: OfficeZone, seat: Item): Group[] {
+  const { focus, box, clear } = zone.rows!,
+    across = focus === "n" || focus === "s",
+    // Seats face (-sin a, cos a): north is pi, south 0, east -pi/2, west pi/2.
+    angle = focus === "n" ? S : focus === "s" ? N : focus === "e" ? Wst : E,
+    width = ROW_SEATS * seat.w + (ROW_SEATS - 1) * 0.1,
+    pieces = Array.from({ length: ROW_SEATS }, (_, i) =>
+      piece(seat, -width / 2 + seat.w / 2 + i * (seat.w + 0.1), 0),
+    ),
+    depth = across ? box.y2 - box.y1 + 1 : box.x2 - box.x1 + 1,
+    [a1, a2] = across ? [zone.x1, zone.x2 + 1] : [zone.y1, zone.y2 + 1],
+    out: Group[] = [];
+  for (let d = clear + 1; d < depth - 1; d += 0.5) {
+    // The line at this depth from the focus wall, if this zone has it.
+    const line =
+      focus === "n"
+        ? box.y1 + d
+        : focus === "s"
+          ? box.y2 - d
+          : focus === "w"
+            ? box.x1 + d
+            : box.x2 - d;
+    if (
+      across
+        ? line < zone.y1 || line > zone.y2
+        : line < zone.x1 || line > zone.x2
+    )
+      continue;
+    // Segments are offered a cell apart along the line; placement keeps a
+    // walking gap between neighbours, which leaves the aisles.
+    for (let along = a1 + 1 + width / 2; along <= a2 - 1 - width / 2; along++)
+      out.push({
+        wall: false,
+        pieces,
+        at: across
+          ? { x: along, y: line + 0.5, angle }
+          : { x: line + 0.5, y: along, angle },
+      });
+  }
+  return out;
+}
+/** The seat a hall's rows are made of: the venue's own seat for that room
+ * function, else any seat the design lists, else a plain chair. */
+function rowSeat(
+  f: Floor,
+  type: OfficeRoomType,
+  furnishing?: RunFurnishing,
+): Item | undefined {
+  const setting = f.setting;
+  if (furnishing && setting)
+    return furnishing.filler
+      .map((n) => fillerItem(setting, n))
+      .find((it) => it.role === "seat");
+  if (floorVenue(f) !== "custom" || !setting?.filler)
+    return fillerItem({ objects: [] } as unknown as RunSetting, "chair");
+  const listed = (names: readonly string[]) =>
+    names.map((n) => fillerItem(setting, n)).find((it) => it.role === "seat");
+  return (
+    listed(setting.filler[type]) ?? listed(Object.values(setting.filler).flat())
+  );
+}
+/** The office function whose arrangement a pattern borrows, where it has one. */
+const PATTERN_TYPE: Record<RunRoomPattern, OfficeRoomType> = {
+  clusters: "cubicles",
+  counter: "reception",
+  lounge: "break",
+  table: "meeting",
+  shelving: "storage",
+  desk: "manager",
+  rows: "meeting",
+  display: "storage",
+  bays: "manager",
+  open: "reception",
+};
+/** Groups for a drawn room: the designer's pattern arranges the designer's
+ * own furniture list. The first name is the room's signature piece. */
+function planPattern(
+  furnishing: RunFurnishing,
+  r: Rng,
+  small: boolean,
+  setting: RunSetting,
+): Group[][] {
+  const { pattern, filler } = furnishing;
+  if (pattern === "open" || !filler.length) return [];
+  const items = filler.map((n) => fillerItem(setting, n)),
+    { sig, rest, seat } = pickRoles(items),
+    others = rest.filter((it) => it !== seat && it.role !== "divider");
+  switch (pattern) {
+    case "rows":
+      // The rows themselves come from hallRows; the signature piece (a
+      // lectern, screen or altar) and the rest stand along the walls.
+      return [
+        [soloItem(sig, true), soloItem(sig, false)],
+        ...others.map((it) => [soloItem(it, true)]),
+      ];
+    case "display": {
+      // Exhibits: free-standing pieces with room to walk around each.
+      const shown = [sig, ...others],
+        groups: Group[][] = [];
+      for (let i = between(r, small ? 2 : 4, small ? 3 : 7); i > 0; i--) {
+        const it = shown[i % shown.length];
+        groups.push([soloItem(it, false), soloItem(it, true)]);
+      }
+      if (seat)
+        groups.push([runItems([seat, seat], 0.15), soloItem(seat, true)]);
+      return groups;
+    }
+    case "bays": {
+      // Beds, pods, stalls or lockers: the signature piece repeated along
+      // the walls, each with its seat where the list has one.
+      const groups: Group[][] = [];
+      for (let i = between(r, small ? 2 : 4, small ? 4 : 8); i > 0; i--)
+        groups.push([
+          seat ? seatedItem(sig, seat, true) : soloItem(sig, true),
+          soloItem(sig, true),
+        ]);
+      for (const it of others.slice(0, 3)) groups.push([soloItem(it, true)]);
+      return groups;
+    }
+    default:
+      return planCustom(PATTERN_TYPE[pattern], r, small, filler, setting);
+  }
+}
 /** Open-plan terminals become cubicle desks: short panels between neighbours
  * along the wall, with the bay left open toward the room. */
 function terminalBays(
@@ -1120,9 +1263,16 @@ export function furnishOffice(
       }
       return false;
     };
-    const divider = custom
-      ? dividerOf(custom)
-      : { kind: broadcast ? ("soundPanel" as const) : ("partition" as const) };
+    const drawn = zone.furnishing && f.setting ? f.setting : undefined;
+    const divider = drawn
+      ? zone
+          .furnishing!.filler.map((n) => fillerItem(drawn, n))
+          .find((it) => it.role === "divider" && it.h <= DIVIDER_DEPTH)
+      : custom
+        ? dividerOf(custom)
+        : {
+            kind: broadcast ? ("soundPanel" as const) : ("partition" as const),
+          };
     if (type === "cubicles" && divider)
       for (const bay of terminalBays(
         f,
@@ -1133,12 +1283,22 @@ export function furnishOffice(
         divider,
       ))
         tryPlace(bay);
-    const planner = custom
-      ? (t: OfficeRoomType, rr: Rng, sm: boolean) =>
-          planCustom(t, rr, sm, custom.filler![t], custom)
-      : broadcast
-        ? planBroadcast
-        : plan;
+    if (zone.rows) {
+      const seat = rowSeat(f, type, zone.furnishing);
+      let left = Math.ceil(ROW_SEGMENTS * (f.design?.furnitureDensity ?? 1));
+      if (seat)
+        for (const row of hallRows(zone, seat))
+          if (left > 0 && tryPlace(row)) left--;
+    }
+    const planner = drawn
+      ? (_t: OfficeRoomType, rr: Rng, sm: boolean) =>
+          planPattern(zone.furnishing!, rr, sm, drawn)
+      : custom
+        ? (t: OfficeRoomType, rr: Rng, sm: boolean) =>
+            planCustom(t, rr, sm, custom.filler![t], custom)
+        : broadcast
+          ? planBroadcast
+          : plan;
     let groups = planner(type, r, small);
     if (f.design) {
       const wanted = Math.ceil(groups.length * f.design.furnitureDensity);
@@ -1151,7 +1311,7 @@ export function furnishOffice(
     for (const variants of groups)
       for (const group of variants) if (tryPlace(group)) break;
   }
-  if (f.generation?.version === 5) clearFillerAroundDesks(f);
+  if ((f.generation?.version ?? 0) >= 5) clearFillerAroundDesks(f);
 }
 
 /** Check the finished physical furnishing, not just the floor-plan raster. */
@@ -1193,8 +1353,9 @@ const ROOMS: OfficeRoomType[] = [
  * random functions. */
 export function pursuitOfficeZones(f: Floor): OfficeZone[] {
   const stages = f.generation?.stages;
-  if (f.index < 4 && f.generation?.sectors) return sectorOfficeZones(f);
-  if (f.index >= 4 || !stages) return [];
+  if (f.index < roofIndexOf(f) && f.generation?.sectors)
+    return sectorOfficeZones(f);
+  if (f.index >= roofIndexOf(f) || !stages) return [];
   const bounds = (y1: number, y2: number) => {
     if (!f.boundary) return { x1: 2, y1, x2: 41, y2 };
     y1 = Math.max(y1, f.boundary.top);
@@ -1237,8 +1398,15 @@ export function fieldClearance(f: Floor): Point[] {
   const lane = Math.min(f.entry.y, 26.5);
   for (let x = f.entry.x - 5; x <= f.entry.x + 5; x++)
     points.push({ x, y: lane }, { x, y: lane + 1 });
+  // An interior stair core: its landings stay clear on every level.
+  if (f.stairCore) {
+    const c = coreRect(f.stairCore);
+    for (let y = c.y1; y <= c.y2; y++)
+      for (let x = c.x1; x <= c.x2; x++)
+        points.push({ x: x + 0.5, y: y + 0.5 });
+  }
   // Nothing may narrow the approach into either staircase.
-  if (f.index < CONFIG.floors) points.push(...stairwellApproach(f, "up"));
+  if (f.index < roofIndexOf(f)) points.push(...stairwellApproach(f, "up"));
   if (f.index > 0) points.push(...stairwellApproach(f, "down"));
   if (f.generation?.sectors) {
     // Version 5: every field cell in either orientation plus two cells in
@@ -1255,6 +1423,19 @@ export function fieldClearance(f: Floor): Point[] {
                 : { x: o.x + d, y: o.y + t },
             );
       }
+    // Drawn floors: every doorway cell and the cell on each side of it.
+    for (const d of f.generation.doorways ?? []) {
+      const across = d.y1 === d.y2;
+      for (let y = d.y1; y <= d.y2; y++)
+        for (let x = d.x1; x <= d.x2; x++)
+          // Two cells each way: room for a hinged leaf to swing.
+          for (const t of [-2, -1, 0, 1, 2])
+            points.push(
+              across
+                ? { x: x + 0.5, y: y + 0.5 + t }
+                : { x: x + 0.5 + t, y: y + 0.5 },
+            );
+    }
     for (const s of floorSectors(f))
       for (const room of s.rooms) {
         const { doorway: d, rect } = room;
@@ -1276,6 +1457,65 @@ export function fieldClearance(f: Floor): Point[] {
   return points;
 }
 
+const OPPOSITE_SIDE = { n: "s", s: "n", e: "w", w: "e" } as const;
+/** Zones of a drawn floor (version 4): one per room with its own pattern and
+ * furniture list, and one per concourse block large enough to furnish. */
+function drawnZones(f: Floor, design: RunFreeFloor): OfficeZone[] {
+  const sectors = floorSectors(f),
+    zones: OfficeZone[] = [];
+  design.rooms.forEach((room, i) => {
+    const sector = sectors[i + 1];
+    if (!sector) return;
+    const rect = sector.blocks[0];
+    // Nothing stands against a carved corner wall.
+    const exclude = (f.generation?.corners ?? [])
+      .filter((c) => c.room === i)
+      .map((c) => {
+        const cells = cornerCells(c);
+        return {
+          x1: Math.min(...cells.map((p) => p.x)) - 1,
+          y1: Math.min(...cells.map((p) => p.y)) - 1,
+          x2: Math.max(...cells.map((p) => p.x)) + 1,
+          y2: Math.max(...cells.map((p) => p.y)) + 1,
+        };
+      });
+    const seated = room.hall
+      ? room.hall.seating === "rows"
+      : room.pattern === "rows";
+    zones.push({
+      id: sector.id,
+      ...rect,
+      types: [PATTERN_TYPE[room.pattern]],
+      furnishing: { pattern: room.pattern, filler: room.filler },
+      ...(exclude.length ? { exclude } : {}),
+      ...(seated
+        ? {
+            rows: {
+              // Without hall features the rows face away from the first door.
+              focus: room.hall?.focus ?? OPPOSITE_SIDE[room.doors[0].side],
+              box: rect,
+              clear:
+                (room.hall?.stage?.depth ?? 0) +
+                (room.hall?.pit ? room.hall.pit.length + 1 : 0),
+            },
+          }
+        : {}),
+    });
+  });
+  // The concourse is circulation: only its larger open areas are furnished.
+  sectors[0]?.blocks.forEach((b, i) => {
+    const w = b.x2 - b.x1 + 1,
+      h = b.y2 - b.y1 + 1;
+    if (Math.min(w, h) < 4 || w * h < 24) return;
+    zones.push({
+      id: `entry${i ? String.fromCharCode(97 + (i % 26)) + (i >= 26 ? i : "") : ""}`,
+      ...b,
+      types: [PATTERN_TYPE[design.concourse.pattern]],
+      furnishing: design.concourse,
+    });
+  });
+  return zones;
+}
 const SUB_ROOM_TYPES: Record<string, OfficeRoomType> = {
   office: "manager",
   meeting: "meeting",
@@ -1286,6 +1526,8 @@ const SUB_ROOM_TYPES: Record<string, OfficeRoomType> = {
  * sector's sub-rooms excluded, then one per sub-room (room3r1, ...). The free
  * hall's circulation is always open-plan cubicles. */
 function sectorOfficeZones(f: Floor): OfficeZone[] {
+  const drawn = freeFloor(f);
+  if (drawn) return drawnZones(f, drawn);
   const sectors = floorSectors(f);
   const study = sectors.filter((s) => s.room !== undefined);
   const zones: OfficeZone[] = [];
@@ -1327,6 +1569,24 @@ function sectorOfficeZones(f: Floor): OfficeZone[] {
             : s.id === "lobby"
               ? ["break", "reception"]
               : ROOMS;
+    // A hall with seating fills with rows that face its focus wall, behind
+    // its stage and pit.
+    const hall =
+      s.merged && f.design && "hall" in f.design ? f.design.hall : undefined;
+    const rows =
+      hall?.seating === "rows"
+        ? {
+            focus: hall.focus,
+            box: {
+              x1: Math.min(...s.blocks.map((b) => b.x1)),
+              y1: Math.min(...s.blocks.map((b) => b.y1)),
+              x2: Math.max(...s.blocks.map((b) => b.x2)),
+              y2: Math.max(...s.blocks.map((b) => b.y2)),
+            },
+            clear:
+              (hall.stage?.depth ?? 0) + (hall.pit ? hall.pit.length + 1 : 0),
+          }
+        : undefined;
     s.blocks.forEach((b, i) =>
       zones.push({
         id: `${s.id}${i ? String.fromCharCode(97 + i) : ""}`,
@@ -1334,6 +1594,7 @@ function sectorOfficeZones(f: Floor): OfficeZone[] {
         types,
         ...(exclude.length ? { exclude } : {}),
         ...(gate ? { gate } : {}),
+        ...(rows ? { rows } : {}),
       }),
     );
     for (const room of s.rooms)

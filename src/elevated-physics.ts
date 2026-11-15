@@ -1,3 +1,10 @@
+import { stairHole } from "./stair-core";
+import {
+  cellLevel,
+  ceilingHeight,
+  groundLevel,
+  hasLevels,
+} from "./floor-levels";
 import {
   COLUMN_SIZE,
   DECK_THICKNESS,
@@ -8,7 +15,7 @@ import {
 } from "./exterior-structure";
 import { fieldPassable } from "./force-fields";
 import {
-  CONFIG,
+  roofIndexOf,
   devPass,
   type Actor,
   type Floor,
@@ -108,11 +115,13 @@ function carvedWell(f: Floor, x: number, y: number) {
   // An open site has no stairwell: its only marker is the ground pad, so no
   // well may be carved through the market's floor plate.
   if (f.open === true) return false;
+  // Interior stairs: the building has no wells in its walls.
+  if (f.stairCore) return false;
   return (
     !!b &&
     x >= 21 &&
     x <= 22 &&
-    ((f.index < CONFIG.floors && y >= b.top - 2 && y < b.top) ||
+    ((f.index < roofIndexOf(f) && y >= b.top - 2 && y < b.top) ||
       (f.index > 0 && y >= b.bottom && y < b.bottom + 2))
   );
 }
@@ -148,7 +157,7 @@ function exteriorRectangles(structure: ExteriorStructure) {
         uy: s.uy,
         halfLength: run / 2,
         halfWidth: s.halfWidth,
-        bottom: s.solidToGround ? 0 : height - DECK_THICKNESS,
+        bottom: s.solidTo ?? (s.solidToGround ? 0 : height - DECK_THICKNESS),
         height,
         kind: "slab",
         floor: Math.round(height / FLOOR_HEIGHT),
@@ -243,35 +252,41 @@ function intervals(
           })
         )
           continue;
+        // An interior flight and the opening above it are neither floor nor
+        // wall: the stair slabs and their guards are the only solids there.
+        if (stairHole(f, x, y)) continue;
         const cell = { x: x + 0.5, y: y + 0.5 },
           inside = insideFootprint(f, cell),
           open = f.tiles[y][x] === 0 || carvedWell(f, x, y);
         if (open) {
+          // A hall's stepped floor: the plate tops out at the cell's level
+          // and is solid down to the slab.
+          const level = cellLevel(f, x, y);
           result.push({
             kind: "plate",
-            height: base,
-            bottom: base - DECK_THICKNESS,
+            height: base + level,
+            bottom: base + Math.min(0, level) - DECK_THICKNESS,
             floor: f.index,
             inside: insideFootprint(f, p),
           });
           const finish = floorZone(f, x, y),
             ownsFinish = !f.boundary || inside || (f.index > 0 && open);
           if (
-            f.index < CONFIG.floors &&
+            f.index < roofIndexOf(f) &&
             ownsFinish &&
             finish !== "concrete" &&
             finish !== "roof"
           )
             result.push({
               kind: "plate",
-              bottom: base + 2.82,
+              bottom: base + ceilingHeight(f, x, y),
               height: base + 3.4,
               floor: f.index,
               inside: insideFootprint(f, p),
             });
         } else if (inside || perimeterWall(f, x, y)) {
           const height =
-            f.index === CONFIG.floors ? (inside ? 2.8 : 1) : FLOOR_HEIGHT;
+            f.index === roofIndexOf(f) ? (inside ? 2.8 : 1) : FLOOR_HEIGHT;
           result.push({
             kind: "wall",
             bottom: base,
@@ -303,7 +318,9 @@ function intervals(
         result.push({
           kind: "furniture",
           bottom: base,
-          height: base + (o.field ? FLOOR_HEIGHT : furnitureHeightOf(o)),
+          height:
+            base +
+            (o.field ? FLOOR_HEIGHT : furnitureHeightOf(o) + groundLevel(f, o)),
           floor: f.index,
           inside: insideFootprint(f, p),
         });
@@ -413,12 +430,22 @@ export function ceilingAbove(g: Game, a: Actor, p: Point, minHeight: number) {
 }
 
 /** Body state is plain JSON and carries the existing horizontal momentum. */
-export function startElevated(
-  g: Game,
-  a: Actor,
-  feet = a.floor * FLOOR_HEIGHT,
-) {
+export function startElevated(g: Game, a: Actor, feet?: number) {
   if (a.elevated) return a.elevated;
+  if (feet === undefined) {
+    feet = a.floor * FLOOR_HEIGHT;
+    const floor = g.floors[a.floor];
+    // On a hall's stepped floor the body starts on the step under it.
+    if (floor && hasLevels(floor)) {
+      const step = surfaceBelow(
+        g,
+        a,
+        a,
+        feet + groundLevel(floor, a) + ELEVATED_STEP,
+      );
+      if (step?.kind === "plate" && step.floor === a.floor) feet = step.height;
+    }
+  }
   const surface = surfaceBelow(g, a, a, feet);
   a.elevated = {
     feet,

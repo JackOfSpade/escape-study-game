@@ -45,7 +45,15 @@ export function createStudyWorkspaceView(
   // Pre-question map state, kept until that question's assessment is applied.
   let baseline: { id: string; snapshot: MapSnapshot } | undefined;
   let reveal: { cancel(): void } | undefined;
-  let scrolledFor: string | undefined;
+  // While a terminal is open the learner may switch between it and the map;
+  // the choice lasts until the question or its natural view changes.
+  let chosen: "map" | "question" | undefined;
+  let shownFor: string | undefined;
+  const mapPeek = root.querySelector<HTMLButtonElement>("#study-map-peek")!;
+  mapPeek.onclick = () => {
+    chosen = mapPeek.dataset.target === "map" ? "map" : "question";
+    render();
+  };
   // Bumped by a reveal so a pending terminal alignment never pulls back down.
   let alignToken = 0;
   const reducedMotion = () =>
@@ -256,40 +264,29 @@ export function createStudyWorkspaceView(
         onDone: () => queueMicrotask(() => next.focus({ preventScroll: true })),
       });
     }
-    // Bring the question terminal to its own screen once it is ready; a
-    // resumed question scrolls again.
-    if (!terminalOpen) scrolledFor = undefined;
-    else if (current?.problem && scrolledFor !== current.id) {
-      const slot = root.querySelector<HTMLElement>("#study-terminal-slot");
-      if (slot) {
-        scrolledFor = current.id;
-        const token = ++alignToken;
-        // Status lines above the slot can change in this same tick, so align
-        // after layout settles, and once more when a smooth scroll lands.
-        const align = (behavior: ScrollBehavior) =>
-          window.scrollTo({
-            top: slot.getBoundingClientRect().top + window.scrollY,
-            behavior,
-          });
-        requestAnimationFrame(() => {
-          if (scrolledFor !== current.id || token !== alignToken) return;
-          if (reducedMotion()) return align("auto");
-          window.addEventListener(
-            "scrollend",
-            () => {
-              if (
-                scrolledFor === current.id &&
-                token === alignToken &&
-                Math.abs(slot.getBoundingClientRect().top) > 2
-              )
-                align("auto");
-            },
-            { once: true },
-          );
-          align("smooth");
-        });
-      }
+    // An unfinished open question takes the place of the skill map. The map
+    // returns the moment the question is done (its terminal may stay open for
+    // more discussion) or closed. The toolbar button shows the other one.
+    const natural = terminalOpen && current ? "question" : "map";
+    if (!terminalOpen || shownFor !== `${current?.id ?? ""}/${natural}`) {
+      shownFor = `${current?.id ?? ""}/${natural}`;
+      chosen = undefined;
     }
+    const view = terminalOpen ? (chosen ?? natural) : "map";
+    if (root.dataset.view !== view) {
+      root.dataset.view = view;
+      // Both views start at the top: nothing is scrolled to any more.
+      alignToken++;
+      window.scrollTo({ top: 0, behavior: "auto" });
+    }
+    mapPeek.hidden = !terminalOpen;
+    mapPeek.textContent =
+      view === "question"
+        ? "Skill map"
+        : current
+          ? "← Back to the question"
+          : "Review the last question";
+    mapPeek.dataset.target = view === "question" ? "map" : "question";
     // An unfinished question whose terminal was closed is resumed here, so
     // the learner can never be left without a way back to it.
     const resumable = !!current && !terminalOpen;

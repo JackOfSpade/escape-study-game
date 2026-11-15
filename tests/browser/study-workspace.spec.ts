@@ -204,12 +204,13 @@ test("the study terminal takes the wide workspace while the map keeps its readin
     (window as any).__deadAir.game.study.profile = "live";
   });
   await page.locator("#study-only-toggle").click();
+  // The map gives way to the open question, so it is measured first.
+  const map = await page.locator(".study-skill-map").boundingBox();
   await page.locator("#study-next").click();
   const terminal = page.locator("#study-terminal-slot #terminal");
   await expect(terminal).toBeVisible();
   await expect(page.locator("#study-terminal-slot #problem")).not.toBeEmpty();
-  const [map, mapPane, input] = await Promise.all([
-    page.locator(".study-skill-map").boundingBox(),
+  const [mapPane, input] = await Promise.all([
     terminal.boundingBox(),
     page.locator("#chat-input").boundingBox(),
   ]);

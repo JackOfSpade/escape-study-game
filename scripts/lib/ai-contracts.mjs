@@ -540,6 +540,8 @@ export function validateAnswer(job, answer) {
     case "escape-epilogue":
     case "escape-area":
     case "escape-catastrophe":
+    case "escape-plan":
+    case "escape-truth":
       validateEscapeAnswer(job.operation, job.payload, answer);
       break;
     default:

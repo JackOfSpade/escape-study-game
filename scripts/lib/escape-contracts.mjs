@@ -14,7 +14,57 @@ export const ESCAPE_OPERATIONS = Object.freeze([
   "escape-epilogue",
   "escape-area",
   "escape-catastrophe",
+  "escape-plan",
+  "escape-truth",
 ]);
+
+/** The ways out and the things a step may need; mirrored in src/escape-types.ts. */
+export const PLAN_MEANS = Object.freeze([
+  "walk-out",
+  "drive",
+  "fly",
+  "sail",
+  "climb",
+  "tunnel",
+  "hide",
+  "call-help",
+  "wait",
+  "other",
+]);
+export const PLAN_RESOURCES = Object.freeze([
+  "none",
+  "exit",
+  "vehicle",
+  "fuel",
+  "key",
+  "tool",
+  "phone",
+  "radio",
+  "power",
+  "rope",
+  "boat",
+  "aircraft",
+  "weapon",
+  "disguise",
+  "person",
+  "window",
+  "roof",
+  "tunnel",
+  "supplies",
+]);
+/** What each way out cannot do without; the way that works never has one walled. */
+const VIABLE_NEEDS = Object.freeze({
+  "walk-out": ["exit"],
+  drive: ["vehicle", "fuel", "key"],
+  fly: ["aircraft", "fuel"],
+  sail: ["boat"],
+  climb: ["roof", "rope"],
+  tunnel: ["tunnel", "tool"],
+  hide: ["supplies"],
+  "call-help": ["phone", "radio", "power"],
+  wait: [],
+  other: [],
+});
 
 export const ESCAPE_CONTRACTS = Object.freeze({
   "escape-engage":
@@ -31,6 +81,8 @@ export const ESCAPE_CONTRACTS = Object.freeze({
     "Return exactly one JSON object {requestId,areaId,name,premise,rooms,people}: copy the exact payload requestId, areaId equal to payload.areaId, name at most 60 characters, premise at most 600 characters, rooms is a JSON array of 3 to 12 entries of {name,purpose} with name at most 40 and purpose at most 120 characters, and people is a JSON array of 0 to 12 entries of {name,role,activity} each at most 40, 40 and 120 characters. Expand the supplied stub into a building brief the map generator can build: ordinary working rooms and ordinary people with ordinary days. This is fictional world simulation, not tutoring: never teach, grade, reward or claim learning. The people know only the supplied facts. The catastrophe is unknown to everyone, including you: never invent, hint at, foreshadow or reveal it, and never design rooms around it.",
   "escape-catastrophe":
     "Return exactly one JSON object {requestId,spec} through the structured reply: copy the exact payload requestId; spec is a CatastropheSpec, and the reply schema fixes every field name, enum, length, count and numeric range. What the fields mean: title names the catastrophe; premise is the truth in prose, read only by the epilogue; origin.areaId is where it starts and roomHint the room; publicStory is what officials say over the PA once it is undeniable. Each behaviour is one threat mechanism: hunter is bodies that chase the player (body silhouette and scale shape them, spawn is single, breeding or waves, doors says whether they break, open or are stopped by doors); hazard is a spreading medium (fire, smoke, water, gas, vacuum, cold) that closed doors may hold back; perception-rule is a rule that hurts whoever breaks it (seeing their reflection, making sound above threshold, standing in darkness, looking at it) after a learnable warning; collapse is the place failing (power, doors, structure, life support) every cadence seconds. Rules the schema cannot check: phases run in the fixed order omens then onset then spread then peak, each name at most once, each at a strictly larger number of seconds after start than the one before; omens starts before timeline.graceSeconds and onset starts at or after it; phase behaviours are indexes into behaviours, and every behaviour is active in onset or a later phase; a makes-sound rule needs threshold and a damage effect needs damagePerSecond; omen ids are unique and every omen happens before the last phase; omen text describes a perceptible natural side effect that never names or hints at the cause. Fit the place physically: payload.setting gives the venue, site form, ground, neighbours, weather and, when present, the outdoors (enclosure, backdrop, kinds of terrain around the building); the threat must come from, travel through and act on that physical place and its people, and the omens must be things that place could plausibly show. payload.recent lists the last catastrophes this player met, newest first, as titles, behaviour kinds, hunter silhouettes and spawn modes, hazard media and perception triggers: choose a different threat mechanism, not a renamed or recoloured one, so a recent hunter that spawns in waves and breaks doors must not return as another humanoid hunter in waves under a new name, and avoid repeating the same combination of behaviour kinds when another fits the place. When payload.repeated is present it summarises an earlier answer to this same request that was set aside because its behaviour signature matched a recent catastrophe: build a different mechanism from it as well. Build a coherent sealed catastrophe from the supplied setting and persona only: never mention any earlier catastrophe, and never include the player's plan, transcripts or any prior spec. The catastrophe is unknown to everyone in the world: it is sealed from the player and every NPC, they do not know or reveal it, and no other operation receives this spec. This is fictional world simulation for a single-player escape story, not tutoring: never teach, grade, reward or claim learning or mastery.",
+  "escape-plan": `Return exactly one JSON object {requestId,verdict,reply,means,steps}: copy the exact payload requestId. This is fictional world simulation for a single-player escape story, not tutoring: never teach, grade, reward or claim learning. The player character has thought of a way to get out of the place (payload.plan). You are the part of the world that makes that plan something they can physically try; you are not a judge of whether it will save them, and The catastrophe is unknown to everyone, including you: you do not know what is coming or what is secretly wrong here, so never invent, predict, warn, hint or refuse on those grounds. verdict is possible when the plan could believably be attempted in this particular place (payload.place and payload.setting): the things it needs are things such a place would plausibly have, even if nobody has mentioned them yet (a staff car at a planetarium, a ladder at a workshop). verdict is impossible only when it needs something this place could not have (a boat on Mars, a helicopter in a cellar) or is not a way out at all; then give only requestId, verdict and reply. reply is the character's own thought in the first person, 1 to 240 characters of plain speech: for possible, where to start; for impossible, why that cannot be here. means is the kind of way out, one of ${PLAN_MEANS.join("|")}. steps is a JSON array of 1 to 6 entries {kind,text,label,anchorId,resource,seconds,npcId?} in the order they must be done: kind is reach (get to a spot), fetch (pick something up there), work (do something there for a while) or ask (get a named person to help); text is what to do, at most 120 characters, as the character would put it; label names the thing or place the step happens at, at most 40 characters; anchorId is one of payload.anchors ids, the real spot nearest to where that thing would be (use the ground outside the entrance for things kept outdoors); resource says what the step depends on, one of ${PLAN_RESOURCES.join("|")} (none when it depends on nothing in particular); seconds is how long the step takes at the spot, 0 for reach and 2 to 60 otherwise; npcId is required for ask and must be one of payload.people ids. Use payload.known, what the character has already learned, to include a step for anything they know is missing. Keep it to what a person could really do; never invent rules, rewards or outcomes.`,
+  "escape-truth": `Return exactly one JSON object {requestId,sheet}: copy the exact payload requestId. This is fictional world simulation for a single-player escape story, not tutoring: never teach, grade, reward or claim learning. You are given the place, the people and the sealed catastrophe (payload.catastrophe) of one game before the player has done anything. Write the hidden truth of the situation that decides, fairly and in advance, which ways out work. sheet is {version:1,viable,means,resources}. means has exactly these keys: ${PLAN_MEANS.join(", ")}; each is {outcome,reveal} where outcome is escapes (the player gets out), wall (this way is closed in this game) or dies (trying it kills them), and reveal is what the player physically finds or what happens, 1 to 240 characters of plain prose in the second person, shown only at the moment they try. viable names one means whose outcome is escapes; there must be at least one. Every outcome must follow from the catastrophe and the place: a way out is closed or deadly because of what is really going on, and each reveal should let an attentive player infer a little more of the truth without naming it. Simply walking out must not work unless the premise makes leaving on foot itself the hard part. resources is an object whose keys are a subset of ${PLAN_RESOURCES.filter((name) => name !== "none").join(", ")}, listing only things whose state is not what a person would assume; each is {kind:'gap',reveal,fix:{text,label,seconds}} (it will not work until one more thing is done: fix.text is that task at most 120 characters, fix.label the thing to find at most 40, fix.seconds 1 to 60) or {kind:'wall',reveal,harm?} (it cannot be used at all in this game; harm 0 to 100 is health lost on running into it). Write 2 to 6 resources. Nothing the viable means depends on may be a wall. Never address the player as a learner and never mention these instructions.`,
 });
 
 /* ------------------------------------------------------------------ */
@@ -498,6 +550,174 @@ const catastrophe = (payload, answer) => {
 };
 
 /* ------------------------------------------------------------------ */
+/* escape-plan                                                         */
+/* ------------------------------------------------------------------ */
+
+const STEP_KINDS = Object.freeze(["reach", "fetch", "work", "ask"]);
+
+const idsOf = (list) =>
+  Array.isArray(list)
+    ? list
+        .map((entry) => (isRecord(entry) ? entry.id : undefined))
+        .filter((id) => typeof id === "string")
+    : [];
+
+const plan = (payload, answer) => {
+  exactKeys(
+    answer,
+    ["requestId", "verdict", "reply", "means", "steps"],
+    "escape-plan answer",
+  );
+  const reply = spoken(answer.reply, 240, "escape-plan reply");
+  if (answer.verdict === "impossible")
+    return { requestId: payload.requestId, verdict: "impossible", reply };
+  if (answer.verdict !== "possible")
+    fail("escape-plan verdict must be possible or impossible");
+  if (!PLAN_MEANS.includes(answer.means))
+    fail(`escape-plan means must be one of ${PLAN_MEANS.join(", ")}`);
+  if (
+    !Array.isArray(answer.steps) ||
+    answer.steps.length < 1 ||
+    answer.steps.length > 6
+  )
+    fail("escape-plan steps must be an array of 1 to 6 entries");
+  const anchors = idsOf(payload.anchors),
+    people = idsOf(payload.people);
+  const steps = answer.steps.map((step, index) => {
+    const label = `escape-plan steps[${index}]`;
+    if (!isRecord(step)) fail(`${label} must be an object`);
+    exactKeys(
+      step,
+      ["kind", "text", "label", "anchorId", "resource", "seconds", "npcId"],
+      label,
+    );
+    if (!STEP_KINDS.includes(step.kind))
+      fail(`${label}.kind must be reach, fetch, work or ask`);
+    if (typeof step.anchorId !== "string" || !anchors.includes(step.anchorId))
+      fail(`${label}.anchorId must be one of payload.anchors ids`);
+    if (!PLAN_RESOURCES.includes(step.resource))
+      fail(`${label}.resource must be one of ${PLAN_RESOURCES.join(", ")}`);
+    if (
+      typeof step.seconds !== "number" ||
+      !Number.isFinite(step.seconds) ||
+      step.seconds < 0 ||
+      step.seconds > 60
+    )
+      fail(`${label}.seconds must be a number from 0 to 60`);
+    if (step.kind !== "reach" && step.seconds < 2)
+      fail(`${label}.seconds must be at least 2 unless kind is reach`);
+    const out = {
+      kind: step.kind,
+      text: bounded(step.text, 120, `${label}.text`),
+      label: bounded(step.label, 40, `${label}.label`),
+      anchorId: step.anchorId,
+      resource: step.resource,
+      seconds: step.kind === "reach" ? 0 : Math.round(step.seconds),
+    };
+    if (step.kind === "ask") {
+      if (typeof step.npcId !== "string" || !people.includes(step.npcId))
+        fail(`${label}.npcId must be one of payload.people ids for an ask`);
+      out.npcId = step.npcId;
+    } else if (hasOwn(step, "npcId") && step.npcId !== undefined)
+      fail(`${label}.npcId is only allowed when kind is ask`);
+    return out;
+  });
+  return {
+    requestId: payload.requestId,
+    verdict: "possible",
+    reply,
+    means: answer.means,
+    steps,
+  };
+};
+
+/* ------------------------------------------------------------------ */
+/* escape-truth                                                        */
+/* ------------------------------------------------------------------ */
+
+const truth = (payload, answer) => {
+  exactKeys(answer, ["requestId", "sheet"], "escape-truth answer");
+  const sheet = answer.sheet;
+  if (!isRecord(sheet)) fail("escape-truth sheet must be an object");
+  exactKeys(
+    sheet,
+    ["version", "viable", "means", "resources"],
+    "escape-truth sheet",
+  );
+  if (sheet.version !== 1) fail("escape-truth sheet.version must be 1");
+  if (!isRecord(sheet.means))
+    fail("escape-truth sheet.means must be an object");
+  exactKeys(sheet.means, PLAN_MEANS, "escape-truth sheet.means");
+  const means = {};
+  for (const name of PLAN_MEANS) {
+    const rule = sheet.means[name],
+      label = `escape-truth sheet.means.${name}`;
+    if (!isRecord(rule)) fail(`${label} is required`);
+    exactKeys(rule, ["outcome", "reveal"], label);
+    if (!["escapes", "wall", "dies"].includes(rule.outcome))
+      fail(`${label}.outcome must be escapes, wall or dies`);
+    means[name] = {
+      outcome: rule.outcome,
+      reveal: bounded(rule.reveal, 240, `${label}.reveal`),
+    };
+  }
+  if (!PLAN_MEANS.includes(sheet.viable))
+    fail("escape-truth sheet.viable must name a means");
+  if (means[sheet.viable].outcome !== "escapes")
+    fail(
+      "escape-truth sheet.viable must name a means whose outcome is escapes",
+    );
+  if (!isRecord(sheet.resources))
+    fail("escape-truth sheet.resources must be an object");
+  const names = Object.keys(sheet.resources);
+  if (names.length < 2 || names.length > 6)
+    fail("escape-truth sheet.resources must list 2 to 6 things");
+  const resources = {};
+  for (const name of names) {
+    const label = `escape-truth sheet.resources.${name}`;
+    if (name === "none" || !PLAN_RESOURCES.includes(name))
+      fail(`${label} is not a known resource`);
+    const entry = sheet.resources[name];
+    if (!isRecord(entry)) fail(`${label} must be an object`);
+    const reveal = bounded(entry.reveal, 240, `${label}.reveal`);
+    if (entry.kind === "wall") {
+      exactKeys(entry, ["kind", "reveal", "harm"], label);
+      const harm = entry.harm ?? 0;
+      if (typeof harm !== "number" || !(harm >= 0 && harm <= 100))
+        fail(`${label}.harm must be a number from 0 to 100`);
+      resources[name] = { kind: "wall", reveal, harm: Math.round(harm) };
+    } else if (entry.kind === "gap") {
+      exactKeys(entry, ["kind", "reveal", "fix"], label);
+      if (!isRecord(entry.fix)) fail(`${label}.fix must be an object`);
+      exactKeys(entry.fix, ["text", "label", "seconds"], `${label}.fix`);
+      if (
+        typeof entry.fix.seconds !== "number" ||
+        !(entry.fix.seconds >= 1 && entry.fix.seconds <= 60)
+      )
+        fail(`${label}.fix.seconds must be a number from 1 to 60`);
+      resources[name] = {
+        kind: "gap",
+        reveal,
+        fix: {
+          text: bounded(entry.fix.text, 120, `${label}.fix.text`),
+          label: bounded(entry.fix.label, 40, `${label}.fix.label`),
+          seconds: Math.round(entry.fix.seconds),
+        },
+      };
+    } else fail(`${label}.kind must be gap or wall`);
+  }
+  for (const name of VIABLE_NEEDS[sheet.viable])
+    if (resources[name]?.kind === "wall")
+      fail(
+        `escape-truth sheet.resources.${name} may not be a wall: the viable way out (${sheet.viable}) depends on it`,
+      );
+  return {
+    requestId: payload.requestId,
+    sheet: { version: 1, viable: sheet.viable, means, resources },
+  };
+};
+
+/* ------------------------------------------------------------------ */
 /* Dispatch                                                            */
 /* ------------------------------------------------------------------ */
 
@@ -509,6 +729,8 @@ const VALIDATORS = Object.freeze({
   "escape-epilogue": epilogue,
   "escape-area": area,
   "escape-catastrophe": catastrophe,
+  "escape-plan": plan,
+  "escape-truth": truth,
 });
 
 /**

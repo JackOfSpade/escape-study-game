@@ -201,6 +201,9 @@ export interface Actor extends Point {
     grounded: boolean;
   };
   technical?: import("./npc-cognition").NpcProfile;
+  /** The human after its run ended; `body` is where the dead body lies
+   * (absent after an escape). A ghost walks the world unseen and unheard. */
+  ghost?: { body?: { x: number; y: number; floor: number } };
   id: string;
   name: string;
   floor: number;
@@ -465,7 +468,20 @@ export interface ExtractionPoint {
   /** Site id when the point belongs to an extra site rather than the start. */
   site?: string;
 }
+/** The floor index of a building's roof: one above its last storey. Four
+ * storeys unless the design chose fewer (Floor.roof). */
+export const roofIndexOf = (f: Pick<Floor, "roof"> | undefined) =>
+  f?.roof ?? CONFIG.floors;
 export interface Floor {
+  /** Index of this building's roof floor when it is not CONFIG.floors: a
+   * design with fewer than four storeys. Set on every floor of the game. */
+  roof?: number;
+  /** An interior stair core placed by the design (src/stair-core.ts): set on
+   * every floor of the start building. Absent means wall wells and the
+   * outside stair route. */
+  stairCore?: import("./stair-core").StairCore;
+  /** Interior stair cores of stamped neighbouring buildings on this layer. */
+  cores?: import("./stair-core").FloorCore[];
   /** Set on every floor of an open site (src/open-site.ts); absent means the
    * enclosed building this game has always generated. */
   open?: true;
@@ -501,7 +517,8 @@ export interface Floor {
     forwardEntry?: Point;
   }[];
   generation?: {
-    version: 2 | 3 | 4 | 5;
+    /** 6 is a free plan drawn by a version 4 design (src/free-plan.ts). */
+    version: 2 | 3 | 4 | 5 | 6;
     upperDivider: number;
     lowerDivider: number;
     stages?: { room: number; rear: number; front: number }[];
@@ -512,6 +529,11 @@ export interface Floor {
     /** Corners carved by floors[].roomShapes: solid tiles drawn as one smooth
      * chamfer or curve. Absent on undesigned floors and older saves. */
     corners?: import("./room-shapes").CarvedCorner[];
+    /** Stepped floor heights of a hall room (floors[].hall). Absent on flat
+     * floors and older saves. */
+    levels?: import("./floor-levels").FloorLevels;
+    /** Free plans: the two-cell doorways carved in room walls. */
+    doorways?: import("./floor-plan").Rect[];
   };
   index: number;
   tiles: number[][];

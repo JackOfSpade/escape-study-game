@@ -1,4 +1,4 @@
-import { floorSectors, inRect, type Sector } from "./floor-plan";
+import { inRect, sectorOfRoom, type Sector } from "./floor-plan";
 import { stampedBySite } from "./building-layout";
 import { boxBounds, boxesOverlap, worldPoint } from "./furniture-geometry";
 import {
@@ -175,7 +175,12 @@ function insideFootprint(floor: Floor, x: number, y: number) {
   );
 }
 
-function roomPlaque(floor: Floor, sector: Sector): ResolvedSceneRoom["plaque"] {
+function roomPlaque(
+  floor: Floor,
+  sector: Sector,
+  /** Position of this room among those sharing the sector (a hall's rooms). */
+  share = 0,
+): ResolvedSceneRoom["plaque"] {
   const candidates: ResolvedSceneRoom["plaque"][] = [];
   for (let y = 1; y < H - 1; y++)
     for (let x = 1; x < W - 1; x++) {
@@ -212,7 +217,14 @@ function roomPlaque(floor: Floor, sector: Sector): ResolvedSceneRoom["plaque"] {
       "no solid interior wall face clear of passages",
     );
   // A stable spatial choice: room identity is never attached to a random desk.
-  return candidates[0];
+  // Rooms merged into one hall spread their plaques along its walls.
+  const shared = sector.merged?.length ?? 1;
+  return candidates[
+    Math.min(
+      candidates.length - 1,
+      Math.floor((share * candidates.length) / shared),
+    )
+  ];
 }
 
 function hasKeys(
@@ -247,7 +259,7 @@ function validPlaque(
   const x = Math.round(p.x - p.nx * 0.514 - 0.5),
     y = Math.round(p.y - p.ny * 0.514 - 0.5),
     open = { x: x + p.nx + 0.5, y: y + p.ny + 0.5 },
-    sector = floorSectors(floor).find((s) => s.room === room);
+    sector = sectorOfRoom(floor, room);
   return (
     !!sector &&
     Math.abs(p.x - (x + 0.5 + p.nx * 0.514)) < 1e-8 &&
@@ -523,12 +535,19 @@ export function realizeAuthoredScene(
   };
   const problems: string[] = [];
   for (const room of design.rooms) {
-    const sector = floorSectors(floor).find((s) => s.room === room.room);
-    if (!sector) failure(floor, room.room, "room", "study room is missing");
+    const held = sectorOfRoom(floor, room.room);
+    if (!held) failure(floor, room.room, "room", "study room is missing");
+    // A room merged into a hall is furnished inside the hall under its own
+    // room number, so ids, palettes and writing stay per scene room.
+    const sector: Sector = { ...held, room: room.room as 0 | 1 | 2 | 3 };
     const { furniture, ...details } = room;
     scene.rooms.push({
       ...structuredClone(details),
-      plaque: roomPlaque(floor, sector),
+      plaque: roomPlaque(
+        floor,
+        sector,
+        Math.max(0, held.merged?.indexOf(room.room) ?? 0),
+      ),
     });
     for (const item of furniture) {
       // Report every problem in one pass so a repair round can fix them all.
@@ -594,7 +613,9 @@ export function sceneSaveErrors(
     !Array.isArray(scene.rooms) ||
     !Array.isArray(scene.furniture) ||
     !Array.isArray(scene.props) ||
-    scene.rooms.length !== 4 ||
+    // Four rooms on a chain floor, the drawn count (up to eight) otherwise.
+    scene.rooms.length < 1 ||
+    scene.rooms.length > 8 ||
     scene.furniture.length > 16 ||
     scene.props.length > 48
   )

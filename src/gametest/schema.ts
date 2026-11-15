@@ -1,3 +1,4 @@
+import { isInventoryDesign } from "../run-design-contract.mjs";
 import {
   CONFIG,
   FURNITURE,
@@ -11,7 +12,7 @@ import {
   parseRunDesign,
   parseRunStructure,
   type RunDesign,
-  type RunStructureV3,
+  type RunStructure,
 } from "../run-design-contract.mjs";
 export const LAB_LIMITS = {
   entities: 512,
@@ -43,6 +44,8 @@ export interface Spawn extends Point {
 export type Action = { tick: number } & (
   | { type: "move"; id: string; x: number; y: number; stairWalk?: boolean }
   | { type: "walkTo"; id: string; x: number; y: number; stairWalk?: boolean }
+  /** Walk the human along the game's own route to a point on their floor. */
+  | { type: "routeTo"; id: string; x: number; y: number }
   | { type: "jump"; id: "human" }
   | { type: "door" | "grip" | "vault"; id: string; target: string }
   | { type: "spawn"; entity: Spawn }
@@ -120,7 +123,7 @@ export interface Scenario {
   design?: RunDesign;
   /** Structure-only v3 proposal (no environment): the same validated data as a
    * run-design fixture, built through previewDesignedRun's construction. */
-  designStructure?: RunStructureV3;
+  designStructure?: RunStructure;
   simulation: "game" | "physics";
   maxTicks: number;
   startTime: number;
@@ -344,7 +347,7 @@ export function parseScenario(value: string | unknown): Scenario {
     );
     const design = parseRunDesign(s.design);
     requireThat(
-      design.version !== 3 || (s.city === true && s.pacing === "study"),
+      !isInventoryDesign(design) || (s.city === true && s.pacing === "study"),
       "Version 3 environment fixtures require the complete physical city and study pacing.",
     );
   }
@@ -445,6 +448,14 @@ export function parseScenario(value: string | unknown): Scenario {
               a.id === "human")) &&
           (s.simulation === "physics" || a.id === "human"),
         "Move actions control the player in game mode, or character motors in physics mode.",
+      );
+    else if (a.type === "routeTo")
+      requireThat(
+        s.simulation === "game" &&
+          a.id === "human" &&
+          point(a, s.template === "building") &&
+          Object.keys(a).length === 5,
+        "RouteTo actions walk the human in game simulation along a route to a bounded world point.",
       );
     else if (a.type === "walkTo")
       requireThat(

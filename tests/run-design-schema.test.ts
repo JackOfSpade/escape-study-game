@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { parseRunStructure } from "../src/run-design-contract.mjs";
-import { designReplySchema } from "../src/run-design-schema.mjs";
+import {
+  designReplySchema,
+  structureReplySchema,
+} from "../src/run-design-schema.mjs";
 import { TERMINAL_STYLES, surfaceTop } from "../src/setting-catalog.mjs";
 import { schemaErrors } from "./helpers/json-schema";
 
@@ -10,6 +13,9 @@ const radio = JSON.parse(
   readFileSync("tests/fixtures/run-designs/radio-broadcast.json", "utf8"),
 );
 const { environment, ...structure } = radio;
+// Fresh structure replies state each floor's hall; this saved fixture, like
+// every older design, has none.
+for (const floor of structure.floors) floor.hall = null;
 /** Give every composed part the neutral pose and motion the contract requires. */
 const neutralParts = (objects: { parts: object[] }[]) => {
   for (const o of objects)
@@ -116,7 +122,7 @@ test("every quality stage has a structured-output schema; legacy requests keep f
 
 test("a valid broadcast structure and its writing fit the stage schemas", () => {
   assert.deepEqual(
-    schemaErrors(designReplySchema(request("structure")), {
+    schemaErrors(structureReplySchema(3), {
       requestId: "req-1",
       structure,
     }),
@@ -214,7 +220,7 @@ test("composed objects in a structure fit the schema and the validator", () => {
     props: [],
   });
   assert.deepEqual(
-    schemaErrors(designReplySchema(request("structure")), {
+    schemaErrors(structureReplySchema(3), {
       requestId: "req-1",
       structure: s,
     }),
@@ -225,7 +231,7 @@ test("composed objects in a structure fit the schema and the validator", () => {
   const bad = structuredClone(s);
   bad.setting.objects[0].parts[0].finish = "chrome";
   delete bad.setting.objects[0].weight;
-  const errors = schemaErrors(designReplySchema(request("structure")), {
+  const errors = schemaErrors(structureReplySchema(3), {
     requestId: "req-1",
     structure: bad,
   });
@@ -407,7 +413,7 @@ test("object roles, wedge and torus parts, larger sizes and roof objects validat
     return s;
   };
   const check = (s: unknown) =>
-    schemaErrors(designReplySchema(request("structure")), {
+    schemaErrors(structureReplySchema(3), {
       requestId: "req-1",
       structure: s,
     });
@@ -484,7 +490,7 @@ test("only flat boxes and upright cylinders or hexprisms count as a prop surface
 });
 
 test("the structure schema requires the terminal and accepts every style only", () => {
-  const schema = designReplySchema(request("structure"));
+  const schema = structureReplySchema(3);
   for (const style of TERMINAL_STYLES) {
     const s = structuredClone(structure);
     s.setting.terminal.style = style;
@@ -509,7 +515,7 @@ test("the structure schema requires the terminal and accepts every style only", 
 });
 
 test("the structure schema lists every new setting option and requires wallFinish and light", () => {
-  const schema = designReplySchema(request("structure"));
+  const schema = structureReplySchema(3);
   const setting = schema.properties.structure.properties.setting;
   const interior = setting.properties.interior;
   assert.deepEqual(
@@ -561,7 +567,7 @@ test("the structure schema lists every new setting option and requires wallFinis
 });
 
 test("the structure schema requires a drawn outdoors and rejects unknown region kinds", () => {
-  const schema = designReplySchema(request("structure"))!,
+  const schema = structureReplySchema(3)!,
     reply = (s: unknown) => ({ requestId: "req-1", structure: s });
   assert.deepEqual(schemaErrors(schema, reply(structure)), []);
   assert.doesNotThrow(() => parseRunStructure(structuredClone(structure)));

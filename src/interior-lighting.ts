@@ -1,7 +1,8 @@
+import { freeFloor } from "./free-design";
 import { floorSectors, inRect, type Rect } from "./floor-plan";
 import { roomPowerKey } from "./room-power-key";
 import {
-  CONFIG,
+  roofIndexOf,
   type BuildingFootprint,
   type Floor,
   type Furniture,
@@ -134,7 +135,7 @@ const LEVEL: Record<InteriorPower, number> = {
 };
 
 export function lightAt(plan: InteriorLighting, p: Point) {
-  if (plan.floor.index >= CONFIG.floors) return 1;
+  if (plan.floor.index >= roofIndexOf(plan.floor)) return 1;
   const region = regionAt(plan, p);
   if (!region) return 1;
   const x = Math.floor(p.x),
@@ -306,7 +307,7 @@ export function buildInteriorLighting(
     stories: [],
     regions: [{ floor, origin: { x: 0, y: 0 }, boundary: floor.boundary }],
   };
-  if (floor.index >= CONFIG.floors) return plan;
+  if (floor.index >= roofIndexOf(floor)) return plan;
   const sectors = floorSectors(floor);
   const darkSector = sectors.filter(
     (s) => s.id !== "entry" && s.id !== "lobby" && s.id !== "room2",
@@ -317,8 +318,14 @@ export function buildInteriorLighting(
         Math.max(1, darkSector.length)
     ]?.id;
   const authoredPower = (id: string) => {
-    const room = /^room([0-3])$/.exec(id);
-    return room ? floor.design?.power[Number(room[1])] : undefined;
+    const room = /^room(\d+)$/.exec(id),
+      design = floor.design;
+    if (!room || !design) return undefined;
+    // A free plan states power on each drawn room; chain floors keep a list.
+    const drawn = freeFloor(floor);
+    return drawn
+      ? drawn.rooms[Number(room[1])]?.power
+      : design.power[Number(room[1])];
   };
   for (const sector of sectors) {
     const roll = interiorHash(seed, floor.index, sector.id),

@@ -1,3 +1,4 @@
+import { isInventoryDesign } from "./run-design-contract.mjs";
 import { withOriginalDesks } from "./station-clearance";
 import { redesign } from "./force-fields";
 import { forwardLayout } from "./forward-layout";
@@ -28,8 +29,11 @@ import {
   parseRunStructure,
   runStructureFingerprint,
   environmentSurfaceFingerprint,
+  isDrawnDesign,
   type RunDesign,
-  type RunStructureV3,
+  type RunExteriorDesign,
+  type RunFloorDesign,
+  type RunStructure,
   type SavedRunDesign,
 } from "./run-design-contract.mjs";
 import {
@@ -45,7 +49,7 @@ import {
 } from "./open-site";
 import type { SurfaceSlot } from "./environment-contract.mjs";
 
-type WorldBlueprint = RunDesign | RunStructureV3;
+type WorldBlueprint = RunDesign | RunStructure;
 
 /** The drawn outdoors of a version 3 design, if it has one. */
 export function designedOutdoors(
@@ -73,7 +77,9 @@ export function populateCity(
         floor,
         g.seed,
         spawnGrace(g) * cityZombieSpeed(g),
-        blueprint?.city ?? g.design?.design.city,
+        // A drawn design (version 4) has no engine street grid to tune.
+        (blueprint && "city" in blueprint ? blueprint.city : undefined) ??
+          g.design?.design.city,
       );
   if (invasion) initCityInvasion(g);
   return g;
@@ -153,7 +159,7 @@ export function createPlayableGame(
 ): Game {
   const saved = design ? parseSavedRunDesign(design) : undefined;
   let g = buildPlayableGame(seed, r, study, saved?.design, saved);
-  if (saved?.design.version === 3) {
+  if (saved && isInventoryDesign(saved.design)) {
     const expected = saved.design.environment.surfaceFingerprint,
       matches = (game: Game) =>
         environmentSurfaceFingerprint(buildEnvironmentSurfaces(game)) ===
@@ -182,7 +188,7 @@ function buildPlayableGame(
   const g = buildGame(seed, r, study, { layout: "forward" }, blueprint, saved);
   redesign(g, {
     randomized: true,
-    ...(blueprint?.version === 3 ? { blueprint } : {}),
+    ...(isInventoryDesign(blueprint) ? { blueprint } : {}),
   });
   // An open site extracts on its ground floor; the stair marker it keeps for
   // egress validation becomes the pickup pad, so no staircase can be climbed.
@@ -196,7 +202,11 @@ function buildPlayableGame(
     // A temporarily unavailable curriculum question must not prevent the
     // physical world from starting. Generation keeps its own eligibility gate.
   }
-  applyStudyPacing(g, depth, blueprint?.pacing);
+  applyStudyPacing(
+    g,
+    depth,
+    blueprint && "pacing" in blueprint ? blueprint.pacing : undefined,
+  );
   populateCity(g, true, blueprint);
   // The opening view presents the approaching street horde immediately.
   // Refuge is just behind the player, where the other survivors are entering.
@@ -229,14 +239,14 @@ export interface ProvisionalRun {
 }
 const provisionalRuns = new WeakMap<
   ProvisionalRun,
-  { game: Game; structure: RunStructureV3; surfaces: SurfaceSlot[] }
+  { game: Game; structure: RunStructure; surfaces: SurfaceSlot[] }
 >();
 
 export function previewDesignedRun(
   seed: number,
   roadmap: Roadmap,
   study: StudyState | undefined,
-  proposed: RunStructureV3,
+  proposed: RunStructure,
 ): ProvisionalRun {
   const structure = parseRunStructure(proposed),
     game = buildPlayableGame(seed, roadmap, study, structure);
@@ -267,7 +277,7 @@ export function structureGame(
   seed: number,
   roadmap: Roadmap,
   study: StudyState | undefined,
-  proposed: RunStructureV3,
+  proposed: RunStructure,
 ): Game {
   return buildPlayableGame(
     seed,
@@ -285,7 +295,7 @@ export function finalizeDesignedRun(
   if (!candidate)
     throw Error("This provisional run is unavailable or already accepted");
   const saved = parseSavedRunDesign(proposed);
-  if (saved.design.version !== 3)
+  if (!isInventoryDesign(saved.design))
     throw Error("A provisional run requires a complete version 3 design");
   const { environment, ...structure } = saved.design;
   if (
@@ -312,7 +322,7 @@ export function createGame(
   const design = options.design
     ? parseSavedRunDesign(options.design)
     : undefined;
-  if (design?.design.version === 3)
+  if (isInventoryDesign(design?.design))
     throw Error(
       "Version 3 designs require createPlayableGame and their complete physical-city inventory",
     );
@@ -339,7 +349,15 @@ function buildGame(
     floors: [],
     survivors: [
       actor("human", "You", 0),
-      ...names.slice(0, CONFIG.npcs).map((n, i) => actor(`npc-${i}`, n, i + 1)),
+      // A drawn design chooses its cast size; everything else has nineteen.
+      ...Array.from(
+        {
+          length: isDrawnDesign(blueprint)
+            ? blueprint.roster.length
+            : CONFIG.npcs,
+        },
+        (_, i) => actor(`npc-${i}`, names[i % names.length], i + 1),
+      ),
     ],
     zombies: [],
     encounters: {},
@@ -376,7 +394,7 @@ function buildGame(
     }
   g.surge.quietDelay =
     CONFIG.quietMin + rand(g) * (CONFIG.quietMax - CONFIG.quietMin);
-  for (let fi = 0; fi <= CONFIG.floors; fi++)
+  for (let fi = 0; fi <= storeysOf(blueprint); fi++)
     g.floors.push(generateFloor(g, fi, blueprint));
   if (options.layout === "forward")
     for (const floor of g.floors)
@@ -430,11 +448,20 @@ function solidOpenFloor(index: number, blueprint: WorldBlueprint): Floor {
     entry: { x: 21.5, y: 26.5 },
   };
 }
+/** Storeys of the building a blueprint describes: a drawn enclosed design
+ * (version 4) has as many as it authored floors; everything else has four
+ * (an open site keeps four layers, solid above the ground). */
+function storeysOf(blueprint?: WorldBlueprint) {
+  return isDrawnDesign(blueprint) && siteFormOf(blueprint) !== "open"
+    ? blueprint.floors.length
+    : CONFIG.floors;
+}
 function generateFloor(
   g: Game,
   index: number,
   blueprint?: WorldBlueprint,
 ): Floor {
+  const roof = storeysOf(blueprint);
   const open = siteFormOf(blueprint) === "open";
   // An open site authors only its ground floor; construction above stays solid.
   if (open && index > 0) return solidOpenFloor(index, blueprint!);
@@ -442,11 +469,25 @@ function generateFloor(
   for (let y = 2; y < 28; y++) for (let x = 2; x < 42; x++) tiles[y][x] = 0;
   const floor: Floor = {
     ...(open ? { open: true as const } : {}),
-    ...(blueprint && index < CONFIG.floors
-      ? { design: structuredClone(blueprint.floors[index]) }
+    ...(roof !== CONFIG.floors ? { roof } : {}),
+    // An interior stair core stands on every level, the roof included.
+    ...(isDrawnDesign(blueprint) && blueprint.stairs && !open
+      ? { stairCore: { x: blueprint.stairs.x, y: blueprint.stairs.y } }
+      : {}),
+    ...(blueprint && index < roof
+      ? {
+          // A drawn floor (version 4) shares this slot; see free-design.ts.
+          design: structuredClone(blueprint.floors[index]) as RunFloorDesign,
+        }
       : {}),
     ...(blueprint && index === 0
-      ? { exteriorDesign: structuredClone(blueprint.exterior) }
+      ? {
+          // A drawn design's exterior shares this slot without the notice
+          // and skyline fields.
+          exteriorDesign: structuredClone(
+            blueprint.exterior,
+          ) as RunExteriorDesign,
+        }
       : {}),
     ...(blueprint && "setting" in blueprint && blueprint.setting
       ? { setting: structuredClone(blueprint.setting) }
@@ -457,7 +498,7 @@ function generateFloor(
     furniture: [],
     dark: index === 0 ? 0.1 : index % 3 === 2 ? 0.95 : 0.5,
     name: blueprint
-      ? index === CONFIG.floors
+      ? index === roof
         ? blueprint.roofName
         : blueprint.floors[index].name
       : floorNames[index],
@@ -469,7 +510,7 @@ function generateFloor(
     stairs: { x: 21.5, y: 3.5 },
     entry: { x: 21.5, y: 26.5 },
   };
-  if (index === CONFIG.floors) {
+  if (index === roof) {
     // The roof has a defensible stair approach and finite movable cover for
     // passengers waiting for a later helicopter, rather than an empty death box.
     for (let x = 2; x < 42; x++) if (x < 21 || x > 23) tiles[22][x] = 1;
@@ -651,7 +692,9 @@ function generateFloor(
     x: i === 11 ? 4.5 : 4.5 + (i % 6) * 2,
     y: i === 11 ? 20.5 : i < 6 ? 18.5 : 22.5,
   }));
-  if (needed > capacitySlots.length)
+  // A drawn design replaces every template station with its own work
+  // points, so a large cast needs no template capacity.
+  if (needed > capacitySlots.length && !isDrawnDesign(blueprint))
     throw new Error(
       "Floor template lacks initial mandatory terminal capacity.",
     );

@@ -5,6 +5,7 @@
  * request is caught and falls back to the deterministic offline data already
  * on the game, so a disconnected bridge cannot break a loop.
  */
+import { fallbackTruth, parseTruthSheet } from "./escape-plan";
 import { bridgeRequest } from "./bridge-client";
 import { validateCatastrophe } from "./catastrophe";
 import {
@@ -212,6 +213,38 @@ export async function prepareCatastrophe(
   escape.catastrophe = spec;
   rememberCatastrophe(spec);
   return report;
+}
+
+/**
+ * Write the game's sealed truth sheet once its catastrophe is settled: which
+ * ways out work, which are closed and what is not as it seems. Called only
+ * for a newly generated game. A missing or malformed answer leaves the
+ * deterministic sheet from the seed, so every game has one.
+ */
+export async function prepareTruth(g: Game): Promise<"ai" | "offline"> {
+  const escape = g.escape;
+  if (!escape) return "offline";
+  const design = g.design?.design;
+  let sheet: ReturnType<typeof parseTruthSheet>;
+  try {
+    const answer = await escapeRequest("escape-truth", {
+      requestId: `truth-${g.id}`,
+      setting: {
+        title: text(design && "title" in design ? design.title : ""),
+        premise: text(design && "premise" in design ? design.premise : ""),
+        opening: text(design && "opening" in design ? design.opening : ""),
+        ...physicalSetting(design),
+      },
+      persona: escape.persona,
+      // The one prompt besides the epilogue that may read the sealed spec.
+      catastrophe: escape.catastrophe,
+    });
+    sheet = isRecord(answer) ? parseTruthSheet(answer.sheet) : undefined;
+  } catch {
+    sheet = undefined;
+  }
+  escape.truth = sheet ?? fallbackTruth(g.seed);
+  return sheet ? "ai" : "offline";
 }
 
 const packetOutcome = (outcome: EndOutcome): "escaped" | "died" | "quit" =>

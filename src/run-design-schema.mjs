@@ -29,7 +29,14 @@ import {
   WALL_FINISHES,
   WINDOW_STYLES,
 } from "./setting-catalog.mjs";
-import { ROOM_SHAPES, TITLE_CARD_FONTS } from "./run-design-contract.mjs";
+import {
+  CAST_LIMITS,
+  FREE_PLAN_LIMITS,
+  HALL_LIMITS,
+  ROOM_PATTERNS,
+  ROOM_SHAPES,
+  TITLE_CARD_FONTS,
+} from "./run-design-contract.mjs";
 import {
   OUTDOOR_BACKDROPS,
   OUTDOOR_ENCLOSURES,
@@ -273,6 +280,15 @@ const setting = obj({
     ),
   ),
 });
+/** A version 4 design lists furniture on each room: no venue catalog. */
+const drawnSetting = {
+  ...setting,
+  properties: {
+    ...setting.properties,
+    venue: { const: "custom" },
+    filler: { type: "null" },
+  },
+};
 const condition = oneOf(["intact", "worn", "damaged"]);
 const prop = obj({
   id: slug(24),
@@ -314,6 +330,71 @@ const roomType = oneOf([
   "reception",
   "manager",
 ]);
+const side = oneOf(HALL_LIMITS.sides);
+const hallFeatures = {
+  focus: side,
+  seating: oneOf(HALL_LIMITS.seating),
+  stage: nullable(
+    obj({
+      depth: int(...HALL_LIMITS.stage.depth),
+      height: num(...HALL_LIMITS.stage.height),
+    }),
+  ),
+  rake: num(...HALL_LIMITS.rake),
+  pit: nullable(
+    obj({
+      width: int(...HALL_LIMITS.pit.width),
+      length: int(...HALL_LIMITS.pit.length),
+      drop: num(...HALL_LIMITS.pit.drop),
+    }),
+  ),
+  platforms: arr(
+    obj({
+      side,
+      width: int(...HALL_LIMITS.platform.width),
+      depth: int(...HALL_LIMITS.platform.depth),
+      height: num(...HALL_LIMITS.platform.height),
+    }),
+    0,
+    HALL_LIMITS.platforms,
+  ),
+};
+const furnishing = {
+  pattern: oneOf(ROOM_PATTERNS),
+  filler: arr(str(24), ...FREE_PLAN_LIMITS.filler),
+};
+/** One storey of a version 4 design: rooms drawn inside an open concourse. */
+const freeFloor = obj({
+  name: str(48),
+  furnitureDensity: num(0.5, 1.5),
+  concourse: obj(furnishing),
+  rooms: arr(
+    obj({
+      name: str(40),
+      ...furnishing,
+      x: int(0, 43),
+      y: int(0, 33),
+      w: int(...FREE_PLAN_LIMITS.size),
+      h: int(...FREE_PLAN_LIMITS.size),
+      shape: oneOf(ROOM_SHAPES),
+      power: oneOf(["lit", "dim", "outage"]),
+      doors: arr(
+        obj({ side, at: num(0, 1), door: nullable(door) }),
+        ...FREE_PLAN_LIMITS.doors,
+      ),
+      work: int(...FREE_PLAN_LIMITS.work),
+      hall: nullable(obj(hallFeatures)),
+    }),
+    ...FREE_PLAN_LIMITS.rooms,
+  ),
+  scene: obj({
+    version: { const: 2 },
+    rooms: arr(
+      { ...room, properties: { ...room.properties, room: int(0, 7) } },
+      ...FREE_PLAN_LIMITS.rooms,
+    ),
+  }),
+});
 const floor = obj(
   {
     name: str(48),
@@ -329,8 +410,40 @@ const floor = obj(
     scene: obj({ version: { const: 2 }, rooms: arr(room, 4, 4) }),
     doors: arr(door, 4, 4),
     roomShapes: arr(oneOf(ROOM_SHAPES), 4, 4),
+    hall: nullable(
+      obj({
+        rooms: arr(oneOf([0, 1, 3]), 2, 3),
+        focus: side,
+        seating: oneOf(HALL_LIMITS.seating),
+        stage: nullable(
+          obj({
+            depth: int(...HALL_LIMITS.stage.depth),
+            height: num(...HALL_LIMITS.stage.height),
+          }),
+        ),
+        rake: num(...HALL_LIMITS.rake),
+        pit: nullable(
+          obj({
+            width: int(...HALL_LIMITS.pit.width),
+            length: int(...HALL_LIMITS.pit.length),
+            drop: num(...HALL_LIMITS.pit.drop),
+          }),
+        ),
+        platforms: arr(
+          obj({
+            side,
+            width: int(...HALL_LIMITS.platform.width),
+            depth: int(...HALL_LIMITS.platform.depth),
+            height: num(...HALL_LIMITS.platform.height),
+          }),
+          0,
+          HALL_LIMITS.platforms,
+        ),
+      }),
+    ),
   },
   [
+    "hall",
     "roomShapes",
     "name",
     "family",
@@ -345,104 +458,141 @@ const floor = obj(
     "scene",
   ],
 );
-const structure = obj(
-  {
-    version: { const: 3 },
-    title: str(64),
-    premise: str(240),
-    opening: str(200),
-    footprint: obj({
-      shape: {
-        enum: [
-          "rectangle",
-          "chamfered",
-          "stepped",
-          "waisted",
-          "tapered",
-          "notched",
-          "tee",
-        ],
-      },
-      width: oneOf([36, 38, 40]),
-      top: int(2, 4),
-      inset: int(2, 4),
-      mirrored: { type: "boolean" },
-      shoulder: int(10, 18),
-    }),
-    // Shape only: the validator requires one floor for an open site and
-    // exactly four for an enclosed one.
-    floors: arr(floor, 1, 4),
-    roofName: str(48),
-    roster: arr(
-      obj({
-        name: str(20),
-        role: oneOf(["builder", "analyst", "rusher", "medic", "skeptic"]),
-        skill: num(0.4, 0.9),
-        risk: num(0.2, 0.8),
-        social: num(0.2, 0.8),
+/** The structure-phase schema of one design version. Fresh requests draw
+ * their floors (version 4); version 3 stays for checking retained designs. */
+const structureBase = (version) =>
+  obj(
+    {
+      version: { const: version },
+      ...(version === 4
+        ? { stairs: nullable(obj({ x: int(0, 43), y: int(0, 33) })) }
+        : {}),
+      title: str(64),
+      premise: str(240),
+      opening: str(200),
+      footprint: obj({
+        shape: {
+          enum: [
+            "rectangle",
+            "chamfered",
+            "stepped",
+            "waisted",
+            "tapered",
+            "notched",
+            "tee",
+          ],
+        },
+        width: oneOf([36, 38, 40]),
+        top: int(2, 4),
+        inset: int(2, 4),
+        mirrored: { type: "boolean" },
+        shoulder: int(10, 18),
       }),
-      19,
-      19,
-    ),
-    city: obj({
-      roadWidth: int(7, 9),
-      boulevardOffset: int(15, 19),
-      districtSize: int(18, 25),
-      buildingHeightMin: num(9, 18),
-      buildingHeightMax: num(25, 45),
-      damageRate: num(0, 0.7),
-      palette: arr(hex, 3, 6),
-    }),
-    exterior: obj({
-      buildingName: str(48),
-      buildingSubtitle: str(48),
-      quarantineTitle: str(48),
-      quarantineSubtitle: str(48),
-      skyline: obj({
-        minHeight: num(24, 60),
-        maxHeight: num(72, 140),
+      // Shape only: the validator requires one floor for an open site and
+      // exactly four for an enclosed one.
+      floors: arr(version === 4 ? freeFloor : floor, 1, 4),
+      roofName: str(48),
+      roster: arr(
+        obj({
+          name: str(20),
+          role: oneOf(["builder", "analyst", "rusher", "medic", "skeptic"]),
+          skill: num(0.4, 0.9),
+          risk: num(0.2, 0.8),
+          social: num(0.2, 0.8),
+        }),
+        19,
+        19,
+      ),
+      city: obj({
+        roadWidth: int(7, 9),
+        boulevardOffset: int(15, 19),
+        districtSize: int(18, 25),
+        buildingHeightMin: num(9, 18),
+        buildingHeightMax: num(25, 45),
         damageRate: num(0, 0.7),
+        palette: arr(hex, 3, 6),
       }),
-    }),
-    pacing: obj({
-      swarmInterval: num(2.5, 4),
-      swarmBatch: int(1, 2),
-      swarmCap: int(120, 220),
-      npcThinkingScale: num(0.2, 0.35),
-      firstHelicopter: num(420, 600),
-      helicopterInterval: num(150, 210),
-    }),
-    relationships: arr(
-      obj({
-        from: str(20),
-        to: str(20),
-        kind: oneOf(["colleague", "friend", "relative", "mentor", "rival"]),
-        detail: str(120),
+      exterior: obj({
+        buildingName: str(48),
+        buildingSubtitle: str(48),
+        quarantineTitle: str(48),
+        quarantineSubtitle: str(48),
+        skyline: obj({
+          minHeight: num(24, 60),
+          maxHeight: num(72, 140),
+          damageRate: num(0, 0.7),
+        }),
       }),
-      1,
-      24,
-    ),
-    mainDoor: door,
-    titleCard: obj({ title: titleStyle, story: titleStyle }),
-    setting,
-  },
-  [
-    "version",
-    "title",
-    "premise",
-    "opening",
-    "footprint",
-    "floors",
-    "roofName",
-    "roster",
-    "city",
-    "exterior",
-    "pacing",
-    "relationships",
-    "titleCard",
-    "setting",
-  ],
-);
+      pacing: obj({
+        swarmInterval: num(2.5, 4),
+        swarmBatch: int(1, 2),
+        swarmCap: int(120, 220),
+        npcThinkingScale: num(0.2, 0.35),
+        firstHelicopter: num(420, 600),
+        helicopterInterval: num(150, 210),
+      }),
+      relationships: arr(
+        obj({
+          from: str(20),
+          to: str(20),
+          kind: oneOf(["colleague", "friend", "relative", "mentor", "rival"]),
+          detail: str(120),
+        }),
+        1,
+        24,
+      ),
+      mainDoor: door,
+      titleCard: obj({ title: titleStyle, story: titleStyle }),
+      setting: version === 4 ? drawnSetting : setting,
+    },
+    [
+      "version",
+      "title",
+      "premise",
+      "opening",
+      "footprint",
+      "floors",
+      "roofName",
+      "roster",
+      "city",
+      "exterior",
+      "pacing",
+      "relationships",
+      "titleCard",
+      "setting",
+      ...(version === 4 ? ["stairs"] : []),
+    ],
+  );
+/** A drawn design (version 4) chooses its cast and has no engine city,
+ * tempo, notice board or skyline to fill in. */
+const structureOf = (version) => {
+  const base = structureBase(version);
+  if (version !== 4) return base;
+  const { city: _city, pacing: _pacing, ...properties } = base.properties;
+  return {
+    ...base,
+    properties: {
+      ...properties,
+      roster: arr(
+        obj({
+          name: str(20),
+          role: str(CAST_LIMITS.role),
+          skill: num(0.4, 0.9),
+          risk: num(0.2, 0.8),
+          social: num(0.2, 0.8),
+        }),
+        ...CAST_LIMITS.size,
+      ),
+      exterior: obj({ buildingName: str(48), buildingSubtitle: str(48) }),
+    },
+    required: base.required.filter((k) => k !== "city" && k !== "pacing"),
+  };
+};
+/** Structure schemas by design version, for tests and tooling. */
+export const STRUCTURE_SCHEMAS = Object.freeze({
+  3: structureOf(3),
+  4: structureOf(4),
+});
 const concept = obj({
   id: slug(40),
   title: str(64),
@@ -455,6 +605,11 @@ const concept = obj({
   novelty: str(240),
 });
 
+/** The structure reply schema of one design version: fresh requests use 4;
+ * 3 checks retained chain designs. */
+export function structureReplySchema(version) {
+  return obj({ requestId: str(128), structure: STRUCTURE_SCHEMAS[version] });
+}
 /** The structured-output schema for a captured quality-flow request, or
  * undefined for retained legacy requests (they keep free-form JSON replies). */
 export function designReplySchema(request) {
@@ -470,7 +625,7 @@ export function designReplySchema(request) {
     case "selection":
       return reply({ selectedId: str(40), rationale: str(600) });
     case "structure":
-      return reply({ structure });
+      return structureReplySchema(4);
     case "structure-review":
     case "content-review":
       return reply({ findings: arr(finding, 0, 12) });

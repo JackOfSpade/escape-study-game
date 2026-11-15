@@ -105,6 +105,18 @@ export const TASK_PROFILES = Object.freeze({
     ...live(180_000, "opus", "medium"),
     stableKeys: ["instruction"],
   },
+  // Chosen by reasoning on 2026-11-15, not measured. The plan builder answers
+  // while the player waits in a live world, so it stays on a fast setting;
+  // the truth sheet is written once per game and decides every outcome, so it
+  // takes the same setting as the catastrophe it is derived from.
+  "escape-plan": {
+    ...live(60_000, "sonnet", "low"),
+    stableKeys: ["instruction"],
+  },
+  "escape-truth": {
+    ...live(180_000, "opus", "medium"),
+    stableKeys: ["instruction"],
+  },
   // Chosen by reasoning on 2026-11-14, not measured: the prompt changed after
   // its ladder (docs/AI_MODEL_SELECTION.md, "Unverified since a prompt change").
   "escape-catastrophe": {

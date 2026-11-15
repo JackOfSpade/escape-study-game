@@ -98,6 +98,8 @@ const generationMetadata: Record<string, readonly string[]> = {
     "catastropheId",
     "durationMs",
   ],
+  // Only where the sheet came from: its content stays sealed, logs included.
+  "truth-prepared": ["source", "durationMs"],
 };
 function state(g: Game) {
   const human = g.survivors.find((a) => a.id === "human");

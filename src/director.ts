@@ -12,6 +12,13 @@ import { catastropheState } from "./catastrophe";
 import { latchDoor, lockDoor } from "./doors";
 import { commitFact, journalLines, learn, type FactInput } from "./fact-ledger";
 import { logEvent } from "./escape-log";
+import {
+  PLAN_LIMITS,
+  adoptPlan,
+  offlinePlan,
+  parsePlanAnswer,
+  planRequest,
+} from "./escape-plan";
 import { createTask, taskIndicator } from "./escape-tasks";
 import type {
   Announcement,
@@ -500,6 +507,41 @@ export function escapeFrame(g: Game, dt: number): void {
 /* ------------------------------------------------------------------ */
 /* Engagement                                                          */
 /* ------------------------------------------------------------------ */
+
+/**
+ * The player thought of a way out. The builder, which knows nothing of the
+ * catastrophe or the truth sheet, turns it into steps; with the bridge down
+ * a keyword plan is used instead. `done` runs once, when the plan is in.
+ */
+export function requestPlan(g: Game, text: string, done?: () => void): boolean {
+  const escape = g.escape,
+    plan = text.trim().slice(0, PLAN_LIMITS.text);
+  if (!escape || !plan || escape.planPending) return false;
+  escape.planPending = true;
+  g.notice = "You think it through…";
+  const payload = planRequest(
+    g,
+    plan,
+    `plan-${g.id}-${escape.loop}-${(escape.plans?.length ?? 0) + 1}`,
+  );
+  ask("escape-plan", payload, (raw) => {
+    delete escape.planPending;
+    const answer = parsePlanAnswer(g, raw) ?? offlinePlan(g, plan);
+    g.notice = answer.reply;
+    if (answer.verdict === "possible") adoptPlan(g, plan, answer);
+    logEvent(escape.log, {
+      at: g.time,
+      kind: "task",
+      areaId: escape.areas.current,
+      text:
+        answer.verdict === "possible"
+          ? `Planned a way out by ${answer.means} in ${answer.steps.length} steps.`
+          : "Thought of a way out that this place could not offer.",
+    });
+    done?.();
+  });
+  return true;
+}
 
 /** Objects and documents: the director always consumes the interaction. */
 export function escapeInteract(g: Game, engagement: Engagement): boolean {

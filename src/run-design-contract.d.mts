@@ -187,6 +187,105 @@ export interface LegacyRunDesign {
 }
 export type RunRoomShape = "rect" | "chamfered" | "rounded" | "octagon";
 export declare const ROOM_SHAPES: readonly RunRoomShape[];
+export type RunHallSide = "n" | "s" | "e" | "w";
+/** One large room in place of two or three gated study rooms (floors[].hall).
+ * Heights are metres; the engine turns every level change into steps. */
+export interface RunHall {
+  /** The merged study rooms (two or three of 0, 1, 3), adjacent in roomOrder. */
+  rooms: number[];
+  /** The wall the hall faces: its stage, screen or altar side. */
+  focus: RunHallSide;
+  seating: "rows" | "none";
+  stage: { depth: number; height: number } | null;
+  /** Rise of the floor from the focus side to the far side. */
+  rake: number;
+  pit: { width: number; length: number; drop: number } | null;
+  platforms: {
+    side: RunHallSide;
+    width: number;
+    depth: number;
+    height: number;
+  }[];
+}
+export declare const HALL_LIMITS: {
+  readonly sides: readonly RunHallSide[];
+  readonly seating: readonly ("rows" | "none")[];
+  readonly stage: { depth: [number, number]; height: [number, number] };
+  readonly rake: [number, number];
+  readonly pit: {
+    width: [number, number];
+    length: [number, number];
+    drop: [number, number];
+  };
+  readonly platforms: number;
+  readonly platform: {
+    width: [number, number];
+    depth: [number, number];
+    height: [number, number];
+  };
+};
+/** A hall's features without the merged-room list: a drawn room's own. */
+export type RunHallFeatures = Omit<RunHall, "rooms">;
+/** How a drawn room's own furniture list is arranged (version 4). */
+export type RunRoomPattern =
+  | "rows"
+  | "clusters"
+  | "counter"
+  | "lounge"
+  | "table"
+  | "shelving"
+  | "display"
+  | "bays"
+  | "desk"
+  | "open";
+export declare const ROOM_PATTERNS: readonly RunRoomPattern[];
+/** How a version 4 structure draws its floors (part of RUN_DESIGN_GUIDANCE). */
+export declare const DRAWN_FLOOR_GUIDANCE: string;
+export declare const CAST_LIMITS: {
+  readonly size: [number, number];
+  readonly role: number;
+};
+export declare const FREE_PLAN_LIMITS: {
+  readonly rooms: [number, number];
+  readonly size: [number, number];
+  readonly doors: [number, number];
+  readonly work: [number, number];
+  readonly floorWork: [number, number];
+  readonly filler: [number, number];
+};
+export interface RunFurnishing {
+  pattern: RunRoomPattern;
+  /** Built-in furniture kinds or setting.objects ids, signature piece first. */
+  filler: string[];
+}
+/** One room of a version 4 floor, drawn in building cells (interior). */
+export interface RunFreeRoom extends RunFurnishing {
+  name: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  shape: RunRoomShape;
+  power: RunPower;
+  /** Two-cell doorways: the wall and the position along it (0..1). */
+  doors: {
+    side: RunHallSide;
+    at: number;
+    /** A hinged door opened by hand, or null for an open doorway. */
+    door: RunDoorDesign | null;
+  }[];
+  /** Study work points the engine places in this room. */
+  work: number;
+  hall: RunHallFeatures | null;
+}
+/** One storey of a version 4 design: walled rooms in an open concourse. */
+export interface RunFreeFloor {
+  name: string;
+  furnitureDensity: number;
+  concourse: RunFurnishing;
+  rooms: RunFreeRoom[];
+  scene: SceneFloorStructure;
+}
 export interface RunFloorStructureV3 extends Omit<
   LegacyRunFloorDesign,
   "stories" | "scene"
@@ -194,12 +293,23 @@ export interface RunFloorStructureV3 extends Omit<
   scene: SceneFloorStructure;
   /** Per study room 0..3; absent means rectangular as before. */
   roomShapes?: RunRoomShape[];
+  /** A hall in place of several study rooms; absent or null means none. */
+  hall?: RunHall | null;
 }
+/** A chain floor's design. A version 4 floor (RunFreeFloor) is stored in the
+ * same Floor.design slot; read it through isFreePlan() in src/free-plan.ts. */
 export type RunFloorDesign = LegacyRunFloorDesign | RunFloorStructureV3;
 export type RunExteriorStructureV3 = Omit<
   LegacyRunExteriorDesign,
   "streetLabels"
 >;
+/** A drawn design (version 4) names the building and nothing else outside. */
+export interface RunExteriorStructureV4 {
+  buildingName: string;
+  buildingSubtitle: string;
+}
+/** A chain design's exterior. A drawn design's (RunExteriorStructureV4)
+ * shares the Floor.exteriorDesign slot; its notice and skyline are absent. */
 export type RunExteriorDesign =
   LegacyRunExteriorDesign | RunExteriorStructureV3;
 export interface RunRelationship {
@@ -223,7 +333,44 @@ export interface RunStructureV3 extends Omit<
 export interface RunDesignV3 extends RunStructureV3 {
   environment: EnvironmentManifest;
 }
+/** Version 4: a version 3 structure whose floors are drawn freely. */
+export interface RunStructureV4 extends Omit<
+  RunStructureV3,
+  "version" | "floors" | "setting" | "roster" | "city" | "pacing" | "exterior"
+> {
+  version: 4;
+  /** 4 to 24 people; each role is the design's own words for what they do. */
+  roster: {
+    name: string;
+    role: string;
+    skill: number;
+    risk: number;
+    social: number;
+  }[];
+  /** No engine notice board or skyline on a drawn design. */
+  exterior: RunExteriorStructureV4;
+  setting: import("./setting-catalog.mjs").RunSetting;
+  floors: RunFreeFloor[];
+  /** Where the interior stair core stands (its north-west interior cell; it
+   * is 4 cells wide and 9 long), or null for wells in the north and south
+   * walls joined by an outside stair on the east face. */
+  stairs: { x: number; y: number } | null;
+}
+export interface RunDesignV4 extends RunStructureV4 {
+  environment: EnvironmentManifest;
+}
+/** A structure proposal of either current version. */
+export type RunStructure = RunStructureV3 | RunStructureV4;
+/** Versions 1 to 3. A version 4 design travels through the same slots
+ * (SavedRunDesign.design, Game.design); narrow it with isDrawnDesign(). */
 export type RunDesign = LegacyRunDesign | RunDesignV3;
+/** Version 3 and later (a version 4 design shares the version 3 slots): each
+ * writing surface is its own inventory entry and the design has an
+ * environment manifest. */
+export function isInventoryDesign(design: unknown): design is RunDesignV3;
+export function isDrawnDesign(
+  design: unknown,
+): design is RunStructureV4 | RunDesignV4;
 export interface SavedRunDesign {
   version: 1;
   source: "chatgpt-handoff" | "claude-cli" | "fixture";
@@ -262,7 +409,7 @@ export interface StructureRunDesignRequest {
   generationId: string;
   seed: number;
   recent: RunDesignSummary[];
-  repair?: { candidate: RunStructureV3; errors: string[] };
+  repair?: { candidate: RunStructure; errors: string[] };
 }
 export interface ContentRunDesignRequest {
   version: 2;
@@ -271,7 +418,7 @@ export interface ContentRunDesignRequest {
   requestId: string;
   generationId: string;
   seed: number;
-  structure: RunStructureV3;
+  structure: RunStructure;
   structureFingerprint: string;
   builderVersion: string;
   surfaces: SurfaceSlot[];
@@ -286,7 +433,7 @@ export type RunDesignRequest =
   | QualityRunDesignRequest;
 export interface RunStructureReply {
   requestId: string;
-  structure: RunStructureV3;
+  structure: RunStructure;
 }
 export interface RunContentReply {
   requestId: string;
@@ -301,7 +448,7 @@ export const RUN_DESIGN_GUIDANCE: string;
 export function parseRunDesign(value: LegacyRunDesign): LegacyRunDesign;
 export function parseRunDesign(value: RunDesignV3): RunDesignV3;
 export function parseRunDesign(value: unknown): RunDesign;
-export function parseRunStructure(value: unknown): RunStructureV3;
+export function parseRunStructure(value: unknown): RunStructure;
 export function parseRunDesignRequest(value: {
   version: 1;
   [key: string]: unknown;
@@ -361,17 +508,17 @@ export function parseRunContentRepairCandidate(
 /** The longest spatial, atmosphere, cast or tempo text a request accepts. */
 export declare const RUN_DESIGN_SUMMARY_LIMIT: number;
 export function summarizeRunDesign(
-  design: RunDesign | RunStructureV3,
+  design: RunDesign | RunStructure,
 ): RunDesignSummary;
 export function runDesignNoveltyErrors(
-  design: RunDesign | RunStructureV3,
+  design: RunDesign | RunStructure,
   recent: RunDesignSummary[],
 ): string[];
 export function titleCardSpoilerErrors(
-  design: RunDesign | RunStructureV3,
+  design: RunDesign | RunStructure,
 ): string[];
 export function runDesignFingerprint(design: unknown): string;
-export function runStructureFingerprint(design: RunStructureV3): string;
+export function runStructureFingerprint(design: RunStructure): string;
 export function parseSavedRunDesign(value: unknown): SavedRunDesign;
 import type {
   SceneFloorDesign,

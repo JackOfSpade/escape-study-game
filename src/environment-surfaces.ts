@@ -5,7 +5,7 @@ import {
 } from "./interior-lighting";
 import { floorSectors, inRect } from "./floor-plan";
 import { cityWall, type CityObstacle } from "./city-layout";
-import { CONFIG, type Floor, type Furniture, type Game } from "./model";
+import { roofIndexOf, type Floor, type Furniture, type Game } from "./model";
 import {
   furnitureHeightOf,
   furnitureSurfaceHeightOf,
@@ -418,7 +418,7 @@ export function buildEnvironmentSurfaces(
         prop.owner,
       );
     }
-    if (floor.index < CONFIG.floors) {
+    if (floor.index < roofIndexOf(floor)) {
       // Low wall marks use a whole, existing interior wall face. Kept well away
       // from portals and other surfaces, they add no collision or false opening.
       const candidates: {
@@ -526,16 +526,18 @@ export function buildEnvironmentSurfaces(
       );
     if (!floor.city || !floor.boundary) continue;
     const entrance = floor.furniture.find((o) => o.id === "main-gate")?.x ?? 22;
-    add(
-      "building:quarantine-sign",
-      "quarantine-sign",
-      fixed(entrance + 4, floor.boundary.bottom + 1.06, 1.8, 3.2, 0.65),
-      `${floor.exteriorDesign?.quarantineTitle ?? "Quarantine"}. ${floor.exteriorDesign?.quarantineSubtitle ?? ""}`,
-      null,
-      48,
-      100,
-      "exterior",
-    );
+    // A drawn design (version 4) has no engine notice board by its entrance.
+    if (!floor.exteriorDesign || "quarantineTitle" in floor.exteriorDesign)
+      add(
+        "building:quarantine-sign",
+        "quarantine-sign",
+        fixed(entrance + 4, floor.boundary.bottom + 1.06, 1.8, 3.2, 0.65),
+        `${floor.exteriorDesign?.quarantineTitle ?? "Quarantine"}. ${floor.exteriorDesign?.quarantineSubtitle ?? ""}`,
+        null,
+        48,
+        100,
+        "exterior",
+      );
     for (const obstacle of floor.city.obstacles.filter(
       (o) => o.kind === "building",
     ))

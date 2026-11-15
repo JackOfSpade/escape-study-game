@@ -458,6 +458,167 @@ export const ROOM_SHAPES = Object.freeze([
   "rounded",
   "octagon",
 ]);
+/** Bounds of floors[].hall: one large room in place of two or three gated
+ * study rooms, with a stepped floor. Heights are metres. */
+export const HALL_LIMITS = Object.freeze({
+  sides: Object.freeze(["n", "s", "e", "w"]),
+  seating: Object.freeze(["rows", "none"]),
+  stage: Object.freeze({ depth: [2, 6], height: [0.3, 1.2] }),
+  rake: [0, 1.5],
+  pit: Object.freeze({ width: [4, 14], length: [3, 10], drop: [0.3, 0.6] }),
+  platforms: 2,
+  platform: Object.freeze({
+    width: [3, 12],
+    depth: [2, 5],
+    height: [0.3, 1.5],
+  }),
+});
+/** A drawn design's cast: how many people besides the player, and the
+ * longest role each may be given. */
+export const CAST_LIMITS = Object.freeze({ size: [4, 24], role: 40 });
+/** How a drawn room's own furniture list is arranged (version 4). */
+export const ROOM_PATTERNS = Object.freeze([
+  "rows",
+  "clusters",
+  "counter",
+  "lounge",
+  "table",
+  "shelving",
+  "display",
+  "bays",
+  "desk",
+  "open",
+]);
+/** Bounds of a version 4 floor: rooms drawn in building cells. */
+export const FREE_PLAN_LIMITS = Object.freeze({
+  rooms: [1, 8],
+  size: [3, 40],
+  doors: [1, 4],
+  work: [0, 12],
+  floorWork: [2, 40],
+  filler: [0, 6],
+});
+function parseFurnishing(v, names, p) {
+  choice(v.pattern, ROOM_PATTERNS, `${p}.pattern`);
+  array(v.filler, ...FREE_PLAN_LIMITS.filler, `${p}.filler`, (name, q) =>
+    requireThat(
+      names.has(name),
+      `${q} must name a built-in furniture kind or one of setting.objects`,
+    ),
+  );
+  requireThat(
+    v.pattern === "open" || v.filler.length > 0,
+    `${p}.filler needs at least one entry unless pattern is open`,
+  );
+}
+/** One storey of a version 4 design: rooms drawn inside an open concourse. */
+function parseFreeFloor(f, names, p) {
+  const L = FREE_PLAN_LIMITS;
+  object(f, ["name", "furnitureDensity", "concourse", "rooms", "scene"], p);
+  text(f.name, 48, `${p}.name`);
+  number(f.furnitureDensity, 0.5, 1.5, `${p}.furnitureDensity`);
+  object(f.concourse, ["pattern", "filler"], `${p}.concourse`);
+  parseFurnishing(f.concourse, names, `${p}.concourse`);
+  array(f.rooms, ...L.rooms, `${p}.rooms`, (room, q) => {
+    object(
+      room,
+      [
+        "name",
+        "pattern",
+        "filler",
+        "x",
+        "y",
+        "w",
+        "h",
+        "shape",
+        "power",
+        "doors",
+        "work",
+        "hall",
+      ],
+      q,
+    );
+    text(room.name, 40, `${q}.name`);
+    parseFurnishing(room, names, q);
+    number(room.x, 0, 43, `${q}.x`, true);
+    number(room.y, 0, 33, `${q}.y`, true);
+    number(room.w, ...L.size, `${q}.w`, true);
+    number(room.h, ...L.size, `${q}.h`, true);
+    choice(room.shape, ROOM_SHAPES, `${q}.shape`);
+    choice(room.power, ["lit", "dim", "outage"], `${q}.power`);
+    array(room.doors, ...L.doors, `${q}.doors`, (door, r) => {
+      object(door, ["side", "at", "door"], r);
+      choice(door.side, HALL_LIMITS.sides, `${r}.side`);
+      number(door.at, 0, 1, `${r}.at`);
+      // null is an open doorway; otherwise a hinged door people open by hand.
+      if (door.door !== null) parseDoorDesign(door.door, `${r}.door`);
+    });
+    number(room.work, ...L.work, `${q}.work`, true);
+    if (room.hall !== null) {
+      requireThat(
+        Math.min(room.w, room.h) >= 8,
+        `${q}.hall needs a room at least 8 cells on its shorter side`,
+      );
+      parseHall(room.hall, null, `${q}.hall`);
+    }
+  });
+  const work = f.rooms.reduce((n, room) => n + room.work, 0);
+  requireThat(
+    work >= L.floorWork[0] && work <= L.floorWork[1],
+    `${p}.rooms need ${L.floorWork[0]}..${L.floorWork[1]} work points in total, not ${work}`,
+  );
+}
+/** `roomOrder` is the chain order of a version 3 floor; null for a drawn
+ * room's own hall features, which name no merged rooms. */
+function parseHall(h, roomOrder, p) {
+  const L = HALL_LIMITS;
+  object(
+    h,
+    [
+      ...(roomOrder ? ["rooms"] : []),
+      "focus",
+      "seating",
+      "stage",
+      "rake",
+      "pit",
+      "platforms",
+    ],
+    p,
+  );
+  if (roomOrder) {
+    array(h.rooms, 2, 3, `${p}.rooms`, (n, q) => choice(n, [0, 1, 3], q));
+    requireThat(
+      new Set(h.rooms).size === h.rooms.length,
+      `${p}.rooms must not repeat a room`,
+    );
+    const at = h.rooms.map((n) => roomOrder.indexOf(n)).sort((a, b) => a - b);
+    requireThat(
+      at[at.length - 1] - at[0] === at.length - 1,
+      `${p}.rooms must be next to each other in roomOrder`,
+    );
+  }
+  choice(h.focus, L.sides, `${p}.focus`);
+  choice(h.seating, L.seating, `${p}.seating`);
+  if (h.stage !== null) {
+    object(h.stage, ["depth", "height"], `${p}.stage`);
+    number(h.stage.depth, ...L.stage.depth, `${p}.stage.depth`, true);
+    number(h.stage.height, ...L.stage.height, `${p}.stage.height`);
+  }
+  number(h.rake, ...L.rake, `${p}.rake`);
+  if (h.pit !== null) {
+    object(h.pit, ["width", "length", "drop"], `${p}.pit`);
+    number(h.pit.width, ...L.pit.width, `${p}.pit.width`, true);
+    number(h.pit.length, ...L.pit.length, `${p}.pit.length`, true);
+    number(h.pit.drop, ...L.pit.drop, `${p}.pit.drop`);
+  }
+  array(h.platforms, 0, L.platforms, `${p}.platforms`, (t, q) => {
+    object(t, ["side", "width", "depth", "height"], q);
+    choice(t.side, L.sides, `${q}.side`);
+    number(t.width, ...L.platform.width, `${q}.width`, true);
+    number(t.depth, ...L.platform.depth, `${q}.depth`, true);
+    number(t.height, ...L.platform.height, `${q}.height`);
+  });
+}
 const roomTypes = [
   "break",
   "cubicles",
@@ -471,7 +632,10 @@ const uint = (v, p) => number(v, 0, 4294967295, p, true);
 const clone = (v) => JSON.parse(JSON.stringify(v));
 
 function parseBlueprint(v, provisional = false) {
-  const v3 = v?.version === 3;
+  // Version 4 is version 3 with floors drawn freely: everything written for
+  // version 3 applies to it except the chain fields of each floor.
+  const v4 = v?.version === 4,
+    v3 = v?.version === 3 || v4;
   bounded(
     v,
     v3 ? (provisional ? 100000 : 900000) : v?.version === 2 ? 100000 : 24000,
@@ -479,6 +643,19 @@ function parseBlueprint(v, provisional = false) {
   if (v3 && !provisional) {
     const { environment: _, ...structure } = v;
     bounded(structure, 100000);
+  }
+  // Name the fields a drawn design must not carry, so a repair knows which.
+  if (v4) {
+    for (const key of ["city", "pacing"])
+      requireThat(
+        !Object.hasOwn(v, key),
+        `${key}: a version 4 design has no ${key}; omit it`,
+      );
+    for (const key of ["quarantineTitle", "quarantineSubtitle", "skyline"])
+      requireThat(
+        !v.exterior || !Object.hasOwn(v.exterior, key),
+        `exterior.${key}: a version 4 design has no exterior.${key}; omit it`,
+      );
   }
   object(
     v,
@@ -491,25 +668,47 @@ function parseBlueprint(v, provisional = false) {
       "floors",
       "roofName",
       "roster",
-      "city",
+      // A drawn design has no engine street grid, horde or helicopter to tune.
+      ...(v4 ? [] : ["city"]),
       "exterior",
-      "pacing",
+      ...(v4 ? [] : ["pacing"]),
       ...(Object.hasOwn(v, "mainDoor") ? ["mainDoor"] : []),
       ...(Object.hasOwn(v, "titleCard") ? ["titleCard"] : []),
       ...(v3 && Object.hasOwn(v, "setting") ? ["setting"] : []),
+      ...(v4 ? ["stairs"] : []),
       ...(v3
         ? ["relationships", ...(!provisional ? ["environment"] : [])]
         : []),
     ],
     "design",
   );
+  if (v4 && v.stairs !== null) {
+    // An interior stair core; null keeps wall wells and the outside stair.
+    object(v.stairs, ["x", "y"], "stairs");
+    number(v.stairs.x, 0, 43, "stairs.x", true);
+    number(v.stairs.y, 0, 33, "stairs.y", true);
+    requireThat(
+      v.setting?.form !== "open",
+      "stairs: an open site is one ground level and has no stairs",
+    );
+  }
   if (Object.hasOwn(v, "mainDoor")) parseDoorDesign(v.mainDoor, "mainDoor");
   if (Object.hasOwn(v, "titleCard")) parseTitleCard(v.titleCard, "titleCard");
-  if (v3 && Object.hasOwn(v, "setting")) parseSetting(v.setting);
+  requireThat(
+    !v4 || Object.hasOwn(v, "setting"),
+    "a version 4 design needs setting",
+  );
+  if (v3 && Object.hasOwn(v, "setting"))
+    parseSetting(v.setting, "setting", { rooms: v4 });
   requireThat(
     v.version === 1 || v.version === 2 || v3,
     "unsupported design version",
   );
+  // Names a drawn room may list as furniture.
+  const furnitureNames = new Set([
+    ...SCENE_FURNITURE_KINDS,
+    ...(v.setting?.objects ?? []).map((o) => o.id),
+  ]);
   // Only version 3 knows about site forms; an older design is always enclosed.
   const siteForm = v3 ? (v.setting?.form ?? "enclosed") : "enclosed";
   requireThat(
@@ -541,87 +740,109 @@ function parseBlueprint(v, provisional = false) {
   number(b.shoulder, b.top + 8, b.top + 14, "footprint.shoulder", true);
   // An open site is one ground-level plan; an enclosed building keeps four.
   const floorCount = siteForm === "open" ? 1 : 4;
-  array(v.floors, floorCount, floorCount, "floors", (f, p) => {
-    object(
-      f,
-      [
-        "name",
-        "family",
-        "roomOrder",
-        "layoutSeed",
-        "roomTypes",
-        "subroomKinds",
-        "furnitureDensity",
-        "fieldQuotas",
-        "power",
-        ...(!v3 ? ["stories"] : []),
-        "brokenGuard",
-        ...(v.version >= 2 ? ["scene"] : []),
-        ...(Object.hasOwn(f, "doors") ? ["doors"] : []),
-        ...(v3 && Object.hasOwn(f, "roomShapes") ? ["roomShapes"] : []),
-      ],
-      p,
-    );
-    if (Object.hasOwn(f, "doors"))
-      array(f.doors, 4, 4, `${p}.doors`, (d, q) => parseDoorDesign(d, q));
-    text(f.name, 48, `${p}.name`);
-    choice(f.family, ["stack", "columns", "serpentine"], `${p}.family`);
-    array(f.roomOrder, 3, 3, `${p}.roomOrder`, (n, q) =>
-      choice(n, [0, 1, 3], q),
-    );
-    requireThat(
-      new Set(f.roomOrder).size === 3,
-      `${p}.roomOrder must be a permutation of [0,1,3]`,
-    );
-    uint(f.layoutSeed, `${p}.layoutSeed`);
-    array(f.roomTypes, 4, 4, `${p}.roomTypes`, (x, q) =>
-      choice(x, roomTypes, q),
-    );
-    array(f.subroomKinds, 1, 4, `${p}.subroomKinds`, (x, q) =>
-      choice(x, ["office", "meeting", "storage", "break"], q),
-    );
-    requireThat(
-      new Set(f.subroomKinds).size === f.subroomKinds.length,
-      `${p}.subroomKinds must be unique`,
-    );
-    number(f.furnitureDensity, 0.5, 1.5, `${p}.furnitureDensity`);
-    array(f.fieldQuotas, 4, 4, `${p}.fieldQuotas`, (n, q) =>
-      number(n, 2, 6, q, true),
-    );
-    array(f.power, 4, 4, `${p}.power`, (x, q) =>
-      choice(x, ["lit", "dim", "outage"], q),
-    );
-    requireThat(
-      f.power[2] === "lit",
-      `${p}.power[2] must keep the free study hall lit`,
-    );
-    if (!v3)
-      array(f.stories, 6, 6, `${p}.stories`, (s, q) => {
-        object(s, ["title", "lines"], q);
-        text(s.title, 36, `${q}.title`);
-        array(s.lines, 1, 4, `${q}.lines`, (line, r) => text(line, 50, r));
-      });
-    object(f.brokenGuard, ["segment", "bay"], `${p}.brokenGuard`);
-    choice(f.brokenGuard.segment, [3, 4], `${p}.brokenGuard.segment`);
-    choice(f.brokenGuard.bay, [1, 2], `${p}.brokenGuard.bay`);
-    if (Object.hasOwn(f, "roomShapes"))
-      array(f.roomShapes, 4, 4, `${p}.roomShapes`, (shape, q) =>
-        choice(shape, ROOM_SHAPES, q),
+  // A drawn building (version 4) has as many storeys as the place has.
+  array(
+    v.floors,
+    v4 && siteForm === "enclosed" ? 1 : floorCount,
+    floorCount,
+    "floors",
+    (f, p) => {
+      if (v4) return parseFreeFloor(f, furnitureNames, p);
+      object(
+        f,
+        [
+          "name",
+          "family",
+          "roomOrder",
+          "layoutSeed",
+          "roomTypes",
+          "subroomKinds",
+          "furnitureDensity",
+          "fieldQuotas",
+          "power",
+          ...(!v3 ? ["stories"] : []),
+          "brokenGuard",
+          ...(v.version >= 2 ? ["scene"] : []),
+          ...(Object.hasOwn(f, "doors") ? ["doors"] : []),
+          ...(v3 && Object.hasOwn(f, "roomShapes") ? ["roomShapes"] : []),
+          ...(v3 && Object.hasOwn(f, "hall") ? ["hall"] : []),
+        ],
+        p,
       );
-  });
+      if (Object.hasOwn(f, "doors"))
+        array(f.doors, 4, 4, `${p}.doors`, (d, q) => parseDoorDesign(d, q));
+      text(f.name, 48, `${p}.name`);
+      choice(f.family, ["stack", "columns", "serpentine"], `${p}.family`);
+      array(f.roomOrder, 3, 3, `${p}.roomOrder`, (n, q) =>
+        choice(n, [0, 1, 3], q),
+      );
+      requireThat(
+        new Set(f.roomOrder).size === 3,
+        `${p}.roomOrder must be a permutation of [0,1,3]`,
+      );
+      uint(f.layoutSeed, `${p}.layoutSeed`);
+      array(f.roomTypes, 4, 4, `${p}.roomTypes`, (x, q) =>
+        choice(x, roomTypes, q),
+      );
+      array(f.subroomKinds, 1, 4, `${p}.subroomKinds`, (x, q) =>
+        choice(x, ["office", "meeting", "storage", "break"], q),
+      );
+      requireThat(
+        new Set(f.subroomKinds).size === f.subroomKinds.length,
+        `${p}.subroomKinds must be unique`,
+      );
+      number(f.furnitureDensity, 0.5, 1.5, `${p}.furnitureDensity`);
+      array(f.fieldQuotas, 4, 4, `${p}.fieldQuotas`, (n, q) =>
+        number(n, 2, 6, q, true),
+      );
+      array(f.power, 4, 4, `${p}.power`, (x, q) =>
+        choice(x, ["lit", "dim", "outage"], q),
+      );
+      requireThat(
+        f.power[2] === "lit",
+        `${p}.power[2] must keep the free study hall lit`,
+      );
+      if (!v3)
+        array(f.stories, 6, 6, `${p}.stories`, (s, q) => {
+          object(s, ["title", "lines"], q);
+          text(s.title, 36, `${q}.title`);
+          array(s.lines, 1, 4, `${q}.lines`, (line, r) => text(line, 50, r));
+        });
+      object(f.brokenGuard, ["segment", "bay"], `${p}.brokenGuard`);
+      choice(f.brokenGuard.segment, [3, 4], `${p}.brokenGuard.segment`);
+      choice(f.brokenGuard.bay, [1, 2], `${p}.brokenGuard.bay`);
+      if (Object.hasOwn(f, "roomShapes"))
+        array(f.roomShapes, 4, 4, `${p}.roomShapes`, (shape, q) =>
+          choice(shape, ROOM_SHAPES, q),
+        );
+      // Optional so older saved designs stay valid; null means no hall.
+      if (Object.hasOwn(f, "hall") && f.hall !== null) {
+        requireThat(
+          siteForm === "enclosed",
+          `${p}.hall: only an enclosed building has hall rooms`,
+        );
+        parseHall(f.hall, f.roomOrder, `${p}.hall`);
+      }
+    },
+  );
   text(v.roofName, 48, "roofName");
-  array(v.roster, 19, 19, "roster", (a, p) => {
+  // A drawn design chooses its cast: how many people and what each one does.
+  const cast = v4 ? CAST_LIMITS.size : [19, 19];
+  array(v.roster, ...cast, "roster", (a, p) => {
     object(a, ["name", "role", "skill", "risk", "social"], p);
     text(a.name, 20, `${p}.name`);
-    choice(a.role, roles, `${p}.role`);
+    if (v4) text(a.role, CAST_LIMITS.role, `${p}.role`);
+    else choice(a.role, roles, `${p}.role`);
     number(a.skill, 0.4, 0.9, `${p}.skill`);
     number(a.risk, 0.2, 0.8, `${p}.risk`);
     number(a.social, 0.2, 0.8, `${p}.social`);
   });
   const names = v.roster.map((a) => a.name.trim().toLowerCase());
   requireThat(
-    new Set(names).size === 19 && !names.includes("you"),
-    "roster needs 19 unique names distinct from You",
+    new Set(names).size === v.roster.length && !names.includes("you"),
+    v4
+      ? "roster needs unique names distinct from You"
+      : "roster needs 19 unique names distinct from You",
   );
   if (v.version >= 2)
     v.floors.forEach((floor, index) =>
@@ -632,6 +853,7 @@ function parseBlueprint(v, provisional = false) {
             `floors[${index}].scene`,
             v.setting?.objects ?? [],
             v.setting?.props ?? [],
+            v4 ? floor.rooms.length : 4,
           )
         : parseSceneDesign(
             floor.scene,
@@ -660,83 +882,86 @@ function parseBlueprint(v, provisional = false) {
       pairs.add(pair);
     });
   }
-  const c = v.city;
-  object(
-    c,
-    [
-      "roadWidth",
-      "boulevardOffset",
-      "districtSize",
-      "buildingHeightMin",
-      "buildingHeightMax",
-      "damageRate",
-      "palette",
-    ],
-    "city",
-  );
-  number(c.roadWidth, 7, 9, "city.roadWidth", true);
-  number(c.boulevardOffset, 15, 19, "city.boulevardOffset", true);
-  number(c.districtSize, 18, 25, "city.districtSize", true);
-  number(c.buildingHeightMin, 9, 18, "city.buildingHeightMin");
-  number(c.buildingHeightMax, 25, 45, "city.buildingHeightMax");
-  number(c.damageRate, 0, 0.7, "city.damageRate");
-  array(c.palette, 3, 6, "city.palette", (color, p) =>
-    requireThat(
-      typeof color === "string" && /^#[0-9a-fA-F]{6}$/u.test(color),
-      `${p} needs a six-digit hex color`,
-    ),
-  );
+  if (!v4) {
+    const c = v.city;
+    object(
+      c,
+      [
+        "roadWidth",
+        "boulevardOffset",
+        "districtSize",
+        "buildingHeightMin",
+        "buildingHeightMax",
+        "damageRate",
+        "palette",
+      ],
+      "city",
+    );
+    number(c.roadWidth, 7, 9, "city.roadWidth", true);
+    number(c.boulevardOffset, 15, 19, "city.boulevardOffset", true);
+    number(c.districtSize, 18, 25, "city.districtSize", true);
+    number(c.buildingHeightMin, 9, 18, "city.buildingHeightMin");
+    number(c.buildingHeightMax, 25, 45, "city.buildingHeightMax");
+    number(c.damageRate, 0, 0.7, "city.damageRate");
+    array(c.palette, 3, 6, "city.palette", (color, p) =>
+      requireThat(
+        typeof color === "string" && /^#[0-9a-fA-F]{6}$/u.test(color),
+        `${p} needs a six-digit hex color`,
+      ),
+    );
+  }
   const e = v.exterior;
   object(
     e,
     [
       "buildingName",
       "buildingSubtitle",
-      "quarantineTitle",
-      "quarantineSubtitle",
+      // A drawn design has no engine notice board or skyline to fill in.
+      ...(v4 ? [] : ["quarantineTitle", "quarantineSubtitle"]),
       ...(!v3 ? ["streetLabels"] : []),
-      "skyline",
+      ...(v4 ? [] : ["skyline"]),
     ],
     "exterior",
   );
   for (const k of [
     "buildingName",
     "buildingSubtitle",
-    "quarantineTitle",
-    "quarantineSubtitle",
+    ...(v4 ? [] : ["quarantineTitle", "quarantineSubtitle"]),
   ])
     text(e[k], 48, `exterior.${k}`);
   if (!v3)
     array(e.streetLabels, 8, 8, "exterior.streetLabels", (s, p) =>
       text(s, 28, p),
     );
-  object(
-    e.skyline,
-    ["minHeight", "maxHeight", "damageRate"],
-    "exterior.skyline",
-  );
-  number(e.skyline.minHeight, 24, 60, "skyline.minHeight");
-  number(e.skyline.maxHeight, 72, 140, "skyline.maxHeight");
-  number(e.skyline.damageRate, 0, 0.7, "skyline.damageRate");
-  const p = v.pacing;
-  object(
-    p,
-    [
-      "swarmInterval",
-      "swarmBatch",
-      "swarmCap",
-      "npcThinkingScale",
-      "firstHelicopter",
-      "helicopterInterval",
-    ],
-    "pacing",
-  );
-  number(p.swarmInterval, 2.5, 4, "pacing.swarmInterval");
-  number(p.swarmBatch, 1, 2, "pacing.swarmBatch", true);
-  number(p.swarmCap, 120, 220, "pacing.swarmCap", true);
-  number(p.npcThinkingScale, 0.2, 0.35, "pacing.npcThinkingScale");
-  number(p.firstHelicopter, 420, 600, "pacing.firstHelicopter");
-  number(p.helicopterInterval, 150, 210, "pacing.helicopterInterval");
+  if (!v4) {
+    object(
+      e.skyline,
+      ["minHeight", "maxHeight", "damageRate"],
+      "exterior.skyline",
+    );
+    number(e.skyline.minHeight, 24, 60, "skyline.minHeight");
+    number(e.skyline.maxHeight, 72, 140, "skyline.maxHeight");
+    number(e.skyline.damageRate, 0, 0.7, "skyline.damageRate");
+    const p = v.pacing;
+    object(
+      p,
+      [
+        "swarmInterval",
+        "swarmBatch",
+        "swarmCap",
+        "npcThinkingScale",
+        "firstHelicopter",
+        "helicopterInterval",
+      ],
+      "pacing",
+    );
+    number(p.swarmInterval, 2.5, 4, "pacing.swarmInterval");
+    number(p.swarmBatch, 1, 2, "pacing.swarmBatch", true);
+    number(p.swarmCap, 120, 220, "pacing.swarmCap", true);
+    number(p.npcThinkingScale, 0.2, 0.35, "pacing.npcThinkingScale");
+    number(p.firstHelicopter, 420, 600, "pacing.firstHelicopter");
+    number(p.helicopterInterval, 150, 210, "pacing.helicopterInterval");
+  }
   if (v3 && !provisional) parseEnvironmentManifest(v.environment, v);
   return clone(v);
 }
@@ -744,8 +969,20 @@ function parseBlueprint(v, provisional = false) {
 export function parseRunDesign(v) {
   return parseBlueprint(v);
 }
+/** Version 3 and later: every writing surface is its own inventory entry, the
+ * cast has relationships and the design carries an environment manifest. */
+export function isInventoryDesign(design) {
+  return design?.version === 3 || design?.version === 4;
+}
+/** Whether a design or structure draws its floors freely (version 4). */
+export function isDrawnDesign(design) {
+  return design?.version === 4;
+}
 export function parseRunStructure(v) {
-  requireThat(v?.version === 3, "a structural proposal must be version 3");
+  requireThat(
+    v?.version === 3 || v?.version === 4,
+    "a structural proposal must be version 3 or 4",
+  );
   return parseBlueprint(v, true);
 }
 export function runStructureFingerprint(v) {
@@ -767,16 +1004,38 @@ export function summarizeRunDesign(d) {
       : null,
   ];
   const atmosphere = [
-    d.floors.map((f) => [f.roomTypes, f.furnitureDensity, f.power]),
-    d.city.palette,
-    d.exterior.skyline,
+    d.floors.map((f) =>
+      // A drawn floor (version 4) is known by what its rooms are furnished as.
+      f.rooms
+        ? [
+            f.rooms.map((r) => [r.pattern, r.filler, r.power]),
+            f.furnitureDensity,
+            f.concourse,
+          ]
+        : [f.roomTypes, f.furnitureDensity, f.power],
+    ),
+    // Absent on a drawn design, which has no engine city or skyline.
+    d.city?.palette ?? null,
+    d.exterior.skyline ?? null,
   ];
   const spatial = [
     footprint,
-    d.floors.map((f) => [f.family, f.roomOrder]),
-    d.city.roadWidth,
-    d.city.boulevardOffset,
-    d.city.districtSize,
+    d.floors.map((f) =>
+      // Drawn rooms in quarter-building steps, so a small nudge is no new plan.
+      f.rooms
+        ? f.rooms.map((r) => [
+            Math.round(r.x / 4),
+            Math.round(r.y / 4),
+            Math.round(r.w / 4),
+            Math.round(r.h / 4),
+            r.shape,
+            r.hall ? [r.hall.focus, !!r.hall.stage, !!r.hall.pit] : null,
+          ])
+        : [f.family, f.roomOrder],
+    ),
+    d.city?.roadWidth ?? null,
+    d.city?.boulevardOffset ?? null,
+    d.city?.districtSize ?? null,
   ];
   // Absent on older designs so their historical summaries stay byte-stable.
   if (d.setting) {
@@ -808,6 +1067,8 @@ export function summarizeRunDesign(d) {
     // Carved room shapes change the spatial plan, not just its look.
     if (d.floors.some((f) => f.roomShapes))
       spatial.push(d.floors.map((f) => f.roomShapes ?? null));
+    if (d.floors.some((f) => f.hall))
+      spatial.push(d.floors.map((f) => f.hall ?? null));
     // An open site is a different place, not just a different look. Only the
     // open form is recorded, so enclosed summaries stay byte-stable.
     if (d.setting.form === "open") spatial.push("open-site");
@@ -861,8 +1122,9 @@ export function summarizeRunDesign(d) {
     premise: d.premise,
     spatial: summaryText(spatial),
     atmosphere: summaryText(atmosphere),
-    cast: summaryText(d.version === 3 ? [d.roster, d.relationships] : d.roster),
-    tempo: summaryText(d.pacing),
+    cast: summaryText(d.version >= 3 ? [d.roster, d.relationships] : d.roster),
+    // A drawn design sets no engine tempo; its timeline is the catastrophe's.
+    tempo: summaryText(d.pacing ?? "unset"),
   };
 }
 /** The longest summary field a request accepts. A full version 3 design (19
@@ -1180,7 +1442,10 @@ export function parseSavedRunDesign(v) {
   return { ...clone(v), design };
 }
 
-export const RUN_DESIGN_GUIDANCE = `${qualityGuidance()}\n\nThe exact captured request selects both version and phase. For request.version:2/designVersion:3/phase:structure, return exactly {requestId,structure:{version:3,...}}. The flattened structure uses the structural fields described below, but OMIT every floors[].stories and exterior.streetLabels. Include relationships:1..24 {from:exact roster name,to:another exact roster name,kind:colleague|friend|relative|mentor|rival,detail:1..120}; one relationship per person pair. Every floor scene has version:2 with the scene layout below, but OMIT furniture.label and prop.label/text. Room title/description and exterior names remain thematic context for later writing. This first phase creates geometry and cast only; never include environment or content. Structure≤100000 UTF-8 bytes. The engine constructs an isolated candidate, then requests content for its exact physical surfaces. For phase:content, follow the following separate content contract instead of returning any structural fields:\n${ENVIRONMENT_GUIDANCE}\n
+const range = ([low, high]) => `${low}..${high}`;
+/** How a version 4 structure draws its floors. */
+export const DRAWN_FLOOR_GUIDANCE = `DRAWN FLOORS (version 4). You draw every storey of the place yourself; nothing about its plan is a template. floors:1..4 for an enclosed site, ground floor first, as many storeys as this place really has (a chapel, hangar or bathhouse has one; a lighthouse or tenement four), and exactly1 for an open one, each {name(1-48),furnitureDensity:0.5..1.5,concourse:{pattern,filler},rooms:${range(FREE_PLAN_LIMITS.rooms)} Room,scene}. A storey is seen from above on a grid of 1 m cells: x grows east and y grows south, the main entrance is in the middle of the south wall and the stairs are in the middle of the north wall. With footprint width W and top T, a room's interior must keep x>=23-W/2, x+w-1<=20+W/2, y>=T+1 and y+h-1<=26; a shaped footprint cuts its corners or sides further and whatever falls outside the shell is simply solid. Everything you do not cover with a room is the concourse: the open floor that joins the entrance to the stairs and to the rooms (a foyer, aisle, cloister, deck, street, yard). Draw the rooms this place really has, at the sizes they would really be: a few large rooms and some small ones, never four equal departments. Room:{name(1-40) what the room is called in this place,pattern,filler,x,y,w,h:integers giving the room's interior (walls are added around it) with w and h ${range(FREE_PLAN_LIMITS.size)},shape:${ROOM_SHAPES.join("|")} how its corners are carved,power:lit|dim|outage,doors:${range(FREE_PLAN_LIMITS.doors)} {side:n|s|e|w,at:0..1 position along that wall,door:null for an open doorway (an arch, a gap, a curtain line) or a DoorDesign (described below) for a hinged door that people open and close by hand and that stays where it is left} each a doorway two cells wide; give real rooms real doors that suit them (a glass foyer door, a steel plant-room door, a wooden office door) and leave wide public openings open,work:integer${range(FREE_PLAN_LIMITS.work)} study work points in this room,hall:null|HallFeatures}. Leave at least one cell between two rooms' interiors: exactly one cell is a shared wall that a door can pass through into the next room, and a wider gap is concourse and must be at least two cells wide to be a passage. Keep x18..25 of rows 25..27 (the entrance lane) and x19..24 of rows T..T+2 (the stair approach) free of rooms and their walls. A door must face the concourse or a room exactly one wall cell away, and every room must be reachable from the entrance through doors; the engine reports each room that is not. Work points are this place's own work stations, styled by setting.terminal; a floor needs ${range(FREE_PLAN_LIMITS.floorWork)} in total across its rooms and each needs about 2 m of clear floor, so a 4 by 4 room holds one. pattern says how the engine arranges that room's filler in the space your scene furniture leaves: rows (rows of the list's seat facing one wall: an auditorium, chapel, classroom, waiting hall), clusters (several work positions, each the first piece with its seat: workshops, labs, desks, benches), counter (one main counter or console with seating before it: reception, bar, ticket office, control desk), lounge (tables with seats around them: mess, cafe, common room), table (one large table ringed with seats: council, dining, briefing), shelving (pieces lining the walls with a few loose in the middle: stores, archive, larder, armoury), display (free-standing pieces with room to walk around each: gallery, showroom, museum, garden), bays (the first piece repeated along the walls, each with its seat: dormitory, ward, stalls, cells, lockers), desk (one desk with its seat and storage: office, booth, study) or open (left empty for your scene furniture alone). filler:${range(FREE_PLAN_LIMITS.filler)} names, each a built-in furniture kind or the id of one of setting.objects, the room's signature piece first; a seat-role object in the list is what people sit on, a divider-role object separates clusters; open needs no filler, every other pattern needs at least one name. Compose the furniture this place would have as setting.objects and list it here; a room furnished with office desks and printers reads as an office. HallFeatures, for a room at least 8 cells on its shorter side that is a real hall (auditorium, star theatre, nave, hangar, arena, court, engine hall, pool): {focus:n|s|e|w the wall the hall faces (its stage, screen, altar or pulpit side),seating:rows|none (rows fills it with rows of the filler's seat facing the focus, whatever the pattern),stage:null|{depth:integer${range(HALL_LIMITS.stage.depth)} metres of flat stage along the focus wall,height:${range(HALL_LIMITS.stage.height)} m},rake:${range(HALL_LIMITS.rake)} m the floor rises from the foot of the stage to the far wall (0 is flat),pit:null|{width:integer${range(HALL_LIMITS.pit.width)},length:integer${range(HALL_LIMITS.pit.length)},drop:${range(HALL_LIMITS.pit.drop)} m} a sunken area in front of the stage,platforms:0..${HALL_LIMITS.platforms} of {side:n|s|e|w,width:integer${range(HALL_LIMITS.platform.width)} along that wall,depth:integer${range(HALL_LIMITS.platform.depth)},height:${range(HALL_LIMITS.platform.height)} m}}. A hall has a 3.4 m ceiling; the engine cuts every level change into 30 cm steps that everyone can walk and keeps the floor flat beside each door. Use hall features wherever the premise has a big room. CAST AND DROPPED FIELDS (version 4). roster:${range(CAST_LIMITS.size)} people besides the player, as many as this place would really hold at this hour (a lighthouse has a handful, a theatre on show night two dozen), each {name:unique1-20 characters distinct from You,role:1-${CAST_LIMITS.role} characters saying what this person does here in plain words (projectionist, night guard, ticket clerk, visiting schoolteacher, duty engineer), skill:0.4..0.9,risk:0.2..0.8,social:0.2..0.8}. The role is yours to write and is how other people and the game understand this person: a role with authority (guard, officer, warden, supervisor, captain) can detain and takes reports, and anyone can be given a radio by saying so in the role. A version 4 structure has no city and no pacing at all, and its exterior is only {buildingName,buildingSubtitle}: omit city, pacing, exterior.quarantineTitle, exterior.quarantineSubtitle and exterior.skyline. STAIRS. stairs (top level of the structure): null, or {x,y} placing one interior stair core for the whole building. The core is 4 cells wide (x..x+3) and 9 long north to south (y..y+8), the same cells on every storey and on the roof: a landing 2 cells deep at each end with two flights between them, so people climb one flight, turn on the landing and climb the next. It needs 3 open cells of concourse beyond each end (rows y-3..y-1 and y+9..y+11), all inside the building, clear of every room and its walls on every floor, clear of the entrance lane, and at least a cell clear of the roof pickup pad (centre 21.5,10.5, radius 2.8). Put it where this place would have its stairs: beside the foyer, in a corner tower, at the end of a wing; with stairs set, every row of the storey is free for rooms except the entrance lane and the core. null instead gives a stair well in the middle of the north wall and one in the south wall joined by an outside stair on the east face, a fire-escape look that suits few places; then keep x19..24 of rows T..T+2 free as described above. An open site has stairs:null. scene:{version:2,rooms:one entry per drawn room, in any order, with room:that room's index in rooms (0 for the first)}; each scene room is otherwise as described under the scene layout below and furnishes that drawn room, and the concourse takes no scene furniture.`;
+export const RUN_DESIGN_GUIDANCE = `${qualityGuidance()}\n\nThe exact captured request selects both version and phase. For request.version:2/designVersion:3/phase:structure, return exactly {requestId,structure:{version:4,...}}. A version 4 structure uses the structural fields described below for version 3 with two differences: every floors[] entry is a floor you draw yourself, as described under DRAWN FLOORS (it has none of family, roomOrder, layoutSeed, roomTypes, subroomKinds, fieldQuotas, power, brokenGuard, roomShapes, hall, doors or stories), and setting.venue is custom with setting.filler null, because each room lists its own furniture. A version 4 structure also has stairs at the top level, described under DRAWN FLOORS, and differs in its cast and legacy fields as described under CAST AND DROPPED FIELDS. OMIT exterior.streetLabels. Include relationships:1..24 {from:exact roster name,to:another exact roster name,kind:colleague|friend|relative|mentor|rival,detail:1..120}; one relationship per person pair. Every floor scene has version:2 with the scene layout below, but OMIT furniture.label and prop.label/text. Room title/description and exterior names remain thematic context for later writing. This first phase creates geometry and cast only; never include environment or content. Structure≤100000 UTF-8 bytes. The engine constructs an isolated candidate, then requests content for its exact physical surfaces. \n${DRAWN_FLOOR_GUIDANCE}\nFor phase:content, follow the following separate content contract instead of returning any structural fields:\n${ENVIRONMENT_GUIDANCE}\n
 The remainder describes the shared structural schema and retained legacy requests. For retained request.version:1, return exactly {requestId:the captured requestId,design:{...}} following its designVersion; never upgrade that request. Design a distinctive fictional building for an escape story as JSON, not a study question. The run opens on an ordinary day in this place, before anything has gone wrong; nobody in it knows what is coming. The building is the specific place the premise is set in (a radio station, clinic, hotel, archive, office and so on): its venue, rooms, furniture, finishes, signage and exterior must all read as that place. Do not output code, HTML, URLs, learner claims or mechanical rule changes. The engine realizes your choices as collision-tested geometry. Give every floor its own coherent purpose and story; tie signs and notes to this cast and premise. Vary actual spatial choices, furnishing, cast, atmosphere and tempo, not only names or random seeds. Recent fictional summaries identify designs to avoid. If repair is supplied, correct all listed failures while retaining the intended theme. Do not conceal an invalid plan or claim validation was performed.
 
 For retained request.version:1 only: If payload.designVersion is 2, return design.version:2 and include the scene objects below. If designVersion is absent, return design.version:1 and OMIT scene on every floor. Never upgrade a retained request or downgrade a version 2 request. Version3 structure requests use the exceptions stated above. setting and the tapered, notched and tee silhouettes belong to version 3 structures only: retained version 1 and 2 designs must omit setting and use rectangle, chamfered, stepped or waisted.
@@ -1189,8 +1454,8 @@ The common required design fields and bounds are:
 version:as requested above; title(1-64 characters), premise(1-240), opening(1-200), roofName(1-48). The title, premise and opening are shown to the player on the black opening card before play, so they set up only the place, the people and an ordinary-seeming tension (a storm, a shift, a deadline, a stranded crew); they must never name, hint at or foreshadow the catastrophe: no zombies, the dead or undead, corpses, infection, outbreak, plague, quarantine, hordes or anything rising, walking or coming back.
 footprint:{shape:${FOOTPRINT_SHAPES.join("|")},width:36|38|40,top:integer2..4,inset:integer2..4,mirrored:boolean,shoulder:integer top+8..top+14}. The footprint is the building's silhouette seen from above and from the street: rectangle is a plain block; chamfered cuts all four corners by inset; stepped narrows one side by inset beyond the shoulder row (mirrored picks the side); waisted pinches both sides by inset around the shoulder row; tapered narrows steadily from the full-width entrance front to a back narrower by inset on each side; notched cuts square inset notches into all four corners; tee keeps a full-width back block and a front wing narrower by inset on each side from the shoulder row. Choose the silhouette that suits this building.
 ${SETTING_GUIDANCE}
-floors:exactly4 entries in ascending order for an enclosed site and exactly1 (the ground plan) for an open one, each {name(1-48),family:stack|columns|serpentine,roomOrder:permutation[0,1,3],layoutSeed:uint32,roomTypes:4 entries indexed rooms0..3 each break|cubicles|meeting|storage|reception|manager (their meaning follows setting.venue),subroomKinds:1..4 unique entries office|meeting|storage|break,furnitureDensity:0.5..1.5,fieldQuotas:4 integers2..6 indexed rooms0..3 (the public entrance to room2 is always free; its outgoing field uses quota2),power:4 entries lit|dim|outage indexed rooms0..3 with room2 lit,stories:exactly6 {title(1-36),lines:1..4 strings each1-50},brokenGuard:{segment:3|4,bay:1|2}}. The six story cards are three wall posters, a whiteboard, a desk photo caption and a desk note. These are actual visible words, not instructions to a renderer. layoutSeed fills smaller geometrical details; family/order are your direct choices. Each ordinary floor keeps all four study rooms along the route; no bypasses. Free hall and entry remain readable. An open site furnishes its one floor's four rooms as outdoor zones (stall rows, plazas, pens, terraces) bounded by low fences, stalls and kerbs rather than walls, with its terminals in the open and roofName naming the ground extraction point; setting.form must match the premise, so open-air places are open and buildings are enclosed.
-Version3 floors also take roomShapes:4 entries indexed rooms0..3 each ${ROOM_SHAPES.join("|")}: how that study room and its sub-rooms are carved from the grid (chamfered cuts the corners at 45°, rounded curves them, octagon makes eight-sided rooms; rect keeps square corners). The engine keeps every route, terminal and exit valid and may square off a corner that would block one. Optional doors, on any floor: doors:exactly4 DoorDesign where doors[r] is the door leading out of room r and doors[2] also covers the hall entrance, and mainDoor:DoorDesign at the top level for the building's main entrance. DoorDesign:{material:wood|steel|glass|fire|security,color:hex,accent:hex,window:none|slit|half|full,label:1..32 short name shown to the player,health:integer400..2400 starting hit points}. Vary doors so they fit each room and the premise. Glass, half and full windows can be seen through when closed, and doors close themselves when a threat comes near. The engine always keeps door access rules and can raise the hall entrance's health to protect study time.
+floors:exactly4 entries in ascending order for an enclosed site and exactly1 (the ground plan) for an open one, each {name(1-48),family:stack|columns|serpentine,roomOrder:permutation[0,1,3],layoutSeed:uint32,roomTypes:4 entries indexed rooms0..3 each break|cubicles|meeting|storage|reception|manager (their meaning follows setting.venue),subroomKinds:1..4 unique entries office|meeting|storage|break,furnitureDensity:0.5..1.5,fieldQuotas:4 integers2..6 indexed rooms0..3 (the public entrance to room2 is always free; its outgoing field uses quota2),power:4 entries lit|dim|outage indexed rooms0..3 with room2 lit,stories:exactly6 {title(1-36),lines:1..4 strings each1-50},brokenGuard:{segment:3|4,bay:1|2}}. The six story cards are three wall posters, a whiteboard, a desk photo caption and a desk note. These are actual visible words, not instructions to a renderer. layoutSeed fills smaller geometrical details; family/order are your direct choices. Each ordinary floor keeps all four study rooms along the route unless it has a hall (below); no bypasses. Free hall and entry remain readable. An open site furnishes its one floor's four rooms as outdoor zones (stall rows, plazas, pens, terraces) bounded by low fences, stalls and kerbs rather than walls, with its terminals in the open and roofName naming the ground extraction point; setting.form must match the premise, so open-air places are open and buildings are enclosed.
+Version3 floors also take roomShapes:4 entries indexed rooms0..3 each ${ROOM_SHAPES.join("|")}: how that study room and its sub-rooms are carved from the grid (chamfered cuts the corners at 45°, rounded curves them, octagon makes eight-sided rooms; rect keeps square corners). The engine keeps every route, terminal and exit valid and may square off a corner that would block one. Version3 enclosed floors also take hall: null, or one large room that takes the place of two or three of the gated study rooms on that floor: an auditorium, star theatre, nave, hangar, arena, court, engine hall, ballroom, market hall. Use a hall wherever the premise has a big room; a place made only of small rooms reads as an office. hall:{rooms:2..3 distinct entries from 0|1|3 that are next to each other in that floor's roomOrder (all three makes a hall about 36 by 10-14 m; two leaves the third room beside it),focus:n|s|e|w the wall the hall faces (its stage, screen, altar or pulpit side; n is the stair-lobby side, s the entrance side),seating:rows|none (rows fills the hall with rows of this venue's seat for that room function, all facing the focus; give setting.filler for the hall's function a seat-role object such as a theatre seat, pew or bench),stage:null|{depth:integer${HALL_LIMITS.stage.depth.join("..")} metres of flat stage along the focus wall,height:${HALL_LIMITS.stage.height.join("..")} m},rake:${HALL_LIMITS.rake.join("..")} m the floor rises from the foot of the stage to the far wall (0 is flat; 0.9-1.5 is a raked auditorium or amphitheatre),pit:null|{width:integer${HALL_LIMITS.pit.width.join("..")},length:integer${HALL_LIMITS.pit.length.join("..")},drop:${HALL_LIMITS.pit.drop.join("..")} m} a sunken area in front of the stage (orchestra pit, arena floor, drained pool, inspection pit),platforms:0..${HALL_LIMITS.platforms} of {side:n|s|e|w,width:integer${HALL_LIMITS.platform.width.join("..")} along that wall,depth:integer${HALL_LIMITS.platform.depth.join("..")},height:${HALL_LIMITS.platform.height.join("..")} m} raised galleries, daises or loading decks against a wall}. The hall has a higher ceiling (3.4 m) than other rooms and no sub-rooms. The engine cuts every level change into 30 cm steps, so everyone can walk onto a stage, down into a pit and up the rake; door openings stay at floor height and cut a walkway through any raised area beside them. The hall holds all the study terminals of its merged rooms and has one exit door. The first entry of hall.rooms that comes first in roomOrder names the hall: its roomTypes, fieldQuotas, power, roomShapes and doors entries apply, and the other merged rooms' entries in those lists are ignored. scene.rooms still has all four rooms: the entries of the merged rooms each furnish a part of the same hall, so title them as parts of it (for example "Star Theatre: Projector Pit" and "Star Theatre: Upper Rows") and place their furniture with anchors across the whole hall. Optional doors, on any floor: doors:exactly4 DoorDesign where doors[r] is the door leading out of room r and doors[2] also covers the hall entrance, and mainDoor:DoorDesign at the top level for the building's main entrance. DoorDesign:{material:wood|steel|glass|fire|security,color:hex,accent:hex,window:none|slit|half|full,label:1..32 short name shown to the player,health:integer400..2400 starting hit points}. Vary doors so they fit each room and the premise. Glass, half and full windows can be seen through when closed, and a door stays where it is left: people open and close doors by hand. The engine always keeps door access rules and can raise the hall entrance's health to protect study time.
 Include titleCard at the top level of every new design (it is optional only so older designs stay valid): {title:TitleStyle,story:TitleStyle}. The game opens on a pure black screen showing the run's title in the title style, then the premise and opening as the scene-setting backstory in the story style, with a Start button beneath. TitleStyle:{font:one of the catalog grouped by feel (${titleCardFontsByGroup()}),color:six-digit hex readable on pure black (WCAG contrast at least 3 for title and 4.5 for story),size:integer pixels (title ${TITLE_CARD_SIZES.title[0]}..${TITLE_CARD_SIZES.title[1]}, story ${TITLE_CARD_SIZES.story[0]}..${TITLE_CARD_SIZES.story[1]})}. Choose the font, color and size of each so the card sets this premise's particular mood; vary them between runs instead of always choosing the same look, and keep the story readable as several sentences of body text. Pick from the group whose feel suits this premise, and pair a title face with a readable story face: a horror, handwritten, techno or display face is for the title, while the story should normally be sans, serif or mono so several sentences stay readable. The title, premise and opening are the first words the player reads on that black card, so they must never name, hint at or foreshadow the catastrophe; set up only the place, the people and an ordinary-seeming tension.
 roster:exactly19 {name:unique1-20 characters distinct from You,role:builder|analyst|rusher|medic|skeptic,skill:0.4..0.9,risk:0.2..0.8,social:0.2..0.8}. Build a varied ensemble; names referenced in stories must belong to it.
 city:{roadWidth:integer7..9,boulevardOffset:integer15..19,districtSize:integer18..25,buildingHeightMin:9..18,buildingHeightMax:25..45,damageRate:0..0.7,palette:3..6 six-digit hex colors}.

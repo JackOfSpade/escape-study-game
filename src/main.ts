@@ -70,8 +70,12 @@ import {
   endLoop,
   epilogueForNewGame,
   prepareCatastrophe,
+  prepareTruth,
 } from "./escape-prepare";
 import { escapeFrame, escapeInteract, escapeJournal } from "./escape-runtime";
+import { requestPlan } from "./director";
+import { fallbackTruth, parseTruthSheet, planTick } from "./escape-plan";
+import { installPlanBox } from "./plan-box";
 import { createEscapeState, loopReset } from "./escape-state";
 import { startTask, taskIndicator } from "./escape-tasks";
 import { taskAtStation, takeEscapeDecision } from "./escape-terminal";
@@ -83,6 +87,7 @@ import {
   claimStation,
   extractionFloor,
   human,
+  damageSurvivor,
   nearbyDoor,
   nearestGrip,
   nearestStation,
@@ -110,8 +115,6 @@ import {
   CONFIG,
   DEV,
   distance,
-  H,
-  W,
 } from "./model";
 import { outcomeIsVisible, presentNpcOutcome } from "./npc-outcome";
 import {
@@ -123,7 +126,6 @@ import {
   recover,
   save,
 } from "./persistence";
-import { camera } from "./camera";
 import {
   rememberVisibleTiles,
   render,
@@ -140,15 +142,13 @@ import {
 import { firstPersonInput } from "./view3d/math";
 import { FirstPersonView } from "./view3d/scene";
 import { lookTarget } from "./view3d/targeting";
+import { ghostActive, ghostNotice } from "./ghost-view";
+import { floorTitle, spectating } from "./spectator";
 import {
-  type SpectatorView,
-  SPECTATOR_ZOOM,
-  clampView,
-  floorTitle,
-  initialView,
-  spectating,
-  spectatorFloors,
-} from "./spectator";
+  escapeEndEyebrow,
+  escapeFloorLabel,
+  escapeObjective,
+} from "./escape-wording";
 import {
   enterRegion,
   exitSiteReached,
@@ -189,6 +189,8 @@ import {
   type RunTitleCard,
   type RunTitleCardStyle,
   type SavedRunDesign,
+  parseSavedRunDesign,
+  runDesignFingerprint,
 } from "./run-design-contract.mjs";
 import {
   enterStudyWorkspace,
@@ -216,8 +218,6 @@ let game: Game,
   lastUI = 0,
   lastSave = 0,
   editorRevision = 0,
-  // Free-look over the live building after the run ends. Page state only.
-  view: SpectatorView | undefined,
   // The human's last opened terminal; finalQuestion marks post-death answering.
   lastQuestion: string | undefined,
   finalQuestion = false;
@@ -372,11 +372,17 @@ function firstPersonPlaying() {
   const a = human(game);
   return (
     game.settings.view !== "top-down" &&
-    game.status === "playing" &&
-    a.alive &&
-    !a.escaped &&
+    (ghostActive(game) ||
+      (game.status === "playing" && a.alive && !a.escaped)) &&
     !game.studyWorkspace?.enabled &&
     game.id !== viewFailedRun
+  );
+}
+/** The living player is the one at the keyboard; a ghost only walks and looks. */
+function playerActing() {
+  const a = human(game);
+  return (
+    firstPersonPlaying() && game.status === "playing" && a.alive && !a.escaped
   );
 }
 function lookUiVisible() {
@@ -529,10 +535,8 @@ function prepareQuestion(e: Encounter): Promise<void> {
       if (game !== requestGame || game.encounters[e.id] !== e) return;
       if (e.problem) {
         showEmbeddedTerminal(e);
-        if (game.status === "dead" || game.status === "escaped") {
+        if (game.status === "dead" || game.status === "escaped")
           $("#start-card").hidden = true;
-          syncSpectatorBar();
-        }
       } else {
         questionChanged();
         // A request that failed may mean Claude went away; the terminal shows the steps.
@@ -637,7 +641,10 @@ function showPauseHome(focus?: HTMLElement) {
 }
 function openPanel(id: string, focus: string) {
   const menu = $<HTMLDialogElement>("#pause-menu");
-  if (!menu.open) setPaused(true);
+  if (!menu.open) {
+    if (game.studyWorkspace?.enabled) studyMenu(true);
+    else setPaused(true);
+  }
   showPauseHome();
   pausePanel = id;
   $("#pause-home").hidden = true;
@@ -726,7 +733,8 @@ function setPaused(paused: boolean) {
 }
 $("#pause-toggle").onclick = () =>
   setPaused(!$<HTMLDialogElement>("#pause-menu").open);
-$("#resume-game").onclick = () => setPaused(false);
+$("#resume-game").onclick = () =>
+  game.studyWorkspace?.enabled ? studyMenu(false) : setPaused(false);
 $("#restart-game").onclick = () => void fresh($("#pause-save-status"));
 $("#generate-run").onclick = () => void newGame($("#pause-save-status"));
 $("#save-quit").onclick = () => void saveAndQuit();
@@ -734,10 +742,23 @@ $("#pause-menu").addEventListener("cancel", (event) => {
   event.preventDefault();
   if (restarting) return;
   if (pausePanel) closePanel(pausePanel);
+  else if (game.studyWorkspace?.enabled) studyMenu(false);
   else setPaused(false);
 });
+/**
+ * The app is a learning workspace. The escape game is archived: its code
+ * stays in the repository and its browser tests still run, but only a build
+ * made with VITE_ARCHIVED_GAME=1 can reach it. No control in the interface
+ * leads to it.
+ */
+const STUDY_APP = import.meta.env.VITE_ARCHIVED_GAME !== "1";
+/** What the question's conversation partner is called. */
+const TUTOR = STUDY_APP ? "Tutor" : "Terminal AI";
+document.documentElement.classList.toggle("study-app", STUDY_APP);
 function setStudyMode(enabled: boolean) {
   if (saveRecoveryError) return;
+  // The workspace is the whole app: there is nothing to exit to.
+  if (!enabled && STUDY_APP) return;
   firstPersonControls.release();
   keys.clear();
   jumpRequested = false;
@@ -757,7 +778,7 @@ function setStudyMode(enabled: boolean) {
     exitStudyWorkspace(game);
   }
   document.documentElement.classList.toggle("study-only", enabled);
-  document.title = enabled ? "Learning workspace" : "zombie-escape-study-game";
+  document.title = enabled ? "Learning workspace" : "Escape Study Game";
   $(".game-layout").hidden = enabled;
   $("#study-workspace").hidden = !enabled;
   placeTerminal(enabled);
@@ -804,6 +825,31 @@ function renderStudyWorkspace() {
 $("#study-only-toggle").onclick = () => setStudyMode(true);
 $("#study-only-menu").onclick = () => setStudyMode(true);
 $("#study-only-exit").onclick = () => setStudyMode(false);
+/** When the workspace menu last closed: the Escape that closed it through the
+ * dialog's own cancel event must not open it again as a keydown. */
+let studyMenuClosedAt = -Infinity;
+/** The workspace menu: settings and nothing of the archived game. */
+function studyMenu(open: boolean) {
+  const menu = $<HTMLDialogElement>("#pause-menu");
+  showPauseHome();
+  if (!open) {
+    if (menu.open) menu.close();
+    studyMenuClosedAt = performance.now();
+    return;
+  }
+  setText("#pause-eyebrow", "LEARNING WORKSPACE");
+  setText("#pause-title", "Menu");
+  setText("#resume-game", "Close · Esc");
+  if (!menu.open) menu.showModal();
+  $("#settings-toggle").focus();
+}
+$("#study-menu").onclick = () => studyMenu(true);
+if (STUDY_APP) {
+  setText("#settings-title", "Settings");
+  setText("#pause-back", "← Back to menu");
+  $("#pause-back").setAttribute("aria-label", "Back to menu");
+  setText("#display-scale-label", "Text size");
+}
 $("#study-save-retry").onclick = () => void saveStudySession();
 $("#study-next").onclick = async () => {
   if (studyStarting) return;
@@ -902,7 +948,6 @@ function readyRun() {
   audio.stop();
   document.body.classList.remove("agent-tools", "surge");
   $<HTMLDialogElement>("#pause-menu").close();
-  leaveSpectator();
   startCard();
   $("#start").focus({ preventScroll: true });
 }
@@ -947,6 +992,14 @@ async function prepareLoggedCatastrophe(g: Game) {
     ...report,
     catastropheId: g.escape?.catastrophe.id ?? null,
     durationMs: Math.round(performance.now() - started),
+  });
+  // The sealed truth sheet is derived from the settled catastrophe: which
+  // ways out work in this game. A failed call leaves the seeded sheet.
+  const truthStarted = performance.now();
+  const truthSource = await prepareTruth(g).catch(() => "offline" as const);
+  runLogs.record(g, "truth-prepared", {
+    source: truthSource,
+    durationMs: Math.round(performance.now() - truthStarted),
   });
   void runLogs.flush();
 }
@@ -1044,7 +1097,6 @@ function startRun() {
   game.paused = false;
   running = true;
   quitMenu = false;
-  leaveSpectator();
   audio.start();
   audio.update(game);
   $("#start-card").hidden = true;
@@ -1382,9 +1434,18 @@ function startCard() {
     card.classList.add("title-card");
     card.innerHTML = titleCardHtml(game.design);
   } else if (game.status === "ready")
-    card.innerHTML = `${game.preparingRun ? '<span class="eyebrow">A NEW ESCAPE</span>' : ""}<h2>${game.design ? escape(game.design.design.title) : "The dead are<br>on your heels."}</h2><p>${game.design ? escape(game.design.design.premise) : "Twenty survivors. Four floors. Four seats.<br>Choose your route. Learn your way out."}</p>${game.preparingRun ? "<p>Claude will prepare your game session before play.</p>" : ""}<button id="start">${game.preparingRun ? "Prepare game ↗" : "Start game ↗"}</button><small class="agent-only">${escape(status().detail)}</small>`;
-  else
-    card.innerHTML = `<span class="eyebrow">${game.status === "escaped" ? "TRANSMISSION RECEIVED" : "SIGNAL LOST"}</span><h2>${game.status === "escaped" ? "You made it." : "Your work survives."}</h2><p>${escape(game.notice)}<br>${game.stats.rescued} extracted · ${game.stats.deaths} lost · ${Math.floor(game.endedAt ?? game.time)} seconds</p>${finishable ? '<button id="finish-question">Continue in the terminal</button>' : ""}<button id="again">Begin another run ↗</button><button id="backup" class="quiet agent-only">Export work & evidence</button><button id="spectate" class="quiet">Watch the building ↗</button>`;
+    card.innerHTML = `${game.preparingRun ? '<span class="eyebrow">A NEW ESCAPE</span>' : ""}<h2>${game.design ? escape(game.design.design.title) : "A life already<br>in motion."}</h2><p>${game.design ? escape(game.design.design.premise) : "Something is about to go wrong.<br>Learn your way out."}</p>${game.preparingRun ? "<p>Claude will prepare your game session before play.</p>" : ""}<button id="start">${game.preparingRun ? "Prepare game ↗" : "Start game ↗"}</button><small class="agent-only">${escape(status().detail)}</small>`;
+  else {
+    const endEyebrow = game.escape
+      ? escapeEndEyebrow(game)
+      : game.status === "escaped"
+        ? "TRANSMISSION RECEIVED"
+        : "SIGNAL LOST";
+    const endStats = game.escape
+      ? `${game.stats.deaths} lost · ${Math.floor(game.endedAt ?? game.time)} seconds`
+      : `${game.stats.rescued} extracted · ${game.stats.deaths} lost · ${Math.floor(game.endedAt ?? game.time)} seconds`;
+    card.innerHTML = `<span class="eyebrow">${endEyebrow}</span><h2>${game.status === "escaped" ? "You made it." : "Your work survives."}</h2><p>${escape(game.notice)}<br>${endStats}</p>${finishable ? '<button id="finish-question">Continue in the terminal</button>' : ""}<button id="again">Begin another run ↗</button><button id="backup" class="quiet agent-only">Export work & evidence</button><button id="spectate" class="quiet">Walk on as a ghost ↗</button>`;
+  }
   document.getElementById("start")?.addEventListener("click", begin);
   document.getElementById("finish-question")?.addEventListener("click", () => {
     if (finishable) openFinalQuestion(finishable);
@@ -1392,12 +1453,12 @@ function startCard() {
   document
     .getElementById("again")
     ?.addEventListener("click", () => void fresh(card.querySelector("p")!));
+  // Closing the card only uncovers the world: the ghost already walks in the
+  // first-person view, with no free camera to drive.
   document.getElementById("spectate")?.addEventListener("click", () => {
     card.hidden = true;
-    syncSpectatorBar();
     focusWorld();
   });
-  syncSpectatorBar();
   document
     .getElementById("backup")
     ?.addEventListener("click", () =>
@@ -1428,104 +1489,15 @@ function continueRun() {
   $("#start-card").hidden = true;
   setPaused(false);
 }
-/** The run is over: the whole building can be watched, floor by floor. */
-function enterSpectator() {
-  view = initialView(game);
-  document.body.classList.add("spectating");
-  renderSpectatorBar();
-  syncSpectatorBar();
-}
-function leaveSpectator() {
-  view = undefined;
-  document.body.classList.remove("spectating");
-  canvas.classList.remove("dragging");
-  syncSpectatorBar();
-}
-/** The floor bar shows only while the building is watched without the card. */
-function syncSpectatorBar() {
-  $("#spectator").hidden = !view || !$("#start-card").hidden;
-}
-function setView(next: SpectatorView) {
-  const changedFloor = next.floor !== view?.floor;
-  view = clampView(next, game);
-  if (changedFloor) {
-    renderSpectatorBar();
-    ui();
-  }
-}
-function renderSpectatorBar() {
-  if (!view) return;
-  const floors = $("#spectator-floors"),
-    current = view.floor;
-  if (!floors.childElementCount)
-    floors.innerHTML = spectatorFloors(game)
-      .map(
-        (f) =>
-          `<button type="button" class="quiet" data-floor="${f.floor}" title="${escape(f.title)}">${escape(f.label)}</button>`,
-      )
-      .join("");
-  for (const b of floors.querySelectorAll<HTMLButtonElement>("[data-floor]")) {
-    const active = Number(b.dataset.floor) === current;
-    b.classList.toggle("active", active);
-    b.setAttribute("aria-pressed", String(active));
-    b.onclick = () => {
-      if (!view) return;
-      // Another floor opens on its centre; the player's floor on the player.
-      setView({
-        ...view,
-        floor: Number(b.dataset.floor),
-        focus: { x: W / 2, y: H / 2 },
-      });
-      focusWorld();
-    };
-  }
-}
 $("#spectator-summary").onclick = () => startCard();
-// Dragging the frozen world pans it; the wheel zooms. Both are inert while a
-// run is playing.
-let dragging: number | undefined;
-canvas.addEventListener("pointerdown", (ev) => {
-  if (!view || !spectating(game) || ev.button !== 0) return;
-  dragging = ev.pointerId;
-  canvas.setPointerCapture(ev.pointerId);
-  canvas.classList.add("dragging");
-});
+// The run is over: the human walks on as a ghost. The spectator bar that once
+// held a free camera stays hidden, so nothing here pans or zooms the world.
+$("#spectator").hidden = true;
 canvas.addEventListener("pointermove", (ev) => {
   const box = canvas.getBoundingClientRect();
   setPointer(ev.clientX - box.left, ev.clientY - box.top);
-  if (dragging !== ev.pointerId || !view) return;
-  const rect = canvas.getBoundingClientRect(),
-    { scale } = camera(
-      rect.width,
-      rect.height,
-      view.focus,
-      view.zoom * displayScale(game.settings.displayScale),
-    );
-  setView({
-    ...view,
-    focus: {
-      x: view.focus.x - ev.movementX / scale,
-      y: view.focus.y - ev.movementY / scale,
-    },
-  });
 });
 canvas.addEventListener("pointerleave", () => setPointer());
-for (const type of ["pointerup", "pointercancel"] as const)
-  canvas.addEventListener(type, (ev) => {
-    if (dragging !== ev.pointerId) return;
-    dragging = undefined;
-    canvas.classList.remove("dragging");
-  });
-canvas.addEventListener(
-  "wheel",
-  (ev) => {
-    if (!view || !spectating(game)) return;
-    ev.preventDefault();
-    const step = ev.deltaY < 0 ? SPECTATOR_ZOOM.step : 1 / SPECTATOR_ZOOM.step;
-    setView({ ...view, zoom: view.zoom * step });
-  },
-  { passive: false },
-);
 /** A station by id, wherever in the building it stands. */
 function stationById(id: string) {
   for (const floor of game.floors) {
@@ -1740,7 +1712,6 @@ function openFinalQuestion(e: Encounter) {
   finalQuestion = true;
   showEmbeddedTerminal(e);
   void prepareQuestion(e);
-  syncSpectatorBar();
   focusWorld();
 }
 /** Leaving a post-death terminal re-assesses its evidence, then shows the end card. */
@@ -1766,7 +1737,7 @@ function leaveTerminal() {
 function engage() {
   if (!game.escape || game.status !== "playing" || game.paused) return;
   const a = human(game);
-  const yaw = firstPersonPlaying()
+  const yaw = playerActing()
     ? firstPersonControls.yaw
     : Math.atan2(a.heading.y, a.heading.x);
   // Writing in front of the player (a note, sign or screen) is read first.
@@ -1775,7 +1746,7 @@ function engage() {
     if (escapeRead(game, readable)) void persist();
     return;
   }
-  const target = firstPersonPlaying()
+  const target = playerActing()
     ? lookTarget(game, firstPersonControls.yaw)
     : undefined;
   const object =
@@ -1793,7 +1764,7 @@ function engage() {
 async function interact() {
   if (game.status !== "playing" || game.paused) return;
   const a = human(game);
-  if (firstPersonPlaying()) a.heading = firstPersonControls.facing;
+  if (playerActing()) a.heading = firstPersonControls.facing;
   if (a.grip) {
     toggleGrip(game, a);
     runLogs.record(game, "release");
@@ -1804,7 +1775,7 @@ async function interact() {
     return;
   }
   if (board(game, a)) return;
-  const target = firstPersonPlaying()
+  const target = playerActing()
     ? lookTarget(game, firstPersonControls.yaw)
     : undefined;
   if (target?.kind === "item") {
@@ -1867,7 +1838,28 @@ async function interact() {
       persist();
       return;
     }
-    if (door?.door && !door.door.latched)
+    if (game.escape && door && !door.field) {
+      // Escape games: E works the door by hand, opening a shut one and
+      // closing an open one. Nothing closes a door by itself.
+      const wasShut = door.door?.latched !== false,
+        done = toggleDoor(game, a, door.id);
+      runLogs.record(game, "door-interact", {
+        door: door.id,
+        released: wasShut && done,
+        closed: !wasShut && done,
+        latched: door.door?.latched,
+        floor: a.floor,
+        x: a.x,
+        y: a.y,
+      });
+      game.notice = done
+        ? wasShut
+          ? "Door unlatched. Push it open; press E at the door to close it again."
+          : "Door closed."
+        : wasShut
+          ? "The door will not open from here."
+          : "Something is in the doorway.";
+    } else if (door?.door && !door.door.latched)
       game.notice =
         "Push the door to swing it. E near its free end grips it for pulling; E releases.";
     else if (door) {
@@ -2151,7 +2143,9 @@ function syncReplyPause(time: number) {
 function renderRevealGate(e: Encounter) {
   setText(
     "#terminal-type",
-    `${e.mode === "shared" ? "LINKED ROOM · ONE WORKSPACE" : e.questionRoom ? "ROOM QUESTION · PRIVATE ANSWER" : "INDIVIDUAL STATION"} / QUESTION READY`,
+    STUDY_APP
+      ? "QUESTION READY"
+      : `${e.mode === "shared" ? "LINKED ROOM · ONE WORKSPACE" : e.questionRoom ? "ROOM QUESTION · PRIVATE ANSWER" : "INDIVIDUAL STATION"} / QUESTION READY`,
   );
   setText("#problem-title", "Your question is ready");
   setText(
@@ -2203,14 +2197,13 @@ function renderTerminal(force = false) {
   }
   composer.disabled = false;
   tab = terminalChannel(e);
-  setText(
-    "#conversation-title",
-    tab === "tutor" ? "Terminal AI" : "Group chat",
-  );
+  setText("#conversation-title", tab === "tutor" ? TUTOR : "Group chat");
   setText(
     "#conversation-context",
     tab === "tutor"
-      ? "Answer and reason here. Terminal AI assumes you already know this and asks one focused question at a time; a good answer can also settle the prerequisites it genuinely depends on. If you do not know something, say so: the gap is recorded for later study and the key is still granted. Access and a key are awarded when it marks the conversation complete."
+      ? STUDY_APP
+        ? "Answer and reason here. Your tutor assumes you already know this and asks one focused question at a time; a good answer can also settle the prerequisites it genuinely depends on. If you do not know something, say so: the gap is recorded for later study."
+        : "Answer and reason here. Terminal AI assumes you already know this and asks one focused question at a time; a good answer can also settle the prerequisites it genuinely depends on. If you do not know something, say so: the gap is recorded for later study and the key is still granted. Access and a key are awarded when it marks the conversation complete."
       : "Discuss with your group. They can read the current answer draft. Chatting does not submit it.",
   );
   setText(
@@ -2231,12 +2224,14 @@ function renderTerminal(force = false) {
     e.state === "consumed"
       ? `${
           conceded.length
-            ? `Solved with a recorded gap · personal access and key awarded. Recorded for later study: ${conceded.map((r) => r.facet.description).join("; ")}.`
-            : "Solved · personal access and key awarded."
+            ? `Solved with a recorded gap${STUDY_APP ? "" : " · personal access and key awarded"}. Recorded for later study: ${conceded.map((r) => r.facet.description).join("; ")}.`
+            : STUDY_APP
+              ? "Solved."
+              : "Solved · personal access and key awarded."
         } You can keep discussing the question.${probeLine ? ` ${probeLine}.` : ""}`
       : probeLine
-        ? `Knowledge probe · ${probeLine}. Say so if you do not know something; the gap is recorded and the key still granted.`
-        : "Work through the question with Terminal AI. Your answers stay in this conversation.",
+        ? `Knowledge probe · ${probeLine}. Say so if you do not know something; the gap is recorded${STUDY_APP ? "" : " and the key still granted"}.`
+        : `Work through the question with ${STUDY_APP ? "your tutor" : "Terminal AI"}. Your answers stay in this conversation.`,
   );
   if (force || document.activeElement !== composer)
     composer.value = e.chatDraft ?? "";
@@ -2245,13 +2240,17 @@ function renderTerminal(force = false) {
   $("#submission-help").hidden = dialogue;
   $("#chat-input").setAttribute(
     "aria-label",
-    dialogue ? "Message Terminal AI" : "Message",
+    dialogue
+      ? `Message ${STUDY_APP ? "your tutor" : "Terminal AI"}`
+      : "Message",
   );
   editor.dataset.mode = e.problem?.runtime ? "code" : "text";
   presentProblem(game, e, roadmap);
   setText(
     "#terminal-type",
-    `${e.mode === "shared" ? "LINKED ROOM · ONE WORKSPACE" : e.questionRoom ? "ROOM QUESTION · PRIVATE ANSWER" : "INDIVIDUAL STATION"} / ${e.reward === "loot" ? "EQUIPMENT CACHE" : "PERSONAL STAIR ACCESS"}`,
+    STUDY_APP
+      ? "QUESTION"
+      : `${e.mode === "shared" ? "LINKED ROOM · ONE WORKSPACE" : e.questionRoom ? "ROOM QUESTION · PRIVATE ANSWER" : "INDIVIDUAL STATION"} / ${e.reward === "loot" ? "EQUIPMENT CACHE" : "PERSONAL STAIR ACCESS"}`,
   );
   setText(
     "#problem-title",
@@ -2611,7 +2610,7 @@ function renderTerminal(force = false) {
           .filter(Boolean)
           .map(
             (text) =>
-              `<div class="message tutor"><strong>Terminal AI</strong><div class="message-body">${markdownToHtml(text!)}</div></div>`,
+              `<div class="message tutor"><strong>${TUTOR}</strong><div class="message-body">${markdownToHtml(text!)}</div></div>`,
           )
           .join("")
       : "");
@@ -3041,7 +3040,8 @@ $("#display-scale").oninput = () => {
 $("#display-scale").onchange = () => void persist();
 $("#settings-toggle").onclick = () => {
   syncDisplayScale();
-  if ($("#settings").hidden) openPanel("settings", "#volume");
+  if ($("#settings").hidden)
+    openPanel("settings", STUDY_APP ? "#settings-career-focus" : "#volume");
   else closePanel("settings");
   $<HTMLInputElement>("#volume").value = String(game.settings.volume);
   $<HTMLInputElement>("#captions").checked = game.settings.captions;
@@ -3119,7 +3119,6 @@ async function restoreRunBackup(file: File) {
     );
     closeTerminal();
     game = next;
-    leaveSpectator();
     saveRecoveryError = "";
     lastQuestion = latestStudyEncounter(game);
     resumeQuestions();
@@ -3136,13 +3135,11 @@ async function restoreRunBackup(file: File) {
       return;
     }
     startCard();
-    if (spectating(game)) {
-      enterSpectator();
-      if (pendingQuestion() || unfinishedLastQuestion(game, lastQuestion)) {
-        $("#start-card").hidden = true;
-        syncSpectatorBar();
-      }
-    }
+    if (
+      spectating(game) &&
+      (pendingQuestion() || unfinishedLastQuestion(game, lastQuestion))
+    )
+      $("#start-card").hidden = true;
     closePanel("settings");
     setPaused(true);
   } catch (err) {
@@ -3165,19 +3162,23 @@ function moveInput(held: ReadonlySet<string>) {
       Number(held.has("KeyW") || held.has("ArrowUp")),
   };
 }
-const PAN_KEYS = [
-  "ArrowUp",
-  "ArrowDown",
-  "ArrowLeft",
-  "ArrowRight",
-  "KeyW",
-  "KeyA",
-  "KeyS",
-  "KeyD",
-];
 window.addEventListener("keydown", (ev) => {
   // Study view never reveals the game through Escape or gameplay shortcuts.
-  if (game.studyWorkspace?.enabled) return;
+  if (game.studyWorkspace?.enabled) {
+    // In the workspace app Escape opens its own menu (the dialog's cancel
+    // event closes it again).
+    if (
+      STUDY_APP &&
+      ev.code === "Escape" &&
+      !ev.repeat &&
+      !$<HTMLDialogElement>("#pause-menu").open &&
+      performance.now() - studyMenuClosedAt > 200
+    ) {
+      ev.preventDefault();
+      studyMenu(true);
+    }
+    return;
+  }
   // Let the design modal own its keyboard, including native Escape dismissal.
   if (document.querySelector<HTMLDialogElement>("#run-design-dialog")?.open)
     return;
@@ -3199,33 +3200,24 @@ window.addEventListener("keydown", (ev) => {
       leaveTerminal();
       return;
     }
-    if (spectating(game) && view) {
-      // Esc toggles the run summary over the watched building.
-      const card = $("#start-card");
-      if (card.hidden) startCard();
-      else {
-        card.hidden = true;
-        syncSpectatorBar();
-        focusWorld();
-      }
-    } else setPaused(true);
+    setPaused(true);
     return;
   }
   if ($<HTMLDialogElement>("#pause-menu").open) return;
-  if (spectating(game) && view) {
-    if (ownsKeyboard(ev.target) || !PAN_KEYS.includes(ev.code)) return;
-    ev.preventDefault();
-    keys.add(ev.code);
-    return;
-  }
-  if (game.status !== "playing" || game.paused || ownsKeyboard(ev.target))
-    return;
-  if (ev.code === "KeyJ") {
+  const playing = game.status === "playing",
+    ghost = !playing && ghostActive(game);
+  if (game.paused || ownsKeyboard(ev.target) || (!playing && !ghost)) return;
+  if (playing && ev.code === "KeyJ") {
     journalOpen = !journalOpen;
     syncEscapeHud();
     return;
   }
-  if (ev.code === "Tab" && firstPersonControls.isLocked && !lookUiVisible()) {
+  if (
+    playing &&
+    ev.code === "Tab" &&
+    firstPersonControls.isLocked &&
+    !lookUiVisible()
+  ) {
     // Esc opens the pause menu before keyboard focus can leave captured play.
     ev.preventDefault();
     return;
@@ -3243,9 +3235,15 @@ window.addEventListener("keydown", (ev) => {
     ev.preventDefault();
   keys.add(ev.code);
   if (ev.repeat) return;
-  if (ev.code === "KeyE") void interact();
-  if (ev.code === "KeyF" && game.escape) engage();
+  // A ghost walks and jumps with the same keys, and does nothing else.
+  if (playing && ev.code === "KeyE") void interact();
+  if (playing && ev.code === "KeyF" && game.escape) engage();
   if (ev.code === "Space") {
+    // A ghost's Space only jumps: it can neither break free nor vault.
+    if (ghost) {
+      jumpRequested = true;
+      return;
+    }
     // Escorted? Space is the break-free gesture, not a jump or a vault.
     if (breakFree(game)) return;
     if (game.rules === "force-fields") {
@@ -3255,7 +3253,7 @@ window.addEventListener("keydown", (ev) => {
     const a = human(game),
       { x, y } = moveInput(keys),
       n = Math.hypot(x, y);
-    if (firstPersonPlaying()) a.heading = firstPersonControls.facing;
+    if (playerActing()) a.heading = firstPersonControls.facing;
     else if (n) a.heading = { x: x / n, y: y / n };
     const jumped = vault(game, a);
     runLogs.record(game, "vault-attempt", {
@@ -3435,9 +3433,12 @@ function ui() {
   document.body.classList.toggle("reduced", game.settings.reducedFlash);
   $("#bridge-label").textContent =
     `${status().label} · ${game.study.profile ?? "development"} profile`;
-  const shown = spectating(game) && view ? view.floor : a.floor;
-  $("#floor-label").textContent = floorTitle(shown, game);
-  $("#floor-name").textContent = game.floors[shown].name;
+  const escapeRun = !!game.escape;
+  const shown = a.floor;
+  $("#floor-label").textContent = escapeRun
+    ? escapeFloorLabel(game, shown)
+    : floorTitle(shown, game);
+  $("#floor-name").textContent = escapeRun ? "" : game.floors[shown].name;
   $("#health").textContent = String(Math.ceil(a.hp));
   $("#health-fill").style.width = `${a.hp}%`;
   // The HUD overlays the canvas; write to it only when a value changes so the
@@ -3446,10 +3447,12 @@ function ui() {
   const fill = `${Math.round(a.hp)}%`;
   if ($("#hud-health-fill").style.width !== fill)
     $("#hud-health-fill").style.width = fill;
-  setText(
-    "#hud-keys",
-    `${a.keys ?? 0} ${(a.keys ?? 0) === 1 ? "key" : "keys"}`,
-  );
+  $("#hud-keys").hidden = escapeRun;
+  if (!escapeRun)
+    setText(
+      "#hud-keys",
+      `${a.keys ?? 0} ${(a.keys ?? 0) === 1 ? "key" : "keys"}`,
+    );
   $("#alive").textContent = String(
     game.survivors.filter((a) => a.alive && !a.escaped).length,
   );
@@ -3458,8 +3461,13 @@ function ui() {
   syncNotice();
   // The pickup level of this run: a building's roof, an open site's ground.
   const pickupFloor = extractionFloor(game);
-  $("#next-title").textContent =
-    game.status === "escaped"
+  const escapeNext = escapeRun ? escapeObjective(game) : undefined;
+  // The title keeps the run's outcome; a ghost's description says what it
+  // now is, whatever the run was.
+  const ghostText = ghostActive(game) ? ghostNotice() : undefined;
+  $("#next-title").textContent = escapeNext
+    ? escapeNext.title
+    : game.status === "escaped"
       ? "Extraction confirmed."
       : game.status === "dead"
         ? "Escape attempt ended."
@@ -3470,24 +3478,28 @@ function ui() {
             : a.access.includes(a.floor)
               ? "Find the upward stairs."
               : "Buy yourself some time.";
-  $("#next-description").textContent =
-    game.status === "escaped" || game.status === "dead"
-      ? "Review your saved work or begin another run."
-      : game.time < spawnGrace(game)
-        ? game.rules === "force-fields"
-          ? `Swarm begins in ${Math.ceil(spawnGrace(game) - game.time)}s. Press E to open a green-lit door; it closes behind you. E uses a key on a red-lit door.`
-          : `Zombies spawn in ${Math.ceil(spawnGrace(game) - game.time)}s. E releases a door latch; move to push it open.`
-        : a.floor === pickupFloor
-          ? isOpenSite(game)
-            ? "Reach the ground pad and press E while a helicopter is boarding. Four seats per trip."
-            : "Reach the helipad and press E while a helicopter is boarding. Four seats per trip."
-          : a.access.includes(a.floor)
-            ? "Your credential is personal. Walk into the staircase at the north edge of the floor. Space jumps; watch for broken guards."
-            : game.rules === "force-fields"
-              ? "Solve a solo terminal for personal stair access and one key. Other entrance passes run out; the rear study hall stays available. Press E to open a door; a door someone else opened still stops you without access. E uses a key on a red-lit door. Space jumps."
-              : "Find a glowing terminal. Solo work or meaningful shared-room defense can earn your credential. Walk into light furniture to push it; E grips heavier pieces to drag and pivot. Space jumps; facing a barricade vaults it.";
-  $("#pickup").textContent =
-    game.status === "escaped"
+  $("#next-description").textContent = ghostText
+    ? `${ghostText.title} ${ghostText.description}`
+    : escapeNext
+      ? escapeNext.description
+      : game.status === "escaped" || game.status === "dead"
+        ? "Review your saved work or begin another run."
+        : game.time < spawnGrace(game)
+          ? game.rules === "force-fields"
+            ? `Swarm begins in ${Math.ceil(spawnGrace(game) - game.time)}s. Press E to open a green-lit door; it closes behind you. E uses a key on a red-lit door.`
+            : `Zombies spawn in ${Math.ceil(spawnGrace(game) - game.time)}s. E releases a door latch; move to push it open.`
+          : a.floor === pickupFloor
+            ? isOpenSite(game)
+              ? "Reach the ground pad and press E while a helicopter is boarding. Four seats per trip."
+              : "Reach the helipad and press E while a helicopter is boarding. Four seats per trip."
+            : a.access.includes(a.floor)
+              ? "Your credential is personal. Walk into the staircase at the north edge of the floor. Space jumps; watch for broken guards."
+              : game.rules === "force-fields"
+                ? "Solve a solo terminal for personal stair access and one key. Other entrance passes run out; the rear study hall stays available. Press E to open a door; a door someone else opened still stops you without access. E uses a key on a red-lit door. Space jumps."
+                : "Find a glowing terminal. Solo work or meaningful shared-room defense can earn your credential. Walk into light furniture to push it; E grips heavier pieces to drag and pivot. Space jumps; facing a barricade vaults it.";
+  $("#pickup").textContent = escapeRun
+    ? ""
+    : game.status === "escaped"
       ? `PICKUP ${game.helicopter.trip} · EXTRACTED`
       : game.status === "dead"
         ? ""
@@ -3590,10 +3602,9 @@ function ui() {
     document.body.classList.remove("terminal-open");
     finalQuestion = false;
     void persist();
-    enterSpectator();
+    // The card closes on the ghost's own view, or opens the last question.
     if (unfinished) {
       $("#start-card").hidden = true;
-      syncSpectatorBar();
     } else startCard();
   }
 }
@@ -3672,8 +3683,8 @@ function frame(time: number) {
     acc += elapsed;
     let count = 0;
     while (acc >= 1 / 30 && count++ < 6) {
-      const focused =
-        game.status !== "playing" || ownsKeyboard(document.activeElement);
+      const controllable = game.status === "playing" || ghostActive(game);
+      const focused = !controllable || ownsKeyboard(document.activeElement);
       const { x, y } = focused ? { x: 0, y: 0 } : moveInput(keys);
       const stepStarted = performance.now();
       const input =
@@ -3718,6 +3729,17 @@ function frame(time: number) {
         game.status = "escaped";
         game.endedAt = game.time;
       }
+      // The player's own plan: each step is answered by the world when it is
+      // actually tried, and the last one decides whether it was a way out.
+      const effect = planTick(game, steps / 30);
+      if (effect.kind === "escape") {
+        game.status = "escaped";
+        game.endedAt = game.time;
+        void persist();
+      } else if (effect.kind === "die")
+        damageSurvivor(game, human(game), 1e6, effect.cause);
+      else if (effect.kind === "harm")
+        damageSurvivor(game, human(game), effect.amount, effect.cause);
     }
     // A region switch prepared by the director swaps the active game.
     const next = game.escape ? takeAreaSwitch(game) : undefined;
@@ -3746,16 +3768,6 @@ function frame(time: number) {
     firstPersonPlaying() ? firstPersonControls.look() : undefined,
   );
   npcVoices.update(game);
-  if (view && spectating(game) && !game.paused) {
-    // Held keys pan the free camera over the live floor.
-    const pan = (16 * elapsed) / view.zoom,
-      { x, y } = moveInput(keys);
-    if (x || y)
-      setView({
-        ...view,
-        focus: { x: view.focus.x + x * pan, y: view.focus.y + y * pan },
-      });
-  }
   const renderStarted = performance.now();
   syncGameView();
   syncReplyPause(time);
@@ -3783,11 +3795,11 @@ function frame(time: number) {
         // A failed 3D view immediately restores Classic.
         render(canvas, game);
       }
-    } else render(canvas, game, spectating(game) ? view : undefined);
+    } else render(canvas, game);
   }
   firstPersonHud.update(
     game,
-    firstPersonPlaying(),
+    playerActing(),
     firstPersonControls.isLocked,
     lookUiVisible() || ownsKeyboard(document.activeElement),
     time,
@@ -3845,8 +3857,9 @@ Object.assign(window, {
     get game() {
       return game;
     },
-    get view() {
-      return view;
+    /** There is no free camera any more: the ghost walks the world itself. */
+    get view(): undefined {
+      return undefined;
     },
     roadmap,
     interact,
@@ -3898,14 +3911,14 @@ let restoreStudyView = !!game.studyWorkspace?.enabled;
 try {
   restoreStudyView ||= localStorage.getItem(STUDY_VIEW_KEY) === "1";
 } catch {}
+// The workspace app always opens in the workspace, whatever was saved.
+restoreStudyView ||= STUDY_APP && !saveRecoveryError;
 if (restoreStudyView) setStudyMode(true);
 else if (game.paused) setPaused(true);
 if (!restoreStudyView && spectating(game)) {
-  enterSpectator();
-  if (pendingQuestion() || unfinishedLastQuestion(game, lastQuestion)) {
+  // A restored, finished run opens the terminal's question, not a camera.
+  if (pendingQuestion() || unfinishedLastQuestion(game, lastQuestion))
     $("#start-card").hidden = true;
-    syncSpectatorBar();
-  }
 }
 resumeQuestions();
 // In-world player speech is installed once for the life of the page; the host
@@ -3916,5 +3929,93 @@ installPlayerChat({
   keyboardBusy: () => ownsKeyboard(document.activeElement),
   log: (type, data) => runLogs.record(game, type, data),
 });
+/**
+ * Load a hand-written level from `public/playtest/<name>.json` as a ready
+ * escape game: its design, its catastrophe wording and its sealed truth
+ * sheet, with no model call. Meant for a dev server (its own origin and
+ * storage); it refuses to replace a level the AI generated.
+ */
+async function startPlaytest(name: string) {
+  if (!/^[a-z0-9-]{1,40}$/.test(name)) return;
+  if (game.design?.source === "claude-cli") {
+    game.notice =
+      "A playtest level would replace your generated level, so it was not loaded. Open it on a dev server instead.";
+    return;
+  }
+  try {
+    const response = await fetch(`playtest/${name}.json`, {
+      cache: "no-store",
+    });
+    if (!response.ok) throw Error(`no playtest level named ${name}`);
+    const file = (await response.json()) as {
+      seed?: number;
+      design?: unknown;
+      catastrophe?: Record<string, unknown>;
+      truth?: unknown;
+    };
+    const saved = parseSavedRunDesign({
+      version: 1,
+      source: "fixture",
+      requestId: `design-playtest-${name}`,
+      generationId: `design-playtest-${name}`,
+      fingerprint: runDesignFingerprint(
+        file.design as SavedRunDesign["design"],
+      ),
+      design: file.design,
+    });
+    const previous = game;
+    delete previous.study.pending;
+    game = newPlayableGame(
+      Number.isSafeInteger(file.seed) ? (file.seed as number) : 4242,
+      previous.study,
+      saved,
+    );
+    game.settings = previous.settings;
+    const state = createEscapeState(game, {
+      gender: "female",
+      seed: game.seed,
+    });
+    game.escape = state;
+    dropHordeNotice(game);
+    // The offline catastrophe keeps its mechanics; the file gives it words
+    // that belong to this place.
+    const words = file.catastrophe ?? {};
+    const line = (value: unknown, max: number) =>
+      typeof value === "string" && value.trim() && value.length <= max
+        ? value.trim()
+        : undefined;
+    state.catastrophe.title = line(words.title, 80) ?? state.catastrophe.title;
+    state.catastrophe.premise =
+      line(words.premise, 600) ?? state.catastrophe.premise;
+    state.catastrophe.publicStory =
+      line(words.publicStory, 240) ?? state.catastrophe.publicStory;
+    state.catastrophe.origin.roomHint =
+      line(words.roomHint, 80) ?? state.catastrophe.origin.roomHint;
+    state.truth = parseTruthSheet(file.truth) ?? fallbackTruth(game.seed);
+    active = undefined;
+    lastQuestion = undefined;
+    completionCursor = 0;
+    closeTerminal();
+    readyRun();
+    await persist();
+  } catch (error) {
+    game.notice = `The playtest level could not be loaded: ${String(error)}`;
+  }
+}
+// The plan box (P): the character thinks of a way out and the world makes it
+// something to try. Installed once; it reads the current game.
+installPlanBox({
+  game: () => game,
+  keyboardBusy: () => ownsKeyboard(document.activeElement),
+  submit: (text) => {
+    keys.clear();
+    if (requestPlan(game, text, () => void persist())) void persist();
+  },
+  log: (type, data) => runLogs.record(game, type, data),
+});
 ui();
 requestAnimationFrame(frame);
+{
+  const playtest = new URLSearchParams(location.search).get("playtest");
+  if (playtest && !STUDY_APP) void startPlaytest(playtest);
+}

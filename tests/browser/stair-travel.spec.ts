@@ -123,7 +123,7 @@ test("walking into the personal staircase starts a saved flight; leaving the wel
   });
   expect(arrived.event.at - saved.start).toBeGreaterThanOrEqual(2 - 1e-8);
   expect(arrived.study).toBe(baseline.study);
-  expect(arrived.access).toEqual([0]);
+  expect(arrived.access).toEqual([0, 1, 2, 3, 4]);
   expect(
     Math.hypot(arrived.x - arrived.entry.x, arrived.y - arrived.entry.y),
   ).toBeLessThan(0.1);

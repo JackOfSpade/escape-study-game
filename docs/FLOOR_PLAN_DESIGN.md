@@ -196,6 +196,169 @@ sides.
   sub-room has exactly one doorway; the existing egress, free-study,
   clearance and spacing checks. Version 3/4 floors keep the existing checks.
 
+## Hall rooms (`floors[].hall`)
+
+A version 3 design for an enclosed building may give a floor a hall: one large
+room in place of two or three of the gated study rooms (`room0`, `room1`,
+`room3`; never the free hall `room2`). The merged rooms must be adjacent in
+`roomOrder`. Designs without the field, and every saved floor, are unchanged.
+
+- **Chain.** The planner paints the chosen family as usual, then opens the
+  walls between the merged rooms' chain orders (`mergeOrders` in
+  `src/office-plan.ts`), so the floor has five or four sectors instead of six.
+  The hall sector keeps the id and `room` of the first merged room in the
+  chain and lists all of them in `Sector.merged`; `sectorOfRoom(f, room)`
+  resolves any study room to its sector. A hall has no sub-rooms and its
+  outline may be up to six rects.
+- **Invariants that still hold.** Every sector is still a cut between entry
+  and stairs with exactly one field per consecutive pair. The hall holds every
+  terminal of its merged rooms (stations keep their own `questionRoom`), so a
+  floor's terminal count, the free hall and the zero-key rule are unchanged.
+  What changes is the number of gated fields: one per hall instead of one per
+  merged room, with the first merged room's quota. `f.doors[n]` and
+  `f.rooms[n].forwardEntry/forwardExit` of every merged room point at the
+  hall's gates. `pursuitLayoutErrors` checks the shorter chain against the
+  floor's design.
+- **Scene.** `scene.rooms` still has four entries. The entries of merged rooms
+  are placed inside the hall under their own room number, and each gets its
+  own plaque position along the hall's walls.
+- **Levels** (`src/floor-levels.ts`). `hall.stage`, `rake`, `pit` and
+  `platforms` become a height per hall cell in 15 cm units, stored as
+  `Floor.generation.levels`. `buildHallLevels` keeps cells within two cells of
+  a field opening at storey height and then lowers every cell until no two
+  neighbours differ by more than 30 cm, so every level change is a flight of
+  steps and nothing is a sheer edge; a raised area keeps its authored flat
+  size and its steps are cut from extra cells in front of it. Walking,
+  routing, sight and sound stay flat per storey. The level decides the height
+  of the floor, the furniture, the terminals and the people on a cell
+  (`groundLevel` blends between cell centres), and the player's jump physics
+  lands on it (`src/elevated-physics.ts`). `levelErrors` validates stored
+  levels.
+- **Height.** A hall's ceiling is 3.38 m instead of 2.82 m
+  (`ceilingHeight`); the storey's walls are drawn from its lowest level to the
+  hall ceiling.
+- **Seating.** `hall.seating: "rows"` fills the hall with rows of four seats
+  facing `hall.focus` (`hallRows` in `src/office-layout.ts`), using the seat
+  role from the venue's filler for the hall's room function, before the
+  function's ordinary filler.
+- **Limits.** No walkable space above walkable space (a platform is solid
+  underneath), no ceiling taller than the storey, and a hall in a building
+  stamped into a shared world as an extra site is flat: stamping does not
+  carry `generation.levels`.
+
+## Drawn floors (design version 4, generation version 6)
+
+A version 4 design draws every storey itself, and fresh design requests produce
+version 4. It is a version 3 structure whose `floors[]` entries are
+`RunFreeFloor` instead of chain floors (one to four of them), with
+`setting.venue: "custom"`, `setting.filler: null` and a top-level `stairs`. Versions 1 to 3 keep loading and building through the
+chain planner above.
+
+```ts
+interface RunFreeFloor {
+  name: string;
+  furnitureDensity: number;
+  concourse: { pattern; filler }; // the open floor between rooms
+  rooms: RunFreeRoom[]; // 1..8
+  scene: SceneFloorStructure; // one entry per drawn room, room = its index
+}
+interface RunFreeRoom {
+  name: string;
+  pattern:
+    | "rows"
+    | "clusters"
+    | "counter"
+    | "lounge"
+    | "table"
+    | "shelving"
+    | "display"
+    | "bays"
+    | "desk"
+    | "open";
+  filler: string[]; // built-in kinds or setting.objects ids, signature first
+  x: number;
+  y: number;
+  w: number;
+  h: number; // interior, building cells
+  shape: "rect" | "chamfered" | "rounded" | "octagon";
+  power: "lit" | "dim" | "outage";
+  // two-cell doorways; door is null (open gap) or a hinged door's DoorDesign
+  doors: { side: "n" | "s" | "e" | "w"; at: number; door }[];
+  work: number; // study work points placed in the room
+  hall: null | { focus; seating; stage; rake; pit; platforms };
+}
+```
+
+`freePlanLayout` (`src/free-plan.ts`) builds the floor in place of
+`planOfficeFloor`:
+
+- **Shell and markers** are unchanged: the footprint, the entrance lane, the
+  stair wells and markers, and the main gate on the ground floor.
+- **Rooms** are walled rectangles; cells outside the shell are simply solid.
+  Interiors need one cell between them (one cell is a shared wall). Everything
+  not covered is the **concourse**, sector `entry`, order 0. Each room is
+  sector `room{i}` with `room: i` and one block. There is no `lobby`, no
+  chain order and no force field except the main gate.
+- **Doorways** are two open cells in a room's wall, recorded in
+  `generation.doorways`. A door must face open floor or a room one wall cell
+  away. `fieldClearance` keeps furniture off them. Each doorway's `door` is
+  null (an open gap) or a `DoorDesign`: then a plain hinged door
+  `f{n}-room{i}-door{d}` (kind `door`, no `field`, the design's style and
+  health) stands latched in it until someone opens it by hand.
+- **Work points** are the floor's study stations: `work` per room, placed on a
+  lattice clear of walls and doorways. Stations keep `questionRoom`
+  `f{n}-room{i}`.
+- **Shapes** reuse `carveRoomShapes` with each room's `shape`. **Hall
+  features** reuse the levels above: any room with `hall` is a hall sector
+  (`Sector.hall`), so a floor may have several.
+- **Furnishing.** Each room is a zone furnished by `planPattern`
+  (`src/office-layout.ts`) from its own `pattern` and `filler`; concourse
+  blocks at least 4 cells wide and 24 cells in area use `concourse`.
+  `rows`, `display` and `bays` are their own arrangements; the other patterns
+  reuse the arrangement of an office function with the room's own list.
+- **What the engine checks** (`freePlanErrors`, reported per room in one
+  error for the repair loop): rooms inside the interior, not overlapping, not
+  covering the entrance lane or a stair approach; every door opens somewhere;
+  the stairs, every room, every open cell and every work point can be walked
+  to from the entrance; the stairs and one door of every room are reached
+  through passages two cells wide; work points have clearance and spacing;
+  stepped levels are walkable.
+- **Storeys.** An enclosed version 4 design authors one to four floors; the
+  roof is the floor above the last storey. `Floor.roof` records the roof
+  index on every floor when it is not four, and `roofIndexOf(f)` replaces the
+  old constant everywhere a roof or a top storey is tested. When a taller
+  neighbouring building is stamped beside a shorter start building,
+  `stampSite` adds solid world layers so the neighbour keeps every storey.
+- **Stairs.** `stairs: null` keeps the wells in the north and south walls and
+  the outside stair on the east face. `stairs: {x, y}` places an interior
+  stair core instead (`src/stair-core.ts`, `Floor.stairCore`): 4 cells wide
+  and 9 long, the same cells on every level and the roof. Its end strips are
+  landings; between them two flights run side by side, the even levels
+  climbing the west pair southward and the odd levels the east pair back. On a
+  level its own flight and the opening of the flight from below are solid
+  tiles to the flat simulation, and `f.stairs` and `f.entry` are markers on
+  the landings, so people on foot use timed travel between them exactly as
+  with wall wells. The flights themselves are `Slab`s in `exteriorStructure`
+  (one per level, solid down to their own floor, with rails along them and
+  around each opening), so the stair gallery renderer draws them and the
+  player's body walks them. A core needs 3 open cells beyond each landing,
+  must stay inside the shell, off the entrance lane and clear of the roof
+  pickup pad; rooms may not cover it. Stamped neighbours carry their core in
+  `Floor.cores`.
+- **Cast and dropped fields.** A version 4 roster has 4 to 24 people
+  (`CAST_LIMITS`), and each `role` is the design's own words for what that
+  person does; authority and radios are read from those words
+  (`AUTHORITY_ROLE`, `RADIO_ROLE` in `src/npc-social.ts`). The world creates
+  exactly that many NPCs. Version 4 has no `city`, no `pacing`, and its
+  `exterior` is only the building's name and subtitle: there is no engine
+  street grid, horde or helicopter tempo, entrance notice board or skyline to
+  fill in, and the contract names any of these fields it finds so a repair
+  can remove them.
+- **What is still fixed:** the shell silhouettes, the entrance position and a
+  flat roof; a stair core always runs north to south. The legacy study economy (enough free terminals for
+  every survivor) is not guaranteed on a drawn floor; escape games do not use
+  it.
+
 ## Open sites
 
 A version 3 design with `setting.form: "open"` authors one ground plan instead

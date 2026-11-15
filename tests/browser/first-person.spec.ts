@@ -604,7 +604,7 @@ test("the embedded terminal releases mouse capture once for text entry and compl
   await expect(page.locator("#pause-menu")).toBeHidden();
 });
 
-test("the Game view setting switches and persists Classic, then first person still yields to the top-down spectator", async ({
+test("the Game view setting switches and persists Classic, then first person stays with the ghost after death", async ({
   page,
 }) => {
   await startFirstPerson(page);
@@ -637,9 +637,11 @@ test("the Game view setting switches and persists Classic, then first person sti
     g.survivors[0].hp = 0;
     g.status = "dead";
   });
-  await page.getByRole("button", { name: "Watch the building" }).click();
-  await expect(page.locator("#spectator")).toBeVisible();
-  await expect(page.locator("#view3d")).toBeHidden();
-  await expect(page.locator("#world")).toBeVisible();
-  await expect(page.locator("#world")).not.toHaveClass(/minimap/);
+  await page.getByRole("button", { name: "Walk on as a ghost" }).click();
+  await expect(page.locator("#spectator")).toBeHidden();
+  await expect(page.locator("#view3d")).toBeVisible();
+  // The end card closes on the ghost's own view; the old free camera is gone.
+  await expect(page.locator("#next-description")).toContainText(
+    "You are a ghost.",
+  );
 });

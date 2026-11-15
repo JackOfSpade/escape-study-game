@@ -495,6 +495,8 @@ test("every escape operation is registered in AI_OPERATIONS with a TASK_PROFILES
       "escape-epilogue",
       "escape-area",
       "escape-catastrophe",
+      "escape-plan",
+      "escape-truth",
     ],
   );
   assert.ok(Object.isFrozen(ESCAPE_OPERATIONS));
@@ -513,6 +515,9 @@ test("every escape operation is registered in AI_OPERATIONS with a TASK_PROFILES
       effort: "medium",
       timeoutMs: 180_000,
     },
+    // Chosen by reasoning on 2026-11-15, not measured.
+    "escape-plan": { model: "sonnet", effort: "low", timeoutMs: 60_000 },
+    "escape-truth": { model: "opus", effort: "medium", timeoutMs: 180_000 },
   };
   for (const operation of ESCAPE_OPERATIONS) {
     assert.ok(
@@ -554,6 +559,11 @@ test("contract prose keeps the catastrophe sealed except for the epilogue", () =
         /the only operation that receives the catastrophe premise/,
         operation,
       );
+      assert.doesNotMatch(prose, /catastrophe is unknown/i, operation);
+    } else if (operation === "escape-truth") {
+      // The truth sheet is derived from the sealed catastrophe, so this one
+      // prompt is given it; nothing it writes reaches a plan or NPC prompt.
+      assert.match(prose, /the sealed catastrophe \(payload\.catastrophe\)/);
       assert.doesNotMatch(prose, /catastrophe is unknown/i, operation);
     } else {
       assert.match(prose, /catastrophe is unknown to everyone/i, operation);
