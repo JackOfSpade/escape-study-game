@@ -263,6 +263,32 @@ test("scene item budgets reject whole-floor excess even when every individual ar
     }));
   }
   assert.throws(() => parseSceneDesign(props, owners), /exceeds 48 props/);
+  const failureMessage = (run: () => unknown): string => {
+    try {
+      run();
+    } catch (error) {
+      return (error as Error).message;
+    }
+    return assert.fail("expected the scene to be rejected");
+  };
+  const roomPairs = (message: string): string[] =>
+    [...message.matchAll(/room (\d): (\d+)/gu)]
+      .map((match) => `${match[1]}:${match[2]}`)
+      .sort();
+  const furnitureMessage = failureMessage(() =>
+    parseSceneDesign(furniture, owners),
+  );
+  assert.match(
+    furnitureMessage,
+    /exceeds 16 furniture items: it has 20 \(.*\); remove at least 4 and keep every room at 1 or more$/u,
+  );
+  assert.deepEqual(roomPairs(furnitureMessage), ["0:5", "1:5", "2:5", "3:5"]);
+  const propsMessage = failureMessage(() => parseSceneDesign(props, owners));
+  assert.match(
+    propsMessage,
+    /exceeds 48 props: it has 56 \(.*\); remove at least 8$/u,
+  );
+  assert.deepEqual(roomPairs(propsMessage), ["0:14", "1:14", "2:14", "3:14"]);
 });
 
 test("retained version 2 requests require scenes while exact retained version 1 requests still accept version 1", () => {
