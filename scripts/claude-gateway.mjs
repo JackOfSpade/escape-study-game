@@ -515,6 +515,14 @@ function designerRepairsInvalid(operation, payload) {
   );
 }
 
+// One correction turn is enough to restate a malformed reply, except for the
+// structure phase: the designer rethrows malformed structure replies instead of
+// repairing them, and a failed structure costs the whole revision, so it gets
+// up to three corrections (four attempts, each logging its own usage row).
+function correctionTurns(operation, payload) {
+  return operation === "design-run" && payload?.phase === "structure" ? 3 : 1;
+}
+
 const CONNECTION_CACHE_MS = 2000;
 // Well under the browser's 5 s status timeout, so a slow check never reads as a dead relay.
 const CONNECTION_TIMEOUT_MS = 3000;
@@ -762,7 +770,11 @@ export function createClaudeGateway({
       let prompt = user,
         problem;
       // A rejected answer gets one correction, as the worker chat's retry did.
-      for (let attempt = 0; attempt < 2; attempt++) {
+      // The structure phase gets up to three corrections: the designer does not
+      // repair malformed structure replies, and a failed structure costs the
+      // whole revision.
+      const attempts = 1 + correctionTurns(operation, payload);
+      for (let attempt = 0; attempt < attempts; attempt++) {
         if (signal?.aborted) throw cancelled();
         let text, measured, opening, logged;
         for (let sessionTries = 0; ; sessionTries++) {
@@ -826,10 +838,10 @@ export function createClaudeGateway({
           // A failed invocation already logged its own row.
           if (!logged) logCall(opening, measured, "rejected");
           // The designer re-validates this content batch with the same parser
-          // and repairs it in its own bounded loop, so after this gateway's one
+          // and repairs it in its own bounded loop, so after this gateway's last
           // correction hand the answer over rather than ending the run.
           if (
-            attempt === 1 &&
+            attempt === attempts - 1 &&
             text !== undefined &&
             designerRepairsInvalid(operation, payload)
           ) {

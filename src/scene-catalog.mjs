@@ -148,6 +148,12 @@ export function parseSceneDesign(
     ids = new Set();
   let furnitureCount = 0,
     propCount = 0;
+  // Counts keyed by the room's authored number, in the order the rooms appear,
+  // so an over-budget floor can name where its items sit and how many to drop.
+  const furnitureByRoom = new Map(),
+    propsByRoom = new Map(),
+    breakdown = (counts) =>
+      [...counts].map(([room, count]) => `room ${room}: ${count}`).join(", ");
   const id = (name, p) => {
     fail(
       typeof name === "string" && /^[a-z][a-z0-9-]{0,23}$/u.test(name),
@@ -188,6 +194,7 @@ export function parseSceneDesign(
     choice(room.condition, ["kept", "worn", "ransacked"], `${p}.condition`);
     array(room.furniture, 1, 6, `${p}.furniture`);
     furnitureCount += room.furniture.length;
+    furnitureByRoom.set(room.room, room.furniture.length);
     let roomProps = 0;
     for (const [j, item] of room.furniture.entries()) {
       const q = `${p}.furniture[${j}]`;
@@ -263,14 +270,15 @@ export function parseSceneDesign(
     }
     fail(roomProps > 0, `${p} needs at least one authored prop`);
     propCount += roomProps;
+    propsByRoom.set(room.room, roomProps);
   }
   fail(
     furnitureCount <= SCENE_LIMITS.furniture,
-    `${path} exceeds ${SCENE_LIMITS.furniture} furniture items`,
+    `${path} exceeds ${SCENE_LIMITS.furniture} furniture items: it has ${furnitureCount} (${breakdown(furnitureByRoom)}); remove at least ${furnitureCount - SCENE_LIMITS.furniture} and keep every room at 1 or more`,
   );
   fail(
     propCount <= SCENE_LIMITS.props,
-    `${path} exceeds ${SCENE_LIMITS.props} props`,
+    `${path} exceeds ${SCENE_LIMITS.props} props: it has ${propCount} (${breakdown(propsByRoom)}); remove at least ${propCount - SCENE_LIMITS.props}`,
   );
   return JSON.parse(JSON.stringify(value));
 }

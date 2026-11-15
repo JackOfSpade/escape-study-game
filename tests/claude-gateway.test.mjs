@@ -707,26 +707,113 @@ test("a still-invalid design content batch returns for the designer's repair", a
 });
 
 test("a still-invalid answer outside the designer's phases still ends the call", async () => {
-  for (const [operation, payload] of [
-    ["design-run", { generationId: "design-structure", phase: "structure" }],
-    ["complete", {}],
+  // Structure gets three corrections, so a still-invalid structure answer costs
+  // four attempts; every other operation and phase still stops after two.
+  for (const [operation, payload, attempts] of [
+    ["design-run", { generationId: "design-structure", phase: "structure" }, 4],
+    ["complete", {}, 2],
   ]) {
     const { rows, log } = usageRows();
-    const g = gateway(['{"bad":1}', '{"bad":2}'], [], {
+    const g = gateway(
+      ['{"bad":1}', '{"bad":2}', '{"bad":3}', '{"bad":4}'],
+      [],
+      {
+        usageLog: log,
+        validate: (_job, answer) => {
+          if (answer.bad) throw Error("wrong shape");
+        },
+      },
+    );
+    await assert.rejects(g.run(operation, payload), {
+      code: "CLAUDE_INVALID_ANSWER",
+    });
+    assert.equal(rows.length, attempts);
+    assert.deepEqual(
+      rows.map((row) => [row.attempt, row.outcome]),
+      Array.from({ length: attempts }, (_, attempt) => [attempt, "rejected"]),
+    );
+  }
+});
+
+test("the structure phase gets three corrections before a valid answer", async () => {
+  const calls = [];
+  const { rows, log } = usageRows();
+  const g = gateway(
+    ['{"bad":1}', '{"bad":2}', '{"bad":3}', '{"ok":1}'],
+    calls,
+    {
       usageLog: log,
       validate: (_job, answer) => {
-        if (answer.bad) throw Error("wrong shape");
+        if (answer.bad)
+          throw Error(
+            "Run design: floors[2].scene exceeds 16 furniture items: it has 18 (room 0: 5, room 1: 4, room 2: 5, room 3: 4); remove at least 2 and keep every room at 1 or more",
+          );
+      },
+    },
+  );
+  assert.deepEqual(
+    await g.run("design-run", {
+      generationId: "design-four-attempts",
+      phase: "structure",
+    }),
+    { ok: 1 },
+  );
+  assert.equal(calls.length, 4);
+  assert.ok(
+    calls[3].input.includes("remove at least 2"),
+    "the fourth call carries the validator's richer message",
+  );
+  assert.deepEqual(
+    rows.map((row) => [row.phase, row.attempt, row.outcome]),
+    [
+      ["structure", 0, "rejected"],
+      ["structure", 1, "rejected"],
+      ["structure", 2, "rejected"],
+      ["structure", 3, "accepted"],
+    ],
+  );
+});
+
+test("four rejected structure replies end the call after four attempts", async () => {
+  const calls = [];
+  const g = gateway(
+    ['{"bad":1}', '{"bad":2}', '{"bad":3}', '{"bad":4}'],
+    calls,
+    {
+      validate: () => {
+        throw Error("wrong shape");
+      },
+    },
+  );
+  await assert.rejects(
+    g.run("design-run", {
+      generationId: "design-four-rejections",
+      phase: "structure",
+    }),
+    { code: "CLAUDE_INVALID_ANSWER" },
+  );
+  assert.equal(calls.length, 4);
+});
+
+test("operations and phases outside structure still get one correction", async () => {
+  for (const [operation, payload] of [
+    ["complete", {}],
+    ["design-run", { generationId: "design-concepts", phase: "concepts" }],
+    ["design-run", { generationId: "design-no-phase" }],
+  ]) {
+    const calls = [];
+    const g = gateway(['{"bad":1}', '{"bad":2}', '{"bad":3}'], calls, {
+      validate: () => {
+        throw Error("wrong shape");
       },
     });
     await assert.rejects(g.run(operation, payload), {
       code: "CLAUDE_INVALID_ANSWER",
     });
-    assert.deepEqual(
-      rows.map((row) => [row.attempt, row.outcome]),
-      [
-        [0, "rejected"],
-        [1, "rejected"],
-      ],
+    assert.equal(
+      calls.length,
+      2,
+      `${operation} ${payload.phase ?? "no phase"}`,
     );
   }
 });
