@@ -241,6 +241,10 @@ export type RunRoomPattern =
 export declare const ROOM_PATTERNS: readonly RunRoomPattern[];
 /** How a version 4 structure draws its floors (part of RUN_DESIGN_GUIDANCE). */
 export declare const DRAWN_FLOOR_GUIDANCE: string;
+export declare const CAST_LIMITS: {
+  readonly size: [number, number];
+  readonly role: number;
+};
 export declare const FREE_PLAN_LIMITS: {
   readonly rooms: [number, number];
   readonly size: [number, number];
@@ -299,6 +303,13 @@ export type RunExteriorStructureV3 = Omit<
   LegacyRunExteriorDesign,
   "streetLabels"
 >;
+/** A drawn design (version 4) names the building and nothing else outside. */
+export interface RunExteriorStructureV4 {
+  buildingName: string;
+  buildingSubtitle: string;
+}
+/** A chain design's exterior. A drawn design's (RunExteriorStructureV4)
+ * shares the Floor.exteriorDesign slot; its notice and skyline are absent. */
 export type RunExteriorDesign =
   LegacyRunExteriorDesign | RunExteriorStructureV3;
 export interface RunRelationship {
@@ -325,9 +336,19 @@ export interface RunDesignV3 extends RunStructureV3 {
 /** Version 4: a version 3 structure whose floors are drawn freely. */
 export interface RunStructureV4 extends Omit<
   RunStructureV3,
-  "version" | "floors" | "setting"
+  "version" | "floors" | "setting" | "roster" | "city" | "pacing" | "exterior"
 > {
   version: 4;
+  /** 4 to 24 people; each role is the design's own words for what they do. */
+  roster: {
+    name: string;
+    role: string;
+    skill: number;
+    risk: number;
+    social: number;
+  }[];
+  /** No engine notice board or skyline on a drawn design. */
+  exterior: RunExteriorStructureV4;
   setting: import("./setting-catalog.mjs").RunSetting;
   floors: RunFreeFloor[];
   /** Where the interior stair core stands (its north-west interior cell; it

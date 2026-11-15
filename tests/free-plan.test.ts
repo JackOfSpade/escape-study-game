@@ -17,6 +17,7 @@ import {
   roofIndexOf,
 } from "../src/model";
 import { exteriorStructure } from "../src/exterior-structure";
+import { AUTHORITY_ROLE, RADIO_ROLE } from "../src/npc-social";
 import { extractionPoints, roofFloorOf, startSite } from "../src/site";
 import { nextSiteOrigin, stampSite } from "../src/site-stamp";
 import { decode, encode } from "../src/persistence";
@@ -568,4 +569,121 @@ test("a taller neighbouring building keeps every storey beside a one-storey star
   assert.equal(roofFloorOf(startSite(g)), 1);
   // The added layers are solid where the start building stands.
   assert.ok(g.floors[3].tiles[14].slice(0, 44).every((tile) => tile === 1));
+});
+
+test("a drawn design chooses its cast: how many people and what each does", () => {
+  const structure = drawn(),
+    g = build(structure);
+  assert.equal(structure.roster.length, 12);
+  // The player plus exactly the authored cast, with their own roles.
+  assert.equal(g.survivors.length, 13);
+  structure.roster.forEach((person, i) => {
+    const actor = g.survivors[i + 1];
+    assert.equal(actor.id, `npc-${i}`);
+    assert.equal(actor.name, person.name);
+    assert.equal(actor.role, person.role);
+  });
+  assert.equal(g.survivors[1].role, "projectionist");
+  // Authority and radios come from the words of the role.
+  const supervisor = g.survivors.find((a) => /supervisor/.test(a.role))!;
+  assert.ok(AUTHORITY_ROLE.test(supervisor.role));
+  assert.ok(RADIO_ROLE.test(supervisor.role));
+  assert.ok(!AUTHORITY_ROLE.test("ticket clerk"));
+
+  const person = (n: number) => ({
+    name: `Person ${n}`,
+    role: "stagehand",
+    skill: 0.5,
+    risk: 0.5,
+    social: 0.5,
+  });
+  const cast = (size: number) => {
+    const s = drawn();
+    s.roster = Array.from({ length: size }, (_, n) => person(n));
+    s.relationships = [
+      { from: "Person 0", to: "Person 1", kind: "colleague", detail: "shift" },
+    ];
+    const fix = (value: unknown): void => {
+      if (Array.isArray(value)) value.forEach(fix);
+      else if (value && typeof value === "object")
+        for (const [key, inner] of Object.entries(value))
+          if (key === "owner" && typeof inner === "string")
+            (value as { owner: string }).owner = "Person 0";
+          else fix(inner);
+    };
+    fix(s.floors);
+    return s;
+  };
+  // The smallest and the largest cast both build, with no template limit.
+  assert.equal(build(cast(4)).survivors.length, 5);
+  assert.equal(build(cast(24)).survivors.length, 25);
+  assert.throws(() => parseRunStructure(cast(3)));
+  assert.throws(() => parseRunStructure(cast(25)));
+  const twin = cast(6);
+  twin.roster[1].name = "Person 0";
+  assert.throws(() => parseRunStructure(twin), /unique names/);
+  const blank = cast(6);
+  blank.roster[2].role = "";
+  assert.throws(() => parseRunStructure(blank));
+  // Chain designs keep nineteen people in the five engine roles.
+  const v3 = JSON.parse(
+    readFileSync("tests/fixtures/run-designs/planetarium-hall.json", "utf8"),
+  );
+  v3.roster[0].role = "projectionist";
+  assert.throws(() => parseRunStructure(v3));
+});
+
+test("a drawn design has no city, tempo, notice board or skyline to fill in", () => {
+  const s = drawn() as unknown as Record<string, unknown>;
+  assert.equal("city" in s, false);
+  assert.equal("pacing" in s, false);
+  assert.deepEqual(Object.keys(drawn().exterior), [
+    "buildingName",
+    "buildingSubtitle",
+  ]);
+  const legacy = JSON.parse(
+    readFileSync("tests/fixtures/run-designs/planetarium-hall.json", "utf8"),
+  );
+  for (const [key, value] of [
+    ["city", legacy.city],
+    ["pacing", legacy.pacing],
+  ] as const) {
+    const withField = { ...drawn(), [key]: value };
+    assert.throws(() => parseRunStructure(withField), new RegExp(key));
+  }
+  for (const key of ["quarantineTitle", "skyline"]) {
+    const withField = drawn();
+    (withField.exterior as unknown as Record<string, unknown>)[key] =
+      legacy.exterior[key];
+    assert.throws(
+      () => parseRunStructure(withField),
+      new RegExp(`exterior.${key}`),
+    );
+  }
+  const schema = STRUCTURE_SCHEMAS[4];
+  assert.equal(schema.properties.city, undefined);
+  assert.equal(schema.properties.pacing, undefined);
+  assert.ok(!schema.required.includes("city"));
+  assert.deepEqual(Object.keys(schema.properties.exterior.properties), [
+    "buildingName",
+    "buildingSubtitle",
+  ]);
+  assert.equal(schema.properties.roster.minItems, 4);
+  assert.equal(schema.properties.roster.maxItems, 24);
+  assert.equal(schema.properties.roster.items.properties.role.maxLength, 40);
+  // Version 3 keeps all of them.
+  assert.ok(STRUCTURE_SCHEMAS[3].required.includes("city"));
+  assert.ok(STRUCTURE_SCHEMAS[3].properties.pacing);
+  // The world still gets its drawn outdoors, and no engine notice surface.
+  const token = previewDesignedRun(
+    42,
+    roadmap,
+    undefined,
+    parseRunStructure(drawn()),
+  );
+  assert.ok(token.surfaces.some((x) => x.id === "building:entrance-sign"));
+  assert.ok(!token.surfaces.some((x) => x.id === "building:quarantine-sign"));
+  assert.ok(build(drawn()).floors[0].city);
+  for (const word of ["roster:4..24", "no city and no pacing", "role"])
+    assert.ok(RUN_DESIGN_GUIDANCE.includes(word), word);
 });

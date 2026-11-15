@@ -364,165 +364,92 @@
     "roster": [
       {
         "name": "Inez",
-        "role": "builder",
+        "role": "projectionist",
         "skill": 0.45,
         "risk": 0.25,
         "social": 0.3
       },
       {
         "name": "Cal",
-        "role": "analyst",
+        "role": "night guard",
         "skill": 0.51,
         "risk": 0.35,
         "social": 0.42
       },
       {
         "name": "Rumi",
-        "role": "rusher",
+        "role": "ticket clerk",
         "skill": 0.57,
         "risk": 0.45,
         "social": 0.54
       },
       {
         "name": "Dev",
-        "role": "medic",
+        "role": "visiting schoolteacher",
         "skill": 0.63,
         "risk": 0.55,
         "social": 0.66
       },
       {
         "name": "Esme",
-        "role": "skeptic",
+        "role": "duty engineer",
         "skill": 0.69,
         "risk": 0.65,
         "social": 0.3
       },
       {
         "name": "Nico",
-        "role": "builder",
+        "role": "show presenter",
         "skill": 0.75,
         "risk": 0.25,
         "social": 0.42
       },
       {
         "name": "Tamsin",
-        "role": "analyst",
+        "role": "cleaner",
         "skill": 0.81,
         "risk": 0.35,
         "social": 0.54
       },
       {
         "name": "Paz",
-        "role": "rusher",
+        "role": "gift shop keeper",
         "skill": 0.45,
         "risk": 0.45,
         "social": 0.66
       },
       {
         "name": "Ellis",
-        "role": "medic",
+        "role": "lamp technician",
         "skill": 0.51,
         "risk": 0.55,
         "social": 0.3
       },
       {
         "name": "Luz",
-        "role": "skeptic",
+        "role": "education officer",
         "skill": 0.57,
         "risk": 0.65,
         "social": 0.42
       },
       {
         "name": "Ren",
-        "role": "builder",
+        "role": "usher",
         "skill": 0.63,
         "risk": 0.25,
         "social": 0.54
       },
       {
         "name": "Ada",
-        "role": "analyst",
+        "role": "security supervisor with a radio",
         "skill": 0.69,
         "risk": 0.35,
         "social": 0.66
-      },
-      {
-        "name": "Seth",
-        "role": "rusher",
-        "skill": 0.75,
-        "risk": 0.45,
-        "social": 0.3
-      },
-      {
-        "name": "Mei",
-        "role": "medic",
-        "skill": 0.81,
-        "risk": 0.55,
-        "social": 0.42
-      },
-      {
-        "name": "Jules",
-        "role": "skeptic",
-        "skill": 0.45,
-        "risk": 0.65,
-        "social": 0.54
-      },
-      {
-        "name": "Sol",
-        "role": "builder",
-        "skill": 0.51,
-        "risk": 0.25,
-        "social": 0.66
-      },
-      {
-        "name": "Bryn",
-        "role": "analyst",
-        "skill": 0.57,
-        "risk": 0.35,
-        "social": 0.3
-      },
-      {
-        "name": "Uma",
-        "role": "rusher",
-        "skill": 0.63,
-        "risk": 0.45,
-        "social": 0.42
-      },
-      {
-        "name": "Vera",
-        "role": "medic",
-        "skill": 0.69,
-        "risk": 0.55,
-        "social": 0.54
       }
     ],
-    "city": {
-      "roadWidth": 9,
-      "boulevardOffset": 19,
-      "districtSize": 24,
-      "buildingHeightMin": 12,
-      "buildingHeightMax": 40,
-      "damageRate": 0.45,
-      "palette": ["#7a3b26", "#9c5a3c", "#b9714c"]
-    },
     "exterior": {
       "buildingName": "ARES HABITAT 4",
-      "buildingSubtitle": "HYDROPONICS \u2022 SCIENCE \u2022 COMMAND",
-      "quarantineTitle": "DECK SEAL ACTIVE",
-      "quarantineSubtitle": "AWAIT ASCENT SHUTTLE",
-      "skyline": {
-        "minHeight": 40,
-        "maxHeight": 110,
-        "damageRate": 0.4
-      }
-    },
-    "pacing": {
-      "swarmInterval": 3.8,
-      "swarmBatch": 1,
-      "swarmCap": 150,
-      "npcThinkingScale": 0.3,
-      "firstHelicopter": 540,
-      "helicopterInterval": 180
+      "buildingSubtitle": "HYDROPONICS \u2022 SCIENCE \u2022 COMMAND"
     },
     "relationships": [
       {
@@ -1748,14 +1675,7 @@
     "npc-8",
     "npc-9",
     "npc-10",
-    "npc-11",
-    "npc-12",
-    "npc-13",
-    "npc-14",
-    "npc-15",
-    "npc-16",
-    "npc-17",
-    "npc-18"
+    "npc-11"
   ],
   "maps": [],
   "actions": [
