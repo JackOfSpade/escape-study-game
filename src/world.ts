@@ -31,6 +31,7 @@ import {
   environmentSurfaceFingerprint,
   isDrawnDesign,
   type RunDesign,
+  type RunExteriorDesign,
   type RunFloorDesign,
   type RunStructure,
   type SavedRunDesign,
@@ -76,7 +77,9 @@ export function populateCity(
         floor,
         g.seed,
         spawnGrace(g) * cityZombieSpeed(g),
-        blueprint?.city ?? g.design?.design.city,
+        // A drawn design (version 4) has no engine street grid to tune.
+        (blueprint && "city" in blueprint ? blueprint.city : undefined) ??
+          g.design?.design.city,
       );
   if (invasion) initCityInvasion(g);
   return g;
@@ -199,7 +202,11 @@ function buildPlayableGame(
     // A temporarily unavailable curriculum question must not prevent the
     // physical world from starting. Generation keeps its own eligibility gate.
   }
-  applyStudyPacing(g, depth, blueprint?.pacing);
+  applyStudyPacing(
+    g,
+    depth,
+    blueprint && "pacing" in blueprint ? blueprint.pacing : undefined,
+  );
   populateCity(g, true, blueprint);
   // The opening view presents the approaching street horde immediately.
   // Refuge is just behind the player, where the other survivors are entering.
@@ -342,7 +349,15 @@ function buildGame(
     floors: [],
     survivors: [
       actor("human", "You", 0),
-      ...names.slice(0, CONFIG.npcs).map((n, i) => actor(`npc-${i}`, n, i + 1)),
+      // A drawn design chooses its cast size; everything else has nineteen.
+      ...Array.from(
+        {
+          length: isDrawnDesign(blueprint)
+            ? blueprint.roster.length
+            : CONFIG.npcs,
+        },
+        (_, i) => actor(`npc-${i}`, names[i % names.length], i + 1),
+      ),
     ],
     zombies: [],
     encounters: {},
@@ -466,7 +481,13 @@ function generateFloor(
         }
       : {}),
     ...(blueprint && index === 0
-      ? { exteriorDesign: structuredClone(blueprint.exterior) }
+      ? {
+          // A drawn design's exterior shares this slot without the notice
+          // and skyline fields.
+          exteriorDesign: structuredClone(
+            blueprint.exterior,
+          ) as RunExteriorDesign,
+        }
       : {}),
     ...(blueprint && "setting" in blueprint && blueprint.setting
       ? { setting: structuredClone(blueprint.setting) }
@@ -671,7 +692,9 @@ function generateFloor(
     x: i === 11 ? 4.5 : 4.5 + (i % 6) * 2,
     y: i === 11 ? 20.5 : i < 6 ? 18.5 : 22.5,
   }));
-  if (needed > capacitySlots.length)
+  // A drawn design replaces every template station with its own work
+  // points, so a large cast needs no template capacity.
+  if (needed > capacitySlots.length && !isDrawnDesign(blueprint))
     throw new Error(
       "Floor template lacks initial mandatory terminal capacity.",
     );

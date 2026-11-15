@@ -1274,7 +1274,7 @@
                 "angle": 180,
                 "color": "#30343c",
                 "condition": "intact",
-                "owner": "Seth",
+                "owner": "Inez",
                 "props": []
               },
               {
@@ -1287,7 +1287,7 @@
                 "angle": -90,
                 "color": "#e8eef2",
                 "condition": "worn",
-                "owner": "Mei",
+                "owner": "Cal",
                 "props": [
                   {
                     "id": "r3-2-sample-vial-0",
@@ -1301,7 +1301,7 @@
                     "color": "#c7553e",
                     "accent": "#f1e3c2",
                     "condition": "intact",
-                    "owner": "Mei"
+                    "owner": "Cal"
                   },
                   {
                     "id": "r3-2-note-1",
@@ -1315,7 +1315,7 @@
                     "color": "#c7553e",
                     "accent": "#f1e3c2",
                     "condition": "intact",
-                    "owner": "Mei"
+                    "owner": "Cal"
                   }
                 ]
               }
@@ -1448,7 +1448,7 @@
             "room": 0,
             "title": "Observatory Offices North-West",
             "description": "The relay desk still shows the last uplink window to Earth; the commander's mug sits by the keypad.",
-            "owner": "Seth",
+            "owner": "Inez",
             "palette": {
               "surface": "#5a6470",
               "metal": "#b9c3cc",
@@ -1466,7 +1466,7 @@
                 "angle": 0,
                 "color": "#5a6470",
                 "condition": "intact",
-                "owner": "Seth",
+                "owner": "Inez",
                 "props": [
                   {
                     "id": "r0-0-mug-0",
@@ -1480,7 +1480,7 @@
                     "color": "#c7553e",
                     "accent": "#f1e3c2",
                     "condition": "intact",
-                    "owner": "Seth"
+                    "owner": "Inez"
                   },
                   {
                     "id": "r0-0-papers-1",
@@ -1494,7 +1494,7 @@
                     "color": "#c7553e",
                     "accent": "#f1e3c2",
                     "condition": "intact",
-                    "owner": "Seth"
+                    "owner": "Inez"
                   },
                   {
                     "id": "r0-0-headphones-2",
@@ -1508,7 +1508,7 @@
                     "color": "#c7553e",
                     "accent": "#f1e3c2",
                     "condition": "intact",
-                    "owner": "Seth"
+                    "owner": "Inez"
                   }
                 ]
               },
@@ -1522,7 +1522,7 @@
                 "angle": 180,
                 "color": "#30343c",
                 "condition": "worn",
-                "owner": "Mei",
+                "owner": "Cal",
                 "props": []
               },
               {
@@ -1535,7 +1535,7 @@
                 "angle": -90,
                 "color": "#e8eef2",
                 "condition": "intact",
-                "owner": "Jules",
+                "owner": "Rumi",
                 "props": [
                   {
                     "id": "r0-2-sample-vial-0",
@@ -1549,7 +1549,7 @@
                     "color": "#c7553e",
                     "accent": "#f1e3c2",
                     "condition": "intact",
-                    "owner": "Jules"
+                    "owner": "Rumi"
                   },
                   {
                     "id": "r0-2-note-1",
@@ -1563,7 +1563,7 @@
                     "color": "#c7553e",
                     "accent": "#f1e3c2",
                     "condition": "intact",
-                    "owner": "Jules"
+                    "owner": "Rumi"
                   }
                 ]
               }
@@ -1573,7 +1573,7 @@
             "room": 1,
             "title": "Observatory Offices North-East",
             "description": "Regolith cores labelled by crater, sealed behind frosted doors.",
-            "owner": "Mei",
+            "owner": "Cal",
             "palette": {
               "surface": "#e8eef2",
               "metal": "#9aa3ad",
@@ -1591,7 +1591,7 @@
                 "angle": 0,
                 "color": "#e8eef2",
                 "condition": "worn",
-                "owner": "Mei",
+                "owner": "Cal",
                 "props": [
                   {
                     "id": "r1-0-box-0",
@@ -1605,7 +1605,7 @@
                     "color": "#c7553e",
                     "accent": "#f1e3c2",
                     "condition": "intact",
-                    "owner": "Mei"
+                    "owner": "Cal"
                   },
                   {
                     "id": "r1-0-note-1",
@@ -1619,7 +1619,7 @@
                     "color": "#c7553e",
                     "accent": "#f1e3c2",
                     "condition": "intact",
-                    "owner": "Mei"
+                    "owner": "Cal"
                   }
                 ]
               },
@@ -1633,7 +1633,7 @@
                 "angle": 0,
                 "color": "#9a9fa6",
                 "condition": "intact",
-                "owner": "Jules",
+                "owner": "Rumi",
                 "props": []
               },
               {
@@ -1646,7 +1646,7 @@
                 "angle": 90,
                 "color": "#b85c38",
                 "condition": "damaged",
-                "owner": "Sol",
+                "owner": "Dev",
                 "props": []
               }
             ]
@@ -1655,7 +1655,7 @@
             "room": 2,
             "title": "Observatory Offices South-West",
             "description": "Lettuce under violet grow lights, the watering rota taped to the rack.",
-            "owner": "Jules",
+            "owner": "Rumi",
             "palette": {
               "surface": "#4f5a63",
               "metal": "#d9dde2",
@@ -1673,7 +1673,7 @@
                 "angle": 0,
                 "color": "#d9dde2",
                 "condition": "intact",
-                "owner": "Jules",
+                "owner": "Rumi",
                 "props": []
               },
               {
@@ -1686,7 +1686,7 @@
                 "angle": 0,
                 "color": "#6c5a48",
                 "condition": "damaged",
-                "owner": "Sol",
+                "owner": "Dev",
                 "props": [
                   {
                     "id": "r2-1-papers-0",
@@ -1700,7 +1700,7 @@
                     "color": "#c7553e",
                     "accent": "#f1e3c2",
                     "condition": "intact",
-                    "owner": "Sol"
+                    "owner": "Dev"
                   },
                   {
                     "id": "r2-1-plant-1",
@@ -1714,7 +1714,7 @@
                     "color": "#c7553e",
                     "accent": "#f1e3c2",
                     "condition": "intact",
-                    "owner": "Sol"
+                    "owner": "Dev"
                   }
                 ]
               }
@@ -1724,7 +1724,7 @@
             "room": 3,
             "title": "Observatory Offices South-East",
             "description": "Eighteen trays still stacked for a meal that never happened.",
-            "owner": "Sol",
+            "owner": "Dev",
             "palette": {
               "surface": "#e3e6e8",
               "metal": "#8a9099",
@@ -1742,7 +1742,7 @@
                 "angle": 0,
                 "color": "#e3e6e8",
                 "condition": "damaged",
-                "owner": "Sol",
+                "owner": "Dev",
                 "props": [
                   {
                     "id": "r3-0-mug-0",
@@ -1756,7 +1756,7 @@
                     "color": "#c7553e",
                     "accent": "#f1e3c2",
                     "condition": "intact",
-                    "owner": "Sol"
+                    "owner": "Dev"
                   },
                   {
                     "id": "r3-0-ration-tin-1",
@@ -1770,7 +1770,7 @@
                     "color": "#c7553e",
                     "accent": "#f1e3c2",
                     "condition": "intact",
-                    "owner": "Sol"
+                    "owner": "Dev"
                   },
                   {
                     "id": "r3-0-bottle-2",
@@ -1784,7 +1784,7 @@
                     "color": "#c7553e",
                     "accent": "#f1e3c2",
                     "condition": "intact",
-                    "owner": "Sol"
+                    "owner": "Dev"
                   }
                 ]
               },
@@ -1798,7 +1798,7 @@
                 "angle": 0,
                 "color": "#3d6fb0",
                 "condition": "intact",
-                "owner": "Bryn",
+                "owner": "Esme",
                 "props": []
               },
               {
@@ -1811,7 +1811,7 @@
                 "angle": 0,
                 "color": "#e9edf0",
                 "condition": "worn",
-                "owner": "Uma",
+                "owner": "Nico",
                 "props": []
               }
             ]
@@ -1824,165 +1824,92 @@
   "roster": [
     {
       "name": "Inez",
-      "role": "builder",
+      "role": "projectionist",
       "skill": 0.45,
       "risk": 0.25,
       "social": 0.3
     },
     {
       "name": "Cal",
-      "role": "analyst",
+      "role": "night guard",
       "skill": 0.51,
       "risk": 0.35,
       "social": 0.42
     },
     {
       "name": "Rumi",
-      "role": "rusher",
+      "role": "ticket clerk",
       "skill": 0.57,
       "risk": 0.45,
       "social": 0.54
     },
     {
       "name": "Dev",
-      "role": "medic",
+      "role": "visiting schoolteacher",
       "skill": 0.63,
       "risk": 0.55,
       "social": 0.66
     },
     {
       "name": "Esme",
-      "role": "skeptic",
+      "role": "duty engineer",
       "skill": 0.69,
       "risk": 0.65,
       "social": 0.3
     },
     {
       "name": "Nico",
-      "role": "builder",
+      "role": "show presenter",
       "skill": 0.75,
       "risk": 0.25,
       "social": 0.42
     },
     {
       "name": "Tamsin",
-      "role": "analyst",
+      "role": "cleaner",
       "skill": 0.81,
       "risk": 0.35,
       "social": 0.54
     },
     {
       "name": "Paz",
-      "role": "rusher",
+      "role": "gift shop keeper",
       "skill": 0.45,
       "risk": 0.45,
       "social": 0.66
     },
     {
       "name": "Ellis",
-      "role": "medic",
+      "role": "lamp technician",
       "skill": 0.51,
       "risk": 0.55,
       "social": 0.3
     },
     {
       "name": "Luz",
-      "role": "skeptic",
+      "role": "education officer",
       "skill": 0.57,
       "risk": 0.65,
       "social": 0.42
     },
     {
       "name": "Ren",
-      "role": "builder",
+      "role": "usher",
       "skill": 0.63,
       "risk": 0.25,
       "social": 0.54
     },
     {
       "name": "Ada",
-      "role": "analyst",
+      "role": "security supervisor with a radio",
       "skill": 0.69,
       "risk": 0.35,
       "social": 0.66
-    },
-    {
-      "name": "Seth",
-      "role": "rusher",
-      "skill": 0.75,
-      "risk": 0.45,
-      "social": 0.3
-    },
-    {
-      "name": "Mei",
-      "role": "medic",
-      "skill": 0.81,
-      "risk": 0.55,
-      "social": 0.42
-    },
-    {
-      "name": "Jules",
-      "role": "skeptic",
-      "skill": 0.45,
-      "risk": 0.65,
-      "social": 0.54
-    },
-    {
-      "name": "Sol",
-      "role": "builder",
-      "skill": 0.51,
-      "risk": 0.25,
-      "social": 0.66
-    },
-    {
-      "name": "Bryn",
-      "role": "analyst",
-      "skill": 0.57,
-      "risk": 0.35,
-      "social": 0.3
-    },
-    {
-      "name": "Uma",
-      "role": "rusher",
-      "skill": 0.63,
-      "risk": 0.45,
-      "social": 0.42
-    },
-    {
-      "name": "Vera",
-      "role": "medic",
-      "skill": 0.69,
-      "risk": 0.55,
-      "social": 0.54
     }
   ],
-  "city": {
-    "roadWidth": 9,
-    "boulevardOffset": 19,
-    "districtSize": 24,
-    "buildingHeightMin": 12,
-    "buildingHeightMax": 40,
-    "damageRate": 0.45,
-    "palette": ["#7a3b26", "#9c5a3c", "#b9714c"]
-  },
   "exterior": {
     "buildingName": "ARES HABITAT 4",
-    "buildingSubtitle": "HYDROPONICS \u2022 SCIENCE \u2022 COMMAND",
-    "quarantineTitle": "DECK SEAL ACTIVE",
-    "quarantineSubtitle": "AWAIT ASCENT SHUTTLE",
-    "skyline": {
-      "minHeight": 40,
-      "maxHeight": 110,
-      "damageRate": 0.4
-    }
-  },
-  "pacing": {
-    "swarmInterval": 3.8,
-    "swarmBatch": 1,
-    "swarmCap": 150,
-    "npcThinkingScale": 0.3,
-    "firstHelicopter": 540,
-    "helicopterInterval": 180
+    "buildingSubtitle": "HYDROPONICS \u2022 SCIENCE \u2022 COMMAND"
   },
   "relationships": [
     {

@@ -30,6 +30,7 @@ import {
   WINDOW_STYLES,
 } from "./setting-catalog.mjs";
 import {
+  CAST_LIMITS,
   FREE_PLAN_LIMITS,
   HALL_LIMITS,
   ROOM_PATTERNS,
@@ -459,7 +460,7 @@ const floor = obj(
 );
 /** The structure-phase schema of one design version. Fresh requests draw
  * their floors (version 4); version 3 stays for checking retained designs. */
-const structureOf = (version) =>
+const structureBase = (version) =>
   obj(
     {
       version: { const: version },
@@ -562,6 +563,31 @@ const structureOf = (version) =>
       ...(version === 4 ? ["stairs"] : []),
     ],
   );
+/** A drawn design (version 4) chooses its cast and has no engine city,
+ * tempo, notice board or skyline to fill in. */
+const structureOf = (version) => {
+  const base = structureBase(version);
+  if (version !== 4) return base;
+  const { city: _city, pacing: _pacing, ...properties } = base.properties;
+  return {
+    ...base,
+    properties: {
+      ...properties,
+      roster: arr(
+        obj({
+          name: str(20),
+          role: str(CAST_LIMITS.role),
+          skill: num(0.4, 0.9),
+          risk: num(0.2, 0.8),
+          social: num(0.2, 0.8),
+        }),
+        ...CAST_LIMITS.size,
+      ),
+      exterior: obj({ buildingName: str(48), buildingSubtitle: str(48) }),
+    },
+    required: base.required.filter((k) => k !== "city" && k !== "pacing"),
+  };
+};
 /** Structure schemas by design version, for tests and tooling. */
 export const STRUCTURE_SCHEMAS = Object.freeze({
   3: structureOf(3),

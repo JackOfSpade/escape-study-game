@@ -345,8 +345,17 @@ interface RunFreeRoom {
   must stay inside the shell, off the entrance lane and clear of the roof
   pickup pad; rooms may not cover it. Stamped neighbours carry their core in
   `Floor.cores`.
-- **What is still fixed:** the shell silhouettes, the entrance position, a
-  flat roof and the cast of 19; a core always runs north to south. The legacy study economy (enough free terminals for
+- **Cast and dropped fields.** A version 4 roster has 4 to 24 people
+  (`CAST_LIMITS`), and each `role` is the design's own words for what that
+  person does; authority and radios are read from those words
+  (`AUTHORITY_ROLE`, `RADIO_ROLE` in `src/npc-social.ts`). The world creates
+  exactly that many NPCs. Version 4 has no `city`, no `pacing`, and its
+  `exterior` is only the building's name and subtitle: there is no engine
+  street grid, horde or helicopter tempo, entrance notice board or skyline to
+  fill in, and the contract names any of these fields it finds so a repair
+  can remove them.
+- **What is still fixed:** the shell silhouettes, the entrance position and a
+  flat roof; a stair core always runs north to south. The legacy study economy (enough free terminals for
   every survivor) is not guaranteed on a drawn floor; escape games do not use
   it.
 
