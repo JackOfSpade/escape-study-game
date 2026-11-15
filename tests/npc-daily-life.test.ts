@@ -9,6 +9,7 @@ import {
 } from "../src/escape-state";
 import type { DailyLife, EscapeState } from "../src/escape-types";
 import type { Actor, Game, Roadmap } from "../src/model";
+import { visitPoint } from "../src/npc-daily-life";
 import { createPlayableGame } from "../src/world";
 
 const roadmap: Roadmap = JSON.parse(
@@ -132,4 +133,37 @@ test("old saves validate and a restarted loop begins the day again", () => {
   const reset = loopReset(escape);
   assert.equal("daily" in reset, false);
   assert.equal(isEscapeState(reset), true);
+});
+
+test("an errand goes to a work point of the NPC's floor, or to furniture where there is none", () => {
+  const g = escapeRun(11),
+    a = crew(g)[0],
+    floor = g.floors[a.floor],
+    life: DailyLife = {
+      home: { x: a.x, y: a.y, floor: a.floor },
+      state: "staying",
+      until: 0,
+      visits: 0,
+    };
+  assert.ok(floor.stations.length > 0, "the floor has work points");
+  const nearest = (p: { x: number; y: number }, list: typeof floor.stations) =>
+    Math.min(...list.map((s) => Math.hypot(s.x - p.x, s.y - p.y)));
+  for (let visit = 0; visit < 6; visit++) {
+    const spot = visitPoint(g, a, life, visit)!;
+    assert.ok(
+      Math.abs(nearest(spot, floor.stations) - 0.9) < 1e-6,
+      "the NPC stops 0.9 m short of a work point",
+    );
+  }
+  floor.stations = [];
+  const fallback = visitPoint(g, a, life, 0)!,
+    furniture = floor.furniture.filter((o) => !o.destroyed);
+  assert.ok(
+    Math.abs(
+      Math.min(
+        ...furniture.map((o) => Math.hypot(o.x - fallback.x, o.y - fallback.y)),
+      ) - 0.9,
+    ) < 1e-6,
+    "without work points it stops 0.9 m short of furniture",
+  );
 });

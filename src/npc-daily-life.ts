@@ -44,8 +44,9 @@ function staySeconds(g: Game, a: Actor, salt: number): number {
   return STAY_MIN + unit(g.seed, a.id, salt) * (STAY_MAX - STAY_MIN);
 }
 
-/** The stand-off point 0.9 m from `o`, on the side facing the NPC's home. */
-function visitPoint(
+/** The stand-off point 0.9 m from a work point (or, failing that, a piece of
+ * furniture), on the side facing the NPC's home. */
+export function visitPoint(
   g: Game,
   a: Actor,
   life: DailyLife,
@@ -53,16 +54,19 @@ function visitPoint(
 ): Point | undefined {
   const floor = g.floors[a.floor];
   if (!floor) return undefined;
-  const points = floor.furniture
-    .filter((o) => !o.destroyed)
-    .map((o) => {
-      const dx = life.home.x - o.x,
-        dy = life.home.y - o.y,
-        n = Math.hypot(dx, dy);
-      return n > 1e-3
-        ? { x: o.x + (dx / n) * VISIT_GAP, y: o.y + (dy / n) * VISIT_GAP }
-        : { x: o.x + VISIT_GAP, y: o.y };
-    });
+  // A place's work points (its stations) are where people have business;
+  // furniture is the fallback on a floor that has none.
+  const places: Point[] = floor.stations.length
+    ? floor.stations
+    : floor.furniture.filter((o) => !o.destroyed);
+  const points = places.map((o) => {
+    const dx = life.home.x - o.x,
+      dy = life.home.y - o.y,
+      n = Math.hypot(dx, dy);
+    return n > 1e-3
+      ? { x: o.x + (dx / n) * VISIT_GAP, y: o.y + (dy / n) * VISIT_GAP }
+      : { x: o.x + VISIT_GAP, y: o.y };
+  });
   if (!points.length) return undefined;
   const worth = points.filter((p) => distance(p, life.home) >= WORTH_WALKING);
   const pool = worth.length ? worth : points;
