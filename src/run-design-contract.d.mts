@@ -330,6 +330,10 @@ export interface RunStructureV4 extends Omit<
   version: 4;
   setting: import("./setting-catalog.mjs").RunSetting;
   floors: RunFreeFloor[];
+  /** Where the interior stair core stands (its north-west interior cell; it
+   * is 4 cells wide and 9 long), or null for wells in the north and south
+   * walls joined by an outside stair on the east face. */
+  stairs: { x: number; y: number } | null;
 }
 export interface RunDesignV4 extends RunStructureV4 {
   environment: EnvironmentManifest;

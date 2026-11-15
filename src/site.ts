@@ -10,7 +10,7 @@
  * to assume for its one building.
  */
 import {
-  CONFIG,
+  roofIndexOf,
   H,
   HELIPAD,
   HELIPAD_RADIUS,
@@ -89,7 +89,7 @@ export function startSite(g: Pick<Game, "floors">): Site {
   const stairs: Record<number, Point> = {};
   const entry: Record<number, Point> = {};
   for (const f of g.floors) {
-    if (f.stairs && f.index < CONFIG.floors) stairs[f.index] = f.stairs;
+    if (f.stairs && f.index < roofIndexOf(f)) stairs[f.index] = f.stairs;
     if (f.entry && f.index > 0) entry[f.index] = f.entry;
   }
   return {
@@ -97,7 +97,7 @@ export function startSite(g: Pick<Game, "floors">): Site {
     name: "start",
     origin: { x: 0, y: 0 },
     floors: g.floors
-      .filter((f) => f.index <= CONFIG.floors)
+      .filter((f) => f.index <= roofIndexOf(f))
       .map((f) => f.index),
     boundary: ground?.boundary as BuildingFootprint,
     stairs,
@@ -184,7 +184,7 @@ export function extractionPoints(g: Game): ExtractionPoint[] {
     start
       ? { ...start }
       : {
-          floor: CONFIG.floors,
+          floor: roofIndexOf(g.floors[0]),
           x: HELIPAD.x,
           y: HELIPAD.y,
           radius: HELIPAD_RADIUS,

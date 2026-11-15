@@ -2,7 +2,7 @@ import { freeFloor } from "./free-design";
 import { floorSectors, inRect, type Rect } from "./floor-plan";
 import { roomPowerKey } from "./room-power-key";
 import {
-  CONFIG,
+  roofIndexOf,
   type BuildingFootprint,
   type Floor,
   type Furniture,
@@ -135,7 +135,7 @@ const LEVEL: Record<InteriorPower, number> = {
 };
 
 export function lightAt(plan: InteriorLighting, p: Point) {
-  if (plan.floor.index >= CONFIG.floors) return 1;
+  if (plan.floor.index >= roofIndexOf(plan.floor)) return 1;
   const region = regionAt(plan, p);
   if (!region) return 1;
   const x = Math.floor(p.x),
@@ -307,7 +307,7 @@ export function buildInteriorLighting(
     stories: [],
     regions: [{ floor, origin: { x: 0, y: 0 }, boundary: floor.boundary }],
   };
-  if (floor.index >= CONFIG.floors) return plan;
+  if (floor.index >= roofIndexOf(floor)) return plan;
   const sectors = floorSectors(floor);
   const darkSector = sectors.filter(
     (s) => s.id !== "entry" && s.id !== "lobby" && s.id !== "room2",

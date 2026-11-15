@@ -5,7 +5,7 @@ import {
 } from "./interior-lighting";
 import { floorSectors, inRect } from "./floor-plan";
 import { cityWall, type CityObstacle } from "./city-layout";
-import { CONFIG, type Floor, type Furniture, type Game } from "./model";
+import { roofIndexOf, type Floor, type Furniture, type Game } from "./model";
 import {
   furnitureHeightOf,
   furnitureSurfaceHeightOf,
@@ -418,7 +418,7 @@ export function buildEnvironmentSurfaces(
         prop.owner,
       );
     }
-    if (floor.index < CONFIG.floors) {
+    if (floor.index < roofIndexOf(floor)) {
       // Low wall marks use a whole, existing interior wall face. Kept well away
       // from portals and other surfaces, they add no collision or false opening.
       const candidates: {

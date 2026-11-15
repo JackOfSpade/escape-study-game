@@ -1,3 +1,4 @@
+import { roofIndexOf } from "./model";
 import {
   type Game,
   type Floor,
@@ -47,7 +48,8 @@ function topUpHall(g: Game, f: Floor) {
  * office-plan.ts); without one it keeps the historical version 3 bands, each
  * complete transverse room a cut between the rear entry and front stairs. */
 export function pursuitLayout(g: Game, f: Floor) {
-  if (isSolidOpenFloor(f) || f.index === 4 || !f.stations.length) return;
+  if (isSolidOpenFloor(f) || f.index >= roofIndexOf(f) || !f.stations.length)
+    return;
   if (f.boundary && isFreePlan(f)) {
     // A version 4 design draws this storey itself: no chain and no fields.
     freePlanLayout(g, f);

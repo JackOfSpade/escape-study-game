@@ -1,3 +1,4 @@
+import { roofIndexOf } from "./model";
 import type { Floor, Furniture, FurnitureKind } from "./model";
 import type {
   RunCustomObject,
@@ -178,9 +179,9 @@ function legacyZone(f: Floor, x: number, y: number): Zone {
       x >= row.right
     )
       return "concrete";
-    if (f.index === 4) return "roof";
+    if (f.index === roofIndexOf(f)) return "roof";
   } else {
-    if (f.index === 4) return "roof";
+    if (f.index === roofIndexOf(f)) return "roof";
     if (x < 2 || x >= 42 || y < 2 || y >= 28) return "concrete";
   }
   if (f.generation?.sectors) {

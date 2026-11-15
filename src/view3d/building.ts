@@ -10,7 +10,7 @@ import {
   MeshStandardMaterial,
 } from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
-import { CONFIG, type Floor, type Point } from "../model";
+import { roofIndexOf, type Floor, type Point } from "../model";
 import { FLOOR_HEIGHT } from "../stair-route";
 import { outsideBuilding, siteFootprints } from "./exterior-layout";
 import type {
@@ -62,7 +62,7 @@ export function isPerimeterWall(floor: Floor, x: number, z: number) {
 }
 
 export function perimeterWindows(floor: Floor): PerimeterWindow[] {
-  if (!hasSites(floor) || floor.index === CONFIG.floors) return [];
+  if (!hasSites(floor) || floor.index === roofIndexOf(floor)) return [];
   const windows: PerimeterWindow[] = [];
   for (let z = 0; z < floor.tiles.length; z++)
     for (let x = 0; x < floor.tiles[z].length; x++) {
@@ -535,7 +535,7 @@ export class BuildingShell {
     for (const floor of floors) {
       if (!hasSites(floor)) continue;
       const base = floor.index * FLOOR_HEIGHT,
-        roof = floor.index === CONFIG.floors;
+        roof = floor.index === roofIndexOf(floor);
       const windows = new Map(
         perimeterWindows(floor).map((w) => [`${w.x}/${w.z}`, w]),
       );
@@ -830,16 +830,20 @@ export class BuildingShell {
     features: NonNullable<Floor["setting"]>["exterior"]["roofFeatures"],
     objects: NonNullable<Floor["setting"]>["objects"] = [],
   ) {
-    const roof = floors.find((f) => f.index === CONFIG.floors);
+    const roof = floors.find((f) => f.index === roofIndexOf(f));
     if (!roof?.boundary || !features.length) return;
     const solid: BufferGeometry[] = [],
       lamps: BufferGeometry[] = [],
       kinds: string[] = [];
-    for (const feature of resolveRoofFeatures(roof.boundary, features)) {
+    for (const feature of resolveRoofFeatures(
+      roof.boundary,
+      features,
+      roof.stairCore,
+    )) {
       if (!feature) continue;
       const parts = roofFeatureParts(
         feature,
-        CONFIG.floors * FLOOR_HEIGHT,
+        roofIndexOf(roof) * FLOOR_HEIGHT,
         objects,
       );
       solid.push(...parts.solid);

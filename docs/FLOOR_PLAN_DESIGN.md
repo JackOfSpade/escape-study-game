@@ -250,8 +250,8 @@ room in place of two or three of the gated study rooms (`room0`, `room1`,
 
 A version 4 design draws every storey itself, and fresh design requests produce
 version 4. It is a version 3 structure whose `floors[]` entries are
-`RunFreeFloor` instead of chain floors, with `setting.venue: "custom"` and
-`setting.filler: null`. Versions 1 to 3 keep loading and building through the
+`RunFreeFloor` instead of chain floors (one to four of them), with
+`setting.venue: "custom"`, `setting.filler: null` and a top-level `stairs`. Versions 1 to 3 keep loading and building through the
 chain planner above.
 
 ```ts
@@ -323,9 +323,30 @@ interface RunFreeRoom {
   to from the entrance; the stairs and one door of every room are reached
   through passages two cells wide; work points have clearance and spacing;
   stepped levels are walkable.
-- **What is still fixed:** four storeys for an enclosed site and one for an
-  open one, the shell silhouettes, the entrance and stair positions, the roof
-  and the cast of 19. The legacy study economy (enough free terminals for
+- **Storeys.** An enclosed version 4 design authors one to four floors; the
+  roof is the floor above the last storey. `Floor.roof` records the roof
+  index on every floor when it is not four, and `roofIndexOf(f)` replaces the
+  old constant everywhere a roof or a top storey is tested. When a taller
+  neighbouring building is stamped beside a shorter start building,
+  `stampSite` adds solid world layers so the neighbour keeps every storey.
+- **Stairs.** `stairs: null` keeps the wells in the north and south walls and
+  the outside stair on the east face. `stairs: {x, y}` places an interior
+  stair core instead (`src/stair-core.ts`, `Floor.stairCore`): 4 cells wide
+  and 9 long, the same cells on every level and the roof. Its end strips are
+  landings; between them two flights run side by side, the even levels
+  climbing the west pair southward and the odd levels the east pair back. On a
+  level its own flight and the opening of the flight from below are solid
+  tiles to the flat simulation, and `f.stairs` and `f.entry` are markers on
+  the landings, so people on foot use timed travel between them exactly as
+  with wall wells. The flights themselves are `Slab`s in `exteriorStructure`
+  (one per level, solid down to their own floor, with rails along them and
+  around each opening), so the stair gallery renderer draws them and the
+  player's body walks them. A core needs 3 open cells beyond each landing,
+  must stay inside the shell, off the entrance lane and clear of the roof
+  pickup pad; rooms may not cover it. Stamped neighbours carry their core in
+  `Floor.cores`.
+- **What is still fixed:** the shell silhouettes, the entrance position, a
+  flat roof and the cast of 19; a core always runs north to south. The legacy study economy (enough free terminals for
   every survivor) is not guaranteed on a drawn floor; escape games do not use
   it.
 

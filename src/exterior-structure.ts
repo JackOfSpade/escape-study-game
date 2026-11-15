@@ -1,3 +1,5 @@
+import { siteCore } from "./stair-route";
+import { type FloorCore, coreFlight } from "./stair-core";
 import { interiorHash } from "./interior-lighting";
 import { type BuildingFootprint, type Game, type Point } from "./model";
 import { START_SITE, roofFloorOf, sitesOf, startSite, type Site } from "./site";
@@ -35,6 +37,8 @@ export interface Slab {
   steps: number;
   /** The ground flight is filled by its concrete foundation down to 0. */
   solidToGround: boolean;
+  /** An interior flight is a solid stair down to its own level's floor. */
+  solidTo?: number;
   level: number;
   segment: number;
   color: string;
@@ -98,6 +102,8 @@ function structureKey(g: Game) {
       f.stairs,
       f.entry,
       f.design?.brokenGuard,
+      f.stairCore,
+      f.cores,
     ]),
     g.sites?.map((site) => [
       site.id,
@@ -190,9 +196,13 @@ function buildSite(g: Game, site: Site, levels: number[], out: StructureBuild) {
         destination,
         until: 0,
       }),
-      broken = brokenBay(g, level),
+      // An interior core has only its flight: the landings are floor.
+      interior = siteCore(g, site, level),
+      broken = interior ? undefined : brokenBay(g, level),
       // Only the start site's ground storey opens onto the public court.
-      cityAccess = site.id === START_SITE && level === 0 && !!floor.city;
+      cityAccess =
+        !interior && site.id === START_SITE && level === 0 && !!floor.city;
+    if (interior) openingGuards(interior, level, guards);
     for (let i = 0; i < route.points.length - 1; i++) {
       const a = route.points[i],
         b = route.points[i + 1],
@@ -200,8 +210,9 @@ function buildSite(g: Game, site: Site, levels: number[], out: StructureBuild) {
         dz = b.z - a.z,
         run = Math.hypot(dx, dz),
         rise = b.y - a.y,
-        groundCourt = level === 0 && !!floor.city && a.y === 0 && rise === 0;
-      if (run < 0.01) continue;
+        groundCourt =
+          !interior && level === 0 && !!floor.city && a.y === 0 && rise === 0;
+      if (run < 0.01 || (interior && !rise)) continue;
       const ux = dx / run,
         uy = dz / run,
         nx = -uy,
@@ -228,7 +239,8 @@ function buildSite(g: Game, site: Site, levels: number[], out: StructureBuild) {
         top: a.y,
         rise,
         steps: rise ? FLIGHT_STEPS : 1,
-        solidToGround: !!rise && level === 0 && !!floor.city,
+        solidToGround: !interior && !!rise && level === 0 && !!floor.city,
+        ...(interior ? { solidTo: a.y < b.y ? a.y : b.y } : {}),
         level,
         segment: i,
         color: "#8e9b91",
@@ -312,7 +324,7 @@ function buildSite(g: Game, site: Site, levels: number[], out: StructureBuild) {
       }
     }
     // Columns stand at the outside edge under the east corners.
-    for (const p of [route.points[2], route.points[4]]) {
+    for (const p of interior ? [] : [route.points[2], route.points[4]]) {
       const x = p.x + 0.98,
         top = p.y - DECK_THICKNESS,
         id = `${x}/${p.z}`;
@@ -320,6 +332,42 @@ function buildSite(g: Game, site: Site, levels: number[], out: StructureBuild) {
         columns.set(id, { x, y: p.z, top });
     }
   }
+}
+
+/** Rails around the opening an interior flight leaves in the floor above:
+ * both long sides and the end over its foot, at the upper level. The head
+ * end stays open, where the flight arrives. */
+function openingGuards(core: FloorCore, level: number, guards: GuardBay[]) {
+  const flight = coreFlight(core, level - core.ground),
+    base = (level + 1) * FLOOR_HEIGHT,
+    x = flight.start.x,
+    y1 = Math.min(flight.start.y, flight.end.y),
+    y2 = Math.max(flight.start.y, flight.end.y),
+    sections = Math.ceil((y2 - y1) / 1.5),
+    bay = (x1: number, ya: number, x2: number, yb: number): GuardBay => ({
+      x1,
+      y1: ya,
+      x2,
+      y2: yb,
+      base1: base,
+      base2: base,
+      broken: false,
+      corner: true,
+      level,
+    });
+  for (const side of [-1, 1])
+    for (let j = 0; j < sections; j++)
+      guards.push(
+        bay(
+          x + side * GUARD_OFFSET,
+          y1 + ((y2 - y1) * j) / sections,
+          x + side * GUARD_OFFSET,
+          y1 + ((y2 - y1) * (j + 1)) / sections,
+        ),
+      );
+  guards.push(
+    bay(x - GUARD_OFFSET, flight.start.y, x + GUARD_OFFSET, flight.start.y),
+  );
 }
 
 /** Horizontal centre of a site's footprint: (min left + max right) / 2. */
@@ -390,6 +438,23 @@ export function stairAccessPortals(g: Game): StairAccessPortal[] {
         continue;
       // The start building opens its well only for a real floor footprint.
       if (site.id === START_SITE && !floor.boundary) continue;
+      const core = siteCore(g, site, index);
+      if (core) {
+        // The field stands across the foot of the interior flight.
+        const flight = coreFlight(core, index - core.ground);
+        portals.push({
+          kind: "well",
+          axis: "y",
+          floor: index,
+          x: flight.start.x,
+          y: flight.start.y,
+          width: 2,
+          base: index * FLOOR_HEIGHT,
+          height: 2.8,
+          direction: flight.direction,
+        });
+        continue;
+      }
       portals.push({
         kind: "well",
         axis: "y",

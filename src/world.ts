@@ -29,6 +29,7 @@ import {
   parseRunStructure,
   runStructureFingerprint,
   environmentSurfaceFingerprint,
+  isDrawnDesign,
   type RunDesign,
   type RunFloorDesign,
   type RunStructure,
@@ -378,7 +379,7 @@ function buildGame(
     }
   g.surge.quietDelay =
     CONFIG.quietMin + rand(g) * (CONFIG.quietMax - CONFIG.quietMin);
-  for (let fi = 0; fi <= CONFIG.floors; fi++)
+  for (let fi = 0; fi <= storeysOf(blueprint); fi++)
     g.floors.push(generateFloor(g, fi, blueprint));
   if (options.layout === "forward")
     for (const floor of g.floors)
@@ -432,11 +433,20 @@ function solidOpenFloor(index: number, blueprint: WorldBlueprint): Floor {
     entry: { x: 21.5, y: 26.5 },
   };
 }
+/** Storeys of the building a blueprint describes: a drawn enclosed design
+ * (version 4) has as many as it authored floors; everything else has four
+ * (an open site keeps four layers, solid above the ground). */
+function storeysOf(blueprint?: WorldBlueprint) {
+  return isDrawnDesign(blueprint) && siteFormOf(blueprint) !== "open"
+    ? blueprint.floors.length
+    : CONFIG.floors;
+}
 function generateFloor(
   g: Game,
   index: number,
   blueprint?: WorldBlueprint,
 ): Floor {
+  const roof = storeysOf(blueprint);
   const open = siteFormOf(blueprint) === "open";
   // An open site authors only its ground floor; construction above stays solid.
   if (open && index > 0) return solidOpenFloor(index, blueprint!);
@@ -444,7 +454,12 @@ function generateFloor(
   for (let y = 2; y < 28; y++) for (let x = 2; x < 42; x++) tiles[y][x] = 0;
   const floor: Floor = {
     ...(open ? { open: true as const } : {}),
-    ...(blueprint && index < CONFIG.floors
+    ...(roof !== CONFIG.floors ? { roof } : {}),
+    // An interior stair core stands on every level, the roof included.
+    ...(isDrawnDesign(blueprint) && blueprint.stairs && !open
+      ? { stairCore: { x: blueprint.stairs.x, y: blueprint.stairs.y } }
+      : {}),
+    ...(blueprint && index < roof
       ? {
           // A drawn floor (version 4) shares this slot; see free-design.ts.
           design: structuredClone(blueprint.floors[index]) as RunFloorDesign,
@@ -462,7 +477,7 @@ function generateFloor(
     furniture: [],
     dark: index === 0 ? 0.1 : index % 3 === 2 ? 0.95 : 0.5,
     name: blueprint
-      ? index === CONFIG.floors
+      ? index === roof
         ? blueprint.roofName
         : blueprint.floors[index].name
       : floorNames[index],
@@ -474,7 +489,7 @@ function generateFloor(
     stairs: { x: 21.5, y: 3.5 },
     entry: { x: 21.5, y: 26.5 },
   };
-  if (index === CONFIG.floors) {
+  if (index === roof) {
     // The roof has a defensible stair approach and finite movable cover for
     // passengers waiting for a later helicopter, rather than an empty death box.
     for (let x = 2; x < 42; x++) if (x < 21 || x > 23) tiles[22][x] = 1;

@@ -34,6 +34,8 @@ const SPACING = 2.5;
 export function resolveRoofFeatures(
   boundary: BuildingFootprint,
   features: readonly RunRoofFeature[],
+  /** The building's interior stair core, which opens onto the roof. */
+  core?: { x: number; y: number },
 ): (ResolvedRoofFeature | null)[] {
   const inside = (x: number, y: number) => {
     const row = boundary.rows[y];
@@ -61,7 +63,16 @@ export function resolveRoofFeatures(
       if (!ox && !oy) continue;
       const cx = x + 0.5,
         cy = y + 0.5;
-      if (x >= 19 && x <= 25) continue; // stair wells and the arrival approach
+      if (core) {
+        // An interior core: keep clear of it and its landings' approach.
+        if (
+          x >= core.x - 2 &&
+          x <= core.x + 5 &&
+          y >= core.y - 3 &&
+          y <= core.y + 11
+        )
+          continue;
+      } else if (x >= 19 && x <= 25) continue; // stair wells and the arrival approach
       if (y >= 21 && y <= 23) continue; // cover barrier row and its gap
       if (Math.hypot(cx - HELIPAD.x, cy - HELIPAD.y) < HELIPAD_RADIUS + 1.2)
         continue;

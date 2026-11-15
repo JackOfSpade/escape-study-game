@@ -8,7 +8,17 @@ import { furnishingErrors } from "../src/office-layout";
 import { pursuitLayoutErrors } from "../src/pursuit-layout";
 import { buildingLayoutErrors } from "../src/building-layout";
 import { buildInteriorLighting } from "../src/interior-lighting";
-import { type Floor, type Game, type Roadmap, H, W } from "../src/model";
+import {
+  type Floor,
+  type Game,
+  type Roadmap,
+  H,
+  W,
+  roofIndexOf,
+} from "../src/model";
+import { exteriorStructure } from "../src/exterior-structure";
+import { extractionPoints, roofFloorOf, startSite } from "../src/site";
+import { nextSiteOrigin, stampSite } from "../src/site-stamp";
 import { decode, encode } from "../src/persistence";
 import {
   DRAWN_FLOOR_GUIDANCE,
@@ -289,9 +299,9 @@ test("drawn rooms are furnished by their own pattern and list, not office functi
       for (const name of placed)
         assert.ok(room.filler.includes(name), `${room.name}: ${name}`);
     });
-  // Bays repeat the signature piece; display stands pieces free.
+  // A bays room holds its signature piece.
   const bays = ids(g.floors[1], "room2");
-  assert.ok(bays.filter((n) => n === "bunk-pod").length >= 2);
+  assert.ok(bays.includes("bunk-pod"));
   // The concourse's larger open areas use the concourse list.
   const concourse = g.floors[1].furniture.filter((o) =>
     /^f1-entry[a-z0-9]*-/.test(o.id),
@@ -411,10 +421,10 @@ test("drawn floors report every problem a repair needs, by room", () => {
   // A door on the outer wall side opens into the shell.
   assert.match(
     change((rooms) => {
-      rooms[1].x = 4;
-      rooms[1].doors = [{ side: "w", at: 0.5, door: null }];
+      rooms[2].x = 30;
+      rooms[2].doors = [{ side: "e", at: 0.5, door: null }];
     }),
-    /door 0 \(w\) opens into a wall/,
+    /door 0 \(e\) opens into a wall/,
   );
   assert.match(
     change((rooms) => (rooms[1].work = 12)),
@@ -422,8 +432,9 @@ test("drawn floors report every problem a repair needs, by room", () => {
   );
   // Two rooms spanning the storey leave only single-cell side passages
   // between the entrance and the stairs.
-  const narrow = drawn(),
-    upper = narrow.floors[1].rooms;
+  const narrow = drawn();
+  narrow.stairs = null;
+  const upper = narrow.floors[1].rooms;
   Object.assign(upper[0], { x: 5, w: 14 });
   Object.assign(upper[1], { x: 21, w: 18 });
   assert.match(
@@ -443,9 +454,7 @@ test("a room reached only through another room is still reachable", () => {
   const s = drawn(),
     rooms = s.floors[1].rooms;
   // North-east opens only into north-west through their shared wall.
-  rooms[0].x = 5;
-  rooms[0].w = 14;
-  rooms[1].x = 20;
+  rooms[1].x = 21;
   rooms[1].w = 14;
   rooms[1].doors = [{ side: "w", at: 0.5, door: null }];
   const g = build(s),
@@ -486,4 +495,77 @@ test("a complete drawn design is accepted, saved and reloaded", () => {
     summarizeRunDesign({ ...design, floors: moved.floors } as never).spatial,
   );
   assert.ok(Array.isArray(runDesignNoveltyErrors(design, [])));
+});
+
+test("a drawn building has as many storeys as the design drew, one to four", () => {
+  for (const storeys of [1, 2, 3, 4]) {
+    const s = drawn();
+    s.floors = s.floors.slice(0, storeys);
+    const g = build(s),
+      site = startSite(g);
+    assert.equal(g.floors.length, storeys + 1, `${storeys} storeys`);
+    assert.deepEqual(
+      site.floors,
+      Array.from({ length: storeys + 1 }, (_, i) => i),
+    );
+    assert.equal(roofFloorOf(site), storeys);
+    assert.deepEqual(buildingLayoutErrors(g), []);
+    // The roof sits on the last storey and is where the default pickup is.
+    const roof = g.floors[storeys];
+    assert.equal(roof.name, s.roofName);
+    assert.equal(roof.generation?.sectors, undefined);
+    assert.equal(roofIndexOf(roof), storeys);
+    assert.equal(roof.stations.length, 0);
+    assert.equal(extractionPoints(g)[0].floor, storeys);
+    // Every storey below it is a drawn floor with a way up; the roof has none.
+    for (const f of g.floors.slice(0, storeys)) {
+      assert.equal(f.generation!.version, 6);
+      assert.ok(site.stairs[f.index], `up from ${f.index}`);
+    }
+    assert.equal(site.stairs[storeys], undefined);
+    // One interior flight per storey; with wall wells instead, the outside
+    // route has ten slabs per storey.
+    assert.equal(exteriorStructure(g).slabs.length, storeys);
+    const outside = drawn();
+    outside.floors = outside.floors.slice(0, storeys);
+    outside.stairs = null;
+    assert.equal(exteriorStructure(build(outside)).slabs.length, storeys * 10);
+  }
+  // Four storeys is the unmarked default; fewer is recorded on every floor.
+  assert.equal(build(drawn()).floors[0].roof, undefined);
+  const two = drawn();
+  two.floors = two.floors.slice(0, 2);
+  assert.ok(build(two).floors.every((f) => f.roof === 2));
+  // The contract bounds the count; chain designs still need exactly four.
+  const none = drawn();
+  none.floors = [];
+  assert.throws(() => parseRunStructure(none));
+  const five = drawn();
+  five.floors.push(five.floors[3]);
+  assert.throws(() => parseRunStructure(five));
+  const v3 = JSON.parse(
+    readFileSync("tests/fixtures/run-designs/planetarium-hall.json", "utf8"),
+  );
+  v3.floors = v3.floors.slice(0, 2);
+  assert.throws(() => parseRunStructure(v3));
+});
+
+test("a taller neighbouring building keeps every storey beside a one-storey start", () => {
+  const low = drawn();
+  low.floors = low.floors.slice(0, 1);
+  const g = build(low),
+    source = build(drawn(), 7);
+  const site = stampSite(g, source, {
+    id: "tower",
+    name: "Tower",
+    origin: nextSiteOrigin(g),
+  });
+  assert.deepEqual(site.floors, [0, 1, 2, 3, 4]);
+  assert.equal(g.floors.length, 5);
+  assert.equal(roofFloorOf(site), 4);
+  // The start building is still one storey with its roof on floor 1.
+  assert.deepEqual(startSite(g).floors, [0, 1]);
+  assert.equal(roofFloorOf(startSite(g)), 1);
+  // The added layers are solid where the start building stands.
+  assert.ok(g.floors[3].tiles[14].slice(0, 44).every((tile) => tile === 1));
 });

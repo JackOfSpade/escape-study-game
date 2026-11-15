@@ -1,3 +1,4 @@
+import { roofIndexOf } from "./model";
 import { settingErrors } from "./venue";
 import { moveBlockingDesks } from "./station-clearance";
 import { presetDoorStyle } from "./door-style";
@@ -212,7 +213,7 @@ export function redesign(
   }
   // The roof's arrival staircase is carved like the ordinary floors' wells.
   // An open site's layers above ground are solid construction with no roof.
-  const roof = g.floors[CONFIG.floors];
+  const roof = g.floors[roofIndexOf(g.floors[0])];
   if (
     roof &&
     !isSolidOpenFloor(roof) &&

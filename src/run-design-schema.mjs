@@ -463,6 +463,9 @@ const structureOf = (version) =>
   obj(
     {
       version: { const: version },
+      ...(version === 4
+        ? { stairs: nullable(obj({ x: int(0, 43), y: int(0, 33) })) }
+        : {}),
       title: str(64),
       premise: str(240),
       opening: str(200),
@@ -556,6 +559,7 @@ const structureOf = (version) =>
       "relationships",
       "titleCard",
       "setting",
+      ...(version === 4 ? ["stairs"] : []),
     ],
   );
 /** Structure schemas by design version, for tests and tooling. */
