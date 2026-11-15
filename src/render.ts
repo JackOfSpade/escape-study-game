@@ -3,6 +3,7 @@ import { doorStyle } from "./door-style";
 import { fieldAllows } from "./force-fields";
 import { drawBlood } from "./blood";
 import { camera } from "./camera";
+import { ghostActive, ghostBody } from "./ghost-view";
 import { displayScale } from "./display-scale";
 import { human } from "./engine";
 import { localPoint } from "./furniture-geometry";
@@ -677,11 +678,43 @@ export function render(
     ctx.stroke();
     ctx.globalAlpha = 1;
   }
+  /** A fallen body, drawn at the current translate: an ellipse along the floor
+   * with a head circle and a straight limbs line. */
+  const drawFallenBody = () => {
+    ctx.fillStyle = p.danger;
+    ctx.beginPath();
+    ctx.ellipse(
+      0,
+      0,
+      BODY_RADIUS * 1.35,
+      BODY_RADIUS * 0.55,
+      0,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+    ctx.strokeStyle = p.ink;
+    ctx.lineWidth = 0.07;
+    ctx.beginPath();
+    ctx.arc(BODY_RADIUS * 1.1, 0, BODY_RADIUS * 0.45, 0, Math.PI * 2);
+    ctx.moveTo(-BODY_RADIUS, 0);
+    ctx.lineTo(BODY_RADIUS, 0);
+    ctx.stroke();
+  };
   for (const s of g.survivors) {
+    // The human's ghost walks away from the body it left where it died.
+    const ghost = s.id === "human" && ghostActive(g);
+    const body = ghost ? ghostBody(g, floorIndex) : undefined;
+    if (body && visible(body)) {
+      ctx.save();
+      ctx.translate(body.x, body.y);
+      drawFallenBody();
+      ctx.restore();
+    }
     if (s.floor !== floorIndex || s.escaped || !visible(s)) continue;
     ctx.save();
     ctx.translate(s.x, s.y);
-    if (!s.alive && s.downAt !== undefined) {
+    if (!s.alive && s.downAt !== undefined && !ghost) {
       // Escape redesign: fallen bodies stay in the world, drawn along the floor.
       ctx.fillStyle = p.danger;
       ctx.beginPath();
@@ -705,11 +738,17 @@ export function render(
       ctx.restore();
       continue;
     }
-    ctx.fillStyle = s.alive
-      ? s.id === "human"
-        ? p.accent
-        : "#b5c6cf"
-      : p.danger;
+    if (ghost) {
+      // The ghost is the normal player marker at 40% opacity: present but
+      // untouchable.
+      ctx.globalAlpha = 0.4;
+      ctx.fillStyle = p.accent;
+    } else
+      ctx.fillStyle = s.alive
+        ? s.id === "human"
+          ? p.accent
+          : "#b5c6cf"
+        : p.danger;
     ctx.beginPath();
     ctx.arc(0, 0, BODY_RADIUS, 0, Math.PI * 2);
     ctx.fill();
@@ -719,7 +758,7 @@ export function render(
     ctx.moveTo(s.heading.x * 0.1, s.heading.y * 0.1);
     ctx.lineTo(s.heading.x * 0.55, s.heading.y * 0.55);
     ctx.stroke();
-    if (s.id === "human" && s.alive) {
+    if (s.id === "human" && (s.alive || ghost)) {
       ctx.strokeStyle = p.accent;
       ctx.lineWidth = 0.04;
       ctx.beginPath();
@@ -818,7 +857,12 @@ export function render(
       )
         ob = undefined;
     }
-    if (hoverLabel.update(ob?.id, performance.now()) && ob)
+    // A ghost cannot use anything, so it never sees a thing's name either.
+    if (
+      g.status === "playing" &&
+      hoverLabel.update(ob?.id, performance.now()) &&
+      ob
+    )
       label(
         objectName(ob.kind, ob.object),
         ob.x,

@@ -201,6 +201,9 @@ export interface Actor extends Point {
     grounded: boolean;
   };
   technical?: import("./npc-cognition").NpcProfile;
+  /** The human after its run ended; `body` is where the dead body lies
+   * (absent after an escape). A ghost walks the world unseen and unheard. */
+  ghost?: { body?: { x: number; y: number; floor: number } };
   id: string;
   name: string;
   floor: number;

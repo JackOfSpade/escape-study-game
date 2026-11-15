@@ -8,6 +8,7 @@
 import { fallbackCatastrophe } from "./catastrophe";
 import type { Game } from "./model";
 import { resetTasksForLoop } from "./escape-tasks";
+import { openEscapeWorld } from "./escape-world";
 import type { AreaGraph, EscapeState, VoiceGender } from "./escape-types";
 import { emptyLedger } from "./fact-ledger";
 import {
@@ -71,6 +72,9 @@ export function createEscapeState(
   opts: { gender: VoiceGender; seed: number },
 ): EscapeState {
   const seed = Number.isFinite(opts.seed) ? opts.seed : g.seed;
+  // Escape runs have plain doors and no floor gating; the world was built with
+  // the legacy rules, so convert it before returning the state.
+  openEscapeWorld(g);
   return {
     version: 1,
     persona: personaOf(g),
@@ -112,6 +116,7 @@ export function loopReset(prev: EscapeState): EscapeState {
     areaStore: {},
     prompts: [],
     roomPower: {},
+    // `daily` is deliberately dropped: a restarted loop begins the day again.
   };
   if (prev.epilogue) next.epilogue = { ...prev.epilogue };
   return next;

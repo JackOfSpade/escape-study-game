@@ -446,6 +446,17 @@ export interface EscapeEvent {
 /* Everything stored on the game                                       */
 /* ------------------------------------------------------------------ */
 
+/** One NPC's ordinary day in an escape run; see src/npc-daily-life.ts. */
+export interface DailyLife {
+  home: { x: number; y: number; floor: number };
+  state: "staying" | "walking";
+  /** Game time the current stay ends or the current walk gives up. */
+  until: number;
+  target?: { x: number; y: number; floor: number };
+  /** How many walks this NPC has started; also salts the routine hashes. */
+  visits: number;
+}
+
 export interface EscapeState {
   version: 1;
   /** Who the player is, as told to them. */
@@ -468,6 +479,11 @@ export interface EscapeState {
   prompts: { npcId: string; reason: string; at: number }[];
   /** Mutable room power keyed `${floor}:${roomId}`; overrides the seeded default. Reset each loop. */
   roomPower: Record<string, "lit" | "dim" | "outage">;
+  /**
+   * Per-NPC ordinary-day routine state, keyed by actor id. Optional so saves
+   * made before routines existed still validate.
+   */
+  daily?: Record<string, DailyLife>;
 }
 
 /** An inactive area. The active area's floors live in `Game.floors`. */
