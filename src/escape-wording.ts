@@ -4,6 +4,7 @@
  * Pure data-in, string-out helpers: no DOM access and no imports from
  * `main.ts`, so they can be unit tested on their own.
  */
+import { planObjective } from "./escape-plan";
 import type { EscapeTask } from "./escape-types";
 import type { Game } from "./model";
 
@@ -26,8 +27,14 @@ export function escapeObjective(game: Game): {
     return { title: "You got out.", description: review };
   if (game.status === "dead")
     return { title: "You did not make it.", description: review };
+  // A plan the player made comes first: it is what they are doing.
+  const plan = planObjective(game);
+  if (plan) return plan;
   const task = taskFor(game);
-  if (!task) return { title: "", description: "" };
+  if (!task)
+    return game.escape
+      ? { title: "", description: "Press P to think of a way out." }
+      : { title: "", description: "" };
   return {
     title: task.title,
     description: `${task.done} of ${task.steps} steps done.`,

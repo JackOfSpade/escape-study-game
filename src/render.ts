@@ -3,6 +3,7 @@ import { doorStyle } from "./door-style";
 import { fieldAllows } from "./force-fields";
 import { drawBlood } from "./blood";
 import { camera } from "./camera";
+import { activePlan, currentStep, stepSpot } from "./escape-plan";
 import { ghostActive, ghostBody } from "./ghost-view";
 import { displayScale } from "./display-scale";
 import { human } from "./engine";
@@ -817,6 +818,21 @@ export function render(
     ctx.moveTo(z.x + Math.cos(heading) * 0.1, z.y + Math.sin(heading) * 0.1);
     ctx.lineTo(z.x + Math.cos(heading) * 0.55, z.y + Math.sin(heading) * 0.55);
     ctx.stroke();
+  }
+  // The spot the current plan step happens at: a ring the player walks to.
+  const planStep = currentStep(activePlan(g.escape)),
+    planSpot =
+      g.status === "playing" && planStep ? stepSpot(g, planStep) : undefined;
+  if (planSpot && planSpot.floor === floorIndex) {
+    ctx.save();
+    ctx.strokeStyle = "#8fd8ff";
+    ctx.lineWidth = 0.09;
+    ctx.globalAlpha = 0.85;
+    ctx.setLineDash([0.28, 0.2]);
+    ctx.beginPath();
+    ctx.arc(planSpot.x, planSpot.y, 0.9, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
   }
   for (const contact of spectator ? [] : stairContactCues(g, a, radius)) {
     ctx.strokeStyle = p.danger;

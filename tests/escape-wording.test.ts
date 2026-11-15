@@ -93,10 +93,10 @@ test("escapeObjective falls back to the first available task", () => {
   });
 });
 
-test("escapeObjective is empty while there is no task to show", () => {
+test("escapeObjective invites a plan while there is nothing to do yet", () => {
   assert.deepEqual(escapeObjective(escapeGame()), {
     title: "",
-    description: "",
+    description: "Press P to think of a way out.",
   });
 });
 

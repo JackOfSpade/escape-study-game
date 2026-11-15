@@ -35,6 +35,7 @@ import {
 } from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { doorFrame } from "../doors";
+import { activePlan, currentStep, stepSpot } from "../escape-plan";
 import { human } from "../engine";
 import { ghostActive, ghostBody } from "../ghost-view";
 import { doorLeaves, doorSeeThrough, doorStyle } from "../door-style";
@@ -471,6 +472,17 @@ export class FirstPersonView {
   // near range, especially while viewing the city at shallow angles.
   readonly camera = new PerspectiveCamera(75, 1, 0.1, 900);
   private scene = new Scene();
+  /** A thin beam of light over the spot the player's current plan step is at. */
+  private planBeacon = new Mesh(
+    new CylinderGeometry(0.1, 0.1, 3.2, 12),
+    new MeshBasicMaterial({
+      color: "#8fd8ff",
+      transparent: true,
+      opacity: 0.42,
+      depthWrite: false,
+      fog: false,
+    }),
+  );
   private fill = new HemisphereLight("#b5c8d2", "#3f494c", 1.1);
   private moon = new DirectionalLight("#91abc9", 0.38);
   private localLights = Array.from(
@@ -647,6 +659,20 @@ export class FirstPersonView {
       this.run = game;
     }
     this.useFloor(floor);
+    // The plan beacon marks where the current step happens, on this level.
+    const planStep = currentStep(activePlan(game.escape)),
+      planSpot =
+        game.status === "playing" && planStep
+          ? stepSpot(game, planStep)
+          : undefined;
+    if (!this.planBeacon.parent) this.scene.add(this.planBeacon);
+    this.planBeacon.visible = !!planSpot && planSpot.floor === a.floor;
+    if (planSpot && this.planBeacon.visible)
+      this.planBeacon.position.set(
+        planSpot.x,
+        liftOf(hasLevels(floor) ? floor : undefined, planSpot) + 1.6,
+        planSpot.y,
+      );
     for (const context of this.floorScenes.values())
       context.root.visible = false;
     this.floorRoot.visible = true;
@@ -2978,6 +3004,8 @@ export class FirstPersonView {
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    this.planBeacon.geometry.dispose();
+    (this.planBeacon.material as MeshBasicMaterial).dispose();
     this.clearFloor();
     this.exterior.dispose();
     this.atmosphere.dispose();

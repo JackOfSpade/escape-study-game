@@ -117,7 +117,11 @@ export function loopReset(prev: EscapeState): EscapeState {
     prompts: [],
     roomPower: {},
     // `daily` is deliberately dropped: a restarted loop begins the day again.
+    // `plans` are dropped too: a plan belongs to the loop it was made in.
   };
+  // The truth of the game and where its things stand never change.
+  if (prev.truth) next.truth = structuredClone(prev.truth);
+  if (prev.places) next.places = structuredClone(prev.places);
   if (prev.epilogue) next.epilogue = { ...prev.epilogue };
   return next;
 }

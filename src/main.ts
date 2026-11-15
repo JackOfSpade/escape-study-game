@@ -70,8 +70,12 @@ import {
   endLoop,
   epilogueForNewGame,
   prepareCatastrophe,
+  prepareTruth,
 } from "./escape-prepare";
 import { escapeFrame, escapeInteract, escapeJournal } from "./escape-runtime";
+import { requestPlan } from "./director";
+import { fallbackTruth, parseTruthSheet, planTick } from "./escape-plan";
+import { installPlanBox } from "./plan-box";
 import { createEscapeState, loopReset } from "./escape-state";
 import { startTask, taskIndicator } from "./escape-tasks";
 import { taskAtStation, takeEscapeDecision } from "./escape-terminal";
@@ -83,6 +87,7 @@ import {
   claimStation,
   extractionFloor,
   human,
+  damageSurvivor,
   nearbyDoor,
   nearestGrip,
   nearestStation,
@@ -184,6 +189,8 @@ import {
   type RunTitleCard,
   type RunTitleCardStyle,
   type SavedRunDesign,
+  parseSavedRunDesign,
+  runDesignFingerprint,
 } from "./run-design-contract.mjs";
 import {
   enterStudyWorkspace,
@@ -943,6 +950,14 @@ async function prepareLoggedCatastrophe(g: Game) {
     ...report,
     catastropheId: g.escape?.catastrophe.id ?? null,
     durationMs: Math.round(performance.now() - started),
+  });
+  // The sealed truth sheet is derived from the settled catastrophe: which
+  // ways out work in this game. A failed call leaves the seeded sheet.
+  const truthStarted = performance.now();
+  const truthSource = await prepareTruth(g).catch(() => "offline" as const);
+  runLogs.record(g, "truth-prepared", {
+    source: truthSource,
+    durationMs: Math.round(performance.now() - truthStarted),
   });
   void runLogs.flush();
 }
@@ -3650,6 +3665,17 @@ function frame(time: number) {
         game.status = "escaped";
         game.endedAt = game.time;
       }
+      // The player's own plan: each step is answered by the world when it is
+      // actually tried, and the last one decides whether it was a way out.
+      const effect = planTick(game, steps / 30);
+      if (effect.kind === "escape") {
+        game.status = "escaped";
+        game.endedAt = game.time;
+        void persist();
+      } else if (effect.kind === "die")
+        damageSurvivor(game, human(game), 1e6, effect.cause);
+      else if (effect.kind === "harm")
+        damageSurvivor(game, human(game), effect.amount, effect.cause);
     }
     // A region switch prepared by the director swaps the active game.
     const next = game.escape ? takeAreaSwitch(game) : undefined;
@@ -3837,5 +3863,93 @@ installPlayerChat({
   keyboardBusy: () => ownsKeyboard(document.activeElement),
   log: (type, data) => runLogs.record(game, type, data),
 });
+/**
+ * Load a hand-written level from `public/playtest/<name>.json` as a ready
+ * escape game: its design, its catastrophe wording and its sealed truth
+ * sheet, with no model call. Meant for a dev server (its own origin and
+ * storage); it refuses to replace a level the AI generated.
+ */
+async function startPlaytest(name: string) {
+  if (!/^[a-z0-9-]{1,40}$/.test(name)) return;
+  if (game.design?.source === "claude-cli") {
+    game.notice =
+      "A playtest level would replace your generated level, so it was not loaded. Open it on a dev server instead.";
+    return;
+  }
+  try {
+    const response = await fetch(`playtest/${name}.json`, {
+      cache: "no-store",
+    });
+    if (!response.ok) throw Error(`no playtest level named ${name}`);
+    const file = (await response.json()) as {
+      seed?: number;
+      design?: unknown;
+      catastrophe?: Record<string, unknown>;
+      truth?: unknown;
+    };
+    const saved = parseSavedRunDesign({
+      version: 1,
+      source: "fixture",
+      requestId: `design-playtest-${name}`,
+      generationId: `design-playtest-${name}`,
+      fingerprint: runDesignFingerprint(
+        file.design as SavedRunDesign["design"],
+      ),
+      design: file.design,
+    });
+    const previous = game;
+    delete previous.study.pending;
+    game = newPlayableGame(
+      Number.isSafeInteger(file.seed) ? (file.seed as number) : 4242,
+      previous.study,
+      saved,
+    );
+    game.settings = previous.settings;
+    const state = createEscapeState(game, {
+      gender: "female",
+      seed: game.seed,
+    });
+    game.escape = state;
+    dropHordeNotice(game);
+    // The offline catastrophe keeps its mechanics; the file gives it words
+    // that belong to this place.
+    const words = file.catastrophe ?? {};
+    const line = (value: unknown, max: number) =>
+      typeof value === "string" && value.trim() && value.length <= max
+        ? value.trim()
+        : undefined;
+    state.catastrophe.title = line(words.title, 80) ?? state.catastrophe.title;
+    state.catastrophe.premise =
+      line(words.premise, 600) ?? state.catastrophe.premise;
+    state.catastrophe.publicStory =
+      line(words.publicStory, 240) ?? state.catastrophe.publicStory;
+    state.catastrophe.origin.roomHint =
+      line(words.roomHint, 80) ?? state.catastrophe.origin.roomHint;
+    state.truth = parseTruthSheet(file.truth) ?? fallbackTruth(game.seed);
+    active = undefined;
+    lastQuestion = undefined;
+    completionCursor = 0;
+    closeTerminal();
+    readyRun();
+    await persist();
+  } catch (error) {
+    game.notice = `The playtest level could not be loaded: ${String(error)}`;
+  }
+}
+// The plan box (P): the character thinks of a way out and the world makes it
+// something to try. Installed once; it reads the current game.
+installPlanBox({
+  game: () => game,
+  keyboardBusy: () => ownsKeyboard(document.activeElement),
+  submit: (text) => {
+    keys.clear();
+    if (requestPlan(game, text, () => void persist())) void persist();
+  },
+  log: (type, data) => runLogs.record(game, type, data),
+});
 ui();
 requestAnimationFrame(frame);
+{
+  const playtest = new URLSearchParams(location.search).get("playtest");
+  if (playtest) void startPlaytest(playtest);
+}
