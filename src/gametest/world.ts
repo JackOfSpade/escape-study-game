@@ -1,3 +1,4 @@
+import { isInventoryDesign } from "../run-design-contract.mjs";
 import { redesign } from "../force-fields";
 import { doorFrame, doorPose, ensureDoor, unlatchDoor } from "../doors";
 import {
@@ -150,14 +151,14 @@ export function createTestWorld(s: Scenario, roadmap: Roadmap) {
     : undefined;
   const g = s.designStructure
     ? structureGame(s.seed, roadmap, undefined, s.designStructure)
-    : s.design?.version === 3
+    : isInventoryDesign(s.design)
       ? createPlayableGame(s.seed, roadmap, undefined, saved)
       : createGame(s.seed, roadmap, undefined, {
           layout:
             s.layout === "randomized" ? "forward" : (s.layout ?? "legacy"),
           ...(saved ? { design: saved } : {}),
         });
-  if ((s.design?.version === 3 || s.designStructure) && !s.naturalSpawns) {
+  if ((isInventoryDesign(s.design) || s.designStructure) && !s.naturalSpawns) {
     g.zombies = [];
     g.spawned = 0;
   }
@@ -191,7 +192,7 @@ export function createTestWorld(s: Scenario, roadmap: Roadmap) {
     for (let x = 18; x <= 25; x++) g.floors[0].tiles[H - 1][x] = 0;
   if (
     s.rules === "force-fields" &&
-    s.design?.version !== 3 &&
+    !isInventoryDesign(s.design) &&
     !s.designStructure
   )
     redesign(g, { randomized: s.layout === "randomized" });

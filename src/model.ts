@@ -501,7 +501,8 @@ export interface Floor {
     forwardEntry?: Point;
   }[];
   generation?: {
-    version: 2 | 3 | 4 | 5;
+    /** 6 is a free plan drawn by a version 4 design (src/free-plan.ts). */
+    version: 2 | 3 | 4 | 5 | 6;
     upperDivider: number;
     lowerDivider: number;
     stages?: { room: number; rear: number; front: number }[];
@@ -515,6 +516,8 @@ export interface Floor {
     /** Stepped floor heights of a hall room (floors[].hall). Absent on flat
      * floors and older saves. */
     levels?: import("./floor-levels").FloorLevels;
+    /** Free plans: the two-cell doorways carved in room walls. */
+    doorways?: import("./floor-plan").Rect[];
   };
   index: number;
   tiles: number[][];

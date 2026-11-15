@@ -140,7 +140,7 @@ export function redesign(
   g: Game,
   options: {
     randomized?: boolean;
-    blueprint?: import("./run-design-contract.mjs").RunStructureV3;
+    blueprint?: import("./run-design-contract.mjs").RunStructure;
   } = {},
 ) {
   g.rules = "force-fields";
@@ -290,10 +290,12 @@ export function redesign(
 function applyDoorDesign(
   g: Game,
   floor: Floor,
-  blueprint?: import("./run-design-contract.mjs").RunStructureV3,
+  blueprint?: import("./run-design-contract.mjs").RunStructure,
 ) {
   const design = blueprint ?? g.design?.design;
-  const designed = design?.floors[floor.index]?.doors;
+  // Drawn floors (version 4) style no chain doors.
+  const authored = design?.floors[floor.index];
+  const designed = authored && "doors" in authored ? authored.doors : undefined;
   for (const o of floor.furniture) {
     if (!o.field) continue;
     const room = /room(\d+)-(?:door|forward)$/.exec(o.id)?.[1];

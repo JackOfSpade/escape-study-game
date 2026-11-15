@@ -21,7 +21,7 @@ import {
   type RunHall,
   type RunStructureV3,
 } from "../src/run-design-contract.mjs";
-import { designReplySchema } from "../src/run-design-schema.mjs";
+import { STRUCTURE_SCHEMAS } from "../src/run-design-schema.mjs";
 import {
   finalizeDesignedRun,
   previewDesignedRun,
@@ -154,9 +154,8 @@ test("contract: a hall is optional, bounded and only merges adjacent rooms", () 
   assert.throws(() => parseRunStructure(open), /enclosed/);
 });
 
-test("schema: every structure reply states its floors' hall", () => {
-  const schema = designReplySchema({ version: 3, phase: "structure" }),
-    floor = schema.properties.structure.properties.floors.items;
+test("schema: a version 3 structure states its floors' hall", () => {
+  const floor = STRUCTURE_SCHEMAS[3].properties.floors.items;
   assert.ok(floor.required.includes("hall"));
   const hall = floor.properties.hall.anyOf[0];
   assert.deepEqual(hall.required, [

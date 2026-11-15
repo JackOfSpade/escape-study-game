@@ -142,7 +142,9 @@ export function parseEnvironmentSurfaces(value, rosterNames) {
     choice(s.scope, ["interior", "exterior"], `${p}.scope`);
     choice(s.role, roles, `${p}.role`);
     fail(
-      s.room === null || [0, 1, 2, 3].includes(s.room),
+      // Chain floors have rooms 0..3; a drawn floor has up to eight.
+      s.room === null ||
+        (Number.isInteger(s.room) && s.room >= 0 && s.room < 8),
       `${p}.room is invalid`,
     );
     if (s.owner !== null) {

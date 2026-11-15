@@ -1,3 +1,4 @@
+import { isInventoryDesign } from "./run-design-contract.mjs";
 import { bridgeRequest, status } from "./bridge-client";
 import {
   parseRunDesignRequest,
@@ -11,7 +12,7 @@ import {
   parseSavedRunDesign,
   parseEnvironmentSummaries,
   type EnvironmentSummary,
-  type RunStructureV3,
+  type RunStructure,
   type StructureRunDesignRequest,
   type ContentRunDesignRequest,
   type RunDesignRequest,
@@ -162,7 +163,7 @@ export function rememberDesign(saved: SavedRunDesign) {
     HISTORY_KEY,
     JSON.stringify([next, ...recent].slice(0, 5)),
   );
-  if (saved.design.version === 3) {
+  if (isInventoryDesign(saved.design)) {
     const summary = summarizeQualityEnvironment(saved.design.environment);
     localStorage.setItem(
       CONTENT_HISTORY_KEY,
@@ -241,7 +242,7 @@ export interface DesignOptions<
   signal: AbortSignal;
   progress?: (text: string) => void;
   activity?: (activity: RunDesignActivity) => void;
-  preview?: (seed: number, structure: RunStructureV3) => ProvisionalRun;
+  preview?: (seed: number, structure: RunStructure) => ProvisionalRun;
   finalize?: (candidate: ProvisionalRun, saved: SavedRunDesign) => T;
   send?: (
     request: R,

@@ -823,7 +823,9 @@ function attempt(
 
 /** The authored quota is shared by construction and validation. */
 export function forwardFieldQuota(g: Game, f: Floor, room: number) {
-  return f.design?.fieldQuotas[room] ?? 3 + ((g.seed + f.index + room) % 3);
+  // A free plan (version 4 design) has no quotas; its only field is the gate.
+  const quotas = f.design && "fieldQuotas" in f.design && f.design.fieldQuotas;
+  return (quotas || undefined)?.[room] ?? 3 + ((g.seed + f.index + room) % 3);
 }
 
 export function fieldDoor(

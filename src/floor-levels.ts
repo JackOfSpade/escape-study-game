@@ -1,6 +1,7 @@
 import type { Floor, Point } from "./model";
-import type { RunHall, RunHallSide } from "./run-design-contract.mjs";
-import { hallSector, inRect, type Rect } from "./floor-plan";
+import type { RunHallFeatures, RunHallSide } from "./run-design-contract.mjs";
+import { freeFloor } from "./free-design";
+import { hallSectors, inRect, type Rect, type Sector } from "./floor-plan";
 
 /** Stepped floor levels inside a hall room (floors[].hall).
  *
@@ -82,7 +83,7 @@ export function ceilingHeight(
   cx: number,
   cy: number,
 ) {
-  return hallSector(f as Floor)?.blocks.some((b) => inRect(b, cx, cy))
+  return hallSectors(f).some((s) => s.blocks.some((b) => inRect(b, cx, cy)))
     ? HALL_CEILING
     : ROOM_CEILING;
 }
@@ -124,7 +125,7 @@ const extent = (box: Rect, side: RunHallSide) =>
     : { depth: box.x2 - box.x1 + 1, along: box.y2 - box.y1 + 1 };
 
 /** The wanted height of each hall cell before steps are cut, in units. */
-function wantedUnits(hall: RunHall, box: Rect, x: number, y: number) {
+function wantedUnits(hall: RunHallFeatures, box: Rect, x: number, y: number) {
   const size = extent(box, hall.focus),
     at = fromSide(box, hall.focus, x, y),
     // A raised area keeps its authored flat size: the steps down from it are
@@ -171,13 +172,60 @@ function wantedUnits(hall: RunHall, box: Rect, x: number, y: number) {
   return out;
 }
 
-/** Build the levels of a floor's hall from its design, or undefined when the
- * hall is flat. Cells within two cells of a field opening stay at storey
- * height, and every height difference is cut back into 30 cm steps. */
+/** The halls of a floor with their authored features: the one merged hall of
+ * a chain floor, or every drawn room of a free plan that has hall features. */
+function authoredHalls(f: Floor): { sector: Sector; hall: RunHallFeatures }[] {
+  const design = f.design,
+    drawn = freeFloor(f),
+    sectors = hallSectors(f);
+  if (!design) return [];
+  if (drawn)
+    return sectors.flatMap((sector) => {
+      const hall = drawn.rooms[sector.room ?? -1]?.hall;
+      return hall ? [{ sector, hall }] : [];
+    });
+  return "hall" in design && design.hall && sectors[0]
+    ? [{ sector: sectors[0], hall: design.hall }]
+    : [];
+}
+
+/** Build the levels of a floor's halls from its design, or undefined when
+ * they are all flat. Cells within two cells of a field opening or doorway
+ * stay at storey height, and every height difference is cut back into 30 cm
+ * steps. */
 export function buildHallLevels(f: Floor): FloorLevels | undefined {
-  const sector = hallSector(f),
-    hall = f.design && "hall" in f.design ? f.design.hall : undefined;
-  if (!sector || !hall) return undefined;
+  const built = authoredHalls(f).flatMap(({ sector, hall }) => {
+    const levels = hallLevels(f, sector, hall);
+    return levels ? [levels] : [];
+  });
+  if (!built.length) return undefined;
+  if (built.length === 1) return built[0];
+  // Several halls share one grid over their common bounding rectangle.
+  const box: Rect = {
+    x1: Math.min(...built.map((l) => l.x1)),
+    y1: Math.min(...built.map((l) => l.y1)),
+    x2: Math.max(...built.map((l) => l.x2)),
+    y2: Math.max(...built.map((l) => l.y2)),
+  };
+  const cols = box.x2 - box.x1 + 1,
+    units = new Array<number>(cols * (box.y2 - box.y1 + 1)).fill(0);
+  for (const l of built) {
+    const width = l.x2 - l.x1 + 1;
+    l.units.forEach((u, i) => {
+      if (!u) return;
+      const x = l.x1 + (i % width),
+        y = l.y1 + Math.floor(i / width);
+      units[(y - box.y1) * cols + (x - box.x1)] = u;
+    });
+  }
+  return { ...box, units };
+}
+
+function hallLevels(
+  f: Floor,
+  sector: Sector,
+  hall: RunHallFeatures,
+): FloorLevels | undefined {
   const box: Rect = {
     x1: Math.min(...sector.blocks.map((b) => b.x1)),
     y1: Math.min(...sector.blocks.map((b) => b.y1)),
@@ -194,12 +242,16 @@ export function buildHallLevels(f: Floor): FloorLevels | undefined {
       y <= box.y2 &&
       f.tiles[y]?.[x] === 0 &&
       sector.blocks.some((b) => inRect(b, x, y));
-  const fields = f.furniture.filter((o) => o.field);
+  const fields = f.furniture.filter((o) => o.field),
+    doorways = f.generation?.doorways ?? [];
   const flat = (x: number, y: number) =>
     fields.some(
       (o) =>
         Math.abs(x + 0.5 - o.x) < o.w / 2 + 2 &&
         Math.abs(y + 0.5 - o.y) < o.h / 2 + 2,
+    ) ||
+    doorways.some(
+      (d) => x >= d.x1 - 2 && x <= d.x2 + 2 && y >= d.y1 - 2 && y <= d.y2 + 2,
     );
   const value = new Array<number>(cols * rows).fill(0),
     cells: Point[] = [],
@@ -268,12 +320,15 @@ export function levelErrors(f: Floor): string[] {
   )
     return ["levels do not match their rectangle"];
   const errors: string[] = [];
-  const hall = hallSector(f);
+  const halls = hallSectors(f);
   for (let y = l.y1; y <= l.y2; y++)
     for (let x = l.x1; x <= l.x2; x++) {
       const here = cellUnits(f, x, y);
       if (f.tiles[y]?.[x] !== 0) continue;
-      if (here && !hall?.blocks.some((b) => inRect(b, x, y)))
+      if (
+        here &&
+        !halls.some((hall) => hall.blocks.some((b) => inRect(b, x, y)))
+      )
         errors.push(`level outside the hall at ${x},${y}`);
       for (const [nx, ny] of [
         [x + 1, y],

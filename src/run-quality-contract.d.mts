@@ -1,7 +1,4 @@
-import type {
-  RunStructureV3,
-  RunDesignSummary,
-} from "./run-design-contract.mjs";
+import type { RunStructure, RunDesignSummary } from "./run-design-contract.mjs";
 import type {
   SurfaceSlot,
   SurfaceContent,
@@ -65,12 +62,12 @@ export interface QualityStructureRequest extends QualityRequestBase {
   phase: "structure";
   concept: QualityConcept;
   rationale: string;
-  repair?: { candidate: RunStructureV3; errors: string[] };
+  repair?: { candidate: RunStructure; errors: string[] };
 }
 interface QualityContext extends QualityRequestBase {
   concept: QualityConcept;
   rationale: string;
-  structure: RunStructureV3;
+  structure: RunStructure;
   surfaces: SurfaceSlot[];
   structureFingerprint: string;
   surfaceFingerprint: string;
@@ -122,7 +119,7 @@ export interface QualitySelectionReply {
 }
 export interface QualityStructureReply {
   requestId: string;
-  structure: RunStructureV3;
+  structure: RunStructure;
 }
 export interface QualityReviewReply {
   requestId: string;
@@ -180,7 +177,7 @@ export function qualityContentBatches(
 ): { groupId: string; targets: string[] }[];
 export function parseQualityPartialContent(
   value: unknown,
-  structure: RunStructureV3,
+  structure: RunStructure,
   surfaces: readonly SurfaceSlot[],
 ): EnvironmentContent;
 export function mergeQualityEntries(

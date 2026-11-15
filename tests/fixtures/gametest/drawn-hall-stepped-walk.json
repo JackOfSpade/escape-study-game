@@ -1,0 +1,3240 @@
+{
+  "version": 1,
+  "seed": 42,
+  "template": "building",
+  "layout": "randomized",
+  "rules": "force-fields",
+  "simulation": "game",
+  "startTime": 0,
+  "naturalSpawns": false,
+  "deleted": [],
+  "maps": [],
+  "id": "drawn-hall-stepped-walk",
+  "name": "A drawn planetarium: the player walks the star theatre's pit, stage and raked floor",
+  "maxTicks": 900,
+  "designStructure": {
+    "version": 4,
+    "title": "Late Show at Calder Planetarium",
+    "premise": "The volunteers of a small-town planetarium rehearse the autumn sky show for a school visit while a storm rattles the dome.",
+    "opening": "Doors open at eight. The projector lamp is new and nobody has tested it yet.",
+    "footprint": {
+      "shape": "notched",
+      "width": 38,
+      "top": 3,
+      "inset": 3,
+      "mirrored": false,
+      "shoulder": 13
+    },
+    "floors": [
+      {
+        "name": "STAR THEATRE",
+        "furnitureDensity": 0.7,
+        "concourse": {
+          "pattern": "counter",
+          "filler": ["airlock-console", "chair"]
+        },
+        "rooms": [
+          {
+            "name": "Star Theatre",
+            "pattern": "rows",
+            "filler": ["star-projector", "theatre-seat", "oxygen-tank"],
+            "x": 6,
+            "y": 8,
+            "w": 32,
+            "h": 12,
+            "shape": "rounded",
+            "power": "lit",
+            "doors": [
+              {
+                "side": "s",
+                "at": 0.5
+              },
+              {
+                "side": "n",
+                "at": 0.15
+              }
+            ],
+            "work": 8,
+            "hall": {
+              "focus": "w",
+              "seating": "rows",
+              "stage": {
+                "depth": 4,
+                "height": 0.9
+              },
+              "rake": 1.5,
+              "pit": {
+                "width": 4,
+                "length": 4,
+                "drop": 0.45
+              },
+              "platforms": [
+                {
+                  "side": "e",
+                  "width": 5,
+                  "depth": 2,
+                  "height": 1.5
+                }
+              ]
+            }
+          },
+          {
+            "name": "Ticket Office",
+            "pattern": "desk",
+            "filler": ["comms-desk", "officeChair", "sample-freezer"],
+            "x": 7,
+            "y": 21,
+            "w": 10,
+            "h": 4,
+            "shape": "rect",
+            "power": "lit",
+            "doors": [
+              {
+                "side": "e",
+                "at": 0.5
+              }
+            ],
+            "work": 1,
+            "hall": null
+          },
+          {
+            "name": "Lamp Workshop",
+            "pattern": "shelving",
+            "filler": ["suit-locker", "sample-freezer", "drill-bit"],
+            "x": 27,
+            "y": 21,
+            "w": 10,
+            "h": 4,
+            "shape": "rect",
+            "power": "dim",
+            "doors": [
+              {
+                "side": "w",
+                "at": 0.5
+              }
+            ],
+            "work": 1,
+            "hall": null
+          }
+        ],
+        "scene": {
+          "version": 2,
+          "rooms": [
+            {
+              "room": 0,
+              "title": "Star Theatre",
+              "description": "The lecturer's stage under the west screen.",
+              "owner": "Inez",
+              "palette": {
+                "surface": "#4b525c",
+                "metal": "#b9c3cc",
+                "accent": "#ff9b3d"
+              },
+              "condition": "kept",
+              "furniture": [
+                {
+                  "id": "r0-airlock-console-0",
+                  "kind": "airlock-console",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.15
+                  },
+                  "angle": 0,
+                  "color": "#4b525c",
+                  "condition": "intact",
+                  "owner": "Inez",
+                  "props": [
+                    {
+                      "id": "r0-0-papers-0",
+                      "kind": "papers",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Inez"
+                    },
+                    {
+                      "id": "r0-0-phone-1",
+                      "kind": "phone",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Inez"
+                    }
+                  ]
+                },
+                {
+                  "id": "r0-suit-locker-1",
+                  "kind": "suit-locker",
+                  "at": {
+                    "x": 0.12,
+                    "y": 0.2
+                  },
+                  "angle": 0,
+                  "color": "#b85c38",
+                  "condition": "worn",
+                  "owner": "Cal",
+                  "props": []
+                },
+                {
+                  "id": "r0-cryo-pod-2",
+                  "kind": "cryo-pod",
+                  "at": {
+                    "x": 0.85,
+                    "y": 0.8
+                  },
+                  "angle": 0,
+                  "color": "#3a4048",
+                  "condition": "intact",
+                  "owner": "Rumi",
+                  "props": []
+                }
+              ]
+            },
+            {
+              "room": 1,
+              "title": "Ticket Office",
+              "description": "The sunken well where the star projector turns.",
+              "owner": "Cal",
+              "palette": {
+                "surface": "#d4d8dc",
+                "metal": "#9aa3ad",
+                "accent": "#ffd65a"
+              },
+              "condition": "worn",
+              "furniture": [
+                {
+                  "id": "r1-bunk-pod-0",
+                  "kind": "bunk-pod",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.15
+                  },
+                  "angle": 0,
+                  "color": "#d4d8dc",
+                  "condition": "worn",
+                  "owner": "Cal",
+                  "props": []
+                },
+                {
+                  "id": "r1-cafetable-1",
+                  "kind": "cafeTable",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.6
+                  },
+                  "angle": 0,
+                  "color": "#e3e6e8",
+                  "condition": "intact",
+                  "owner": "Rumi",
+                  "props": [
+                    {
+                      "id": "r1-1-photo-0",
+                      "kind": "photo",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Rumi"
+                    },
+                    {
+                      "id": "r1-1-mug-1",
+                      "kind": "mug",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Rumi"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "room": 2,
+              "title": "Lamp Workshop",
+              "description": "Lettuce under violet grow lights, the watering rota taped to the rack.",
+              "owner": "Rumi",
+              "palette": {
+                "surface": "#4f5a63",
+                "metal": "#d9dde2",
+                "accent": "#c47cff"
+              },
+              "condition": "ransacked",
+              "furniture": [
+                {
+                  "id": "r2-hydroponic-rack-0",
+                  "kind": "hydroponic-rack",
+                  "at": {
+                    "x": 0.25,
+                    "y": 0.12
+                  },
+                  "angle": 0,
+                  "color": "#d9dde2",
+                  "condition": "intact",
+                  "owner": "Rumi",
+                  "props": []
+                },
+                {
+                  "id": "r2-desk-1",
+                  "kind": "desk",
+                  "at": {
+                    "x": 0.8,
+                    "y": 0.15
+                  },
+                  "angle": 0,
+                  "color": "#6c5a48",
+                  "condition": "damaged",
+                  "owner": "Dev",
+                  "props": [
+                    {
+                      "id": "r2-1-papers-0",
+                      "kind": "papers",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Dev"
+                    },
+                    {
+                      "id": "r2-1-plant-1",
+                      "kind": "plant",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Dev"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "CREW DECK",
+        "furnitureDensity": 0.85,
+        "concourse": {
+          "pattern": "lounge",
+          "filler": ["cafeTable", "chair", "oxygen-tank"]
+        },
+        "rooms": [
+          {
+            "name": "Exhibit Gallery North-West",
+            "pattern": "display",
+            "filler": ["cryo-pod", "drill-bit", "chair"],
+            "x": 6,
+            "y": 8,
+            "w": 13,
+            "h": 7,
+            "shape": "chamfered",
+            "power": "lit",
+            "doors": [
+              {
+                "side": "s",
+                "at": 0.5
+              }
+            ],
+            "work": 4,
+            "hall": null
+          },
+          {
+            "name": "Exhibit Gallery North-East",
+            "pattern": "clusters",
+            "filler": ["hydroponic-rack", "desk", "officeChair"],
+            "x": 24,
+            "y": 8,
+            "w": 13,
+            "h": 7,
+            "shape": "rect",
+            "power": "lit",
+            "doors": [
+              {
+                "side": "s",
+                "at": 0.5
+              }
+            ],
+            "work": 4,
+            "hall": null
+          },
+          {
+            "name": "Exhibit Gallery South-West",
+            "pattern": "bays",
+            "filler": ["bunk-pod", "chair", "suit-locker"],
+            "x": 6,
+            "y": 19,
+            "w": 10,
+            "h": 6,
+            "shape": "rect",
+            "power": "dim",
+            "doors": [
+              {
+                "side": "e",
+                "at": 0.3
+              }
+            ],
+            "work": 2,
+            "hall": null
+          },
+          {
+            "name": "Exhibit Gallery South-East",
+            "pattern": "table",
+            "filler": ["mess-table", "chair", "oxygen-tank"],
+            "x": 27,
+            "y": 19,
+            "w": 11,
+            "h": 6,
+            "shape": "rect",
+            "power": "lit",
+            "doors": [
+              {
+                "side": "w",
+                "at": 0.3
+              }
+            ],
+            "work": 2,
+            "hall": null
+          }
+        ],
+        "scene": {
+          "version": 2,
+          "rooms": [
+            {
+              "room": 0,
+              "title": "Exhibit Gallery North-West",
+              "description": "Eighteen trays still stacked for a meal that never happened.",
+              "owner": "Esme",
+              "palette": {
+                "surface": "#e3e6e8",
+                "metal": "#8a9099",
+                "accent": "#ff9b3d"
+              },
+              "condition": "worn",
+              "furniture": [
+                {
+                  "id": "r0-mess-table-0",
+                  "kind": "mess-table",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.5
+                  },
+                  "angle": 0,
+                  "color": "#e3e6e8",
+                  "condition": "intact",
+                  "owner": "Esme",
+                  "props": [
+                    {
+                      "id": "r0-0-mug-0",
+                      "kind": "mug",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Esme"
+                    },
+                    {
+                      "id": "r0-0-ration-tin-1",
+                      "kind": "ration-tin",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Esme"
+                    },
+                    {
+                      "id": "r0-0-bottle-2",
+                      "kind": "bottle",
+                      "at": {
+                        "x": 0,
+                        "y": 0.35
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Esme"
+                    }
+                  ]
+                },
+                {
+                  "id": "r0-chair-1",
+                  "kind": "chair",
+                  "at": {
+                    "x": 0.3,
+                    "y": 0.3
+                  },
+                  "angle": 0,
+                  "color": "#3d6fb0",
+                  "condition": "worn",
+                  "owner": "Nico",
+                  "props": []
+                },
+                {
+                  "id": "r0-oxygen-tank-2",
+                  "kind": "oxygen-tank",
+                  "at": {
+                    "x": 0.1,
+                    "y": 0.1
+                  },
+                  "angle": 0,
+                  "color": "#e9edf0",
+                  "condition": "intact",
+                  "owner": "Tamsin",
+                  "props": []
+                }
+              ]
+            },
+            {
+              "room": 1,
+              "title": "Exhibit Gallery North-East",
+              "description": "The relay desk still shows the last uplink window to Earth; the commander's mug sits by the keypad.",
+              "owner": "Nico",
+              "palette": {
+                "surface": "#5a6470",
+                "metal": "#b9c3cc",
+                "accent": "#4fd1ff"
+              },
+              "condition": "ransacked",
+              "furniture": [
+                {
+                  "id": "r1-comms-desk-0",
+                  "kind": "comms-desk",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.2
+                  },
+                  "angle": 0,
+                  "color": "#5a6470",
+                  "condition": "worn",
+                  "owner": "Nico",
+                  "props": [
+                    {
+                      "id": "r1-0-mug-0",
+                      "kind": "mug",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Nico"
+                    },
+                    {
+                      "id": "r1-0-papers-1",
+                      "kind": "papers",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Nico"
+                    },
+                    {
+                      "id": "r1-0-headphones-2",
+                      "kind": "headphones",
+                      "at": {
+                        "x": 0,
+                        "y": 0.35
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Nico"
+                    }
+                  ]
+                },
+                {
+                  "id": "r1-officechair-1",
+                  "kind": "officeChair",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.45
+                  },
+                  "angle": 180,
+                  "color": "#30343c",
+                  "condition": "intact",
+                  "owner": "Tamsin",
+                  "props": []
+                },
+                {
+                  "id": "r1-sample-freezer-2",
+                  "kind": "sample-freezer",
+                  "at": {
+                    "x": 0.85,
+                    "y": 0.8
+                  },
+                  "angle": -90,
+                  "color": "#e8eef2",
+                  "condition": "damaged",
+                  "owner": "Paz",
+                  "props": [
+                    {
+                      "id": "r1-2-sample-vial-0",
+                      "kind": "sample-vial",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Paz"
+                    },
+                    {
+                      "id": "r1-2-note-1",
+                      "kind": "note",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Paz"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "room": 2,
+              "title": "Exhibit Gallery South-West",
+              "description": "Lettuce under violet grow lights, the watering rota taped to the rack.",
+              "owner": "Tamsin",
+              "palette": {
+                "surface": "#4f5a63",
+                "metal": "#d9dde2",
+                "accent": "#c47cff"
+              },
+              "condition": "kept",
+              "furniture": [
+                {
+                  "id": "r2-hydroponic-rack-0",
+                  "kind": "hydroponic-rack",
+                  "at": {
+                    "x": 0.25,
+                    "y": 0.12
+                  },
+                  "angle": 0,
+                  "color": "#d9dde2",
+                  "condition": "intact",
+                  "owner": "Tamsin",
+                  "props": []
+                },
+                {
+                  "id": "r2-desk-1",
+                  "kind": "desk",
+                  "at": {
+                    "x": 0.8,
+                    "y": 0.15
+                  },
+                  "angle": 0,
+                  "color": "#6c5a48",
+                  "condition": "damaged",
+                  "owner": "Paz",
+                  "props": [
+                    {
+                      "id": "r2-1-papers-0",
+                      "kind": "papers",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Paz"
+                    },
+                    {
+                      "id": "r2-1-plant-1",
+                      "kind": "plant",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Paz"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "room": 3,
+              "title": "Exhibit Gallery South-East",
+              "description": "Sleep pods with photos of home clipped inside the lids.",
+              "owner": "Paz",
+              "palette": {
+                "surface": "#d4d8dc",
+                "metal": "#9aa3ad",
+                "accent": "#ffd65a"
+              },
+              "condition": "worn",
+              "furniture": [
+                {
+                  "id": "r3-bunk-pod-0",
+                  "kind": "bunk-pod",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.15
+                  },
+                  "angle": 0,
+                  "color": "#d4d8dc",
+                  "condition": "damaged",
+                  "owner": "Paz",
+                  "props": []
+                },
+                {
+                  "id": "r3-cafetable-1",
+                  "kind": "cafeTable",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.6
+                  },
+                  "angle": 0,
+                  "color": "#e3e6e8",
+                  "condition": "intact",
+                  "owner": "Ellis",
+                  "props": [
+                    {
+                      "id": "r3-1-photo-0",
+                      "kind": "photo",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Ellis"
+                    },
+                    {
+                      "id": "r3-1-mug-1",
+                      "kind": "mug",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Ellis"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "SCIENCE DECK",
+        "furnitureDensity": 1,
+        "concourse": {
+          "pattern": "lounge",
+          "filler": ["cafeTable", "chair", "oxygen-tank"]
+        },
+        "rooms": [
+          {
+            "name": "Education Wing North-West",
+            "pattern": "display",
+            "filler": ["cryo-pod", "drill-bit", "chair"],
+            "x": 6,
+            "y": 8,
+            "w": 13,
+            "h": 7,
+            "shape": "chamfered",
+            "power": "lit",
+            "doors": [
+              {
+                "side": "s",
+                "at": 0.5
+              }
+            ],
+            "work": 4,
+            "hall": null
+          },
+          {
+            "name": "Education Wing North-East",
+            "pattern": "clusters",
+            "filler": ["hydroponic-rack", "desk", "officeChair"],
+            "x": 24,
+            "y": 8,
+            "w": 13,
+            "h": 7,
+            "shape": "rect",
+            "power": "lit",
+            "doors": [
+              {
+                "side": "s",
+                "at": 0.5
+              }
+            ],
+            "work": 4,
+            "hall": null
+          },
+          {
+            "name": "Education Wing South-West",
+            "pattern": "bays",
+            "filler": ["bunk-pod", "chair", "suit-locker"],
+            "x": 6,
+            "y": 19,
+            "w": 10,
+            "h": 6,
+            "shape": "rect",
+            "power": "dim",
+            "doors": [
+              {
+                "side": "e",
+                "at": 0.3
+              }
+            ],
+            "work": 2,
+            "hall": null
+          },
+          {
+            "name": "Education Wing South-East",
+            "pattern": "table",
+            "filler": ["mess-table", "chair", "oxygen-tank"],
+            "x": 27,
+            "y": 19,
+            "w": 11,
+            "h": 6,
+            "shape": "rect",
+            "power": "lit",
+            "doors": [
+              {
+                "side": "w",
+                "at": 0.3
+              }
+            ],
+            "work": 2,
+            "hall": null
+          }
+        ],
+        "scene": {
+          "version": 2,
+          "rooms": [
+            {
+              "room": 0,
+              "title": "Education Wing North-West",
+              "description": "Regolith cores labelled by crater, sealed behind frosted doors.",
+              "owner": "Ellis",
+              "palette": {
+                "surface": "#e8eef2",
+                "metal": "#9aa3ad",
+                "accent": "#7fe3ff"
+              },
+              "condition": "ransacked",
+              "furniture": [
+                {
+                  "id": "r0-sample-freezer-0",
+                  "kind": "sample-freezer",
+                  "at": {
+                    "x": 0.3,
+                    "y": 0.15
+                  },
+                  "angle": 0,
+                  "color": "#e8eef2",
+                  "condition": "intact",
+                  "owner": "Ellis",
+                  "props": [
+                    {
+                      "id": "r0-0-box-0",
+                      "kind": "box",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Ellis"
+                    },
+                    {
+                      "id": "r0-0-note-1",
+                      "kind": "note",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Ellis"
+                    }
+                  ]
+                },
+                {
+                  "id": "r0-drill-bit-1",
+                  "kind": "drill-bit",
+                  "at": {
+                    "x": 0.85,
+                    "y": 0.2
+                  },
+                  "angle": 0,
+                  "color": "#9a9fa6",
+                  "condition": "worn",
+                  "owner": "Luz",
+                  "props": []
+                },
+                {
+                  "id": "r0-suit-locker-2",
+                  "kind": "suit-locker",
+                  "at": {
+                    "x": 0.15,
+                    "y": 0.8
+                  },
+                  "angle": 90,
+                  "color": "#b85c38",
+                  "condition": "intact",
+                  "owner": "Ren",
+                  "props": []
+                }
+              ]
+            },
+            {
+              "room": 1,
+              "title": "Education Wing North-East",
+              "description": "Eighteen trays still stacked for a meal that never happened.",
+              "owner": "Luz",
+              "palette": {
+                "surface": "#e3e6e8",
+                "metal": "#8a9099",
+                "accent": "#ff9b3d"
+              },
+              "condition": "kept",
+              "furniture": [
+                {
+                  "id": "r1-mess-table-0",
+                  "kind": "mess-table",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.5
+                  },
+                  "angle": 0,
+                  "color": "#e3e6e8",
+                  "condition": "worn",
+                  "owner": "Luz",
+                  "props": [
+                    {
+                      "id": "r1-0-mug-0",
+                      "kind": "mug",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Luz"
+                    },
+                    {
+                      "id": "r1-0-ration-tin-1",
+                      "kind": "ration-tin",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Luz"
+                    },
+                    {
+                      "id": "r1-0-bottle-2",
+                      "kind": "bottle",
+                      "at": {
+                        "x": 0,
+                        "y": 0.35
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Luz"
+                    }
+                  ]
+                },
+                {
+                  "id": "r1-chair-1",
+                  "kind": "chair",
+                  "at": {
+                    "x": 0.3,
+                    "y": 0.3
+                  },
+                  "angle": 0,
+                  "color": "#3d6fb0",
+                  "condition": "intact",
+                  "owner": "Ren",
+                  "props": []
+                },
+                {
+                  "id": "r1-oxygen-tank-2",
+                  "kind": "oxygen-tank",
+                  "at": {
+                    "x": 0.1,
+                    "y": 0.1
+                  },
+                  "angle": 0,
+                  "color": "#e9edf0",
+                  "condition": "damaged",
+                  "owner": "Ada",
+                  "props": []
+                }
+              ]
+            },
+            {
+              "room": 2,
+              "title": "Education Wing South-West",
+              "description": "Lettuce under violet grow lights, the watering rota taped to the rack.",
+              "owner": "Ren",
+              "palette": {
+                "surface": "#4f5a63",
+                "metal": "#d9dde2",
+                "accent": "#c47cff"
+              },
+              "condition": "worn",
+              "furniture": [
+                {
+                  "id": "r2-hydroponic-rack-0",
+                  "kind": "hydroponic-rack",
+                  "at": {
+                    "x": 0.25,
+                    "y": 0.12
+                  },
+                  "angle": 0,
+                  "color": "#d9dde2",
+                  "condition": "intact",
+                  "owner": "Ren",
+                  "props": []
+                },
+                {
+                  "id": "r2-desk-1",
+                  "kind": "desk",
+                  "at": {
+                    "x": 0.8,
+                    "y": 0.15
+                  },
+                  "angle": 0,
+                  "color": "#6c5a48",
+                  "condition": "damaged",
+                  "owner": "Ada",
+                  "props": [
+                    {
+                      "id": "r2-1-papers-0",
+                      "kind": "papers",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Ada"
+                    },
+                    {
+                      "id": "r2-1-plant-1",
+                      "kind": "plant",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Ada"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "room": 3,
+              "title": "Education Wing South-East",
+              "description": "The relay desk still shows the last uplink window to Earth; the commander's mug sits by the keypad.",
+              "owner": "Ada",
+              "palette": {
+                "surface": "#5a6470",
+                "metal": "#b9c3cc",
+                "accent": "#4fd1ff"
+              },
+              "condition": "ransacked",
+              "furniture": [
+                {
+                  "id": "r3-comms-desk-0",
+                  "kind": "comms-desk",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.2
+                  },
+                  "angle": 0,
+                  "color": "#5a6470",
+                  "condition": "damaged",
+                  "owner": "Ada",
+                  "props": [
+                    {
+                      "id": "r3-0-mug-0",
+                      "kind": "mug",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Ada"
+                    },
+                    {
+                      "id": "r3-0-papers-1",
+                      "kind": "papers",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Ada"
+                    },
+                    {
+                      "id": "r3-0-headphones-2",
+                      "kind": "headphones",
+                      "at": {
+                        "x": 0,
+                        "y": 0.35
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Ada"
+                    }
+                  ]
+                },
+                {
+                  "id": "r3-officechair-1",
+                  "kind": "officeChair",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.45
+                  },
+                  "angle": 180,
+                  "color": "#30343c",
+                  "condition": "intact",
+                  "owner": "Seth",
+                  "props": []
+                },
+                {
+                  "id": "r3-sample-freezer-2",
+                  "kind": "sample-freezer",
+                  "at": {
+                    "x": 0.85,
+                    "y": 0.8
+                  },
+                  "angle": -90,
+                  "color": "#e8eef2",
+                  "condition": "worn",
+                  "owner": "Mei",
+                  "props": [
+                    {
+                      "id": "r3-2-sample-vial-0",
+                      "kind": "sample-vial",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Mei"
+                    },
+                    {
+                      "id": "r3-2-note-1",
+                      "kind": "note",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Mei"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "COMMAND DECK",
+        "furnitureDensity": 1.15,
+        "concourse": {
+          "pattern": "lounge",
+          "filler": ["cafeTable", "chair", "oxygen-tank"]
+        },
+        "rooms": [
+          {
+            "name": "Observatory Offices North-West",
+            "pattern": "display",
+            "filler": ["cryo-pod", "drill-bit", "chair"],
+            "x": 6,
+            "y": 8,
+            "w": 13,
+            "h": 7,
+            "shape": "chamfered",
+            "power": "lit",
+            "doors": [
+              {
+                "side": "s",
+                "at": 0.5
+              }
+            ],
+            "work": 4,
+            "hall": null
+          },
+          {
+            "name": "Observatory Offices North-East",
+            "pattern": "clusters",
+            "filler": ["hydroponic-rack", "desk", "officeChair"],
+            "x": 24,
+            "y": 8,
+            "w": 13,
+            "h": 7,
+            "shape": "rect",
+            "power": "lit",
+            "doors": [
+              {
+                "side": "s",
+                "at": 0.5
+              }
+            ],
+            "work": 4,
+            "hall": null
+          },
+          {
+            "name": "Observatory Offices South-West",
+            "pattern": "bays",
+            "filler": ["bunk-pod", "chair", "suit-locker"],
+            "x": 6,
+            "y": 19,
+            "w": 10,
+            "h": 6,
+            "shape": "rect",
+            "power": "dim",
+            "doors": [
+              {
+                "side": "e",
+                "at": 0.3
+              }
+            ],
+            "work": 2,
+            "hall": null
+          },
+          {
+            "name": "Observatory Offices South-East",
+            "pattern": "table",
+            "filler": ["mess-table", "chair", "oxygen-tank"],
+            "x": 27,
+            "y": 19,
+            "w": 11,
+            "h": 6,
+            "shape": "rect",
+            "power": "lit",
+            "doors": [
+              {
+                "side": "w",
+                "at": 0.3
+              }
+            ],
+            "work": 2,
+            "hall": null
+          }
+        ],
+        "scene": {
+          "version": 2,
+          "rooms": [
+            {
+              "room": 0,
+              "title": "Observatory Offices North-West",
+              "description": "The relay desk still shows the last uplink window to Earth; the commander's mug sits by the keypad.",
+              "owner": "Seth",
+              "palette": {
+                "surface": "#5a6470",
+                "metal": "#b9c3cc",
+                "accent": "#4fd1ff"
+              },
+              "condition": "kept",
+              "furniture": [
+                {
+                  "id": "r0-comms-desk-0",
+                  "kind": "comms-desk",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.2
+                  },
+                  "angle": 0,
+                  "color": "#5a6470",
+                  "condition": "intact",
+                  "owner": "Seth",
+                  "props": [
+                    {
+                      "id": "r0-0-mug-0",
+                      "kind": "mug",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Seth"
+                    },
+                    {
+                      "id": "r0-0-papers-1",
+                      "kind": "papers",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Seth"
+                    },
+                    {
+                      "id": "r0-0-headphones-2",
+                      "kind": "headphones",
+                      "at": {
+                        "x": 0,
+                        "y": 0.35
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Seth"
+                    }
+                  ]
+                },
+                {
+                  "id": "r0-officechair-1",
+                  "kind": "officeChair",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.45
+                  },
+                  "angle": 180,
+                  "color": "#30343c",
+                  "condition": "worn",
+                  "owner": "Mei",
+                  "props": []
+                },
+                {
+                  "id": "r0-sample-freezer-2",
+                  "kind": "sample-freezer",
+                  "at": {
+                    "x": 0.85,
+                    "y": 0.8
+                  },
+                  "angle": -90,
+                  "color": "#e8eef2",
+                  "condition": "intact",
+                  "owner": "Jules",
+                  "props": [
+                    {
+                      "id": "r0-2-sample-vial-0",
+                      "kind": "sample-vial",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Jules"
+                    },
+                    {
+                      "id": "r0-2-note-1",
+                      "kind": "note",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Jules"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "room": 1,
+              "title": "Observatory Offices North-East",
+              "description": "Regolith cores labelled by crater, sealed behind frosted doors.",
+              "owner": "Mei",
+              "palette": {
+                "surface": "#e8eef2",
+                "metal": "#9aa3ad",
+                "accent": "#7fe3ff"
+              },
+              "condition": "worn",
+              "furniture": [
+                {
+                  "id": "r1-sample-freezer-0",
+                  "kind": "sample-freezer",
+                  "at": {
+                    "x": 0.3,
+                    "y": 0.15
+                  },
+                  "angle": 0,
+                  "color": "#e8eef2",
+                  "condition": "worn",
+                  "owner": "Mei",
+                  "props": [
+                    {
+                      "id": "r1-0-box-0",
+                      "kind": "box",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Mei"
+                    },
+                    {
+                      "id": "r1-0-note-1",
+                      "kind": "note",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Mei"
+                    }
+                  ]
+                },
+                {
+                  "id": "r1-drill-bit-1",
+                  "kind": "drill-bit",
+                  "at": {
+                    "x": 0.85,
+                    "y": 0.2
+                  },
+                  "angle": 0,
+                  "color": "#9a9fa6",
+                  "condition": "intact",
+                  "owner": "Jules",
+                  "props": []
+                },
+                {
+                  "id": "r1-suit-locker-2",
+                  "kind": "suit-locker",
+                  "at": {
+                    "x": 0.15,
+                    "y": 0.8
+                  },
+                  "angle": 90,
+                  "color": "#b85c38",
+                  "condition": "damaged",
+                  "owner": "Sol",
+                  "props": []
+                }
+              ]
+            },
+            {
+              "room": 2,
+              "title": "Observatory Offices South-West",
+              "description": "Lettuce under violet grow lights, the watering rota taped to the rack.",
+              "owner": "Jules",
+              "palette": {
+                "surface": "#4f5a63",
+                "metal": "#d9dde2",
+                "accent": "#c47cff"
+              },
+              "condition": "ransacked",
+              "furniture": [
+                {
+                  "id": "r2-hydroponic-rack-0",
+                  "kind": "hydroponic-rack",
+                  "at": {
+                    "x": 0.25,
+                    "y": 0.12
+                  },
+                  "angle": 0,
+                  "color": "#d9dde2",
+                  "condition": "intact",
+                  "owner": "Jules",
+                  "props": []
+                },
+                {
+                  "id": "r2-desk-1",
+                  "kind": "desk",
+                  "at": {
+                    "x": 0.8,
+                    "y": 0.15
+                  },
+                  "angle": 0,
+                  "color": "#6c5a48",
+                  "condition": "damaged",
+                  "owner": "Sol",
+                  "props": [
+                    {
+                      "id": "r2-1-papers-0",
+                      "kind": "papers",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Sol"
+                    },
+                    {
+                      "id": "r2-1-plant-1",
+                      "kind": "plant",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Sol"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "room": 3,
+              "title": "Observatory Offices South-East",
+              "description": "Eighteen trays still stacked for a meal that never happened.",
+              "owner": "Sol",
+              "palette": {
+                "surface": "#e3e6e8",
+                "metal": "#8a9099",
+                "accent": "#ff9b3d"
+              },
+              "condition": "kept",
+              "furniture": [
+                {
+                  "id": "r3-mess-table-0",
+                  "kind": "mess-table",
+                  "at": {
+                    "x": 0.5,
+                    "y": 0.5
+                  },
+                  "angle": 0,
+                  "color": "#e3e6e8",
+                  "condition": "damaged",
+                  "owner": "Sol",
+                  "props": [
+                    {
+                      "id": "r3-0-mug-0",
+                      "kind": "mug",
+                      "at": {
+                        "x": -0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Sol"
+                    },
+                    {
+                      "id": "r3-0-ration-tin-1",
+                      "kind": "ration-tin",
+                      "at": {
+                        "x": 0.55,
+                        "y": -0.3
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Sol"
+                    },
+                    {
+                      "id": "r3-0-bottle-2",
+                      "kind": "bottle",
+                      "at": {
+                        "x": 0,
+                        "y": 0.35
+                      },
+                      "angle": 0,
+                      "scale": 0.85,
+                      "color": "#c7553e",
+                      "accent": "#f1e3c2",
+                      "condition": "intact",
+                      "owner": "Sol"
+                    }
+                  ]
+                },
+                {
+                  "id": "r3-chair-1",
+                  "kind": "chair",
+                  "at": {
+                    "x": 0.3,
+                    "y": 0.3
+                  },
+                  "angle": 0,
+                  "color": "#3d6fb0",
+                  "condition": "intact",
+                  "owner": "Bryn",
+                  "props": []
+                },
+                {
+                  "id": "r3-oxygen-tank-2",
+                  "kind": "oxygen-tank",
+                  "at": {
+                    "x": 0.1,
+                    "y": 0.1
+                  },
+                  "angle": 0,
+                  "color": "#e9edf0",
+                  "condition": "worn",
+                  "owner": "Uma",
+                  "props": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "roofName": "ASCENT PAD",
+    "roster": [
+      {
+        "name": "Inez",
+        "role": "builder",
+        "skill": 0.45,
+        "risk": 0.25,
+        "social": 0.3
+      },
+      {
+        "name": "Cal",
+        "role": "analyst",
+        "skill": 0.51,
+        "risk": 0.35,
+        "social": 0.42
+      },
+      {
+        "name": "Rumi",
+        "role": "rusher",
+        "skill": 0.57,
+        "risk": 0.45,
+        "social": 0.54
+      },
+      {
+        "name": "Dev",
+        "role": "medic",
+        "skill": 0.63,
+        "risk": 0.55,
+        "social": 0.66
+      },
+      {
+        "name": "Esme",
+        "role": "skeptic",
+        "skill": 0.69,
+        "risk": 0.65,
+        "social": 0.3
+      },
+      {
+        "name": "Nico",
+        "role": "builder",
+        "skill": 0.75,
+        "risk": 0.25,
+        "social": 0.42
+      },
+      {
+        "name": "Tamsin",
+        "role": "analyst",
+        "skill": 0.81,
+        "risk": 0.35,
+        "social": 0.54
+      },
+      {
+        "name": "Paz",
+        "role": "rusher",
+        "skill": 0.45,
+        "risk": 0.45,
+        "social": 0.66
+      },
+      {
+        "name": "Ellis",
+        "role": "medic",
+        "skill": 0.51,
+        "risk": 0.55,
+        "social": 0.3
+      },
+      {
+        "name": "Luz",
+        "role": "skeptic",
+        "skill": 0.57,
+        "risk": 0.65,
+        "social": 0.42
+      },
+      {
+        "name": "Ren",
+        "role": "builder",
+        "skill": 0.63,
+        "risk": 0.25,
+        "social": 0.54
+      },
+      {
+        "name": "Ada",
+        "role": "analyst",
+        "skill": 0.69,
+        "risk": 0.35,
+        "social": 0.66
+      },
+      {
+        "name": "Seth",
+        "role": "rusher",
+        "skill": 0.75,
+        "risk": 0.45,
+        "social": 0.3
+      },
+      {
+        "name": "Mei",
+        "role": "medic",
+        "skill": 0.81,
+        "risk": 0.55,
+        "social": 0.42
+      },
+      {
+        "name": "Jules",
+        "role": "skeptic",
+        "skill": 0.45,
+        "risk": 0.65,
+        "social": 0.54
+      },
+      {
+        "name": "Sol",
+        "role": "builder",
+        "skill": 0.51,
+        "risk": 0.25,
+        "social": 0.66
+      },
+      {
+        "name": "Bryn",
+        "role": "analyst",
+        "skill": 0.57,
+        "risk": 0.35,
+        "social": 0.3
+      },
+      {
+        "name": "Uma",
+        "role": "rusher",
+        "skill": 0.63,
+        "risk": 0.45,
+        "social": 0.42
+      },
+      {
+        "name": "Vera",
+        "role": "medic",
+        "skill": 0.69,
+        "risk": 0.55,
+        "social": 0.54
+      }
+    ],
+    "city": {
+      "roadWidth": 9,
+      "boulevardOffset": 19,
+      "districtSize": 24,
+      "buildingHeightMin": 12,
+      "buildingHeightMax": 40,
+      "damageRate": 0.45,
+      "palette": ["#7a3b26", "#9c5a3c", "#b9714c"]
+    },
+    "exterior": {
+      "buildingName": "ARES HABITAT 4",
+      "buildingSubtitle": "HYDROPONICS \u2022 SCIENCE \u2022 COMMAND",
+      "quarantineTitle": "DECK SEAL ACTIVE",
+      "quarantineSubtitle": "AWAIT ASCENT SHUTTLE",
+      "skyline": {
+        "minHeight": 40,
+        "maxHeight": 110,
+        "damageRate": 0.4
+      }
+    },
+    "pacing": {
+      "swarmInterval": 3.8,
+      "swarmBatch": 1,
+      "swarmCap": 150,
+      "npcThinkingScale": 0.3,
+      "firstHelicopter": 540,
+      "helicopterInterval": 180
+    },
+    "relationships": [
+      {
+        "from": "Inez",
+        "to": "Cal",
+        "kind": "colleague",
+        "detail": "They catalogued damaged exhibits together before the evacuation."
+      },
+      {
+        "from": "Rumi",
+        "to": "Dev",
+        "kind": "friend",
+        "detail": "They exchanged small drawings during their lunch breaks."
+      }
+    ],
+    "titleCard": {
+      "title": {
+        "font": "oswald",
+        "color": "#ff7a3d",
+        "size": 70
+      },
+      "story": {
+        "font": "dm-sans",
+        "color": "#f1e6dc",
+        "size": 18
+      }
+    },
+    "setting": {
+      "venue": "custom",
+      "interior": {
+        "roomFloor": "rubber",
+        "hallFloor": "polished",
+        "roomTint": "#8a4a32",
+        "hallTint": "#b9b1a8",
+        "wall": "#d9dde2",
+        "trim": "#ff9b3d",
+        "wallFinish": "plaster",
+        "light": "#f2d7a3"
+      },
+      "exterior": {
+        "facade": "metal",
+        "facadeColor": "#c9ccd1",
+        "trimColor": "#ff7a3d",
+        "windows": "ribbon",
+        "canopy": "gabled",
+        "canopyGlow": "#4fd1ff",
+        "roofFeatures": [
+          {
+            "kind": "dish",
+            "x": 0.1,
+            "y": 0.1
+          },
+          {
+            "kind": "solar",
+            "x": 0.9,
+            "y": 0.1
+          },
+          {
+            "kind": "solar",
+            "x": 0.1,
+            "y": 0.95
+          },
+          {
+            "kind": "beacon",
+            "x": 0.95,
+            "y": 0.95
+          },
+          {
+            "kind": "mast",
+            "x": 0.5,
+            "y": 0
+          }
+        ]
+      },
+      "terminal": {
+        "style": "kiosk",
+        "body": "#f2f4f5",
+        "accent": "#ff8a2a",
+        "screen": "#3de6ff"
+      },
+      "objects": [
+        {
+          "id": "cryo-pod",
+          "name": "Cryo pod",
+          "weight": "heavy",
+          "size": {
+            "w": 0.9,
+            "d": 0.9,
+            "h": 2.1
+          },
+          "surface": false,
+          "parts": [
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "w": 0.9,
+              "d": 0.9,
+              "h": 0.25,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#3a4048",
+              "finish": "metal"
+            },
+            {
+              "shape": "cylinder",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0.25,
+              "w": 0.78,
+              "d": 0.78,
+              "h": 1.55,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#9fd8ff",
+              "finish": "glass"
+            },
+            {
+              "shape": "cylinder",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0.3,
+              "w": 0.4,
+              "d": 0.4,
+              "h": 1.2,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#cfe6f2",
+              "finish": "matte"
+            },
+            {
+              "shape": "cylinder",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 1.8,
+              "w": 0.86,
+              "d": 0.86,
+              "h": 0.3,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#3a4048",
+              "finish": "metal"
+            },
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0,
+              "y": 0.42,
+              "z": 0.55,
+              "w": 0.32,
+              "d": 0.05,
+              "h": 0.14,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "pulse",
+              "rate": 0.5,
+              "color": "#56f0c8",
+              "finish": "glow"
+            },
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": -0.3,
+              "y": 0.38,
+              "z": 0.25,
+              "w": 0.08,
+              "d": 0.08,
+              "h": 1.55,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#2a2f36",
+              "finish": "metal"
+            }
+          ],
+          "role": "equipment"
+        },
+        {
+          "id": "airlock-console",
+          "name": "Airlock console",
+          "weight": "medium",
+          "size": {
+            "w": 1.4,
+            "d": 0.8,
+            "h": 1.3
+          },
+          "surface": true,
+          "parts": [
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "w": 1.4,
+              "d": 0.8,
+              "h": 0.85,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#4b525c",
+              "finish": "metal"
+            },
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0,
+              "y": -0.3,
+              "z": 0.85,
+              "w": 1.4,
+              "d": 0.2,
+              "h": 0.45,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#2c3138",
+              "finish": "matte"
+            },
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0,
+              "y": -0.24,
+              "z": 0.95,
+              "w": 1.1,
+              "d": 0.04,
+              "h": 0.3,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#ff9b3d",
+              "finish": "glow"
+            },
+            {
+              "shape": "cylinder",
+              "axis": "up",
+              "x": -0.5,
+              "y": 0.3,
+              "z": 0.85,
+              "w": 0.12,
+              "d": 0.12,
+              "h": 0.02,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#ff3b30",
+              "finish": "glow"
+            }
+          ],
+          "role": "surface"
+        },
+        {
+          "id": "hydroponic-rack",
+          "name": "Hydroponic rack",
+          "weight": "medium",
+          "size": {
+            "w": 1.6,
+            "d": 0.6,
+            "h": 1.9
+          },
+          "surface": false,
+          "parts": [
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": -0.77,
+              "y": 0,
+              "z": 0,
+              "w": 0.06,
+              "d": 0.6,
+              "h": 1.9,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#d9dde2",
+              "finish": "metal"
+            },
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0.77,
+              "y": 0,
+              "z": 0,
+              "w": 0.06,
+              "d": 0.6,
+              "h": 1.9,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#d9dde2",
+              "finish": "metal"
+            },
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0.35,
+              "w": 1.48,
+              "d": 0.56,
+              "h": 0.06,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#e7ecef",
+              "finish": "matte"
+            },
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0.41,
+              "w": 1.4,
+              "d": 0.5,
+              "h": 0.22,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#4fae5a",
+              "finish": "matte"
+            },
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 1.05,
+              "w": 1.48,
+              "d": 0.56,
+              "h": 0.06,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#e7ecef",
+              "finish": "matte"
+            },
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 1.11,
+              "w": 1.4,
+              "d": 0.5,
+              "h": 0.26,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#62c46b",
+              "finish": "matte"
+            },
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 1.78,
+              "w": 1.48,
+              "d": 0.5,
+              "h": 0.06,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "pulse",
+              "rate": 0.3,
+              "color": "#c47cff",
+              "finish": "glow"
+            }
+          ],
+          "role": "storage"
+        },
+        {
+          "id": "oxygen-tank",
+          "name": "Oxygen tank",
+          "weight": "heavy",
+          "size": {
+            "w": 0.6,
+            "d": 0.6,
+            "h": 1.7
+          },
+          "surface": false,
+          "parts": [
+            {
+              "shape": "cylinder",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "w": 0.6,
+              "d": 0.6,
+              "h": 1.4,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#e9edf0",
+              "finish": "metal"
+            },
+            {
+              "shape": "sphere",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 1.4,
+              "w": 0.6,
+              "d": 0.6,
+              "h": 0.2,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#e9edf0",
+              "finish": "metal"
+            },
+            {
+              "shape": "cylinder",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 1.55,
+              "w": 0.12,
+              "d": 0.12,
+              "h": 0.15,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#2f6fd6",
+              "finish": "metal"
+            },
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0,
+              "y": 0.29,
+              "z": 0.9,
+              "w": 0.08,
+              "d": 0.04,
+              "h": 0.08,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#7dff8a",
+              "finish": "glow"
+            }
+          ],
+          "role": "equipment"
+        },
+        {
+          "id": "suit-locker",
+          "name": "EVA suit locker",
+          "weight": "heavy",
+          "size": {
+            "w": 1,
+            "d": 0.6,
+            "h": 2.1
+          },
+          "surface": false,
+          "parts": [
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "w": 1,
+              "d": 0.6,
+              "h": 2.1,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#b85c38",
+              "finish": "metal"
+            },
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0,
+              "y": 0.29,
+              "z": 0.2,
+              "w": 0.86,
+              "d": 0.02,
+              "h": 1.7,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#9fd8ff",
+              "finish": "glass"
+            },
+            {
+              "shape": "sphere",
+              "axis": "up",
+              "x": 0,
+              "y": 0.1,
+              "z": 1.2,
+              "w": 0.36,
+              "d": 0.3,
+              "h": 0.45,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#f2f2ee",
+              "finish": "matte"
+            },
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0,
+              "y": 0.1,
+              "z": 0.3,
+              "w": 0.5,
+              "d": 0.3,
+              "h": 0.9,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#f2f2ee",
+              "finish": "matte"
+            }
+          ],
+          "role": "storage"
+        },
+        {
+          "id": "comms-desk",
+          "name": "Earth relay desk",
+          "weight": "medium",
+          "size": {
+            "w": 1.8,
+            "d": 0.9,
+            "h": 1.25
+          },
+          "surface": true,
+          "parts": [
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "w": 1.8,
+              "d": 0.9,
+              "h": 0.74,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#5a6470",
+              "finish": "metal"
+            },
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0,
+              "y": -0.38,
+              "z": 0.74,
+              "w": 1.6,
+              "d": 0.1,
+              "h": 0.5,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#20252b",
+              "finish": "matte"
+            },
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": -0.4,
+              "y": -0.32,
+              "z": 0.8,
+              "w": 0.6,
+              "d": 0.02,
+              "h": 0.36,
+              "pitch": -15,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#4fd1ff",
+              "finish": "glow"
+            },
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0.4,
+              "y": -0.32,
+              "z": 0.8,
+              "w": 0.6,
+              "d": 0.02,
+              "h": 0.36,
+              "pitch": -15,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#4fd1ff",
+              "finish": "glow"
+            }
+          ],
+          "role": "surface"
+        },
+        {
+          "id": "mess-table",
+          "name": "Mess table",
+          "weight": "medium",
+          "size": {
+            "w": 2,
+            "d": 1,
+            "h": 0.76
+          },
+          "surface": true,
+          "parts": [
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "w": 0.2,
+              "d": 0.6,
+              "h": 0.7,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#8a9099",
+              "finish": "metal"
+            },
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0.7,
+              "w": 2,
+              "d": 1,
+              "h": 0.06,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#e3e6e8",
+              "finish": "matte"
+            }
+          ],
+          "role": "surface"
+        },
+        {
+          "id": "bunk-pod",
+          "name": "Sleep pod",
+          "weight": "heavy",
+          "size": {
+            "w": 2.1,
+            "d": 1,
+            "h": 1.1
+          },
+          "surface": false,
+          "parts": [
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "w": 2.1,
+              "d": 1,
+              "h": 0.45,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#d4d8dc",
+              "finish": "matte"
+            },
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0.45,
+              "w": 1.9,
+              "d": 0.9,
+              "h": 0.15,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#3d6fb0",
+              "finish": "matte"
+            },
+            {
+              "shape": "cylinder",
+              "axis": "across",
+              "x": 0,
+              "y": 0,
+              "z": 0.6,
+              "w": 2.1,
+              "d": 1,
+              "h": 0.5,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#c7ecff",
+              "finish": "glass"
+            },
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": -0.9,
+              "y": 0.48,
+              "z": 0.3,
+              "w": 0.1,
+              "d": 0.04,
+              "h": 0.06,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#ffd65a",
+              "finish": "glow"
+            }
+          ],
+          "role": "bed"
+        },
+        {
+          "id": "sample-freezer",
+          "name": "Core sample freezer",
+          "weight": "heavy",
+          "size": {
+            "w": 1.2,
+            "d": 0.8,
+            "h": 1
+          },
+          "surface": true,
+          "parts": [
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "w": 1.2,
+              "d": 0.8,
+              "h": 0.95,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#e8eef2",
+              "finish": "metal"
+            },
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0,
+              "y": 0.39,
+              "z": 0.7,
+              "w": 0.9,
+              "d": 0.03,
+              "h": 0.12,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#7fe3ff",
+              "finish": "glow"
+            },
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0.95,
+              "w": 1.2,
+              "d": 0.8,
+              "h": 0.05,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#b9c3cc",
+              "finish": "metal"
+            }
+          ],
+          "role": "storage"
+        },
+        {
+          "id": "drill-bit",
+          "name": "Spare drill bit",
+          "weight": "light",
+          "size": {
+            "w": 0.5,
+            "d": 0.5,
+            "h": 1.2
+          },
+          "surface": false,
+          "parts": [
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "w": 0.5,
+              "d": 0.5,
+              "h": 0.1,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#3a3a3a",
+              "finish": "metal"
+            },
+            {
+              "shape": "cylinder",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0.1,
+              "w": 0.18,
+              "d": 0.18,
+              "h": 0.7,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#9a9fa6",
+              "finish": "metal"
+            },
+            {
+              "shape": "cone",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0.8,
+              "w": 0.3,
+              "d": 0.3,
+              "h": 0.4,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "spin",
+              "rate": 0.4,
+              "color": "#c96b2c",
+              "finish": "metal"
+            }
+          ],
+          "role": "decor"
+        },
+        {
+          "id": "theatre-seat",
+          "name": "Reclining theatre seat",
+          "role": "seat",
+          "weight": "medium",
+          "size": {
+            "w": 0.6,
+            "d": 0.7,
+            "h": 1.0
+          },
+          "surface": false,
+          "parts": [
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "w": 0.6,
+              "d": 0.6,
+              "h": 0.42,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#5a2330",
+              "finish": "matte"
+            },
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0,
+              "y": -0.25,
+              "z": 0.42,
+              "w": 0.6,
+              "d": 0.12,
+              "h": 0.5,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#6d2a3a",
+              "finish": "matte"
+            },
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": -0.27,
+              "y": 0,
+              "z": 0.42,
+              "w": 0.06,
+              "d": 0.4,
+              "h": 0.14,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#22262b",
+              "finish": "metal"
+            },
+            {
+              "shape": "box",
+              "axis": "up",
+              "x": 0.27,
+              "y": 0,
+              "z": 0.42,
+              "w": 0.06,
+              "d": 0.4,
+              "h": 0.14,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#22262b",
+              "finish": "metal"
+            }
+          ]
+        },
+        {
+          "id": "star-projector",
+          "name": "Star projector",
+          "role": "equipment",
+          "weight": "heavy",
+          "size": {
+            "w": 1.4,
+            "d": 1.4,
+            "h": 2.4
+          },
+          "surface": false,
+          "parts": [
+            {
+              "shape": "cylinder",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "w": 1.2,
+              "d": 1.2,
+              "h": 0.5,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#2b2f36",
+              "finish": "metal"
+            },
+            {
+              "shape": "cylinder",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0.5,
+              "w": 0.3,
+              "d": 0.3,
+              "h": 0.9,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#555b66",
+              "finish": "metal"
+            },
+            {
+              "shape": "sphere",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 1.4,
+              "w": 0.9,
+              "d": 0.9,
+              "h": 0.9,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "spin",
+              "rate": 0.1,
+              "color": "#14171c",
+              "finish": "metal"
+            },
+            {
+              "shape": "sphere",
+              "axis": "up",
+              "x": 0.3,
+              "y": 0,
+              "z": 1.7,
+              "w": 0.25,
+              "d": 0.25,
+              "h": 0.25,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "pulse",
+              "rate": 0.5,
+              "color": "#cfe6ff",
+              "finish": "glow"
+            }
+          ]
+        }
+      ],
+      "props": [
+        {
+          "id": "ration-tin",
+          "name": "Ration tin",
+          "size": {
+            "w": 0.2,
+            "d": 0.2,
+            "h": 0.13
+          },
+          "parts": [
+            {
+              "shape": "cylinder",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "w": 0.2,
+              "d": 0.2,
+              "h": 0.1,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#b8bcc2",
+              "finish": "metal"
+            },
+            {
+              "shape": "cylinder",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0.1,
+              "w": 0.21,
+              "d": 0.21,
+              "h": 0.025,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#ff9b3d",
+              "finish": "metal"
+            }
+          ]
+        },
+        {
+          "id": "sample-vial",
+          "name": "Sample vial",
+          "size": {
+            "w": 0.08,
+            "d": 0.08,
+            "h": 0.2
+          },
+          "parts": [
+            {
+              "shape": "cylinder",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "w": 0.08,
+              "d": 0.08,
+              "h": 0.15,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#9fd8ff",
+              "finish": "glass"
+            },
+            {
+              "shape": "cylinder",
+              "axis": "up",
+              "x": 0,
+              "y": 0,
+              "z": 0.15,
+              "w": 0.06,
+              "d": 0.06,
+              "h": 0.04,
+              "pitch": 0,
+              "roll": 0,
+              "motion": "none",
+              "rate": 1,
+              "color": "#7fe3ff",
+              "finish": "glow"
+            }
+          ]
+        }
+      ],
+      "surroundings": {
+        "ground": "regolith",
+        "groundColor": "#8a4a32",
+        "pathColor": "#6e3a28",
+        "sky": {
+          "zenith": "#2a1410",
+          "horizon": "#c27a4a"
+        },
+        "fog": {
+          "color": "#b8673f",
+          "density": 0.45
+        },
+        "neighbors": "rocks",
+        "neighborColor": "#7a3b26",
+        "weather": "dust",
+        "scenery": ["oxygen-tank"]
+      },
+      "filler": null,
+      "form": "enclosed",
+      "outdoors": {
+        "version": 1,
+        "bounds": {
+          "left": -40,
+          "right": 90,
+          "top": -30,
+          "bottom": 96
+        },
+        "ground": "regolith",
+        "enclosure": "dome",
+        "backdrop": "dunes",
+        "regions": [
+          {
+            "kind": "dome-wall",
+            "shape": "ring",
+            "x": 22,
+            "y": 30,
+            "r": 54,
+            "thickness": 1,
+            "gaps": [
+              {
+                "angle": 90,
+                "width": 6
+              }
+            ],
+            "height": 14,
+            "color": "#bcd6e0"
+          },
+          {
+            "kind": "structure",
+            "shape": "rect",
+            "x": -18,
+            "y": 50,
+            "w": 12,
+            "h": 10,
+            "height": 5,
+            "color": "#9aa0a6"
+          },
+          {
+            "kind": "vehicle",
+            "shape": "rect",
+            "x": 35,
+            "y": 55,
+            "w": 2.4,
+            "h": 4.6,
+            "height": 1.8,
+            "color": "#c7b39a"
+          },
+          {
+            "kind": "path",
+            "shape": "rect",
+            "x": 22,
+            "y": 60,
+            "w": 5,
+            "h": 40,
+            "color": "#b06a4a"
+          }
+        ]
+      }
+    }
+  },
+  "entities": [
+    {
+      "id": "human",
+      "kind": "player",
+      "x": 21.5,
+      "y": 17.5
+    }
+  ],
+  "actions": [
+    {
+      "tick": 1,
+      "type": "routeTo",
+      "id": "human",
+      "x": 14.5,
+      "y": 13.5
+    },
+    {
+      "tick": 200,
+      "type": "routeTo",
+      "id": "human",
+      "x": 7.5,
+      "y": 13.5
+    },
+    {
+      "tick": 360,
+      "type": "jump",
+      "id": "human"
+    },
+    {
+      "tick": 420,
+      "type": "routeTo",
+      "id": "human",
+      "x": 36.5,
+      "y": 13.5
+    }
+  ],
+  "checks": [
+    {
+      "name": "The player walks down the steps into the projector pit",
+      "mode": "at",
+      "query": {
+        "type": "property",
+        "id": "human",
+        "field": "elevation"
+      },
+      "op": "lte",
+      "expected": -0.4,
+      "tick": 190
+    },
+    {
+      "name": "The player climbs the steps onto the stage",
+      "mode": "at",
+      "query": {
+        "type": "property",
+        "id": "human",
+        "field": "elevation"
+      },
+      "op": "gte",
+      "expected": 0.85,
+      "tick": 350
+    },
+    {
+      "name": "The stage is no higher than authored",
+      "mode": "at",
+      "query": {
+        "type": "property",
+        "id": "human",
+        "field": "elevation"
+      },
+      "op": "lte",
+      "expected": 0.95,
+      "tick": 350
+    },
+    {
+      "name": "A jump on the stage rises above every floor level in the hall",
+      "mode": "eventually",
+      "query": {
+        "type": "property",
+        "id": "human",
+        "field": "elevation"
+      },
+      "op": "gte",
+      "expected": 1.55
+    },
+    {
+      "name": "The jump lands back on the stage, not on the storey slab",
+      "mode": "at",
+      "query": {
+        "type": "property",
+        "id": "human",
+        "field": "elevation"
+      },
+      "op": "gte",
+      "expected": 0.85,
+      "tick": 415
+    },
+    {
+      "name": "The player climbs the rake to the rear gallery",
+      "mode": "at",
+      "query": {
+        "type": "property",
+        "id": "human",
+        "field": "elevation"
+      },
+      "op": "gte",
+      "expected": 1.45,
+      "tick": 900
+    },
+    {
+      "name": "The player never leaves the hall's storey",
+      "mode": "always",
+      "query": {
+        "type": "property",
+        "id": "human",
+        "field": "floor"
+      },
+      "op": "eq",
+      "expected": 0
+    },
+    {
+      "name": "The drawn building keeps its shell, stairs and portals",
+      "mode": "always",
+      "query": {
+        "type": "buildingLayoutErrors"
+      },
+      "op": "eq",
+      "expected": 0
+    },
+    {
+      "name": "The drawn floor is furnished with composed objects",
+      "mode": "at",
+      "tick": 1,
+      "query": {
+        "type": "furnitureCount",
+        "kind": "custom",
+        "floor": 0
+      },
+      "op": "gte",
+      "expected": 20
+    },
+    {
+      "name": "No office partitions on a drawn floor",
+      "mode": "at",
+      "tick": 1,
+      "query": {
+        "type": "furnitureCount",
+        "kind": "partition"
+      },
+      "op": "eq",
+      "expected": 0
+    }
+  ]
+}

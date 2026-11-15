@@ -296,5 +296,10 @@ export const VENUE_ROOM_MEANINGS: Readonly<
     >
   >
 >;
-export function parseSetting(value: unknown, path?: string): RunSetting;
+export function parseSetting(
+  value: unknown,
+  path?: string,
+  /** `rooms`: a version 4 design, whose rooms list their own furniture. */
+  options?: { rooms?: boolean },
+): RunSetting;
 export const SETTING_GUIDANCE: string;

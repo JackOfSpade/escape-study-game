@@ -17,12 +17,15 @@ export interface SubRoom {
   /** The two open cells in this room's wall ring. */
   doorway: Rect;
 }
-export type SectorId =
-  "entry" | "lobby" | "room0" | "room1" | "room2" | "room3";
+/** `room${n}` for study rooms; a free plan (generation 6) numbers its drawn
+ * rooms from 0 and has the one "entry" concourse. */
+export type SectorId = "entry" | "lobby" | `room${number}`;
 export interface Sector {
   id: SectorId;
-  /** Study sectors only. */
-  room?: 0 | 1 | 2 | 3;
+  /** Study sectors only: 0..3 on chain floors, 0..n-1 on a free plan. */
+  room?: number;
+  /** A hall: taller than other rooms, with optional stepped levels. */
+  hall?: true;
   /** Study sectors of a hall floor only: every study room this sector holds
    * (its own `room` first). A hall takes the place of two or three rooms. */
   merged?: number[];
@@ -85,7 +88,7 @@ export function floorSectors(f: Floor): Sector[] {
     room?: number,
   ): Sector => ({
     id,
-    ...(room === undefined ? {} : { room: room as 0 | 1 | 2 | 3 }),
+    ...(room === undefined ? {} : { room }),
     order,
     blocks: [rect],
     corridors: [],
@@ -136,5 +139,10 @@ export function sectorOfRoom(f: Floor, room: number): Sector | undefined {
 
 /** The hall of a floor (floors[].hall), if it has one. */
 export function hallSector(f: Floor): Sector | undefined {
-  return f.generation?.sectors?.find((s) => s.merged);
+  return f.generation?.sectors?.find((s) => s.merged || s.hall);
+}
+
+/** Every hall of a floor: one on a chain floor, any number on a free plan. */
+export function hallSectors(f: Pick<Floor, "generation">): Sector[] {
+  return f.generation?.sectors?.filter((s) => s.merged || s.hall) ?? [];
 }
