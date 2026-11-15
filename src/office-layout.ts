@@ -138,6 +138,9 @@ export interface OfficeZone {
   exclude?: Rect[];
   /** Version 5: id of the field through which this zone's sector is entered. */
   gate?: string;
+  /** A hall with seating: rows of seats facing the hall's focus wall. `box`
+   * is the whole hall and `clear` the depth kept free in front of that wall. */
+  rows?: { focus: "n" | "s" | "e" | "w"; box: Rect; clear: number };
 }
 const excluded = (zone: OfficeZone, p: Point) =>
   !!zone.exclude?.some((r) => inRect(r, Math.floor(p.x), Math.floor(p.y)));
@@ -827,6 +830,66 @@ function planCustom(
   }
   return groups;
 }
+/** Seats per row segment and the most segments a hall takes at density 1. */
+const ROW_SEATS = 4,
+  ROW_SEGMENTS = 10;
+/** Rows of seats across a hall zone, all facing its focus wall, nearest row
+ * first, in segments of four. Lines are offered every half cell; placement
+ * keeps a walking gap between segments and clear of the terminals, so rows
+ * settle between the terminal lines with aisles between them. */
+function hallRows(zone: OfficeZone, seat: Item): Group[] {
+  const { focus, box, clear } = zone.rows!,
+    across = focus === "n" || focus === "s",
+    // Seats face (-sin a, cos a): north is pi, south 0, east -pi/2, west pi/2.
+    angle = focus === "n" ? S : focus === "s" ? N : focus === "e" ? Wst : E,
+    width = ROW_SEATS * seat.w + (ROW_SEATS - 1) * 0.1,
+    pieces = Array.from({ length: ROW_SEATS }, (_, i) =>
+      piece(seat, -width / 2 + seat.w / 2 + i * (seat.w + 0.1), 0),
+    ),
+    depth = across ? box.y2 - box.y1 + 1 : box.x2 - box.x1 + 1,
+    [a1, a2] = across ? [zone.x1, zone.x2 + 1] : [zone.y1, zone.y2 + 1],
+    out: Group[] = [];
+  for (let d = clear + 1; d < depth - 1; d += 0.5) {
+    // The line at this depth from the focus wall, if this zone has it.
+    const line =
+      focus === "n"
+        ? box.y1 + d
+        : focus === "s"
+          ? box.y2 - d
+          : focus === "w"
+            ? box.x1 + d
+            : box.x2 - d;
+    if (
+      across
+        ? line < zone.y1 || line > zone.y2
+        : line < zone.x1 || line > zone.x2
+    )
+      continue;
+    // Segments are offered a cell apart along the line; placement keeps a
+    // walking gap between neighbours, which leaves the aisles.
+    for (let along = a1 + 1 + width / 2; along <= a2 - 1 - width / 2; along++)
+      out.push({
+        wall: false,
+        pieces,
+        at: across
+          ? { x: along, y: line + 0.5, angle }
+          : { x: line + 0.5, y: along, angle },
+      });
+  }
+  return out;
+}
+/** The seat a hall's rows are made of: the venue's own seat for that room
+ * function, else any seat the design lists, else a plain chair. */
+function rowSeat(f: Floor, type: OfficeRoomType): Item | undefined {
+  const setting = f.setting;
+  if (floorVenue(f) !== "custom" || !setting?.filler)
+    return fillerItem({ objects: [] } as unknown as RunSetting, "chair");
+  const listed = (names: readonly string[]) =>
+    names.map((n) => fillerItem(setting, n)).find((it) => it.role === "seat");
+  return (
+    listed(setting.filler[type]) ?? listed(Object.values(setting.filler).flat())
+  );
+}
 /** Open-plan terminals become cubicle desks: short panels between neighbours
  * along the wall, with the bay left open toward the room. */
 function terminalBays(
@@ -1133,6 +1196,13 @@ export function furnishOffice(
         divider,
       ))
         tryPlace(bay);
+    if (zone.rows) {
+      const seat = rowSeat(f, type);
+      let left = Math.ceil(ROW_SEGMENTS * (f.design?.furnitureDensity ?? 1));
+      if (seat)
+        for (const row of hallRows(zone, seat))
+          if (left > 0 && tryPlace(row)) left--;
+    }
     const planner = custom
       ? (t: OfficeRoomType, rr: Rng, sm: boolean) =>
           planCustom(t, rr, sm, custom.filler![t], custom)
@@ -1327,6 +1397,24 @@ function sectorOfficeZones(f: Floor): OfficeZone[] {
             : s.id === "lobby"
               ? ["break", "reception"]
               : ROOMS;
+    // A hall with seating fills with rows that face its focus wall, behind
+    // its stage and pit.
+    const hall =
+      s.merged && f.design && "hall" in f.design ? f.design.hall : undefined;
+    const rows =
+      hall?.seating === "rows"
+        ? {
+            focus: hall.focus,
+            box: {
+              x1: Math.min(...s.blocks.map((b) => b.x1)),
+              y1: Math.min(...s.blocks.map((b) => b.y1)),
+              x2: Math.max(...s.blocks.map((b) => b.x2)),
+              y2: Math.max(...s.blocks.map((b) => b.y2)),
+            },
+            clear:
+              (hall.stage?.depth ?? 0) + (hall.pit ? hall.pit.length + 1 : 0),
+          }
+        : undefined;
     s.blocks.forEach((b, i) =>
       zones.push({
         id: `${s.id}${i ? String.fromCharCode(97 + i) : ""}`,
@@ -1334,6 +1422,7 @@ function sectorOfficeZones(f: Floor): OfficeZone[] {
         types,
         ...(exclude.length ? { exclude } : {}),
         ...(gate ? { gate } : {}),
+        ...(rows ? { rows } : {}),
       }),
     );
     for (const room of s.rooms)

@@ -1,4 +1,6 @@
+import { groundLevel } from "../floor-levels";
 import { EQUIPMENT } from "../equipment";
+import { survivorPath } from "../navigation";
 import { SWARM } from "../force-fields";
 import { soundConnected } from "../acoustics";
 import { buildingLayoutErrors } from "../building-layout";
@@ -84,8 +86,8 @@ function read(
         ? (e.elevated?.feet ??
             (e.stairTravel?.walked !== undefined
               ? sampleStairRoute(g, e.stairTravel).y
-              : e.floor * FLOOR_HEIGHT))
-        : e.floor * FLOOR_HEIGHT;
+              : e.floor * FLOOR_HEIGHT + groundLevel(g.floors[e.floor], e)))
+        : e.floor * FLOOR_HEIGHT + groundLevel(g.floors[e.floor], e);
     if (q.field === "falling")
       return (
         "alive" in e &&
@@ -170,6 +172,8 @@ export class TestRunner {
   readonly actionResults: { tick: number; type: string; ok: boolean }[] = [];
   private moves = new Map<string, Point & { stairWalk?: boolean }>();
   private walkTargets = new Map<string, Point & { stairWalk?: boolean }>();
+  /** Remaining waypoints of a routeTo action, nearest first. */
+  private route: Point[] = [];
   private jumpPending = false;
   private endedTravel = { npcTravel: 0, zombieTravel: 0 };
   constructor(s: Scenario, roadmap: Roadmap) {
@@ -225,12 +229,23 @@ export class TestRunner {
       this.jumpPending = true;
       return true;
     }
+    if (a.type === "routeTo") {
+      // The route the game itself would give a survivor between these points.
+      const path = survivorPath(this.game.floors[e.floor], e, a);
+      if (!path.length) return false;
+      this.moves.delete(a.id);
+      this.route = path.map((p) => ({ x: p.x, y: p.y }));
+      this.walkTargets.set(a.id, this.route[0]);
+      return true;
+    }
     if (a.type === "walkTo") {
+      this.route = [];
       this.moves.delete(a.id);
       this.walkTargets.set(a.id, { x: a.x, y: a.y, stairWalk: a.stairWalk });
       return true;
     }
     if (a.type === "move") {
+      this.route = [];
       this.walkTargets.delete(a.id);
       this.moves.set(a.id, {
         x: a.x,
@@ -285,8 +300,16 @@ export class TestRunner {
                     { x: e.x, y: e.y, floor: e.floor },
                   ]),
                 );
+          const human = this.game.survivors[0];
+          // Follow a routeTo path: move on once a waypoint is reached.
+          while (
+            this.route.length > 1 &&
+            distance(human, this.route[0]) < 0.2
+          ) {
+            this.route.shift();
+            this.walkTargets.set("human", this.route[0]);
+          }
           const target = this.walkTargets.get("human"),
-            human = this.game.survivors[0],
             dx = target ? target.x - human.x : 0,
             dy = target ? target.y - human.y : 0,
             remaining = Math.hypot(dx, dy),

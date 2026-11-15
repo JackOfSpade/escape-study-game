@@ -187,6 +187,43 @@ export interface LegacyRunDesign {
 }
 export type RunRoomShape = "rect" | "chamfered" | "rounded" | "octagon";
 export declare const ROOM_SHAPES: readonly RunRoomShape[];
+export type RunHallSide = "n" | "s" | "e" | "w";
+/** One large room in place of two or three gated study rooms (floors[].hall).
+ * Heights are metres; the engine turns every level change into steps. */
+export interface RunHall {
+  /** The merged study rooms (two or three of 0, 1, 3), adjacent in roomOrder. */
+  rooms: number[];
+  /** The wall the hall faces: its stage, screen or altar side. */
+  focus: RunHallSide;
+  seating: "rows" | "none";
+  stage: { depth: number; height: number } | null;
+  /** Rise of the floor from the focus side to the far side. */
+  rake: number;
+  pit: { width: number; length: number; drop: number } | null;
+  platforms: {
+    side: RunHallSide;
+    width: number;
+    depth: number;
+    height: number;
+  }[];
+}
+export declare const HALL_LIMITS: {
+  readonly sides: readonly RunHallSide[];
+  readonly seating: readonly ("rows" | "none")[];
+  readonly stage: { depth: [number, number]; height: [number, number] };
+  readonly rake: [number, number];
+  readonly pit: {
+    width: [number, number];
+    length: [number, number];
+    drop: [number, number];
+  };
+  readonly platforms: number;
+  readonly platform: {
+    width: [number, number];
+    depth: [number, number];
+    height: [number, number];
+  };
+};
 export interface RunFloorStructureV3 extends Omit<
   LegacyRunFloorDesign,
   "stories" | "scene"
@@ -194,6 +231,8 @@ export interface RunFloorStructureV3 extends Omit<
   scene: SceneFloorStructure;
   /** Per study room 0..3; absent means rectangular as before. */
   roomShapes?: RunRoomShape[];
+  /** A hall in place of several study rooms; absent or null means none. */
+  hall?: RunHall | null;
 }
 export type RunFloorDesign = LegacyRunFloorDesign | RunFloorStructureV3;
 export type RunExteriorStructureV3 = Omit<

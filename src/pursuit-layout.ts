@@ -10,9 +10,10 @@ import {
 import { carveStairwells } from "./stairwell";
 import { isSolidOpenFloor } from "./open-site";
 import { layoutRandom } from "./building-layout";
-import { inRect, sizeFits, type Sector } from "./floor-plan";
+import { inRect, sectorRooms, sizeFits, type Sector } from "./floor-plan";
 import { carveRoomShapes, cornerCells } from "./room-shapes";
 import { fieldClearance } from "./office-layout";
+import { buildHallLevels, levelErrors } from "./floor-levels";
 import {
   fieldDoor,
   forwardFieldQuota,
@@ -61,6 +62,9 @@ export function pursuitLayout(g: Game, f: Floor) {
       (fl) => pursuitLayoutErrors(g, fl),
       f.design && "roomShapes" in f.design ? fieldClearance(f) : [],
     );
+    // A hall's stage, rake, pit and platforms, cut into walkable steps.
+    const levels = buildHallLevels(f);
+    if (levels) f.generation!.levels = levels;
     return;
   }
   const random = { rng: (g.seed ^ Math.imul(f.index + 1, 0x6d2b79f5)) >>> 0 };
@@ -314,13 +318,27 @@ function officePlanErrors(g: Game, f: Floor): string[] {
   const errors: string[] = [];
   const sectors = f.generation?.sectors ?? [];
   const ids = sectors.map((s) => s.id);
+  const lobby = sectors.length - 1;
+  // A hall (floors[].hall) holds two or three of the gated rooms in one
+  // sector; every study room still belongs to exactly one sector.
+  const hall =
+    f.design && "hall" in f.design ? (f.design.hall?.rooms ?? []) : [];
   if (
-    sectors.length !== 6 ||
+    sectors.length !== (hall.length ? 7 - hall.length : 6) ||
     ids[0] !== "entry" ||
     ids[1] !== "room2" ||
-    ids[5] !== "lobby" ||
-    [...ids.slice(2, 5)].sort().join() !== "room0,room1,room3" ||
-    sectors.some((s, i) => s.order !== i)
+    ids[lobby] !== "lobby" ||
+    sectors.slice(1, lobby).flatMap(sectorRooms).sort().join() !== "0,1,2,3" ||
+    sectors.some(
+      (s, i) =>
+        s.order !== i ||
+        (i > 0 && i < lobby && s.id !== `room${s.room}`) ||
+        (s.merged
+          ? [...s.merged].sort().join() !== [...hall].sort().join() ||
+            s.merged[0] !== s.room
+          : false),
+    ) ||
+    sectors.filter((s) => s.merged).length !== (hall.length ? 1 : 0)
   )
     return ["bad sector chain"];
   const b = f.boundary;
@@ -360,7 +378,7 @@ function officePlanErrors(g: Game, f: Floor): string[] {
     }
     return undefined;
   };
-  const pairs = [0, 0, 0, 0, 0];
+  const pairs = sectors.slice(1).map(() => 0);
   const gates: (Furniture | undefined)[] = [];
   for (const o of chain) {
     const vertical = o.h > o.w,
@@ -397,7 +415,7 @@ function officePlanErrors(g: Game, f: Floor): string[] {
   });
   errors.push(...stationErrors(g, f, fields));
   // Blocking any study sector must sever every entry-to-stairs path.
-  for (const s of sectors.slice(1, 5))
+  for (const s of sectors.slice(1, lobby))
     if (
       contains(
         floodFrom(f, f.entry, [], (x, y) => owner[y * W + x] === s.order),
@@ -406,6 +424,7 @@ function officePlanErrors(g: Game, f: Floor): string[] {
     )
       errors.push(`bypass around ${s.id}`);
   errors.push(...sectorShapeErrors(g, f, sectors, gates, owner, front));
+  errors.push(...levelErrors(f));
   return errors;
 }
 
@@ -434,7 +453,8 @@ function sectorShapeErrors(
       next = gates[k];
     const start =
       k === 0 ? { x: 21, y: b.bottom - 1 } : previous && front(previous, k);
-    const exit = k === 5 ? { x: 21, y: b.top } : next && front(next, k);
+    const exit =
+      k === sectors.length - 1 ? { x: 21, y: b.top } : next && front(next, k);
     if (!start || !exit) {
       errors.push(`sector ${s.id} gate fronts missing`);
       continue;
@@ -442,9 +462,10 @@ function sectorShapeErrors(
     const seen = wideFlood(f.tiles, inSector, start);
     const reach = (p: Point) => seen[p.y * W + p.x] === 1;
     if (!reach(exit)) errors.push(`sector ${s.id} gates lack wide route`);
-    const prefix = `f${f.index}-${s.id}`;
+    const held = sectorRooms(s).map((room) => `f${f.index}-room${room}`);
     for (const st of f.stations) {
-      if (g.encounters[st.encounter]?.questionRoom !== prefix) continue;
+      if (!held.includes(g.encounters[st.encounter]?.questionRoom ?? ""))
+        continue;
       const p = { x: Math.floor(st.x), y: Math.floor(st.y) };
       if (!inSector(p.x, p.y)) errors.push(`terminal ${st.id} outside ${s.id}`);
       else if (!reach(p)) errors.push(`terminal ${st.id} lacks wide route`);

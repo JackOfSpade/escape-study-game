@@ -1,3 +1,4 @@
+import { groundLevel, hasLevels } from "./floor-levels";
 import {
   type Actor,
   type Game,
@@ -461,10 +462,19 @@ export function settleElevated(g: Game, a: Actor, surface?: ElevatedSurface) {
   const body = a.elevated;
   if (!body) return;
   const travel = a.stairTravel;
-  a.floor = Math.max(
+  const storey = Math.max(
     0,
     Math.min(CONFIG.floors, Math.floor((body.feet + 0.05) / FLOOR_HEIGHT)),
   );
+  // A hall's pit lies a little below its storey's slab: a body in it is still
+  // on that storey, not the one beneath.
+  if (!(
+    storey === a.floor - 1 &&
+    body.feet > a.floor * FLOOR_HEIGHT - 0.8 &&
+    hasLevels(g.floors[a.floor]) &&
+    groundLevel(g.floors[a.floor], a) < 0
+  ))
+    a.floor = storey;
   if (travel?.walked !== undefined) {
     projectWalkingProgress(g, a);
     if (!insideFootprint(g.floors[travel.fromFloor], a)) travel.left = true;

@@ -1,4 +1,12 @@
 import {
+  HALL_CEILING,
+  cellLevel,
+  ceilingHeight,
+  groundLevel,
+  hasLevels,
+  levelRange,
+} from "../floor-levels";
+import {
   ACESFilmicToneMapping,
   BoxGeometry,
   BufferGeometry,
@@ -29,7 +37,7 @@ import { doorFrame } from "../doors";
 import { human } from "../engine";
 import { doorLeaves, doorSeeThrough, doorStyle } from "../door-style";
 import { fieldAllows } from "../force-fields";
-import { floorSectors } from "../floor-plan";
+import { floorSectors, hallSector } from "../floor-plan";
 import { floorCols, floorRows } from "../site";
 import { carvedCells } from "../room-shapes";
 import { cornerWallGeometries } from "./corner-walls";
@@ -431,6 +439,11 @@ function scaleWallUVs(geometry: BufferGeometry) {
 const WHITE = new Color(0xffffff);
 
 /** Presentation only. Each floor is stacked at its real storey elevation. */
+/** How far the ground under a point stands above its storey's floor: the
+ * stepped levels of a hall room, 0 on every flat floor. */
+const liftOf = (floor: Floor | undefined, p: Point) =>
+  floor ? groundLevel(floor, p) : 0;
+
 export class FirstPersonView {
   readonly renderer: WebGLRenderer;
   /** Agent benchmark hook for the complete rendered frame. */
@@ -705,7 +718,9 @@ export class FirstPersonView {
           ? sampleStairRoute(game, a.stairTravel)
           : undefined,
       eyeX = route?.x ?? a.x,
-      eyeY = (a.elevated?.feet ?? route?.y ?? elevation) + 1.6,
+      eyeY =
+        (a.elevated?.feet ?? route?.y ?? elevation + groundLevel(floor, a)) +
+        1.6,
       eyeZ = route?.z ?? a.y;
     this.camera.position.set(eyeX, eyeY, eyeZ);
     this.target.set(
@@ -967,8 +982,14 @@ export class FirstPersonView {
       this.exterior.build(floor);
       this.building.build([floor]);
     }
+    // A hall is taller than other rooms and its floor may step up or down, so
+    // that storey's walls run from its lowest level to the hall ceiling.
     const open = floor.open === true,
-      wallHeight = open ? OPEN_FENCE_HEIGHT : 2.8;
+      tall = !open && !!hallSector(floor),
+      wallBase = tall ? levelRange(floor).low : 0,
+      wallHeight = open
+        ? OPEN_FENCE_HEIGHT
+        : (tall ? HALL_CEILING + 0.02 : 2.8) - wallBase;
     const boxes: BufferGeometry[] = [];
     const interiorTiles = exteriorWallTiles(floor).map((row, z) =>
       row.map((tile, x) =>
@@ -991,13 +1012,16 @@ export class FirstPersonView {
       // chamfer drops to fence height with the rest of the stall row.
       if (open)
         for (const corner of corners) corner.scale(1, wallHeight / 2.8, 1);
+      else if (tall)
+        for (const corner of corners)
+          corner.scale(1, wallHeight / 2.8, 1).translate(0, wallBase, 0);
       boxes.push(...corners);
     }
     for (const r of wallRectangles(interiorTiles))
       boxes.push(
         new BoxGeometry(r.w, wallHeight, r.h).translate(
           r.x + r.w / 2,
-          wallHeight / 2,
+          wallBase + wallHeight / 2,
           r.y + r.h / 2,
         ),
       );
@@ -1020,9 +1044,9 @@ export class FirstPersonView {
       boxes.push(
         new BoxGeometry(
           vertical ? 1 : span + 0.3,
-          2.8 - 2.49,
+          wallBase + wallHeight - 2.49,
           vertical ? span + 0.3 : 1,
-        ).translate(cx, (2.8 + 2.49) / 2, cz),
+        ).translate(cx, (wallBase + wallHeight + 2.49) / 2, cz),
       );
     }
     // Only the wall batch is rescaled: its boxes each carry 0..1 face UVs, so a
@@ -1064,17 +1088,21 @@ export class FirstPersonView {
         }
         const finish = floorZone(floor, x, y),
           key = surfaceKey(finish, x, y),
-          start = x;
+          start = x,
+          level = cellLevel(floor, x, y),
+          ceiling = ceilingHeight(floor, x, y);
         while (
           x < cols &&
           floorZone(floor, x, y) === finish &&
           surfaceKey(finish, x, y) === key &&
-          ownsFinish(x, y)
+          ownsFinish(x, y) &&
+          cellLevel(floor, x, y) === level &&
+          ceilingHeight(floor, x, y) === ceiling
         )
           x++;
         const plane = new PlaneGeometry(x - start, 1)
           .rotateX(-Math.PI / 2)
-          .translate((start + x) / 2, -0.025, y + 0.5);
+          .translate((start + x) / 2, level - 0.025, y + 0.5);
         const uv = plane.getAttribute("uv"),
           position = plane.getAttribute("position");
         for (let i = 0; i < uv.count; i++)
@@ -1089,9 +1117,47 @@ export class FirstPersonView {
           ceilings.push(
             new PlaneGeometry(x - start, 1)
               .rotateX(Math.PI / 2)
-              .translate((start + x) / 2, 2.82, y + 0.5),
+              .translate((start + x) / 2, ceiling, y + 0.5),
           );
       }
+    }
+    // Risers of a hall's stepped floor, in the finish of the upper step.
+    if (hasLevels(floor)) {
+      const sides = [
+        { dx: 1, dy: 0, turn: Math.PI / 2 },
+        { dx: -1, dy: 0, turn: -Math.PI / 2 },
+        { dx: 0, dy: 1, turn: 0 },
+        { dx: 0, dy: -1, turn: Math.PI },
+      ];
+      for (let y = 0; y < rows; y++)
+        for (let x = 0; x < cols; x++) {
+          if (floor.tiles[y][x] !== 0) continue;
+          const level = cellLevel(floor, x, y);
+          for (const side of sides) {
+            const nx = x + side.dx,
+              ny = y + side.dy;
+            if (floor.tiles[ny]?.[nx] !== 0) continue;
+            const below = cellLevel(floor, nx, ny);
+            if (below >= level) continue;
+            const riser = new PlaneGeometry(1, level - below)
+              .rotateY(side.turn)
+              .translate(
+                x + 0.5 + side.dx * 0.5,
+                (level + below) / 2 - 0.025,
+                y + 0.5 + side.dy * 0.5,
+              );
+            const uv = riser.getAttribute("uv"),
+              position = riser.getAttribute("position");
+            for (let i = 0; i < uv.count; i++)
+              uv.setXY(
+                i,
+                position.getX(i) + position.getZ(i),
+                position.getY(i),
+              );
+            const finish = floorZone(floor, x, y);
+            surfaceList(surfaceKey(finish, x, y)).push(riser);
+          }
+        }
     }
     for (const [key, planes] of surfaces)
       this.addMerged(planes, this.floorMaterial(key), "floor", false);
@@ -1247,7 +1313,8 @@ export class FirstPersonView {
         this.pools.panel.set(
           panel.slot,
           panel.x,
-          2.775,
+          ceilingHeight(floor, Math.floor(panel.x), Math.floor(panel.y)) -
+            0.045,
           panel.y,
           0.42,
           0.045,
@@ -1330,6 +1397,9 @@ export class FirstPersonView {
     });
   }
 
+  /** The floor being drawn when it has a hall's stepped levels. */
+  private levelFloor?: Floor;
+
   private markPresent(object: object) {
     const visual = this.visuals.get(object);
     if (visual) visual.present = this.frame;
@@ -1343,6 +1413,7 @@ export class FirstPersonView {
     exteriorOnly = false,
   ) {
     this.frame++;
+    this.levelFloor = hasLevels(floor) ? floor : undefined;
     this.animationTime = game.time;
     this.animationCalm = !!game.settings.reducedFlash;
     // Static objects rely on depth-tested walls for occlusion. A centre-point
@@ -1479,6 +1550,7 @@ export class FirstPersonView {
       swing = o.field?.leaf
         ? o.field.leaf.side * o.field.leaf.open * DOOR_OPEN_ANGLE
         : 0;
+    const lift = o.field ? 0 : liftOf(this.levelFloor, o);
     for (const p of visual.parts) {
       const swung = p.leaf ? p.leaf.sign * swing : 0,
         swungCos = Math.cos(swung),
@@ -1546,7 +1618,10 @@ export class FirstPersonView {
       this.pools[p.batch].set(
         p.slot,
         anchor.x + x * c - z * s,
-        p.y - (broken && p.role === "leg" ? 0.07 : 0) + (moved?.lift ?? 0),
+        lift +
+          p.y -
+          (broken && p.role === "leg" ? 0.07 : 0) +
+          (moved?.lift ?? 0),
         anchor.y + x * s + z * c,
         p.w * (bar && !vertical ? health : 1),
         p.h,
@@ -2467,12 +2542,13 @@ export class FirstPersonView {
       );
       this.part(visual.parts, 0, 0.83, 0.15, 0.55, 0.04, 0.2, "dark");
     }
-    const consumed = game.encounters[station.encounter]?.state === "consumed";
+    const consumed = game.encounters[station.encounter]?.state === "consumed",
+      lift = liftOf(this.levelFloor, station);
     for (const p of visual.parts)
       this.pools[p.batch].set(
         p.slot,
         station.x + facing * p.x,
-        p.y,
+        lift + p.y,
         station.y + facing * p.z,
         p.w,
         p.h,
@@ -2497,7 +2573,7 @@ export class FirstPersonView {
       this.pools[p.batch].set(
         p.slot,
         position.x + p.x,
-        p.y,
+        liftOf(this.levelFloor, position) + p.y,
         position.y + p.z,
         p.w,
         p.h,
@@ -2646,7 +2722,7 @@ export class FirstPersonView {
       this.pools[p.batch].set(
         p.slot,
         actor.x + x * c - p.z * s,
-        y + (dead ? 0 : sway),
+        liftOf(this.levelFloor, actor) + y + (dead ? 0 : sway),
         actor.y + x * s + p.z * c,
         p.w,
         p.h,
@@ -2736,7 +2812,8 @@ export class FirstPersonView {
     if (visual.label) visual.label.visible = false;
     visual.speech!.position.set(
       actor.x,
-      Math.min(2.18, 2.72 - visual.speech!.scale.y),
+      liftOf(this.levelFloor, actor) +
+        Math.min(2.18, 2.72 - visual.speech!.scale.y),
       actor.y,
     );
   }
@@ -2778,7 +2855,11 @@ export class FirstPersonView {
       this.floorRoot.add(visual.label);
     }
     visual.label.visible = true;
-    visual.label.position.set(actor.x, 1.98, actor.y);
+    visual.label.position.set(
+      actor.x,
+      liftOf(this.levelFloor, actor) + 1.98,
+      actor.y,
+    );
   }
 
   private color(tint: Tint, palette: Palette, kind?: FurnitureKind): Color {

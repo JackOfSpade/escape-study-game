@@ -23,7 +23,10 @@ export interface Sector {
   id: SectorId;
   /** Study sectors only. */
   room?: 0 | 1 | 2 | 3;
-  /** 0 = entry ... 5 = lobby. */
+  /** Study sectors of a hall floor only: every study room this sector holds
+   * (its own `room` first). A hall takes the place of two or three rooms. */
+  merged?: number[];
+  /** 0 = entry ... last = lobby (5 unless a hall shortens the chain). */
   order: number;
   /** Union = territory (clipped to the building shell); one to three rects. */
   blocks: Rect[];
@@ -118,4 +121,20 @@ export function sectorBounds(f: Floor, p: Point): Rect | undefined {
   for (const s of floorSectors(f))
     for (const b of s.blocks) if (inRect(b, x, y)) return b;
   return undefined;
+}
+
+/** The study rooms a sector holds: its own, plus those a hall absorbed. */
+export const sectorRooms = (s: Sector): number[] =>
+  s.merged ?? (s.room === undefined ? [] : [s.room]);
+
+/** The sector that holds a study room: its own sector, or the hall that
+ * absorbed it. Scene rooms, stations and doors of an absorbed room resolve to
+ * the hall this way. */
+export function sectorOfRoom(f: Floor, room: number): Sector | undefined {
+  return floorSectors(f).find((s) => sectorRooms(s).includes(room));
+}
+
+/** The hall of a floor (floors[].hall), if it has one. */
+export function hallSector(f: Floor): Sector | undefined {
+  return f.generation?.sectors?.find((s) => s.merged);
 }

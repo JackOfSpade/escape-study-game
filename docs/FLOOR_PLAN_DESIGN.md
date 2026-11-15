@@ -196,6 +196,56 @@ sides.
   sub-room has exactly one doorway; the existing egress, free-study,
   clearance and spacing checks. Version 3/4 floors keep the existing checks.
 
+## Hall rooms (`floors[].hall`)
+
+A version 3 design for an enclosed building may give a floor a hall: one large
+room in place of two or three of the gated study rooms (`room0`, `room1`,
+`room3`; never the free hall `room2`). The merged rooms must be adjacent in
+`roomOrder`. Designs without the field, and every saved floor, are unchanged.
+
+- **Chain.** The planner paints the chosen family as usual, then opens the
+  walls between the merged rooms' chain orders (`mergeOrders` in
+  `src/office-plan.ts`), so the floor has five or four sectors instead of six.
+  The hall sector keeps the id and `room` of the first merged room in the
+  chain and lists all of them in `Sector.merged`; `sectorOfRoom(f, room)`
+  resolves any study room to its sector. A hall has no sub-rooms and its
+  outline may be up to six rects.
+- **Invariants that still hold.** Every sector is still a cut between entry
+  and stairs with exactly one field per consecutive pair. The hall holds every
+  terminal of its merged rooms (stations keep their own `questionRoom`), so a
+  floor's terminal count, the free hall and the zero-key rule are unchanged.
+  What changes is the number of gated fields: one per hall instead of one per
+  merged room, with the first merged room's quota. `f.doors[n]` and
+  `f.rooms[n].forwardEntry/forwardExit` of every merged room point at the
+  hall's gates. `pursuitLayoutErrors` checks the shorter chain against the
+  floor's design.
+- **Scene.** `scene.rooms` still has four entries. The entries of merged rooms
+  are placed inside the hall under their own room number, and each gets its
+  own plaque position along the hall's walls.
+- **Levels** (`src/floor-levels.ts`). `hall.stage`, `rake`, `pit` and
+  `platforms` become a height per hall cell in 15 cm units, stored as
+  `Floor.generation.levels`. `buildHallLevels` keeps cells within two cells of
+  a field opening at storey height and then lowers every cell until no two
+  neighbours differ by more than 30 cm, so every level change is a flight of
+  steps and nothing is a sheer edge; a raised area keeps its authored flat
+  size and its steps are cut from extra cells in front of it. Walking,
+  routing, sight and sound stay flat per storey. The level decides the height
+  of the floor, the furniture, the terminals and the people on a cell
+  (`groundLevel` blends between cell centres), and the player's jump physics
+  lands on it (`src/elevated-physics.ts`). `levelErrors` validates stored
+  levels.
+- **Height.** A hall's ceiling is 3.38 m instead of 2.82 m
+  (`ceilingHeight`); the storey's walls are drawn from its lowest level to the
+  hall ceiling.
+- **Seating.** `hall.seating: "rows"` fills the hall with rows of four seats
+  facing `hall.focus` (`hallRows` in `src/office-layout.ts`), using the seat
+  role from the venue's filler for the hall's room function, before the
+  function's ordinary filler.
+- **Limits.** No walkable space above walkable space (a platform is solid
+  underneath), no ceiling taller than the storey, and a hall in a building
+  stamped into a shared world as an extra site is flat: stamping does not
+  carry `generation.levels`.
+
 ## Open sites
 
 A version 3 design with `setting.form: "open"` authors one ground plan instead

@@ -246,9 +246,9 @@ function serpentine(p: PlanGrid, r: Rng) {
 
 /** Sector blocks as column-run rects, or undefined when a sector is not a
  * union of one to three rects or two sectors touch without a wall. */
-function decompose(p: PlanGrid): Rect[][] | undefined {
+function decompose(p: PlanGrid, sectors = 6, hall = -1): Rect[][] | undefined {
   const blocks: Rect[][] = [];
-  for (let label = 0; label < 6; label++) {
+  for (let label = 0; label < sectors; label++) {
     const out: Rect[] = [];
     let open: Rect | undefined;
     for (let x = p.X0; x <= p.X1 + 1; x++) {
@@ -268,7 +268,9 @@ function decompose(p: PlanGrid): Rect[][] | undefined {
       if (open) out.push(open);
       open = y1 >= 0 ? { x1: x, y1, x2: x, y2 } : undefined;
     }
-    if (out.length < 1 || out.length > 3) return undefined;
+    // A hall spans several departments, so its outline may step more often.
+    if (out.length < 1 || out.length > (label === hall ? 6 : 3))
+      return undefined;
     blocks.push(out);
   }
   for (let y = p.top; y < p.bottom; y++)
@@ -279,6 +281,34 @@ function decompose(p: PlanGrid): Rect[][] | undefined {
         if (b >= 0 && b !== a) return undefined;
     }
   return blocks;
+}
+
+/** A hall (floors[].hall): chain orders a..b become one sector. The walls
+ * that separated them are opened (also outside a shaped shell, where labels
+ * still cover the bounding box), and later orders close the gap. */
+function mergeOrders(p: PlanGrid, a: number, b: number) {
+  const inSet = (x: number, y: number) => {
+    const l = labelAt(p, x, y);
+    return l >= a && l <= b;
+  };
+  for (let changed = true; changed;) {
+    changed = false;
+    for (let y = p.top; y < p.bottom; y++)
+      for (let x = p.X0; x <= p.X1; x++)
+        if (
+          p.lab[y * W + x] === -1 &&
+          ((inSet(x - 1, y) && inSet(x + 1, y)) ||
+            (inSet(x, y - 1) && inSet(x, y + 1)))
+        ) {
+          p.lab[y * W + x] = a;
+          changed = true;
+        }
+  }
+  for (let i = 0; i < p.lab.length; i++) {
+    const l = p.lab[i];
+    if (l > b) p.lab[i] = l - (b - a);
+    else if (l > a) p.lab[i] = a;
+  }
 }
 
 export interface PlanGate {
@@ -690,8 +720,10 @@ function placeTerminals(
 
 interface Draft {
   plan: Plan;
-  /** Study room number per chain order 1..4. */
+  /** Study room number per chain order 1..4 (a hall's first room). */
   roomOf: number[];
+  /** Every study room each order holds: one, or a hall's two or three. */
+  roomsOf: number[][];
   terminals: Point[][];
 }
 /** One planning attempt; undefined when this draw cannot be built. */
@@ -710,7 +742,29 @@ function attempt(
         ? columns(p, r)
         : serpentine(p, r);
   if (!built) return undefined;
-  const blocks = decompose(p);
+  // Chain orders 1..4 hold room2 and then the authored (or seeded) order; a
+  // hall folds its adjacent rooms into one order.
+  // A seeded floor draws its room order after its gates, as it always has;
+  // only an authored order (which a hall needs) is known this early.
+  const authored = f.design?.roomOrder;
+  const order = [2, ...(authored ?? [-1, -1, -1])];
+  const hallRooms =
+    (f.design && "hall" in f.design ? f.design.hall?.rooms : undefined) ?? [];
+  const roomsOf: number[][] = [[]];
+  for (const room of order) {
+    const last = roomsOf[roomsOf.length - 1];
+    if (hallRooms.includes(room) && last.some((n) => hallRooms.includes(n)))
+      last.push(room);
+    else roomsOf.push([room]);
+  }
+  const roomOf = roomsOf.map((rooms) => rooms[0] ?? -1);
+  const hallOrder = roomsOf.findIndex((rooms) => rooms.length > 1);
+  if (hallOrder > 0)
+    mergeOrders(p, hallOrder, hallOrder + roomsOf[hallOrder].length - 1);
+  // Entry, the study orders and the stair lobby.
+  const count = roomsOf.length + 1,
+    lobby = count - 1;
+  const blocks = decompose(p, count, hallOrder);
   if (!blocks) return undefined;
   f.tiles = footprintTiles(f.boundary!);
   for (let y = p.top; y < p.bottom; y++)
@@ -736,24 +790,35 @@ function attempt(
     ring: new Uint8Array(W * H),
     door: new Uint8Array(W * H),
   };
-  for (let k = 0; k < 5; k++) {
+  for (let k = 0; k < lobby; k++) {
     const options = gateCandidates(p, k, k + 1);
     if (!options.length) return undefined;
     const gate = options[int(r, 0, options.length - 1)];
     for (const [x, y] of gate.cells) f.tiles[y][x] = 0;
     plan.gates.push(gate);
   }
-  const roomOf = [-1, 2, ...(f.design?.roomOrder ?? shuffle(r, [3, 0, 1]))];
+  if (!authored)
+    shuffle(r, [3, 0, 1]).forEach((room, i) => {
+      roomsOf[i + 2] = [room];
+      roomOf[i + 2] = room;
+    });
   if (!defaults)
-    for (let order = 1; order <= 4; order++)
-      carveSector(plan, order, roomOf[order], r, f.design?.subroomKinds);
+    for (let order = 1; order < lobby; order++)
+      // A hall stays one open room: no sub-rooms are carved from it.
+      if (order !== hallOrder)
+        carveSector(plan, order, roomOf[order], r, f.design?.subroomKinds);
   const terminals: Point[][] = [];
-  for (let order = 1; order <= 4; order++) {
-    const t = placeTerminals(plan, order, counts[roomOf[order]], r);
+  for (let order = 1; order < lobby; order++) {
+    const t = placeTerminals(
+      plan,
+      order,
+      roomsOf[order].reduce((n, room) => n + counts[room], 0),
+      r,
+    );
     if (!t) return undefined;
     terminals[order] = t;
   }
-  return { plan, roomOf, terminals };
+  return { plan, roomOf, roomsOf, terminals };
 }
 
 /** The authored quota is shared by construction and validation. */
@@ -823,25 +888,27 @@ const SECTOR_IDS = (roomOf: number[]): SectorId[] => [
 ];
 /** Publish a draft onto the floor: generation record, fields and terminals. */
 function commit(g: Game, f: Floor, draft: Draft, mainHp: number | undefined) {
-  const { plan, roomOf, terminals } = draft;
-  const ids = SECTOR_IDS(roomOf);
+  const { plan, roomOf, roomsOf, terminals } = draft;
+  const ids = SECTOR_IDS(roomOf),
+    lobby = ids.length - 1;
   const sectors: Sector[] = ids.map((id, order) => ({
     id,
-    ...(order >= 1 && order <= 4
+    ...(order >= 1 && order < lobby
       ? { room: roomOf[order] as 0 | 1 | 2 | 3 }
       : {}),
+    ...(roomsOf[order]?.length > 1 ? { merged: [...roomsOf[order]] } : {}),
     order,
     blocks: plan.blocks[order],
     corridors: plan.corridors[order],
     rooms: plan.rooms[order],
-    ...(order < 5
+    ...(order < lobby
       ? { gate: { x: plan.gates[order].x, y: plan.gates[order].y } }
       : {}),
   }));
   f.layout = "pursuit";
   f.generation = {
     version: 5,
-    upperDivider: plan.blocks[5][0].y2 + 1,
+    upperDivider: plan.blocks[lobby][0].y2 + 1,
     lowerDivider: plan.blocks[0][0].y1 - 1,
     family: plan.family,
     sectors,
@@ -853,11 +920,18 @@ function commit(g: Game, f: Floor, draft: Draft, mainHp: number | undefined) {
   f.doors = [];
   f.furniture = [];
   const point = (gate: PlanGate) => ({ x: gate.x, y: gate.y });
-  for (let order = 1; order <= 4; order++) {
+  for (let order = 1; order < lobby; order++) {
     const room = roomOf[order],
       entry = plan.gates[order - 1],
       exit = plan.gates[order];
-    f.doors[room] = point(entry);
+    // Rooms a hall absorbed share its entrance and exit.
+    for (const held of roomsOf[order]) {
+      f.doors[held] = point(entry);
+      Object.assign(f.rooms![held], {
+        forwardEntry: point(entry),
+        forwardExit: point(exit),
+      });
+    }
     if (order === 1)
       fieldDoor(
         g,
@@ -879,10 +953,6 @@ function commit(g: Game, f: Floor, draft: Draft, mainHp: number | undefined) {
       room,
       exit.direction,
     );
-    Object.assign(f.rooms[room], {
-      forwardEntry: point(entry),
-      forwardExit: point(exit),
-    });
   }
   if (f.index === 0) {
     for (let y = 29; y < H; y++)
@@ -891,11 +961,10 @@ function commit(g: Game, f: Floor, draft: Draft, mainHp: number | undefined) {
     main.hp = main.maxHp = mainHp ?? 600;
     main.field!.exit = false;
   }
-  for (let order = 1; order <= 4; order++) {
-    const stations = f.stations.filter(
-      (s) =>
-        g.encounters[s.encounter].questionRoom ===
-        `f${f.index}-room${roomOf[order]}`,
+  for (let order = 1; order < lobby; order++) {
+    const held = roomsOf[order].map((room) => `f${f.index}-room${room}`);
+    const stations = f.stations.filter((s) =>
+      held.includes(g.encounters[s.encounter].questionRoom ?? ""),
     );
     stations.forEach((s, i) => Object.assign(s, terminals[order][i]));
   }

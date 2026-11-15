@@ -512,6 +512,9 @@ export interface Floor {
     /** Corners carved by floors[].roomShapes: solid tiles drawn as one smooth
      * chamfer or curve. Absent on undesigned floors and older saves. */
     corners?: import("./room-shapes").CarvedCorner[];
+    /** Stepped floor heights of a hall room (floors[].hall). Absent on flat
+     * floors and older saves. */
+    levels?: import("./floor-levels").FloorLevels;
   };
   index: number;
   tiles: number[][];

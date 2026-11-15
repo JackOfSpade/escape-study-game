@@ -29,7 +29,11 @@ import {
   WALL_FINISHES,
   WINDOW_STYLES,
 } from "./setting-catalog.mjs";
-import { ROOM_SHAPES, TITLE_CARD_FONTS } from "./run-design-contract.mjs";
+import {
+  HALL_LIMITS,
+  ROOM_SHAPES,
+  TITLE_CARD_FONTS,
+} from "./run-design-contract.mjs";
 import {
   OUTDOOR_BACKDROPS,
   OUTDOOR_ENCLOSURES,
@@ -314,6 +318,7 @@ const roomType = oneOf([
   "reception",
   "manager",
 ]);
+const side = oneOf(HALL_LIMITS.sides);
 const floor = obj(
   {
     name: str(48),
@@ -329,8 +334,40 @@ const floor = obj(
     scene: obj({ version: { const: 2 }, rooms: arr(room, 4, 4) }),
     doors: arr(door, 4, 4),
     roomShapes: arr(oneOf(ROOM_SHAPES), 4, 4),
+    hall: nullable(
+      obj({
+        rooms: arr(oneOf([0, 1, 3]), 2, 3),
+        focus: side,
+        seating: oneOf(HALL_LIMITS.seating),
+        stage: nullable(
+          obj({
+            depth: int(...HALL_LIMITS.stage.depth),
+            height: num(...HALL_LIMITS.stage.height),
+          }),
+        ),
+        rake: num(...HALL_LIMITS.rake),
+        pit: nullable(
+          obj({
+            width: int(...HALL_LIMITS.pit.width),
+            length: int(...HALL_LIMITS.pit.length),
+            drop: num(...HALL_LIMITS.pit.drop),
+          }),
+        ),
+        platforms: arr(
+          obj({
+            side,
+            width: int(...HALL_LIMITS.platform.width),
+            depth: int(...HALL_LIMITS.platform.depth),
+            height: num(...HALL_LIMITS.platform.height),
+          }),
+          0,
+          HALL_LIMITS.platforms,
+        ),
+      }),
+    ),
   },
   [
+    "hall",
     "roomShapes",
     "name",
     "family",

@@ -43,6 +43,8 @@ export interface Spawn extends Point {
 export type Action = { tick: number } & (
   | { type: "move"; id: string; x: number; y: number; stairWalk?: boolean }
   | { type: "walkTo"; id: string; x: number; y: number; stairWalk?: boolean }
+  /** Walk the human along the game's own route to a point on their floor. */
+  | { type: "routeTo"; id: string; x: number; y: number }
   | { type: "jump"; id: "human" }
   | { type: "door" | "grip" | "vault"; id: string; target: string }
   | { type: "spawn"; entity: Spawn }
@@ -445,6 +447,14 @@ export function parseScenario(value: string | unknown): Scenario {
               a.id === "human")) &&
           (s.simulation === "physics" || a.id === "human"),
         "Move actions control the player in game mode, or character motors in physics mode.",
+      );
+    else if (a.type === "routeTo")
+      requireThat(
+        s.simulation === "game" &&
+          a.id === "human" &&
+          point(a, s.template === "building") &&
+          Object.keys(a).length === 5,
+        "RouteTo actions walk the human in game simulation along a route to a bounded world point.",
       );
     else if (a.type === "walkTo")
       requireThat(

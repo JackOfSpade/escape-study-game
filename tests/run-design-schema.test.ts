@@ -10,6 +10,9 @@ const radio = JSON.parse(
   readFileSync("tests/fixtures/run-designs/radio-broadcast.json", "utf8"),
 );
 const { environment, ...structure } = radio;
+// Fresh structure replies state each floor's hall; this saved fixture, like
+// every older design, has none.
+for (const floor of structure.floors) floor.hall = null;
 /** Give every composed part the neutral pose and motion the contract requires. */
 const neutralParts = (objects: { parts: object[] }[]) => {
   for (const o of objects)

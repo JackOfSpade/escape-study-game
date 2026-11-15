@@ -1,3 +1,4 @@
+import { cellLevel } from "./floor-levels";
 import { doorStyle } from "./door-style";
 import { fieldAllows } from "./force-fields";
 import { drawBlood } from "./blood";
@@ -38,6 +39,38 @@ const STRIKE_SHAKE_SECONDS = 0.35;
 /** Sideways offset of the 2D impact shake. Only a recent strike shakes an
  * object: lasting damage, including authored wear, shows as cracks and holds
  * still. */
+/** A hall's stepped floor from above: raised cells lighten, sunken cells
+ * darken, and every step edge is a thin line on its lower side. */
+function drawLevels(ctx: CanvasRenderingContext2D, f: Floor) {
+  const levels = f.generation?.levels;
+  if (!levels) return;
+  ctx.save();
+  for (let y = levels.y1; y <= levels.y2; y++)
+    for (let x = levels.x1; x <= levels.x2; x++) {
+      if (f.tiles[y]?.[x] !== 0) continue;
+      const level = cellLevel(f, x, y);
+      if (level) {
+        ctx.fillStyle =
+          level > 0
+            ? `rgba(255,255,255,${Math.min(0.22, level * 0.14)})`
+            : `rgba(0,0,0,${Math.min(0.3, -level * 0.4)})`;
+        ctx.fillRect(x, y, 1, 1);
+      }
+      ctx.fillStyle = "rgba(0,0,0,0.38)";
+      if (f.tiles[y]?.[x + 1] === 0) {
+        const next = cellLevel(f, x + 1, y);
+        if (next !== level)
+          ctx.fillRect(next < level ? x + 1 : x + 0.94, y, 0.06, 1);
+      }
+      if (f.tiles[y + 1]?.[x] === 0) {
+        const next = cellLevel(f, x, y + 1);
+        if (next !== level)
+          ctx.fillRect(x, next < level ? y + 1 : y + 0.94, 1, 0.06);
+      }
+    }
+  ctx.restore();
+}
+
 export function strikeShake(
   o: { struckAt?: number },
   time: number,
@@ -402,6 +435,7 @@ export function render(
   );
   if (f.city) ctx.restore();
   ctx.globalAlpha = 1;
+  drawLevels(ctx, f);
   drawBlood(ctx, f);
   const healthBars: {
     x: number;

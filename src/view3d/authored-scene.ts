@@ -1,3 +1,4 @@
+import { groundLevel } from "../floor-levels";
 import {
   BoxGeometry,
   CanvasTexture,
@@ -807,7 +808,11 @@ export class AuthoredScene {
       part.pool.set(
         part.slot,
         host ? host.x + x * hc - z * hs : part.x,
-        (prop?.top ?? 0) + part.y + lift,
+        // Dressing on furniture standing on a hall's raised or sunken floor.
+        (host ? groundLevel(this.floor, host) : 0) +
+          (prop?.top ?? 0) +
+          part.y +
+          lift,
         host ? host.y + x * hs + z * hc : part.z,
         part.w,
         part.h,

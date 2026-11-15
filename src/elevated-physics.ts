@@ -1,4 +1,10 @@
 import {
+  cellLevel,
+  ceilingHeight,
+  groundLevel,
+  hasLevels,
+} from "./floor-levels";
+import {
   COLUMN_SIZE,
   DECK_THICKNESS,
   exteriorStructure,
@@ -247,10 +253,13 @@ function intervals(
           inside = insideFootprint(f, cell),
           open = f.tiles[y][x] === 0 || carvedWell(f, x, y);
         if (open) {
+          // A hall's stepped floor: the plate tops out at the cell's level
+          // and is solid down to the slab.
+          const level = cellLevel(f, x, y);
           result.push({
             kind: "plate",
-            height: base,
-            bottom: base - DECK_THICKNESS,
+            height: base + level,
+            bottom: base + Math.min(0, level) - DECK_THICKNESS,
             floor: f.index,
             inside: insideFootprint(f, p),
           });
@@ -264,7 +273,7 @@ function intervals(
           )
             result.push({
               kind: "plate",
-              bottom: base + 2.82,
+              bottom: base + ceilingHeight(f, x, y),
               height: base + 3.4,
               floor: f.index,
               inside: insideFootprint(f, p),
@@ -303,7 +312,9 @@ function intervals(
         result.push({
           kind: "furniture",
           bottom: base,
-          height: base + (o.field ? FLOOR_HEIGHT : furnitureHeightOf(o)),
+          height:
+            base +
+            (o.field ? FLOOR_HEIGHT : furnitureHeightOf(o) + groundLevel(f, o)),
           floor: f.index,
           inside: insideFootprint(f, p),
         });
@@ -413,12 +424,22 @@ export function ceilingAbove(g: Game, a: Actor, p: Point, minHeight: number) {
 }
 
 /** Body state is plain JSON and carries the existing horizontal momentum. */
-export function startElevated(
-  g: Game,
-  a: Actor,
-  feet = a.floor * FLOOR_HEIGHT,
-) {
+export function startElevated(g: Game, a: Actor, feet?: number) {
   if (a.elevated) return a.elevated;
+  if (feet === undefined) {
+    feet = a.floor * FLOOR_HEIGHT;
+    const floor = g.floors[a.floor];
+    // On a hall's stepped floor the body starts on the step under it.
+    if (floor && hasLevels(floor)) {
+      const step = surfaceBelow(
+        g,
+        a,
+        a,
+        feet + groundLevel(floor, a) + ELEVATED_STEP,
+      );
+      if (step?.kind === "plate" && step.floor === a.floor) feet = step.height;
+    }
+  }
   const surface = surfaceBelow(g, a, a, feet);
   a.elevated = {
     feet,
