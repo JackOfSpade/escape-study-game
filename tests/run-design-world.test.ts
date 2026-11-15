@@ -13,7 +13,12 @@ import { decode, encode } from "../src/persistence";
 import { pursuitLayoutErrors } from "../src/pursuit-layout";
 import { pacingProfile, spawnGrace } from "../src/study-pacing";
 import { type Game, type Roadmap } from "../src/model";
-import { createGame, createPlayableGame } from "../src/world";
+import {
+  createGame,
+  createPlayableGame,
+  dropHordeNotice,
+  HORDE_NOTICE,
+} from "../src/world";
 import { runDesignFixture, savedRunDesign } from "./helpers/run-design";
 
 const roadmap: Roadmap = JSON.parse(
@@ -67,6 +72,14 @@ test("authored run choices control actual geometry, field quotas, furnishings an
     );
     assert.ok(g.notice.startsWith(design.opening));
     assert.ok(g.notice.includes("about three minutes"));
+    // An escape game has no horde and keeps its catastrophe secret: only the
+    // authored opening remains once the escape state is attached.
+    dropHordeNotice(g);
+    assert.ok(g.notice.includes(HORDE_NOTICE), "old saves keep the warning");
+    g.escape = {} as NonNullable<typeof g.escape>;
+    dropHordeNotice(g);
+    assert.equal(g.notice, design.opening);
+    delete g.escape;
   }
 });
 

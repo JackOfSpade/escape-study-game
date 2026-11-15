@@ -201,8 +201,21 @@ function buildPlayableGame(
   // The opening view presents the approaching street horde immediately.
   // Refuge is just behind the player, where the other survivors are entering.
   g.survivors[0].heading = { x: 0, y: 1 };
-  g.notice = `${blueprint ? `${blueprint.opening} ` : ""}Zombies are already approaching. The entrance is behind you; they will reach it in about three minutes.`;
+  g.notice = `${blueprint ? `${blueprint.opening} ` : ""}${HORDE_NOTICE}`;
   return g;
+}
+
+/** The street-horde warning of the historical zombie game's opening notice. */
+export const HORDE_NOTICE =
+  "Zombies are already approaching. The entrance is behind you; they will reach it in about three minutes.";
+/**
+ * An escape game has no horde (`catastropheTick` removes the seeded zombies),
+ * and its catastrophe stays secret until it shows itself: the opening notice
+ * keeps the authored opening and drops the zombie warning.
+ */
+export function dropHordeNotice(g: Game) {
+  if (!g.escape || !g.notice.includes(HORDE_NOTICE)) return;
+  g.notice = g.notice.replace(HORDE_NOTICE, "").replace(/\s+/g, " ").trim();
 }
 
 declare const provisionalBrand: unique symbol;

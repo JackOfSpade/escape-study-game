@@ -885,3 +885,101 @@ test("transport marks stay bounded inside the run's byte budget", async () => {
   assert.equal(Object.keys(logs.runs[0].marks!.transport).length, 64);
   assert.ok(logs.noteTransport(g, "direct-run-499", "pending/499") === false);
 });
+
+test("what a run was generated from outlives the detail tail", async () => {
+  let stored: string | null = null;
+  const storage = {
+    read: async () => stored,
+    write: async (value: string) => {
+      stored = value;
+    },
+  };
+  const logs = new RunLogs(storage),
+    { g } = scene();
+  logs.record(g, "catastrophe-prepared", {
+    source: "offline",
+    requests: 1,
+    repeated: 0,
+    failure: "invalid",
+    detail: "2 problem(s): title too long",
+    catastropheId: "fallback-fire",
+    durationMs: 1234,
+    spec: { premise: "never retained" },
+  });
+  logs.record(g, "run-design", {
+    title: "St Example",
+    source: "claude-cli",
+    form: "building",
+    venue: "custom",
+    neighbors: "buildings",
+    ground: "cobble",
+    weather: "ash",
+    requestId: "design-1",
+    generationId: "design-2",
+    fingerprint: "abc",
+    escape: 1,
+    loop: 0,
+    catastropheId: "fallback-fire",
+    catastropheTitle: "The Fire",
+    catastropheKinds: "hazard,collapse",
+    catastrophe: { title: "The Fire", behaviours: ["hazard"], hunters: 0 },
+    exteriorSigns: 3,
+  });
+  // A minute of play: large snapshots push both entries out of the tail.
+  for (let i = 0; i < 400; i++) {
+    g.time += 2;
+    logs.record(g, "snapshot", { payload: "x".repeat(4000) });
+  }
+  await logs.flush();
+  const loaded = new RunLogs(storage);
+  await loaded.load();
+  const run = loaded.runs[0];
+  assert.ok(!run.entries.some((e) => e.type === "run-design"));
+  const design = run.audit!.events.find((e) => e.type === "run-design")!,
+    prepared = run.audit!.events.find(
+      (e) => e.type === "catastrophe-prepared",
+    )!;
+  assert.deepEqual(design.data, {
+    requestId: "design-1",
+    title: "St Example",
+    source: "claude-cli",
+    form: "building",
+    venue: "custom",
+    neighbors: "buildings",
+    ground: "cobble",
+    weather: "ash",
+    generationId: "design-2",
+    fingerprint: "abc",
+    escape: 1,
+    loop: 0,
+    catastropheId: "fallback-fire",
+    catastropheTitle: "The Fire",
+    catastropheKinds: "hazard,collapse",
+    exteriorSigns: 3,
+  });
+  assert.deepEqual(prepared.data, {
+    source: "offline",
+    requests: 1,
+    repeated: 0,
+    failure: "invalid",
+    detail: "2 problem(s): title too long",
+    catastropheId: "fallback-fire",
+    durationMs: 1234,
+  });
+  assert.ok(Buffer.byteLength(JSON.stringify(run)) <= LOG_LIMITS.bytesPerGame);
+});
+test("an escape game's seeded horde never counts toward the zombie peak", () => {
+  const logs = new RunLogs(memory()),
+    { g } = scene();
+  type Zombie = Game["zombies"][number];
+  g.zombies = [{ id: "z-1", hp: 10 } as unknown as Zombie];
+  logs.record(g, "legacy");
+  assert.equal(logs.runs[0].summary!.peakZombies, 1);
+  g.id = "run-escape";
+  g.escape = {} as NonNullable<Game["escape"]>;
+  logs.record(g, "start");
+  assert.equal(logs.runs[1].summary!.peakZombies, 0);
+  g.zombies[0].hunter = {} as NonNullable<Zombie["hunter"]>;
+  logs.record(g, "later");
+  assert.equal(logs.runs[1].summary!.peakZombies, 1);
+});

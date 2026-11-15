@@ -249,7 +249,11 @@ export class RunLogs {
       snapshots: run.summary?.snapshots ?? 0,
       peakZombies: Math.max(
         run.summary?.peakZombies ?? 0,
-        g.zombies.filter((z) => z.hp > 0).length,
+        // An escape game has no horde: the zombies the city seeds before the
+        // escape state exists are removed on the first tick and never count.
+        g.zombies.filter(
+          (z) => z.hp > 0 && (!g.escape || z.hunter !== undefined),
+        ).length,
       ),
     };
     if (type === "snapshot") run.summary.snapshots++;

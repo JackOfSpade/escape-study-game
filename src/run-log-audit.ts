@@ -66,6 +66,39 @@ const importantWorld = new Set([
   "board",
   "extraction",
 ]);
+/**
+ * What a run was generated from. These entries are written once, at the start
+ * of a run, so the rolling detail tail drops them within a minute of play;
+ * the audit keeps their scalar fields for the whole run.
+ */
+const generationMetadata: Record<string, readonly string[]> = {
+  "run-design": [
+    "title",
+    "source",
+    "form",
+    "venue",
+    "neighbors",
+    "ground",
+    "weather",
+    "generationId",
+    "fingerprint",
+    "escape",
+    "loop",
+    "catastropheId",
+    "catastropheTitle",
+    "catastropheKinds",
+    "exteriorSigns",
+  ],
+  "catastrophe-prepared": [
+    "source",
+    "requests",
+    "repeated",
+    "failure",
+    "detail",
+    "catastropheId",
+    "durationMs",
+  ],
+};
 function state(g: Game) {
   const human = g.survivors.find((a) => a.id === "human");
   return {
@@ -196,6 +229,7 @@ export function updateAudit(
       p[key] = Math.max(p[key], Number(data[key]));
   }
   const important =
+    entry.type in generationMetadata ||
     entry.type === "native-study-transport" ||
     entry.type === "browser-error" ||
     entry.type === "unhandled-rejection" ||
@@ -222,6 +256,7 @@ export function updateAudit(
       "file",
       "line",
       "column",
+      ...(generationMetadata[entry.type] ?? []),
     ]) {
       const value = data[key];
       if (typeof value === "number" && Number.isFinite(value))
