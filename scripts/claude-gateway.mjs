@@ -105,7 +105,12 @@ export const TASK_PROFILES = Object.freeze({
     ...live(180_000, "opus", "medium"),
     stableKeys: ["instruction"],
   },
-  "escape-catastrophe": { ...live(180_000), stableKeys: ["instruction"] },
+  // Chosen by reasoning on 2026-11-14, not measured: the prompt changed after
+  // its ladder (docs/AI_MODEL_SELECTION.md, "Unverified since a prompt change").
+  "escape-catastrophe": {
+    ...live(180_000, "opus", "medium"),
+    stableKeys: ["instruction"],
+  },
   "design-run": { ...authoring(), model: "sonnet", stableKeys: [] },
 });
 /** Every task runs the model and effort in its own profile: the 2026-11-12

@@ -507,8 +507,9 @@ test("every escape operation is registered in AI_OPERATIONS with a TASK_PROFILES
     "escape-intent": { model: "haiku", effort: "medium", timeoutMs: 120_000 },
     "escape-epilogue": { model: "haiku", effort: "high", timeoutMs: 180_000 },
     "escape-area": { model: "opus", effort: "medium", timeoutMs: 180_000 },
+    // Chosen by reasoning on 2026-11-14 after its prompt changed, not measured.
     "escape-catastrophe": {
-      model: "sonnet",
+      model: "opus",
       effort: "medium",
       timeoutMs: 180_000,
     },
