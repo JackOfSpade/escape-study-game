@@ -39,7 +39,34 @@ html.study-only body {
 .study-workspace-toolbar {
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
   margin-bottom: 24px;
+}
+/* One thing at a time: the skill map with the way into the next question, or
+   the open question on its own. Status lines stay visible in both. */
+#study-workspace[data-view="question"] #study-progress,
+#study-workspace[data-view="question"] .study-session h2,
+#study-workspace[data-view="question"] #study-next,
+#study-workspace[data-view="map"] #study-terminal-slot {
+  display: none;
+}
+#study-workspace[data-view="question"] {
+  padding-top: 24px;
+}
+#study-workspace[data-view="question"] .study-workspace-toolbar {
+  margin-bottom: 12px;
+}
+/* With the heading and the start button gone, the session card holds only
+   status lines; it takes no room while they are empty. */
+#study-workspace[data-view="question"] .study-session {
+  margin: 0 auto 12px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+#study-workspace[data-view="question"]
+  .study-actions:not(:has(button:not([hidden]):not(#study-next))) {
+  display: none;
 }
 .study-label {
   color: var(--muted);

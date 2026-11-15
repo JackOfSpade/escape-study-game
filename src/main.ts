@@ -641,7 +641,10 @@ function showPauseHome(focus?: HTMLElement) {
 }
 function openPanel(id: string, focus: string) {
   const menu = $<HTMLDialogElement>("#pause-menu");
-  if (!menu.open) setPaused(true);
+  if (!menu.open) {
+    if (game.studyWorkspace?.enabled) studyMenu(true);
+    else setPaused(true);
+  }
   showPauseHome();
   pausePanel = id;
   $("#pause-home").hidden = true;
@@ -730,7 +733,8 @@ function setPaused(paused: boolean) {
 }
 $("#pause-toggle").onclick = () =>
   setPaused(!$<HTMLDialogElement>("#pause-menu").open);
-$("#resume-game").onclick = () => setPaused(false);
+$("#resume-game").onclick = () =>
+  game.studyWorkspace?.enabled ? studyMenu(false) : setPaused(false);
 $("#restart-game").onclick = () => void fresh($("#pause-save-status"));
 $("#generate-run").onclick = () => void newGame($("#pause-save-status"));
 $("#save-quit").onclick = () => void saveAndQuit();
@@ -738,10 +742,23 @@ $("#pause-menu").addEventListener("cancel", (event) => {
   event.preventDefault();
   if (restarting) return;
   if (pausePanel) closePanel(pausePanel);
+  else if (game.studyWorkspace?.enabled) studyMenu(false);
   else setPaused(false);
 });
+/**
+ * The app is a learning workspace. The escape game is archived: its code
+ * stays in the repository and its browser tests still run, but only a build
+ * made with VITE_ARCHIVED_GAME=1 can reach it. No control in the interface
+ * leads to it.
+ */
+const STUDY_APP = import.meta.env.VITE_ARCHIVED_GAME !== "1";
+/** What the question's conversation partner is called. */
+const TUTOR = STUDY_APP ? "Tutor" : "Terminal AI";
+document.documentElement.classList.toggle("study-app", STUDY_APP);
 function setStudyMode(enabled: boolean) {
   if (saveRecoveryError) return;
+  // The workspace is the whole app: there is nothing to exit to.
+  if (!enabled && STUDY_APP) return;
   firstPersonControls.release();
   keys.clear();
   jumpRequested = false;
@@ -808,6 +825,31 @@ function renderStudyWorkspace() {
 $("#study-only-toggle").onclick = () => setStudyMode(true);
 $("#study-only-menu").onclick = () => setStudyMode(true);
 $("#study-only-exit").onclick = () => setStudyMode(false);
+/** When the workspace menu last closed: the Escape that closed it through the
+ * dialog's own cancel event must not open it again as a keydown. */
+let studyMenuClosedAt = -Infinity;
+/** The workspace menu: settings and nothing of the archived game. */
+function studyMenu(open: boolean) {
+  const menu = $<HTMLDialogElement>("#pause-menu");
+  showPauseHome();
+  if (!open) {
+    if (menu.open) menu.close();
+    studyMenuClosedAt = performance.now();
+    return;
+  }
+  setText("#pause-eyebrow", "LEARNING WORKSPACE");
+  setText("#pause-title", "Menu");
+  setText("#resume-game", "Close · Esc");
+  if (!menu.open) menu.showModal();
+  $("#settings-toggle").focus();
+}
+$("#study-menu").onclick = () => studyMenu(true);
+if (STUDY_APP) {
+  setText("#settings-title", "Settings");
+  setText("#pause-back", "← Back to menu");
+  $("#pause-back").setAttribute("aria-label", "Back to menu");
+  setText("#display-scale-label", "Text size");
+}
 $("#study-save-retry").onclick = () => void saveStudySession();
 $("#study-next").onclick = async () => {
   if (studyStarting) return;
@@ -2101,7 +2143,9 @@ function syncReplyPause(time: number) {
 function renderRevealGate(e: Encounter) {
   setText(
     "#terminal-type",
-    `${e.mode === "shared" ? "LINKED ROOM · ONE WORKSPACE" : e.questionRoom ? "ROOM QUESTION · PRIVATE ANSWER" : "INDIVIDUAL STATION"} / QUESTION READY`,
+    STUDY_APP
+      ? "QUESTION READY"
+      : `${e.mode === "shared" ? "LINKED ROOM · ONE WORKSPACE" : e.questionRoom ? "ROOM QUESTION · PRIVATE ANSWER" : "INDIVIDUAL STATION"} / QUESTION READY`,
   );
   setText("#problem-title", "Your question is ready");
   setText(
@@ -2153,14 +2197,13 @@ function renderTerminal(force = false) {
   }
   composer.disabled = false;
   tab = terminalChannel(e);
-  setText(
-    "#conversation-title",
-    tab === "tutor" ? "Terminal AI" : "Group chat",
-  );
+  setText("#conversation-title", tab === "tutor" ? TUTOR : "Group chat");
   setText(
     "#conversation-context",
     tab === "tutor"
-      ? "Answer and reason here. Terminal AI assumes you already know this and asks one focused question at a time; a good answer can also settle the prerequisites it genuinely depends on. If you do not know something, say so: the gap is recorded for later study and the key is still granted. Access and a key are awarded when it marks the conversation complete."
+      ? STUDY_APP
+        ? "Answer and reason here. Your tutor assumes you already know this and asks one focused question at a time; a good answer can also settle the prerequisites it genuinely depends on. If you do not know something, say so: the gap is recorded for later study."
+        : "Answer and reason here. Terminal AI assumes you already know this and asks one focused question at a time; a good answer can also settle the prerequisites it genuinely depends on. If you do not know something, say so: the gap is recorded for later study and the key is still granted. Access and a key are awarded when it marks the conversation complete."
       : "Discuss with your group. They can read the current answer draft. Chatting does not submit it.",
   );
   setText(
@@ -2181,12 +2224,14 @@ function renderTerminal(force = false) {
     e.state === "consumed"
       ? `${
           conceded.length
-            ? `Solved with a recorded gap · personal access and key awarded. Recorded for later study: ${conceded.map((r) => r.facet.description).join("; ")}.`
-            : "Solved · personal access and key awarded."
+            ? `Solved with a recorded gap${STUDY_APP ? "" : " · personal access and key awarded"}. Recorded for later study: ${conceded.map((r) => r.facet.description).join("; ")}.`
+            : STUDY_APP
+              ? "Solved."
+              : "Solved · personal access and key awarded."
         } You can keep discussing the question.${probeLine ? ` ${probeLine}.` : ""}`
       : probeLine
-        ? `Knowledge probe · ${probeLine}. Say so if you do not know something; the gap is recorded and the key still granted.`
-        : "Work through the question with Terminal AI. Your answers stay in this conversation.",
+        ? `Knowledge probe · ${probeLine}. Say so if you do not know something; the gap is recorded${STUDY_APP ? "" : " and the key still granted"}.`
+        : `Work through the question with ${STUDY_APP ? "your tutor" : "Terminal AI"}. Your answers stay in this conversation.`,
   );
   if (force || document.activeElement !== composer)
     composer.value = e.chatDraft ?? "";
@@ -2195,13 +2240,17 @@ function renderTerminal(force = false) {
   $("#submission-help").hidden = dialogue;
   $("#chat-input").setAttribute(
     "aria-label",
-    dialogue ? "Message Terminal AI" : "Message",
+    dialogue
+      ? `Message ${STUDY_APP ? "your tutor" : "Terminal AI"}`
+      : "Message",
   );
   editor.dataset.mode = e.problem?.runtime ? "code" : "text";
   presentProblem(game, e, roadmap);
   setText(
     "#terminal-type",
-    `${e.mode === "shared" ? "LINKED ROOM · ONE WORKSPACE" : e.questionRoom ? "ROOM QUESTION · PRIVATE ANSWER" : "INDIVIDUAL STATION"} / ${e.reward === "loot" ? "EQUIPMENT CACHE" : "PERSONAL STAIR ACCESS"}`,
+    STUDY_APP
+      ? "QUESTION"
+      : `${e.mode === "shared" ? "LINKED ROOM · ONE WORKSPACE" : e.questionRoom ? "ROOM QUESTION · PRIVATE ANSWER" : "INDIVIDUAL STATION"} / ${e.reward === "loot" ? "EQUIPMENT CACHE" : "PERSONAL STAIR ACCESS"}`,
   );
   setText(
     "#problem-title",
@@ -2561,7 +2610,7 @@ function renderTerminal(force = false) {
           .filter(Boolean)
           .map(
             (text) =>
-              `<div class="message tutor"><strong>Terminal AI</strong><div class="message-body">${markdownToHtml(text!)}</div></div>`,
+              `<div class="message tutor"><strong>${TUTOR}</strong><div class="message-body">${markdownToHtml(text!)}</div></div>`,
           )
           .join("")
       : "");
@@ -2991,7 +3040,8 @@ $("#display-scale").oninput = () => {
 $("#display-scale").onchange = () => void persist();
 $("#settings-toggle").onclick = () => {
   syncDisplayScale();
-  if ($("#settings").hidden) openPanel("settings", "#volume");
+  if ($("#settings").hidden)
+    openPanel("settings", STUDY_APP ? "#settings-career-focus" : "#volume");
   else closePanel("settings");
   $<HTMLInputElement>("#volume").value = String(game.settings.volume);
   $<HTMLInputElement>("#captions").checked = game.settings.captions;
@@ -3114,7 +3164,21 @@ function moveInput(held: ReadonlySet<string>) {
 }
 window.addEventListener("keydown", (ev) => {
   // Study view never reveals the game through Escape or gameplay shortcuts.
-  if (game.studyWorkspace?.enabled) return;
+  if (game.studyWorkspace?.enabled) {
+    // In the workspace app Escape opens its own menu (the dialog's cancel
+    // event closes it again).
+    if (
+      STUDY_APP &&
+      ev.code === "Escape" &&
+      !ev.repeat &&
+      !$<HTMLDialogElement>("#pause-menu").open &&
+      performance.now() - studyMenuClosedAt > 200
+    ) {
+      ev.preventDefault();
+      studyMenu(true);
+    }
+    return;
+  }
   // Let the design modal own its keyboard, including native Escape dismissal.
   if (document.querySelector<HTMLDialogElement>("#run-design-dialog")?.open)
     return;
@@ -3847,6 +3911,8 @@ let restoreStudyView = !!game.studyWorkspace?.enabled;
 try {
   restoreStudyView ||= localStorage.getItem(STUDY_VIEW_KEY) === "1";
 } catch {}
+// The workspace app always opens in the workspace, whatever was saved.
+restoreStudyView ||= STUDY_APP && !saveRecoveryError;
 if (restoreStudyView) setStudyMode(true);
 else if (game.paused) setPaused(true);
 if (!restoreStudyView && spectating(game)) {
@@ -3951,5 +4017,5 @@ ui();
 requestAnimationFrame(frame);
 {
   const playtest = new URLSearchParams(location.search).get("playtest");
-  if (playtest) void startPlaytest(playtest);
+  if (playtest && !STUDY_APP) void startPlaytest(playtest);
 }

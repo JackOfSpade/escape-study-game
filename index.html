@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#101b1d" />
-    <title>zombie-escape-study-game</title>
+    <title>Learning workspace</title>
     <script>
       try {
         if (localStorage.getItem("learning-workspace-view-v1") === "1") {
@@ -18,8 +18,10 @@
         background: #11151d;
         color-scheme: dark;
       }
+      /* The workspace has its own menu in the same dialog, so the dialog is
+         hidden only while it is closed. */
       html.study-only .game-layout,
-      html.study-only #pause-menu {
+      html.study-only #pause-menu:not([open]) {
         display: none !important;
       }
     </style>

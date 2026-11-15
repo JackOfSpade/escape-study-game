@@ -1415,18 +1415,14 @@ body.reduced * {
   min-width: 0;
   max-width: 100%;
 }
-/* An open question gets its own screen below the map. */
-#study-terminal-slot:has(#terminal:not([hidden])) {
-  margin-top: 30vh;
-  min-height: var(--view-height);
-  scroll-margin-top: 0;
-}
+/* An open question takes the place of the map (study-workspace.css), so the
+   slot needs no screen of its own below it. */
 #study-terminal-slot #terminal {
   position: static;
   width: 100%;
   max-width: 100%;
   height: auto;
-  min-height: calc(var(--view-height) - 32px);
+  min-height: calc(var(--view-height) - 150px);
   margin: 0;
   overflow-x: hidden;
 }
@@ -1731,4 +1727,16 @@ body.epilogue-open .world-top {
 }
 .gender-actions button {
   flex: 1 1 160px;
+}
+
+/* The app is a learning workspace: controls of the archived game are never
+   shown, and workspace-only controls appear only there. */
+.study-app .game-only {
+  display: none !important;
+}
+.study-app-only {
+  display: none !important;
+}
+.study-app .study-app-only {
+  display: revert !important;
 }

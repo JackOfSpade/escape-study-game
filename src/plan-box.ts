@@ -27,6 +27,7 @@ export function planable(game: Game | undefined): boolean {
     !!game &&
     !!game.escape &&
     game.status === "playing" &&
+    !game.studyWorkspace?.enabled &&
     !game.paused &&
     !game.escape.planPending
   );

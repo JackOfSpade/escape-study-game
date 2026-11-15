@@ -275,7 +275,11 @@
 <section id="study-workspace" aria-label="Learning workspace" hidden>
   <div class="study-workspace-inner">
     <div class="study-workspace-toolbar">
-      <button id="study-only-exit" class="quiet">Exit study view</button>
+      <button id="study-only-exit" class="quiet game-only">
+        Exit study view
+      </button>
+      <button id="study-map-peek" class="quiet" hidden>Skill map</button>
+      <button id="study-menu" class="quiet study-app-only">Menu · Esc</button>
     </div>
     <div id="study-progress" class="study-progress"></div>
     <section class="study-session" aria-labelledby="study-session-title">
@@ -298,10 +302,10 @@
 </section>
 <dialog id="pause-menu" aria-labelledby="pause-title">
   <div id="pause-home">
-    <span class="eyebrow">ZOMBIE ESCAPE</span>
+    <span class="eyebrow" id="pause-eyebrow">ZOMBIE ESCAPE</span>
     <h2 id="pause-title">Game paused</h2>
     <button id="resume-game">Resume · Esc</button>
-    <button id="study-only-menu" class="quiet">Study only</button>
+    <button id="study-only-menu" class="quiet game-only">Study only</button>
     <button
       id="settings-toggle"
       class="quiet"
@@ -310,14 +314,17 @@
     >
       Settings
     </button>
-    <button id="restart-game" class="quiet">
+    <button id="restart-game" class="quiet game-only">
       Restart run · keep learning progress
     </button>
-    <button id="generate-run" class="quiet">
+    <button id="generate-run" class="quiet game-only">
       New game · a new building and a new catastrophe
     </button>
-    <button id="save-quit" class="quiet">Save and quit</button>
-    <section class="pause-controls" aria-labelledby="pause-controls-title">
+    <button id="save-quit" class="quiet game-only">Save and quit</button>
+    <section
+      class="pause-controls game-only"
+      aria-labelledby="pause-controls-title"
+    >
       <span class="eyebrow" id="pause-controls-title">CONTROLS</span>
       <ul class="controls">
         <li><kbd>WASD</kbd> move</li>
@@ -341,7 +348,7 @@
         Inspect ↗
       </button>
       <button id="save-button" class="quiet">Save run</button>
-      <p>
+      <p class="game-only">
         <a href="/lab.html" target="_blank" rel="noopener">Open Test Lab ↗</a>
       </p>
       <div class="menu-connection">
@@ -386,14 +393,14 @@
         <option value="full">Full original curriculum</option>
       </select>
       <p id="settings-career-summary" class="muted"></p>
-      <label for="game-view">Game view</label>
-      <select id="game-view">
+      <label for="game-view" class="game-only">Game view</label>
+      <select id="game-view" class="game-only">
         <option value="first-person">First person · mouse look</option>
         <option value="top-down">Classic · top down</option>
       </select>
       <label class="display-size" for="display-scale">
         <span
-          >Game and text size
+          ><span id="display-scale-label">Game and text size</span>
           <output id="display-scale-value" for="display-scale"
             >100%</output
           ></span
@@ -407,38 +414,40 @@
           value="100"
         />
       </label>
-      <p id="audio-status" class="muted"></p>
-      <label
+      <p id="audio-status" class="muted game-only"></p>
+      <label class="game-only"
         >Sound level
         <input id="volume" type="range" min="0" max="1" step="0.05" /></label
-      ><label
+      ><label class="game-only"
         ><input id="captions" type="checkbox" /> Surge visual cues & sound
         captions</label
-      ><label
+      ><label class="game-only"
         ><input id="npc-voices" type="checkbox" /> NPC voices
         (computer-generated)</label
       >
-      <p id="npc-voice-status" class="muted">
+      <p id="npc-voice-status" class="muted game-only">
         Brief contextual speech. Voice clips are discarded after use.
       </p>
-      <p class="muted">
+      <p class="muted game-only">
         NPC lines are written by your AI connection. Clips stay temporary on
         this computer.
       </p>
-      <label><input id="reduced" type="checkbox" /> Reduced motion</label>
-      <label
+      <label class="game-only"
+        ><input id="reduced" type="checkbox" /> Reduced motion</label
+      >
+      <label class="game-only"
         ><input id="pass-all-doors" type="checkbox" /> Dev: pass all
         doors</label
       >
-      <p class="muted">
+      <p class="muted game-only">
         Playtesting only. You pass every locked door and staircase without a key
         or credential. NPCs and zombies are unaffected.
       </p>
       <details id="study-connection-settings">
         <summary>Study connection</summary>
         <p>
-          Study questions, tutoring and NPC voices run through Claude CLI on
-          this computer. It must be installed and signed in.
+          Study questions and tutoring run through Claude CLI on this computer.
+          It must be installed and signed in.
         </p>
         <button id="reconnect" class="quiet">Recheck study connection</button>
       </details>

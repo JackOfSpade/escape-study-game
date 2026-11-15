@@ -32,6 +32,11 @@ const ARRAY_FIELDS = {
   // Its reply is structured output: the schema, not the prose, declares the
   // behaviours, phases and omens arrays (tests/catastrophe-schema.test.ts).
   "escape-catastrophe": {},
+  "escape-plan": {
+    steps: /steps is a JSON array of 1 to 6 entries/,
+  },
+  // The truth sheet is an object of objects; it has no array field.
+  "escape-truth": {},
 };
 
 const describedArrays = (contract) =>
