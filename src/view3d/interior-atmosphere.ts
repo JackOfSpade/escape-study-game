@@ -29,7 +29,7 @@ import {
   regionAt,
   type InteriorLighting,
 } from "../interior-lighting";
-import { CONFIG, type Floor, type Furniture, type Game } from "../model";
+import { roofIndexOf, type Floor, type Furniture, type Game } from "../model";
 import type { Site } from "../site";
 import { FLOOR_HEIGHT } from "../stair-route";
 import { playerCanSee } from "../visibility";
@@ -912,7 +912,7 @@ export class InteriorAtmosphere {
   ) {
     const player = game.survivors[0],
       enabled =
-        floor.index < CONFIG.floors &&
+        floor.index < roofIndexOf(floor) &&
         (!!regionAt(active.plan, player)?.site ||
           !outsideBuilding(floor, player.x, player.y)),
       range = FIXTURE_RANGE - 0.5,
@@ -981,7 +981,7 @@ export class InteriorAtmosphere {
   private updateDust(game: Game, floor: Floor, lit: boolean) {
     this.dust.visible =
       lit &&
-      floor.index < CONFIG.floors &&
+      floor.index < roofIndexOf(floor) &&
       !outsideBuilding(floor, game.survivors[0].x, game.survivors[0].y);
     if (!this.dust.visible) return;
     const a = game.survivors[0],

@@ -8,7 +8,7 @@ import {
   type Floor,
   type Game,
   type Point,
-  CONFIG,
+  roofIndexOf,
   distance,
   furnitureName,
 } from "./model";
@@ -529,7 +529,7 @@ function lightingObservation(g: Game, a: Actor) {
         a.x < row.left ||
         a.x >= row.right);
   // An open site has no ceilings to light: its ground layer is outdoors too.
-  if (outside || floor.open === true || floor.index >= CONFIG.floors)
+  if (outside || floor.open === true || floor.index >= roofIndexOf(floor))
     return {
       key: "exterior",
       text: "You are outside the building's ceiling-light circuits.",

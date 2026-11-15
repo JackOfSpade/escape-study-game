@@ -1,3 +1,5 @@
+import { coreRect, coreReserved } from "./stair-core";
+import { HELIPAD, HELIPAD_RADIUS } from "./model";
 import { ensureDoor } from "./doors";
 import type { Furniture } from "./model";
 import { type Floor, type Game, type Point, type Station, H, W } from "./model";
@@ -60,6 +62,8 @@ function reservedCells(f: Floor): Point[] {
     out: Point[] = [];
   for (let y = b.bottom - 3; y < b.bottom; y++)
     for (let x = 18; x <= 25; x++) out.push({ x, y });
+  // Interior stairs: the core and the apron beyond each landing.
+  if (f.stairCore) return [...out, ...coreReserved(f.stairCore)];
   for (let y = b.top; y < b.top + 3; y++)
     for (let x = 19; x <= 24; x++) out.push({ x, y });
   for (const kind of ["up", "down"] as const)
@@ -194,6 +198,30 @@ export function freePlanLayout(g: Game, f: Floor) {
     main.field!.exit = false;
   }
   const reserved = new Set(reservedCells(f).map((p) => key(p.x, p.y)));
+  if (f.stairCore) {
+    // The core is the same on every storey, so it is judged once.
+    const c = f.stairCore,
+      cells = coreReserved(c);
+    if (f.index === 0) {
+      if (cells.some((p) => !insideShell(p.x, p.y)))
+        problems.push(
+          `stairs at ${c.x},${c.y} do not fit: the core is 4 cells wide and 9 long and needs 3 open cells beyond each end, all inside the building (x ${X0}..${X1 - 3}, y ${b.top + 3}..${b.bottom - 12})`,
+        );
+      if (cells.some((p) => p.y >= b.bottom - 3 && p.x >= 18 && p.x <= 25))
+        problems.push("stairs cover the entrance lane: move them aside");
+      const rect = coreRect(c);
+      if (
+        Math.hypot(
+          Math.max(rect.x1 - HELIPAD.x, 0, HELIPAD.x - rect.x2 - 1),
+          Math.max(rect.y1 - HELIPAD.y, 0, HELIPAD.y - rect.y2 - 1),
+        ) <
+        HELIPAD_RADIUS + 1
+      )
+        problems.push(
+          `stairs at ${c.x},${c.y} come up through the roof pickup pad (centre ${HELIPAD.x},${HELIPAD.y}, radius ${HELIPAD_RADIUS}): move them at least a cell clear of it`,
+        );
+    }
+  }
   const interiors = rooms.map(interiorOf);
   rooms.forEach((room, i) => {
     const r = interiors[i];
@@ -223,7 +251,9 @@ export function freePlanLayout(g: Game, f: Floor) {
       for (let x = r.x1 - 1; x <= r.x2 + 1; x++)
         if (reserved.has(key(x, y))) {
           problems.push(
-            `${label(room, i)} covers the entrance lane or a stair approach near ${x},${y}: keep x 18..25 of the three southmost rows and x 19..24 of the three northmost rows open`,
+            f.stairCore
+              ? `${label(room, i)} covers the entrance lane or the stairs near ${x},${y}: keep x 18..25 of the three southmost rows open, and the stair core with 3 cells beyond each of its ends`
+              : `${label(room, i)} covers the entrance lane or a stair approach near ${x},${y}: keep x 18..25 of the three southmost rows and x 19..24 of the three northmost rows open`,
           );
           y = r.y2 + 2;
           break;
@@ -398,6 +428,8 @@ function reachErrors(f: Floor): string[] {
     rooms = freeRooms(f);
   if (!seen[key(Math.floor(f.stairs.x), Math.floor(f.stairs.y))])
     errors.push("the stairs cannot be reached from the entrance");
+  if (f.index > 0 && !seen[key(Math.floor(f.entry.x), Math.floor(f.entry.y))])
+    errors.push("the stair landing people arrive on is sealed off");
   rooms.forEach((room, i) => {
     const r = interiorOf(room);
     let open = 0,

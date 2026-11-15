@@ -1,3 +1,4 @@
+import { type FloorCore, coreFlight, floorCores } from "./stair-core";
 import type { Actor, Game, Point } from "./model";
 import { START_SITE, sitesOf, type Site } from "./site";
 import type { StairTravel } from "./stair-travel";
@@ -24,6 +25,19 @@ export interface CityStairBase extends Point {
 
 function segmentLength(a: StairRoutePoint, b: StairRoutePoint) {
   return Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
+}
+
+/** The interior stair core of a site on a level, if it climbs by one. */
+export function siteCore(
+  g: Pick<Game, "floors">,
+  site: Pick<Site, "id">,
+  level: number,
+): FloorCore | undefined {
+  const floor = g.floors[level];
+  if (!floor) return undefined;
+  return floorCores(floor).find((core) =>
+    site.id === START_SITE ? core.site === undefined : core.site === site.id,
+  );
 }
 
 /** The site a stored flight belongs to; the start building when unrecorded. */
@@ -61,7 +75,26 @@ export function buildStairRoute(g: Game, travel: StairTravel): StairRoute {
     highY = upper.index * FLOOR_HEIGHT,
     low = down ? travel.destination : travel.origin,
     high = down ? travel.origin : travel.destination,
-    canonical: StairRoutePoint[] = [
+    core = siteCore(g, site, lower.index);
+  if (core) {
+    // An interior flight: from the lower landing straight up the treads to
+    // the landing of the level above.
+    const flight = coreFlight(core, lower.index - core.ground),
+      points: StairRoutePoint[] = [
+        { x: low.x, y: lowY, z: low.y },
+        { x: flight.start.x, y: lowY, z: flight.start.y },
+        { x: flight.end.x, y: highY, z: flight.end.y },
+        { x: high.x, y: highY, z: high.y },
+      ];
+    if (down) points.reverse();
+    return {
+      points,
+      length: points
+        .slice(1)
+        .reduce((sum, p, i) => sum + segmentLength(points[i], p), 0),
+    };
+  }
+  const canonical: StairRoutePoint[] = [
       { x: low.x, y: lowY, z: low.y },
       { x: stairs.x, y: lowY, z: north },
       { x: east, y: lowY, z: north },
@@ -93,7 +126,9 @@ export function buildStairRoute(g: Game, travel: StairTravel): StairRoute {
 export function cityStairBase(g: Game): CityStairBase | undefined {
   const lower = g.floors[0],
     upper = g.floors[1];
-  if (!lower?.city || !lower.boundary || !upper) return undefined;
+  // Interior stairs have no flight standing on the ground outside.
+  if (!lower?.city || !lower.boundary || !upper || lower.stairCore)
+    return undefined;
   const route = buildStairRoute(g, {
       fromFloor: 0,
       toFloor: 1,

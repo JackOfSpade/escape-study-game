@@ -658,12 +658,23 @@ function parseBlueprint(v, provisional = false) {
       ...(Object.hasOwn(v, "mainDoor") ? ["mainDoor"] : []),
       ...(Object.hasOwn(v, "titleCard") ? ["titleCard"] : []),
       ...(v3 && Object.hasOwn(v, "setting") ? ["setting"] : []),
+      ...(v4 ? ["stairs"] : []),
       ...(v3
         ? ["relationships", ...(!provisional ? ["environment"] : [])]
         : []),
     ],
     "design",
   );
+  if (v4 && v.stairs !== null) {
+    // An interior stair core; null keeps wall wells and the outside stair.
+    object(v.stairs, ["x", "y"], "stairs");
+    number(v.stairs.x, 0, 43, "stairs.x", true);
+    number(v.stairs.y, 0, 33, "stairs.y", true);
+    requireThat(
+      v.setting?.form !== "open",
+      "stairs: an open site is one ground level and has no stairs",
+    );
+  }
   if (Object.hasOwn(v, "mainDoor")) parseDoorDesign(v.mainDoor, "mainDoor");
   if (Object.hasOwn(v, "titleCard")) parseTitleCard(v.titleCard, "titleCard");
   requireThat(
@@ -712,84 +723,91 @@ function parseBlueprint(v, provisional = false) {
   number(b.shoulder, b.top + 8, b.top + 14, "footprint.shoulder", true);
   // An open site is one ground-level plan; an enclosed building keeps four.
   const floorCount = siteForm === "open" ? 1 : 4;
-  array(v.floors, floorCount, floorCount, "floors", (f, p) => {
-    if (v4) return parseFreeFloor(f, furnitureNames, p);
-    object(
-      f,
-      [
-        "name",
-        "family",
-        "roomOrder",
-        "layoutSeed",
-        "roomTypes",
-        "subroomKinds",
-        "furnitureDensity",
-        "fieldQuotas",
-        "power",
-        ...(!v3 ? ["stories"] : []),
-        "brokenGuard",
-        ...(v.version >= 2 ? ["scene"] : []),
-        ...(Object.hasOwn(f, "doors") ? ["doors"] : []),
-        ...(v3 && Object.hasOwn(f, "roomShapes") ? ["roomShapes"] : []),
-        ...(v3 && Object.hasOwn(f, "hall") ? ["hall"] : []),
-      ],
-      p,
-    );
-    if (Object.hasOwn(f, "doors"))
-      array(f.doors, 4, 4, `${p}.doors`, (d, q) => parseDoorDesign(d, q));
-    text(f.name, 48, `${p}.name`);
-    choice(f.family, ["stack", "columns", "serpentine"], `${p}.family`);
-    array(f.roomOrder, 3, 3, `${p}.roomOrder`, (n, q) =>
-      choice(n, [0, 1, 3], q),
-    );
-    requireThat(
-      new Set(f.roomOrder).size === 3,
-      `${p}.roomOrder must be a permutation of [0,1,3]`,
-    );
-    uint(f.layoutSeed, `${p}.layoutSeed`);
-    array(f.roomTypes, 4, 4, `${p}.roomTypes`, (x, q) =>
-      choice(x, roomTypes, q),
-    );
-    array(f.subroomKinds, 1, 4, `${p}.subroomKinds`, (x, q) =>
-      choice(x, ["office", "meeting", "storage", "break"], q),
-    );
-    requireThat(
-      new Set(f.subroomKinds).size === f.subroomKinds.length,
-      `${p}.subroomKinds must be unique`,
-    );
-    number(f.furnitureDensity, 0.5, 1.5, `${p}.furnitureDensity`);
-    array(f.fieldQuotas, 4, 4, `${p}.fieldQuotas`, (n, q) =>
-      number(n, 2, 6, q, true),
-    );
-    array(f.power, 4, 4, `${p}.power`, (x, q) =>
-      choice(x, ["lit", "dim", "outage"], q),
-    );
-    requireThat(
-      f.power[2] === "lit",
-      `${p}.power[2] must keep the free study hall lit`,
-    );
-    if (!v3)
-      array(f.stories, 6, 6, `${p}.stories`, (s, q) => {
-        object(s, ["title", "lines"], q);
-        text(s.title, 36, `${q}.title`);
-        array(s.lines, 1, 4, `${q}.lines`, (line, r) => text(line, 50, r));
-      });
-    object(f.brokenGuard, ["segment", "bay"], `${p}.brokenGuard`);
-    choice(f.brokenGuard.segment, [3, 4], `${p}.brokenGuard.segment`);
-    choice(f.brokenGuard.bay, [1, 2], `${p}.brokenGuard.bay`);
-    if (Object.hasOwn(f, "roomShapes"))
-      array(f.roomShapes, 4, 4, `${p}.roomShapes`, (shape, q) =>
-        choice(shape, ROOM_SHAPES, q),
+  // A drawn building (version 4) has as many storeys as the place has.
+  array(
+    v.floors,
+    v4 && siteForm === "enclosed" ? 1 : floorCount,
+    floorCount,
+    "floors",
+    (f, p) => {
+      if (v4) return parseFreeFloor(f, furnitureNames, p);
+      object(
+        f,
+        [
+          "name",
+          "family",
+          "roomOrder",
+          "layoutSeed",
+          "roomTypes",
+          "subroomKinds",
+          "furnitureDensity",
+          "fieldQuotas",
+          "power",
+          ...(!v3 ? ["stories"] : []),
+          "brokenGuard",
+          ...(v.version >= 2 ? ["scene"] : []),
+          ...(Object.hasOwn(f, "doors") ? ["doors"] : []),
+          ...(v3 && Object.hasOwn(f, "roomShapes") ? ["roomShapes"] : []),
+          ...(v3 && Object.hasOwn(f, "hall") ? ["hall"] : []),
+        ],
+        p,
       );
-    // Optional so older saved designs stay valid; null means no hall.
-    if (Object.hasOwn(f, "hall") && f.hall !== null) {
+      if (Object.hasOwn(f, "doors"))
+        array(f.doors, 4, 4, `${p}.doors`, (d, q) => parseDoorDesign(d, q));
+      text(f.name, 48, `${p}.name`);
+      choice(f.family, ["stack", "columns", "serpentine"], `${p}.family`);
+      array(f.roomOrder, 3, 3, `${p}.roomOrder`, (n, q) =>
+        choice(n, [0, 1, 3], q),
+      );
       requireThat(
-        siteForm === "enclosed",
-        `${p}.hall: only an enclosed building has hall rooms`,
+        new Set(f.roomOrder).size === 3,
+        `${p}.roomOrder must be a permutation of [0,1,3]`,
       );
-      parseHall(f.hall, f.roomOrder, `${p}.hall`);
-    }
-  });
+      uint(f.layoutSeed, `${p}.layoutSeed`);
+      array(f.roomTypes, 4, 4, `${p}.roomTypes`, (x, q) =>
+        choice(x, roomTypes, q),
+      );
+      array(f.subroomKinds, 1, 4, `${p}.subroomKinds`, (x, q) =>
+        choice(x, ["office", "meeting", "storage", "break"], q),
+      );
+      requireThat(
+        new Set(f.subroomKinds).size === f.subroomKinds.length,
+        `${p}.subroomKinds must be unique`,
+      );
+      number(f.furnitureDensity, 0.5, 1.5, `${p}.furnitureDensity`);
+      array(f.fieldQuotas, 4, 4, `${p}.fieldQuotas`, (n, q) =>
+        number(n, 2, 6, q, true),
+      );
+      array(f.power, 4, 4, `${p}.power`, (x, q) =>
+        choice(x, ["lit", "dim", "outage"], q),
+      );
+      requireThat(
+        f.power[2] === "lit",
+        `${p}.power[2] must keep the free study hall lit`,
+      );
+      if (!v3)
+        array(f.stories, 6, 6, `${p}.stories`, (s, q) => {
+          object(s, ["title", "lines"], q);
+          text(s.title, 36, `${q}.title`);
+          array(s.lines, 1, 4, `${q}.lines`, (line, r) => text(line, 50, r));
+        });
+      object(f.brokenGuard, ["segment", "bay"], `${p}.brokenGuard`);
+      choice(f.brokenGuard.segment, [3, 4], `${p}.brokenGuard.segment`);
+      choice(f.brokenGuard.bay, [1, 2], `${p}.brokenGuard.bay`);
+      if (Object.hasOwn(f, "roomShapes"))
+        array(f.roomShapes, 4, 4, `${p}.roomShapes`, (shape, q) =>
+          choice(shape, ROOM_SHAPES, q),
+        );
+      // Optional so older saved designs stay valid; null means no hall.
+      if (Object.hasOwn(f, "hall") && f.hall !== null) {
+        requireThat(
+          siteForm === "enclosed",
+          `${p}.hall: only an enclosed building has hall rooms`,
+        );
+        parseHall(f.hall, f.roomOrder, `${p}.hall`);
+      }
+    },
+  );
   text(v.roofName, 48, "roofName");
   array(v.roster, 19, 19, "roster", (a, p) => {
     object(a, ["name", "role", "skill", "risk", "social"], p);
@@ -1399,8 +1417,8 @@ export function parseSavedRunDesign(v) {
 
 const range = ([low, high]) => `${low}..${high}`;
 /** How a version 4 structure draws its floors. */
-export const DRAWN_FLOOR_GUIDANCE = `DRAWN FLOORS (version 4). You draw every storey of the place yourself; nothing about its plan is a template. floors:exactly4 for an enclosed site (ground floor first) and exactly1 for an open one, each {name(1-48),furnitureDensity:0.5..1.5,concourse:{pattern,filler},rooms:${range(FREE_PLAN_LIMITS.rooms)} Room,scene}. A storey is seen from above on a grid of 1 m cells: x grows east and y grows south, the main entrance is in the middle of the south wall and the stairs are in the middle of the north wall. With footprint width W and top T, a room's interior must keep x>=23-W/2, x+w-1<=20+W/2, y>=T+1 and y+h-1<=26; a shaped footprint cuts its corners or sides further and whatever falls outside the shell is simply solid. Everything you do not cover with a room is the concourse: the open floor that joins the entrance to the stairs and to the rooms (a foyer, aisle, cloister, deck, street, yard). Draw the rooms this place really has, at the sizes they would really be: a few large rooms and some small ones, never four equal departments. Room:{name(1-40) what the room is called in this place,pattern,filler,x,y,w,h:integers giving the room's interior (walls are added around it) with w and h ${range(FREE_PLAN_LIMITS.size)},shape:${ROOM_SHAPES.join("|")} how its corners are carved,power:lit|dim|outage,doors:${range(FREE_PLAN_LIMITS.doors)} {side:n|s|e|w,at:0..1 position along that wall,door:null for an open doorway (an arch, a gap, a curtain line) or a DoorDesign (described below) for a hinged door that people open and close by hand and that stays where it is left} each a doorway two cells wide; give real rooms real doors that suit them (a glass foyer door, a steel plant-room door, a wooden office door) and leave wide public openings open,work:integer${range(FREE_PLAN_LIMITS.work)} study work points in this room,hall:null|HallFeatures}. Leave at least one cell between two rooms' interiors: exactly one cell is a shared wall that a door can pass through into the next room, and a wider gap is concourse and must be at least two cells wide to be a passage. Keep x18..25 of rows 25..27 (the entrance lane) and x19..24 of rows T..T+2 (the stair approach) free of rooms and their walls. A door must face the concourse or a room exactly one wall cell away, and every room must be reachable from the entrance through doors; the engine reports each room that is not. Work points are this place's own work stations, styled by setting.terminal; a floor needs ${range(FREE_PLAN_LIMITS.floorWork)} in total across its rooms and each needs about 2 m of clear floor, so a 4 by 4 room holds one. pattern says how the engine arranges that room's filler in the space your scene furniture leaves: rows (rows of the list's seat facing one wall: an auditorium, chapel, classroom, waiting hall), clusters (several work positions, each the first piece with its seat: workshops, labs, desks, benches), counter (one main counter or console with seating before it: reception, bar, ticket office, control desk), lounge (tables with seats around them: mess, cafe, common room), table (one large table ringed with seats: council, dining, briefing), shelving (pieces lining the walls with a few loose in the middle: stores, archive, larder, armoury), display (free-standing pieces with room to walk around each: gallery, showroom, museum, garden), bays (the first piece repeated along the walls, each with its seat: dormitory, ward, stalls, cells, lockers), desk (one desk with its seat and storage: office, booth, study) or open (left empty for your scene furniture alone). filler:${range(FREE_PLAN_LIMITS.filler)} names, each a built-in furniture kind or the id of one of setting.objects, the room's signature piece first; a seat-role object in the list is what people sit on, a divider-role object separates clusters; open needs no filler, every other pattern needs at least one name. Compose the furniture this place would have as setting.objects and list it here; a room furnished with office desks and printers reads as an office. HallFeatures, for a room at least 8 cells on its shorter side that is a real hall (auditorium, star theatre, nave, hangar, arena, court, engine hall, pool): {focus:n|s|e|w the wall the hall faces (its stage, screen, altar or pulpit side),seating:rows|none (rows fills it with rows of the filler's seat facing the focus, whatever the pattern),stage:null|{depth:integer${range(HALL_LIMITS.stage.depth)} metres of flat stage along the focus wall,height:${range(HALL_LIMITS.stage.height)} m},rake:${range(HALL_LIMITS.rake)} m the floor rises from the foot of the stage to the far wall (0 is flat),pit:null|{width:integer${range(HALL_LIMITS.pit.width)},length:integer${range(HALL_LIMITS.pit.length)},drop:${range(HALL_LIMITS.pit.drop)} m} a sunken area in front of the stage,platforms:0..${HALL_LIMITS.platforms} of {side:n|s|e|w,width:integer${range(HALL_LIMITS.platform.width)} along that wall,depth:integer${range(HALL_LIMITS.platform.depth)},height:${range(HALL_LIMITS.platform.height)} m}}. A hall has a 3.4 m ceiling; the engine cuts every level change into 30 cm steps that everyone can walk and keeps the floor flat beside each door. Use hall features wherever the premise has a big room. scene:{version:2,rooms:one entry per drawn room, in any order, with room:that room's index in rooms (0 for the first)}; each scene room is otherwise as described under the scene layout below and furnishes that drawn room, and the concourse takes no scene furniture.`;
-export const RUN_DESIGN_GUIDANCE = `${qualityGuidance()}\n\nThe exact captured request selects both version and phase. For request.version:2/designVersion:3/phase:structure, return exactly {requestId,structure:{version:4,...}}. A version 4 structure uses the structural fields described below for version 3 with two differences: every floors[] entry is a floor you draw yourself, as described under DRAWN FLOORS (it has none of family, roomOrder, layoutSeed, roomTypes, subroomKinds, fieldQuotas, power, brokenGuard, roomShapes, hall, doors or stories), and setting.venue is custom with setting.filler null, because each room lists its own furniture. OMIT exterior.streetLabels. Include relationships:1..24 {from:exact roster name,to:another exact roster name,kind:colleague|friend|relative|mentor|rival,detail:1..120}; one relationship per person pair. Every floor scene has version:2 with the scene layout below, but OMIT furniture.label and prop.label/text. Room title/description and exterior names remain thematic context for later writing. This first phase creates geometry and cast only; never include environment or content. Structure≤100000 UTF-8 bytes. The engine constructs an isolated candidate, then requests content for its exact physical surfaces. \n${DRAWN_FLOOR_GUIDANCE}\nFor phase:content, follow the following separate content contract instead of returning any structural fields:\n${ENVIRONMENT_GUIDANCE}\n
+export const DRAWN_FLOOR_GUIDANCE = `DRAWN FLOORS (version 4). You draw every storey of the place yourself; nothing about its plan is a template. floors:1..4 for an enclosed site, ground floor first, as many storeys as this place really has (a chapel, hangar or bathhouse has one; a lighthouse or tenement four), and exactly1 for an open one, each {name(1-48),furnitureDensity:0.5..1.5,concourse:{pattern,filler},rooms:${range(FREE_PLAN_LIMITS.rooms)} Room,scene}. A storey is seen from above on a grid of 1 m cells: x grows east and y grows south, the main entrance is in the middle of the south wall and the stairs are in the middle of the north wall. With footprint width W and top T, a room's interior must keep x>=23-W/2, x+w-1<=20+W/2, y>=T+1 and y+h-1<=26; a shaped footprint cuts its corners or sides further and whatever falls outside the shell is simply solid. Everything you do not cover with a room is the concourse: the open floor that joins the entrance to the stairs and to the rooms (a foyer, aisle, cloister, deck, street, yard). Draw the rooms this place really has, at the sizes they would really be: a few large rooms and some small ones, never four equal departments. Room:{name(1-40) what the room is called in this place,pattern,filler,x,y,w,h:integers giving the room's interior (walls are added around it) with w and h ${range(FREE_PLAN_LIMITS.size)},shape:${ROOM_SHAPES.join("|")} how its corners are carved,power:lit|dim|outage,doors:${range(FREE_PLAN_LIMITS.doors)} {side:n|s|e|w,at:0..1 position along that wall,door:null for an open doorway (an arch, a gap, a curtain line) or a DoorDesign (described below) for a hinged door that people open and close by hand and that stays where it is left} each a doorway two cells wide; give real rooms real doors that suit them (a glass foyer door, a steel plant-room door, a wooden office door) and leave wide public openings open,work:integer${range(FREE_PLAN_LIMITS.work)} study work points in this room,hall:null|HallFeatures}. Leave at least one cell between two rooms' interiors: exactly one cell is a shared wall that a door can pass through into the next room, and a wider gap is concourse and must be at least two cells wide to be a passage. Keep x18..25 of rows 25..27 (the entrance lane) and x19..24 of rows T..T+2 (the stair approach) free of rooms and their walls. A door must face the concourse or a room exactly one wall cell away, and every room must be reachable from the entrance through doors; the engine reports each room that is not. Work points are this place's own work stations, styled by setting.terminal; a floor needs ${range(FREE_PLAN_LIMITS.floorWork)} in total across its rooms and each needs about 2 m of clear floor, so a 4 by 4 room holds one. pattern says how the engine arranges that room's filler in the space your scene furniture leaves: rows (rows of the list's seat facing one wall: an auditorium, chapel, classroom, waiting hall), clusters (several work positions, each the first piece with its seat: workshops, labs, desks, benches), counter (one main counter or console with seating before it: reception, bar, ticket office, control desk), lounge (tables with seats around them: mess, cafe, common room), table (one large table ringed with seats: council, dining, briefing), shelving (pieces lining the walls with a few loose in the middle: stores, archive, larder, armoury), display (free-standing pieces with room to walk around each: gallery, showroom, museum, garden), bays (the first piece repeated along the walls, each with its seat: dormitory, ward, stalls, cells, lockers), desk (one desk with its seat and storage: office, booth, study) or open (left empty for your scene furniture alone). filler:${range(FREE_PLAN_LIMITS.filler)} names, each a built-in furniture kind or the id of one of setting.objects, the room's signature piece first; a seat-role object in the list is what people sit on, a divider-role object separates clusters; open needs no filler, every other pattern needs at least one name. Compose the furniture this place would have as setting.objects and list it here; a room furnished with office desks and printers reads as an office. HallFeatures, for a room at least 8 cells on its shorter side that is a real hall (auditorium, star theatre, nave, hangar, arena, court, engine hall, pool): {focus:n|s|e|w the wall the hall faces (its stage, screen, altar or pulpit side),seating:rows|none (rows fills it with rows of the filler's seat facing the focus, whatever the pattern),stage:null|{depth:integer${range(HALL_LIMITS.stage.depth)} metres of flat stage along the focus wall,height:${range(HALL_LIMITS.stage.height)} m},rake:${range(HALL_LIMITS.rake)} m the floor rises from the foot of the stage to the far wall (0 is flat),pit:null|{width:integer${range(HALL_LIMITS.pit.width)},length:integer${range(HALL_LIMITS.pit.length)},drop:${range(HALL_LIMITS.pit.drop)} m} a sunken area in front of the stage,platforms:0..${HALL_LIMITS.platforms} of {side:n|s|e|w,width:integer${range(HALL_LIMITS.platform.width)} along that wall,depth:integer${range(HALL_LIMITS.platform.depth)},height:${range(HALL_LIMITS.platform.height)} m}}. A hall has a 3.4 m ceiling; the engine cuts every level change into 30 cm steps that everyone can walk and keeps the floor flat beside each door. Use hall features wherever the premise has a big room. STAIRS. stairs (top level of the structure): null, or {x,y} placing one interior stair core for the whole building. The core is 4 cells wide (x..x+3) and 9 long north to south (y..y+8), the same cells on every storey and on the roof: a landing 2 cells deep at each end with two flights between them, so people climb one flight, turn on the landing and climb the next. It needs 3 open cells of concourse beyond each end (rows y-3..y-1 and y+9..y+11), all inside the building, clear of every room and its walls on every floor, clear of the entrance lane, and at least a cell clear of the roof pickup pad (centre 21.5,10.5, radius 2.8). Put it where this place would have its stairs: beside the foyer, in a corner tower, at the end of a wing; with stairs set, every row of the storey is free for rooms except the entrance lane and the core. null instead gives a stair well in the middle of the north wall and one in the south wall joined by an outside stair on the east face, a fire-escape look that suits few places; then keep x19..24 of rows T..T+2 free as described above. An open site has stairs:null. scene:{version:2,rooms:one entry per drawn room, in any order, with room:that room's index in rooms (0 for the first)}; each scene room is otherwise as described under the scene layout below and furnishes that drawn room, and the concourse takes no scene furniture.`;
+export const RUN_DESIGN_GUIDANCE = `${qualityGuidance()}\n\nThe exact captured request selects both version and phase. For request.version:2/designVersion:3/phase:structure, return exactly {requestId,structure:{version:4,...}}. A version 4 structure uses the structural fields described below for version 3 with two differences: every floors[] entry is a floor you draw yourself, as described under DRAWN FLOORS (it has none of family, roomOrder, layoutSeed, roomTypes, subroomKinds, fieldQuotas, power, brokenGuard, roomShapes, hall, doors or stories), and setting.venue is custom with setting.filler null, because each room lists its own furniture. A version 4 structure also has stairs at the top level, described under DRAWN FLOORS. OMIT exterior.streetLabels. Include relationships:1..24 {from:exact roster name,to:another exact roster name,kind:colleague|friend|relative|mentor|rival,detail:1..120}; one relationship per person pair. Every floor scene has version:2 with the scene layout below, but OMIT furniture.label and prop.label/text. Room title/description and exterior names remain thematic context for later writing. This first phase creates geometry and cast only; never include environment or content. Structure≤100000 UTF-8 bytes. The engine constructs an isolated candidate, then requests content for its exact physical surfaces. \n${DRAWN_FLOOR_GUIDANCE}\nFor phase:content, follow the following separate content contract instead of returning any structural fields:\n${ENVIRONMENT_GUIDANCE}\n
 The remainder describes the shared structural schema and retained legacy requests. For retained request.version:1, return exactly {requestId:the captured requestId,design:{...}} following its designVersion; never upgrade that request. Design a distinctive fictional building for an escape story as JSON, not a study question. The run opens on an ordinary day in this place, before anything has gone wrong; nobody in it knows what is coming. The building is the specific place the premise is set in (a radio station, clinic, hotel, archive, office and so on): its venue, rooms, furniture, finishes, signage and exterior must all read as that place. Do not output code, HTML, URLs, learner claims or mechanical rule changes. The engine realizes your choices as collision-tested geometry. Give every floor its own coherent purpose and story; tie signs and notes to this cast and premise. Vary actual spatial choices, furnishing, cast, atmosphere and tempo, not only names or random seeds. Recent fictional summaries identify designs to avoid. If repair is supplied, correct all listed failures while retaining the intended theme. Do not conceal an invalid plan or claim validation was performed.
 
 For retained request.version:1 only: If payload.designVersion is 2, return design.version:2 and include the scene objects below. If designVersion is absent, return design.version:1 and OMIT scene on every floor. Never upgrade a retained request or downgrade a version 2 request. Version3 structure requests use the exceptions stated above. setting and the tapered, notched and tee silhouettes belong to version 3 structures only: retained version 1 and 2 designs must omit setting and use rectangle, chamfered, stepped or waisted.

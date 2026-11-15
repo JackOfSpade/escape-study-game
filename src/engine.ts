@@ -1,3 +1,4 @@
+import { roofIndexOf } from "./model";
 import { BARRICADE_ATTACK } from "./barricade-combat";
 import {
   planZombieRoute,
@@ -2932,7 +2933,7 @@ function zombie(
   // a way up, and its upper layers are solid, so nothing climbs there.
   const climb = g.sites?.length
     ? nearestStairMarker(g, z, "up")
-    : z.floor < CONFIG.floors && !isOpenSite(g)
+    : z.floor < roofIndexOf(g.floors[z.floor]) && !isOpenSite(g)
       ? f.stairs
       : undefined;
   if (

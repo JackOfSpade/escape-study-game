@@ -1,3 +1,4 @@
+import { roofIndexOf } from "./model";
 /**
  * Stamping a second building into the shared floors
  * (docs/ESCAPE_REDESIGN.md section 16, phase 2).
@@ -54,6 +55,27 @@ function grow(f: Floor, cols: number, rows: number) {
   while (f.tiles.length < rows) f.tiles.push(new Array(cols).fill(1));
 }
 
+/** A solid world layer above the start building's roof: nothing of the start
+ * site stands on it, so it carries that site's roof index and is never one
+ * of its floors. */
+function blankLayer(g: Game, index: number): Floor {
+  const ground = g.floors[0];
+  return {
+    ...(ground.roof === undefined ? {} : { roof: ground.roof }),
+    ...(ground.setting ? { setting: structuredClone(ground.setting) } : {}),
+    index,
+    tiles: ground.tiles.map((row) => row.map(() => 1)),
+    stations: [],
+    furniture: [],
+    dark: 0,
+    name: ground.name,
+    rooms: [],
+    doors: [],
+    stairs: { ...ground.stairs },
+    entry: { ...ground.entry },
+  };
+}
+
 function shifted<T extends Point | undefined>(p: T, o: Point): T {
   return p ? ({ ...p, x: p.x + o.x, y: p.y + o.y } as T) : p;
 }
@@ -68,6 +90,11 @@ export function stampSite(g: Game, source: Game, opts: StampOptions): Site {
   const floors: number[] = [],
     stairs: Record<number, Point> = {},
     entry: Record<number, Point> = {};
+  // A start building with fewer storeys than this one has fewer world layers:
+  // add solid layers above it so the taller building keeps every storey.
+  if (!open)
+    for (let index = g.floors.length; index < source.floors.length; index++)
+      g.floors.push(blankLayer(g, index));
   for (const f of g.floors) {
     if (open && f.index !== 0) continue;
     const s = source.floors.find((x) => x.index === f.index);
@@ -125,6 +152,18 @@ export function stampSite(g: Game, source: Game, opts: StampOptions): Site {
     }
     for (const p of s.doors ?? [])
       f.doors.push({ ...p, x: p.x + origin.x, y: p.y + origin.y });
+    // The neighbour's interior stair core, in world cells, on each layer.
+    if (s.stairCore)
+      f.cores = [
+        ...(f.cores ?? []),
+        {
+          x: s.stairCore.x + origin.x,
+          y: s.stairCore.y + origin.y,
+          ground: 0,
+          roof: roofIndexOf(s),
+          site: id,
+        },
+      ];
     const up = shifted(s.stairs, origin);
     if (up) stairs[f.index] = up;
     const down = shifted(s.entry, origin);

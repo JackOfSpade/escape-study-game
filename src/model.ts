@@ -468,7 +468,20 @@ export interface ExtractionPoint {
   /** Site id when the point belongs to an extra site rather than the start. */
   site?: string;
 }
+/** The floor index of a building's roof: one above its last storey. Four
+ * storeys unless the design chose fewer (Floor.roof). */
+export const roofIndexOf = (f: Pick<Floor, "roof"> | undefined) =>
+  f?.roof ?? CONFIG.floors;
 export interface Floor {
+  /** Index of this building's roof floor when it is not CONFIG.floors: a
+   * design with fewer than four storeys. Set on every floor of the game. */
+  roof?: number;
+  /** An interior stair core placed by the design (src/stair-core.ts): set on
+   * every floor of the start building. Absent means wall wells and the
+   * outside stair route. */
+  stairCore?: import("./stair-core").StairCore;
+  /** Interior stair cores of stamped neighbouring buildings on this layer. */
+  cores?: import("./stair-core").FloorCore[];
   /** Set on every floor of an open site (src/open-site.ts); absent means the
    * enclosed building this game has always generated. */
   open?: true;

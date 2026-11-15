@@ -1,6 +1,7 @@
+import { coreRect } from "./stair-core";
 import { clearFillerAroundDesks } from "./station-clearance";
 import {
-  CONFIG,
+  roofIndexOf,
   FURNITURE,
   furnitureSpec,
   H,
@@ -1352,8 +1353,9 @@ const ROOMS: OfficeRoomType[] = [
  * random functions. */
 export function pursuitOfficeZones(f: Floor): OfficeZone[] {
   const stages = f.generation?.stages;
-  if (f.index < 4 && f.generation?.sectors) return sectorOfficeZones(f);
-  if (f.index >= 4 || !stages) return [];
+  if (f.index < roofIndexOf(f) && f.generation?.sectors)
+    return sectorOfficeZones(f);
+  if (f.index >= roofIndexOf(f) || !stages) return [];
   const bounds = (y1: number, y2: number) => {
     if (!f.boundary) return { x1: 2, y1, x2: 41, y2 };
     y1 = Math.max(y1, f.boundary.top);
@@ -1396,8 +1398,15 @@ export function fieldClearance(f: Floor): Point[] {
   const lane = Math.min(f.entry.y, 26.5);
   for (let x = f.entry.x - 5; x <= f.entry.x + 5; x++)
     points.push({ x, y: lane }, { x, y: lane + 1 });
+  // An interior stair core: its landings stay clear on every level.
+  if (f.stairCore) {
+    const c = coreRect(f.stairCore);
+    for (let y = c.y1; y <= c.y2; y++)
+      for (let x = c.x1; x <= c.x2; x++)
+        points.push({ x: x + 0.5, y: y + 0.5 });
+  }
   // Nothing may narrow the approach into either staircase.
-  if (f.index < CONFIG.floors) points.push(...stairwellApproach(f, "up"));
+  if (f.index < roofIndexOf(f)) points.push(...stairwellApproach(f, "up"));
   if (f.index > 0) points.push(...stairwellApproach(f, "down"));
   if (f.generation?.sectors) {
     // Version 5: every field cell in either orientation plus two cells in

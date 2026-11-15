@@ -1,3 +1,4 @@
+import { roofIndexOf } from "./model";
 import { canPlace } from "./spatial";
 import {
   type Floor,
@@ -8,7 +9,7 @@ import {
 } from "./model";
 /** Upgrade fresh generated floors only. Restored worlds retain their physical geometry. */
 export function forwardLayout(f: Floor, seed: number) {
-  if (f.index === 4) return;
+  if (f.index >= roofIndexOf(f)) return;
   const random = { rng: (seed ^ Math.imul(f.index + 1, 0x45d9f3b)) >>> 0 };
   const upper = 12 + Math.floor(rand(random) * 3),
     lower = 16 + Math.floor(rand(random) * 2);

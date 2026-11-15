@@ -1,5 +1,6 @@
+import { coreFlight, coreRect, stairHole } from "./stair-core";
 import {
-  CONFIG,
+  roofIndexOf,
   H,
   W,
   rand,
@@ -86,6 +87,20 @@ export function footprintTiles(boundary: BuildingFootprint) {
 export function buildingRoof(f: Floor) {
   if (!f.boundary) return;
   f.tiles = footprintTiles(f.boundary);
+  if (f.stairCore) {
+    // The core's landings open straight onto the roof: no arrival shaft to
+    // screen, and no cover standing in the stair opening.
+    carveStairwells(f);
+    const c = coreRect(f.stairCore);
+    f.furniture = f.furniture.filter(
+      (o) =>
+        o.x < c.x1 - 1.5 ||
+        o.x > c.x2 + 2.5 ||
+        o.y < c.y1 - 1.5 ||
+        o.y > c.y2 + 2.5,
+    );
+    return;
+  }
   const row = f.boundary.rows[22];
   for (let x = row.left; x < row.right; x++)
     if (x < 21 || x > 23) f.tiles[22][x] = 1;
@@ -134,17 +149,41 @@ export function buildingLayoutErrors(g: Game): string[] {
     if (isSolidOpenFloor(f)) continue;
     // Extra sites can add storeys above the start building's roof; those
     // floors carry their own site's layout, not the start site's shell.
-    if (extra.length && f.index > CONFIG.floors) continue;
+    if (extra.length && f.index > roofIndexOf(f)) continue;
     if (JSON.stringify(f.boundary) !== expected) {
       errors.push(`floor ${f.index} has a different building boundary`);
       continue;
     }
-    if (f.entry.x !== 22 && f.index > 0)
+    const core = f.stairCore;
+    if (core) {
+      // Interior stairs: markers on the core's landings, landings open, and
+      // the flight and its opening closed to people on foot.
+      const up = f.index < roofIndexOf(f) && coreFlight(core, f.index).foot,
+        down = f.index > 0 && coreFlight(core, f.index - 1).head;
+      if (up && (f.stairs.x !== up.x || f.stairs.y !== up.y))
+        errors.push(`floor ${f.index} stair foot is misaligned`);
+      if (down && (f.entry.x !== down.x || f.entry.y !== down.y))
+        errors.push(`floor ${f.index} stair head is misaligned`);
+      const rect = coreRect(core);
+      for (let y = rect.y1; y <= rect.y2; y++)
+        for (let x = rect.x1; x <= rect.x2; x++) {
+          const hole = !!stairHole(f, x, y),
+            row = first.rows[y];
+          if (!row || x < row.left || x >= row.right)
+            errors.push(`floor ${f.index} stair core leaves the building`);
+          else if ((f.tiles[y]?.[x] !== 0) !== hole)
+            errors.push(
+              `floor ${f.index} stair core is miscarved at ${x},${y}`,
+            );
+        }
+    }
+    if (!core && f.entry.x !== 22 && f.index > 0)
       errors.push(`floor ${f.index} arrival shaft is misaligned`);
-    if (f.index > 0 && f.entry.y !== first.bottom + 1)
+    if (!core && f.index > 0 && f.entry.y !== first.bottom + 1)
       errors.push(`floor ${f.index} arrival shaft depth is misaligned`);
     if (
-      f.index < CONFIG.floors &&
+      !core &&
+      f.index < roofIndexOf(f) &&
       (f.stairs.x !== 22 || f.stairs.y !== first.top - 1)
     )
       errors.push(`floor ${f.index} ascending shaft is misaligned`);
@@ -156,8 +195,9 @@ export function buildingLayoutErrors(g: Game): string[] {
         const row = first.rows[y];
         const inside = x >= row.left && x < row.right;
         const well =
+          !core &&
           (x === 21 || x === 22) &&
-          ((f.index < CONFIG.floors && y >= first.top - 2 && y < first.top) ||
+          ((f.index < roofIndexOf(f) && y >= first.top - 2 && y < first.top) ||
             (f.index > 0 && y >= first.bottom && y < first.bottom + 2));
         const entrance =
           f.index === 0 &&

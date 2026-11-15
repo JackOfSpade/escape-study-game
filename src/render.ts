@@ -9,7 +9,7 @@ import { human } from "./engine";
 import { localPoint } from "./furniture-geometry";
 import { HoverLabel } from "./hover-label";
 import {
-  CONFIG,
+  roofIndexOf,
   HELIPAD,
   distance,
   type BuildingFootprint,
@@ -30,7 +30,7 @@ import {
   terrainCanvas,
 } from "./office-art";
 import { spectating, type SpectatorView } from "./spectator";
-import { type Stairwell, stairwell } from "./stairwell";
+import { type Stairwell, stairDrawing } from "./stairwell";
 import { playerCanSee, sightRadius, visibilityPolygon } from "./visibility";
 import { stairContactCues } from "./zombie-stairs";
 import { npcSpeechBubble, speechLines } from "./speech-bubbles";
@@ -324,7 +324,7 @@ export function buildingClipRows(floor: Floor): BuildingClipRow[] {
  * its own ground floor (`g.extraction`); a building keeps the rooftop helipad on
  * the top floor. Absent means the floor draws no pad marking at all. */
 export function extractionPad(
-  g: Pick<Game, "extraction" | "helicopter" | "time">,
+  g: Pick<Game, "extraction" | "helicopter" | "time" | "floors">,
   floorIndex: number,
 ): { x: number; y: number; radius: number; rooftop: boolean } | undefined {
   const pad = g.extraction;
@@ -332,7 +332,7 @@ export function extractionPad(
     if (pad.floor !== floorIndex) return undefined;
     return { x: pad.x, y: pad.y, radius: pad.radius, rooftop: false };
   }
-  if (floorIndex !== CONFIG.floors) return undefined;
+  if (floorIndex !== roofIndexOf(g.floors[0])) return undefined;
   return { x: HELIPAD.x, y: HELIPAD.y, radius: 3.8, rooftop: true };
 }
 
@@ -511,8 +511,8 @@ export function render(
       label(`${4 - g.helicopter.passengers.length} SEATS`, HELIPAD.x, 14.7);
     }
   }
-  if (floorIndex !== CONFIG.floors) {
-    const well = stairwell(f, "up");
+  if (floorIndex !== roofIndexOf(f)) {
+    const well = stairDrawing(f, "up");
     if (wellVisible(well)) {
       drawStairs(well);
       if (!spectator && !a.access.includes(a.floor))
@@ -526,7 +526,7 @@ export function render(
     }
   }
   if (floorIndex > 0) {
-    const well = stairwell(f, "down");
+    const well = stairDrawing(f, "down");
     if (wellVisible(well)) drawStairs(well);
   }
   for (const room of f.rooms ?? []) {

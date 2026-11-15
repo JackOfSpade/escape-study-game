@@ -1,3 +1,4 @@
+import { stairHole } from "../stair-core";
 import {
   HALL_CEILING,
   cellLevel,
@@ -44,7 +45,7 @@ import { carvedCells } from "../room-shapes";
 import { cornerWallGeometries } from "./corner-walls";
 import { readStationFacing } from "../spatial";
 import {
-  CONFIG,
+  roofIndexOf,
   type Actor,
   type Floor,
   type Furniture,
@@ -996,7 +997,7 @@ export class FirstPersonView {
       row.map((tile, x) =>
         isPerimeterWall(floor, x, z) ||
         (floor.boundary &&
-          ((floor.index < CONFIG.floors && z < floor.boundary.top) ||
+          ((floor.index < roofIndexOf(floor) && z < floor.boundary.top) ||
             (floor.index > 0 && z >= floor.boundary.bottom)) &&
           x >= 21 &&
           x <= 22)
@@ -1018,6 +1019,12 @@ export class FirstPersonView {
           corner.scale(1, wallHeight / 2.8, 1).translate(0, wallBase, 0);
       boxes.push(...corners);
     }
+    // An interior flight and the opening above it are closed to people on
+    // foot but are not walls: the stair gallery draws the treads and rails.
+    if (floor.stairCore || floor.cores)
+      for (let z = 0; z < interiorTiles.length; z++)
+        for (let x = 0; x < interiorTiles[z].length; x++)
+          if (stairHole(floor, x, z)) interiorTiles[z][x] = 0;
     for (const r of wallRectangles(interiorTiles))
       boxes.push(
         new BoxGeometry(r.w, wallHeight, r.h).translate(
@@ -1069,9 +1076,11 @@ export class FirstPersonView {
     // approaches still need their local floor finish beside the stair deck.
     // Never stack a second nearly coplanar floor over the same outside lane.
     const ownsFinish = (x: number, y: number) =>
-      !floor.boundary ||
-      !outsideBuilding(floor, x + 0.5, y + 0.5) ||
-      (floor.index > 0 && floor.tiles[y][x] === 0);
+      // No floor or ceiling where an interior flight comes up from below.
+      stairHole(floor, x, y) !== "opening" &&
+      (!floor.boundary ||
+        !outsideBuilding(floor, x + 0.5, y + 0.5) ||
+        (floor.index > 0 && floor.tiles[y][x] === 0));
     const surfaceList = (key: string) => {
       let list = surfaces.get(key);
       if (!list) surfaces.set(key, (list = []));
@@ -1111,7 +1120,7 @@ export class FirstPersonView {
         surfaceList(key).push(plane);
         if (
           !open &&
-          floor.index < CONFIG.floors &&
+          floor.index < roofIndexOf(floor) &&
           finish !== "concrete" &&
           finish !== "roof"
         )
@@ -1167,7 +1176,7 @@ export class FirstPersonView {
     const treads: BufferGeometry[] = [];
     for (const kind of ["up", "down"] as const) {
       if (
-        (kind === "up" && floor.index === CONFIG.floors) ||
+        (kind === "up" && floor.index === roofIndexOf(floor)) ||
         (kind === "down" && floor.index === 0)
       )
         continue;
@@ -1191,7 +1200,7 @@ export class FirstPersonView {
     }
     this.addMerged(treads, this.materials.stairs, "stairs", true);
     if (floor.boundary) this.atmosphere.build(floor, this.run?.seed ?? 0);
-    else if (floor.index < CONFIG.floors) this.buildPanels(floor);
+    else if (floor.index < roofIndexOf(floor)) this.buildPanels(floor);
     this.theme = "";
   }
 

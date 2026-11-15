@@ -38,16 +38,16 @@
             "name": "Star Theatre",
             "pattern": "rows",
             "filler": ["star-projector", "theatre-seat", "oxygen-tank"],
-            "x": 6,
+            "x": 12,
             "y": 8,
-            "w": 32,
+            "w": 26,
             "h": 12,
             "shape": "rounded",
             "power": "lit",
             "doors": [
               {
                 "side": "s",
-                "at": 0.5,
+                "at": 0.4,
                 "door": null
               },
               {
@@ -84,10 +84,10 @@
             "name": "Ticket Office",
             "pattern": "desk",
             "filler": ["comms-desk", "officeChair", "sample-freezer"],
-            "x": 7,
+            "x": 10,
             "y": 21,
-            "w": 10,
-            "h": 4,
+            "w": 7,
+            "h": 5,
             "shape": "rect",
             "power": "lit",
             "doors": [
@@ -373,9 +373,9 @@
             "name": "Exhibit Gallery North-West",
             "pattern": "display",
             "filler": ["cryo-pod", "drill-bit", "chair"],
-            "x": 6,
+            "x": 11,
             "y": 8,
-            "w": 13,
+            "w": 9,
             "h": 7,
             "shape": "chamfered",
             "power": "lit",
@@ -393,7 +393,7 @@
                 }
               }
             ],
-            "work": 4,
+            "work": 3,
             "hall": null
           },
           {
@@ -427,9 +427,9 @@
             "name": "Exhibit Gallery South-West",
             "pattern": "bays",
             "filler": ["bunk-pod", "chair", "suit-locker"],
-            "x": 6,
+            "x": 11,
             "y": 19,
-            "w": 10,
+            "w": 6,
             "h": 6,
             "shape": "rect",
             "power": "dim",
@@ -447,7 +447,7 @@
                 }
               }
             ],
-            "work": 2,
+            "work": 1,
             "hall": null
           },
           {
@@ -855,9 +855,9 @@
             "name": "Education Wing North-West",
             "pattern": "display",
             "filler": ["cryo-pod", "drill-bit", "chair"],
-            "x": 6,
+            "x": 11,
             "y": 8,
-            "w": 13,
+            "w": 9,
             "h": 7,
             "shape": "chamfered",
             "power": "lit",
@@ -875,7 +875,7 @@
                 }
               }
             ],
-            "work": 4,
+            "work": 3,
             "hall": null
           },
           {
@@ -909,9 +909,9 @@
             "name": "Education Wing South-West",
             "pattern": "bays",
             "filler": ["bunk-pod", "chair", "suit-locker"],
-            "x": 6,
+            "x": 11,
             "y": 19,
-            "w": 10,
+            "w": 6,
             "h": 6,
             "shape": "rect",
             "power": "dim",
@@ -929,7 +929,7 @@
                 }
               }
             ],
-            "work": 2,
+            "work": 1,
             "hall": null
           },
           {
@@ -1350,9 +1350,9 @@
             "name": "Observatory Offices North-West",
             "pattern": "display",
             "filler": ["cryo-pod", "drill-bit", "chair"],
-            "x": 6,
+            "x": 11,
             "y": 8,
-            "w": 13,
+            "w": 9,
             "h": 7,
             "shape": "chamfered",
             "power": "lit",
@@ -1370,7 +1370,7 @@
                 }
               }
             ],
-            "work": 4,
+            "work": 3,
             "hall": null
           },
           {
@@ -1404,9 +1404,9 @@
             "name": "Observatory Offices South-West",
             "pattern": "bays",
             "filler": ["bunk-pod", "chair", "suit-locker"],
-            "x": 6,
+            "x": 11,
             "y": 19,
-            "w": 10,
+            "w": 6,
             "h": 6,
             "shape": "rect",
             "power": "dim",
@@ -1424,7 +1424,7 @@
                 }
               }
             ],
-            "work": 2,
+            "work": 1,
             "hall": null
           },
           {
@@ -3197,13 +3197,17 @@
           }
         ]
       }
+    },
+    "stairs": {
+      "x": 5,
+      "y": 9
     }
   },
   "entities": [
     {
       "id": "human",
       "kind": "player",
-      "x": 21.5,
+      "x": 27.5,
       "y": 17.5
     }
   ],
@@ -3212,14 +3216,14 @@
       "tick": 1,
       "type": "routeTo",
       "id": "human",
-      "x": 14.5,
+      "x": 20.5,
       "y": 13.5
     },
     {
       "tick": 200,
       "type": "routeTo",
       "id": "human",
-      "x": 7.5,
+      "x": 13.5,
       "y": 13.5
     },
     {

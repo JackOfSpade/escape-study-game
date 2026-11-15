@@ -1,3 +1,5 @@
+import { coreFlight, coreMouth } from "./stair-core";
+import { roofIndexOf } from "./model";
 import { groundLevel, hasLevels } from "./floor-levels";
 import {
   type Actor,
@@ -16,6 +18,7 @@ import {
   buildStairRoute,
   FLOOR_HEIGHT,
   sampleStairRoute,
+  siteCore,
   STAIR_ROUTE_WIDTH,
   travelSite,
 } from "./stair-route";
@@ -164,7 +167,11 @@ export function enterStairs(g: Game, a: Actor, walking = false, input?: Point) {
   if (well === a.stairwell) {
     // A newly unlocked visible portal must work without requiring an unseen
     // step-out/reset. Outbound input also distinguishes this from an arrival.
-    const outbound = well && input && input.y * (well === "up" ? -1 : 1) > 0;
+    // Outbound is into the stairs: north into an ascending wall well, south
+    // into a descending one, and toward the flights from a core's landing.
+    const core = marker && siteCore(g, marker.site, a.floor),
+      toward = core ? -coreMouth(core, marker.at) : well === "up" ? -1 : 1;
+    const outbound = well && input && input.y * toward > 0;
     // Only the start building's climb is gated by personal credentials.
     if (
       !walking ||
@@ -202,7 +209,13 @@ export function beginStairs(g: Game, a: Actor, down = false, walking = false) {
     // Layers share x/y, so a flight stays on this site's own column: its
     // landing on the floor above, its stair head on the floor below.
     at = down ? site.stairs[toFloor] : site.entry[toFloor],
-    destination = at && (down ? { x: at.x, y: at.y + 1 } : { ...at });
+    // A wall well is entered from just inside the room; an interior core's
+    // marker already stands on its landing.
+    destination =
+      at &&
+      (down && !siteCore(g, site, toFloor)
+        ? { x: at.x, y: at.y + 1 }
+        : { ...at });
   if (
     !f ||
     !destination ||
@@ -227,7 +240,12 @@ export function beginStairs(g: Game, a: Actor, down = false, walking = false) {
       fromFloor: a.floor,
       toFloor,
       site: site.id,
-      origin: { x: a.x, y: a.y },
+      // An interior flight starts a metre from its landing marker, so the
+      // marker is the travel's origin: stepping onto the first tread from
+      // anywhere on the landing is still on the stairs.
+      origin: siteCore(g, site, Math.min(a.floor, toFloor))
+        ? { ...marker.at }
+        : { x: a.x, y: a.y },
       destination,
       until: g.time + CONFIG.stairSeconds,
       ...(walking ? { walked: 0 } : {}),
@@ -392,7 +410,7 @@ export function advanceStairs(g: Game, a: Actor) {
   const arrivedIn = stairwellAt(g, a);
   if (arrivedIn) a.stairwell = arrivedIn;
   else delete a.stairwell;
-  const text = `${a.name} reached ${a.floor === CONFIG.floors ? "the rooftop" : `Floor ${a.floor + 1}`}.`;
+  const text = `${a.name} reached ${a.floor === roofIndexOf(g.floors[a.floor]) ? "the rooftop" : `Floor ${a.floor + 1}`}.`;
   event(g, "climb", text, a.floor, a.id);
   if (a.id === "human") g.notice = text;
   return true;
@@ -464,7 +482,10 @@ export function settleElevated(g: Game, a: Actor, surface?: ElevatedSurface) {
   const travel = a.stairTravel;
   const storey = Math.max(
     0,
-    Math.min(CONFIG.floors, Math.floor((body.feet + 0.05) / FLOOR_HEIGHT)),
+    Math.min(
+      g.floors.length - 1,
+      Math.floor((body.feet + 0.05) / FLOOR_HEIGHT),
+    ),
   );
   // A hall's pit lies a little below its storey's slab: a body in it is still
   // on that storey, not the one beneath.
@@ -478,6 +499,32 @@ export function settleElevated(g: Game, a: Actor, surface?: ElevatedSurface) {
   if (travel?.walked !== undefined) {
     projectWalkingProgress(g, a);
     if (!insideFootprint(g.floors[travel.fromFloor], a)) travel.left = true;
+    // An interior flight never leaves the footprint: the walker has left the
+    // starting level once they stand well above or below its floor.
+    const core = siteCore(
+        g,
+        travelSite(g, travel),
+        Math.min(travel.fromFloor, travel.toFloor),
+      ),
+      flight =
+        core &&
+        coreFlight(
+          core,
+          Math.min(travel.fromFloor, travel.toFloor) - core.ground,
+        ).cells,
+      // Still over the treads, where the body may also touch the landing.
+      onFlight =
+        !!flight &&
+        a.x > flight.x1 - 0.3 &&
+        a.x < flight.x2 + 1.3 &&
+        a.y > flight.y1 - 0.3 &&
+        a.y < flight.y2 + 1.3;
+    if (
+      core &&
+      !travel.left &&
+      Math.abs(body.feet - travel.fromFloor * FLOOR_HEIGHT) > 0.45
+    )
+      travel.left = true;
     if (!body.grounded || !surface) return;
     if (surface.kind === "ground") {
       cancelStairs(g, a);
@@ -487,7 +534,7 @@ export function settleElevated(g: Game, a: Actor, surface?: ElevatedSurface) {
     } else if (surface.kind === "plate" && surface.inside) {
       a.floor = surface.floor;
       if (
-        (!travel.left && !inStairwell(a, travel.origin)) ||
+        (!travel.left && !inStairwell(a, travel.origin) && !onFlight) ||
         (travel.left && surface.floor === travel.fromFloor)
       ) {
         cancelStairs(g, a);

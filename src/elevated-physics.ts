@@ -1,3 +1,4 @@
+import { stairHole } from "./stair-core";
 import {
   cellLevel,
   ceilingHeight,
@@ -14,7 +15,7 @@ import {
 } from "./exterior-structure";
 import { fieldPassable } from "./force-fields";
 import {
-  CONFIG,
+  roofIndexOf,
   devPass,
   type Actor,
   type Floor,
@@ -114,11 +115,13 @@ function carvedWell(f: Floor, x: number, y: number) {
   // An open site has no stairwell: its only marker is the ground pad, so no
   // well may be carved through the market's floor plate.
   if (f.open === true) return false;
+  // Interior stairs: the building has no wells in its walls.
+  if (f.stairCore) return false;
   return (
     !!b &&
     x >= 21 &&
     x <= 22 &&
-    ((f.index < CONFIG.floors && y >= b.top - 2 && y < b.top) ||
+    ((f.index < roofIndexOf(f) && y >= b.top - 2 && y < b.top) ||
       (f.index > 0 && y >= b.bottom && y < b.bottom + 2))
   );
 }
@@ -154,7 +157,7 @@ function exteriorRectangles(structure: ExteriorStructure) {
         uy: s.uy,
         halfLength: run / 2,
         halfWidth: s.halfWidth,
-        bottom: s.solidToGround ? 0 : height - DECK_THICKNESS,
+        bottom: s.solidTo ?? (s.solidToGround ? 0 : height - DECK_THICKNESS),
         height,
         kind: "slab",
         floor: Math.round(height / FLOOR_HEIGHT),
@@ -249,6 +252,9 @@ function intervals(
           })
         )
           continue;
+        // An interior flight and the opening above it are neither floor nor
+        // wall: the stair slabs and their guards are the only solids there.
+        if (stairHole(f, x, y)) continue;
         const cell = { x: x + 0.5, y: y + 0.5 },
           inside = insideFootprint(f, cell),
           open = f.tiles[y][x] === 0 || carvedWell(f, x, y);
@@ -266,7 +272,7 @@ function intervals(
           const finish = floorZone(f, x, y),
             ownsFinish = !f.boundary || inside || (f.index > 0 && open);
           if (
-            f.index < CONFIG.floors &&
+            f.index < roofIndexOf(f) &&
             ownsFinish &&
             finish !== "concrete" &&
             finish !== "roof"
@@ -280,7 +286,7 @@ function intervals(
             });
         } else if (inside || perimeterWall(f, x, y)) {
           const height =
-            f.index === CONFIG.floors ? (inside ? 2.8 : 1) : FLOOR_HEIGHT;
+            f.index === roofIndexOf(f) ? (inside ? 2.8 : 1) : FLOOR_HEIGHT;
           result.push({
             kind: "wall",
             bottom: base,
