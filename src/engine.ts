@@ -19,6 +19,7 @@ import { planVault } from "./vault";
 import { recordZombieTrails } from "./blood";
 import {
   DOOR_SWING,
+  closeDoor,
   doorClosingDrive,
   doorClosingMotion,
   doorFrame,
@@ -44,6 +45,8 @@ import {
   rememberPlace,
 } from "./exploration";
 import { furnitureRoute, handlingPositions } from "./fortification";
+import { dailyLifeStep } from "./npc-daily-life";
+import { openEscapeWorld } from "./escape-world";
 import { localPoint, surfacePoint, worldPoint } from "./furniture-geometry";
 import { chooseFurnitureYield } from "./furniture-yield";
 import { canGrip, gripPoint } from "./handling";
@@ -140,6 +143,7 @@ import { zombieStairArrival } from "./zombie-stairs";
 import { sectorAt } from "./floor-plan";
 import { cityApproachTarget, spawnCityReinforcements } from "./city-invasion";
 import { jumpElevated, stepElevated } from "./elevated-physics";
+import { beginGhost, ghostStep, isGhost } from "./ghost";
 export interface Input {
   x: number;
   y: number;
@@ -230,7 +234,7 @@ export function toggleDoor(g: Game, a: Actor, id: string, open?: boolean) {
     !canSee(f, a, doorFrame(door), 1.9, door.id)
   )
     return false;
-  if (open === false) return false;
+  if (!g.escape && open === false) return false;
   if (door.lock) {
     if (doorSideOf(door, a) === door.lock.side) {
       event(
@@ -254,6 +258,32 @@ export function toggleDoor(g: Game, a: Actor, id: string, open?: boolean) {
     );
   }
   if (door.field) return useField(g, a, door);
+  if (g.escape) {
+    // Escape runs: plain doors are worked by hand, never by a field, and a
+    // door only moves in the direction the caller asked for.
+    ensureDoor(door, f);
+    if (door.door?.latched) {
+      if (open === false) return false;
+      if (!unlatchDoor(door)) return true;
+      a.noiseUntil = g.time + 1;
+      a.noiseLevel = 8;
+      event(
+        g,
+        "door",
+        `${a.name} released a door latch. Push to swing it open.`,
+        a.floor,
+        a.id,
+        door.id,
+      );
+      return true;
+    }
+    if (open === true) return false;
+    if (!closeDoor(g, door)) return false;
+    a.noiseUntil = g.time + 1;
+    a.noiseLevel = 8;
+    event(g, "door", `${a.name} closed a door.`, a.floor, a.id, door.id);
+    return true;
+  }
   ensureDoor(door, f); // Closing is a physical push back into the latch.
   if (!unlatchDoor(door)) return true;
 
@@ -1709,7 +1739,10 @@ function npc(g: Game, a: Actor, dt: number) {
         if (n > 1e-6) a.heading = { x: dx / n, y: dy / n };
       },
     };
-    if (socialStep(g, a, dt, motor)) return;
+    if (!socialStep(g, a, dt, motor)) dailyLifeStep(g, a, dt, motor);
+    // Escape NPCs are not competitors: they live an ordinary day and never
+    // reach the legacy brain below (boarding, stations, loot, doors).
+    return;
   }
   // Taking an already available escape wins over retreating from a nearby
   // threat. Boarding still uses the same physical range and atomic seat check.
@@ -2683,6 +2716,7 @@ function zombie(
         actorOnFloor(g, a, z.floor) &&
         a.alive &&
         !a.escaped &&
+        !a.ghost &&
         canSee(f, z, a, sightRange, a.vault?.obstacle),
     )
     .sort((a, b) => distance(a, z) - distance(b, z))[0];
@@ -2707,6 +2741,7 @@ function zombie(
                 actorOnFloor(g, a, z.floor) &&
                 a.alive &&
                 !a.escaped &&
+                !a.ghost &&
                 (a.noiseUntil ?? 0) > g.time &&
                 distance(a, z) < (a.noiseLevel ?? 0),
             )
@@ -3055,6 +3090,11 @@ export function step(
   // not-yet-started runs still freeze it.
   if (!simulationActive(g) || g.paused || !Number.isFinite(dt) || dt <= 0)
     return;
+  // An escape world has plain doors and free stairs. The conversion is
+  // repeated here because a loaded save, a restarted loop and every newly
+  // stamped site are all built with the legacy field doors; it is idempotent
+  // and only scans door furniture.
+  if (g.escape) openEscapeWorld(g);
   // Historical ended saves predate endedAt. Their saved world time is the
   // best available human end time, before spectator advancement resumes.
   if (!humanActive(g)) markEnded(g);
@@ -3106,13 +3146,16 @@ function advanceStep(
       );
     }
   g.effects = g.effects.filter((e) => e.until > g.time);
+  // The human's run is over: from the first ended tick it walks as a ghost.
+  if (g.status === "dead" || g.status === "escaped") beginGhost(g);
   const a = human(g);
   for (const f of g.floors)
     for (const o of f.furniture) {
       o.movers = [];
       if (o.turning > 0) o.turning = Math.max(0, o.turning - dt);
     }
-  // Human input ends with the human's run; the world keeps advancing.
+  // Human input ends with the human's run; the ghost keeps walking and the
+  // world keeps advancing.
   if (humanActive(g) && a.alive && !a.escaped && escortStep(g, a, dt)) {
     // An escort controls the human's movement for this tick.
   } else if (humanActive(g) && a.alive && !a.escaped) {
@@ -3196,6 +3239,9 @@ function advanceStep(
           );
       }
     } else if (!input.grab && !a.grip) delete a.handling;
+  } else if (isGhost(a)) {
+    // The run ended; the player keeps walking through the world as a ghost.
+    ghostStep(g, a, input, dt);
   }
   const thinkingScale = npcThinkingScale(g),
     // Distance detail exists only in a continuous world; a single-building
@@ -3273,7 +3319,11 @@ function advanceStep(
             ) &&
             !g.survivors.some(
               (a) =>
-                a.floor === 0 && a.alive && !a.escaped && distance(a, p) < 0.55,
+                a.floor === 0 &&
+                a.alive &&
+                !a.escaped &&
+                !a.ghost &&
+                distance(a, p) < 0.55,
             ),
         );
         if (!position) break;

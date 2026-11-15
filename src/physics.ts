@@ -54,6 +54,7 @@ const active = (e: Entity) =>
     : actor(e)
       ? e.alive &&
         !e.escaped &&
+        !e.ghost &&
         !e.elevated &&
         e.stairTravel?.walked === undefined
       : e.hp > 0;

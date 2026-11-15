@@ -35,6 +35,7 @@ import {
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { doorFrame } from "../doors";
 import { human } from "../engine";
+import { ghostActive, ghostBody } from "../ghost-view";
 import { doorLeaves, doorSeeThrough, doorStyle } from "../door-style";
 import { fieldAllows } from "../force-fields";
 import { floorSectors, hallSector } from "../floor-plan";
@@ -1462,6 +1463,13 @@ export class FirstPersonView {
           if (playerCanSee(floor, a, actor))
             this.actor(actor, game, palette, a);
         }
+      // The human is never drawn as a walking actor in its own first-person
+      // view, but its ghost leaves a body behind where it died.
+      const body = ghostActive(game) ? ghostBody(game, floor.index) : undefined;
+      if (body && playerCanSee(floor, a, body)) {
+        this.markPresent(a);
+        this.actor(a, game, palette, a, body);
+      }
     }
     for (const zombie of game.zombies)
       if (zombie.floor === floor.index) {
@@ -2592,9 +2600,12 @@ export class FirstPersonView {
     game: Game,
     palette: Palette,
     player: Actor,
+    at?: Point,
   ) {
     const zombie = !("alive" in actor),
-      visual = this.visual(actor, zombie ? "zombie" : "survivor");
+      visual = this.visual(actor, zombie ? "zombie" : "survivor"),
+      // A body lies where it fell rather than where its ghost now walks.
+      origin = at ?? actor;
     if (!visual.parts.length) {
       // Human proportions: 1.75 m overall, 23 cm head, distinct shoulders and hips.
       this.part(visual.parts, 0, 1.19, 0, 0.24, 0.55, 0.46);
@@ -2643,10 +2654,10 @@ export class FirstPersonView {
             "eye",
           );
       }
-      visual.motion = createMotion(actor.x, actor.y, game.time, actor.hp);
+      visual.motion = createMotion(origin.x, origin.y, game.time, actor.hp);
     }
     const motion = visual.motion!;
-    updateMotion(motion, actor.x, actor.y, game.time, actor.hp);
+    updateMotion(motion, origin.x, origin.y, game.time, actor.hp);
     const strike = zombie
         ? zombieStrike(motion, (actor as Zombie).cooldown, game.time)
         : 0,
@@ -2721,9 +2732,9 @@ export class FirstPersonView {
       this.tint.copy(color).lerp(palette.danger, (1 - health) * 0.32);
       this.pools[p.batch].set(
         p.slot,
-        actor.x + x * c - p.z * s,
-        liftOf(this.levelFloor, actor) + y + (dead ? 0 : sway),
-        actor.y + x * s + p.z * c,
+        origin.x + x * c - p.z * s,
+        liftOf(this.levelFloor, origin) + y + (dead ? 0 : sway),
+        origin.y + x * s + p.z * c,
         p.w,
         p.h,
         p.d,

@@ -130,7 +130,7 @@ test("paused games ignore first-person movement without advancing time", () => {
   assert.equal(JSON.stringify(game), before);
 });
 for (const status of ["dead", "escaped"] as const)
-  test(`${status} humans ignore first-person input while the spectator world advances`, () => {
+  test(`${status} humans keep moving as ghosts while the world advances`, () => {
     const game = fixture(),
       player = human(game),
       start = { ...player };
@@ -140,8 +140,10 @@ for (const status of ["dead", "escaped"] as const)
       player.alive = false;
     } else player.escaped = true;
     step(game, TEST_DT, { ...firstPersonInput(0, keys("KeyW")), grab: false });
-    point(player, start);
-    point(player.heading, { x: 0, y: -1 });
+    const along =
+      (player.x - start.x) * player.heading.x +
+      (player.y - start.y) * player.heading.y;
+    assert.ok(along > 0, "the ghost walked along its heading");
     assert.ok(game.time > 0);
   });
 for (const strafing of [false, true])

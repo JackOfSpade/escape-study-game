@@ -109,6 +109,23 @@ export function latchDoor(g: Game, o: Furniture) {
   return true;
 }
 
+/**
+ * Close an unlatched plain door by hand (escape runs only). A leaf that has
+ * swung away is snapped shut through `latchDoor`, which refuses while a body
+ * or barricade sits in the doorway; a leaf that never left its frame (a latch
+ * just released, not yet pushed) goes through the same doorway checks at the
+ * closed pose. Returns false when the door stays as it was.
+ */
+export function closeDoor(g: Game, o: Furniture) {
+  const d = o.door;
+  if (!d || d.latched) return false;
+  if (d.swung) return latchDoor(g, o);
+  d.swung = true;
+  if (latchDoor(g, o)) return true;
+  d.swung = false;
+  return false;
+}
+
 /** Stand on the face that produces torque back toward the closed frame. */
 export function doorClosingMotion(o: Furniture) {
   const d = o.door!,

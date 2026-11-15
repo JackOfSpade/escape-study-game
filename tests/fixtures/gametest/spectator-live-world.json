@@ -9,7 +9,7 @@
   "deleted": [],
   "maps": [],
   "id": "spectator-live-world",
-  "name": "Combat death leaves a live, pausable spectator world",
+  "name": "Combat death leaves a live, pausable world the ghost can walk",
   "entities": [
     {
       "id": "human",
@@ -143,15 +143,15 @@
       "fromTick": 30
     },
     {
-      "name": "Spectator movement input cannot move the dead human",
+      "name": "Movement input walks the ghost after death",
       "mode": "at",
       "query": {
         "type": "property",
         "id": "human",
         "field": "x"
       },
-      "op": "eq",
-      "expected": 3.5,
+      "op": "gte",
+      "expected": 5,
       "tick": 390
     }
   ]

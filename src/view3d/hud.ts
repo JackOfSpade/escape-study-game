@@ -23,7 +23,7 @@ export function interactionPrompt(
     hover?.update(undefined, now);
     return "E · Release grip";
   }
-  if (canBoard(game, a)) {
+  if (!game.escape && canBoard(game, a)) {
     hover?.update(undefined, now);
     return "E · Board helicopter";
   }
@@ -62,6 +62,12 @@ export function interactionPrompt(
     return "E · Open terminal";
   }
   if (door?.field) return accessDoorPrompt(door, a);
+  if (game.escape)
+    return door
+      ? door.door?.latched === false
+        ? "E · Close door"
+        : "E · Open door"
+      : "";
   if (door?.door && !door.door.latched)
     return "Push to swing door · E near handle to grip";
   return door ? "E · Release door latch" : "";
