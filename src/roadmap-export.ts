@@ -80,9 +80,11 @@ function gapLineMap(source: string, track?: string) {
 }
 function replaceBlock(raw: string, name: string, value: string) {
   const old = block(raw, name);
+  // A replacer function keeps "$&", "$'" and "$$" in learner or curriculum text
+  // literal; a replacement string would expand them into the document.
   return raw.replace(
     `<!-- BEGIN ${name} -->${old}<!-- END ${name} -->`,
-    `<!-- BEGIN ${name} -->${value}<!-- END ${name} -->`,
+    () => `<!-- BEGIN ${name} -->${value}<!-- END ${name} -->`,
   );
 }
 const section = (raw: string, heading: string) => {
@@ -130,7 +132,7 @@ function table(raw: string, edit: (cells: string[]) => string[] | undefined) {
 function fields(raw: string, changes: Record<string, string>) {
   const found = new Set<string>();
   const result = table(raw, (c) => {
-    if (!(c[0] in changes)) return;
+    if (!Object.hasOwn(changes, c[0])) return;
     found.add(c[0]);
     return [c[0], changes[c[0]]];
   });

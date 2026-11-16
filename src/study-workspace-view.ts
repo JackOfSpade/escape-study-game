@@ -54,8 +54,6 @@ export function createStudyWorkspaceView(
     chosen = mapPeek.dataset.target === "map" ? "map" : "question";
     render();
   };
-  // Bumped by a reveal so a pending terminal alignment never pulls back down.
-  let alignToken = 0;
   const reducedMotion = () =>
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -256,12 +254,23 @@ export function createStudyWorkspaceView(
     ) {
       const { snapshot } = baseline;
       baseline = undefined;
-      alignToken++;
       reveal?.cancel();
       reveal = playProgressReveal(progress, snapshot, {
         reducedMotion: reducedMotion(),
-        // Deferred so the button is already re-enabled by this render.
-        onDone: () => queueMicrotask(() => next.focus({ preventScroll: true })),
+        // Deferred so the button is already re-enabled by this render. Any
+        // key skips the reveal, so never pull focus out of a visible text
+        // field the learner is typing in (the question stays open to discuss).
+        onDone: () =>
+          queueMicrotask(() => {
+            const active = document.activeElement;
+            const typing =
+              active instanceof HTMLElement &&
+              active.getClientRects().length > 0 &&
+              (active instanceof HTMLTextAreaElement ||
+                active instanceof HTMLInputElement ||
+                active.isContentEditable);
+            if (!typing) next.focus({ preventScroll: true });
+          }),
       });
     }
     // An unfinished open question takes the place of the skill map. The map
@@ -276,7 +285,6 @@ export function createStudyWorkspaceView(
     if (root.dataset.view !== view) {
       root.dataset.view = view;
       // Both views start at the top: nothing is scrolled to any more.
-      alignToken++;
       window.scrollTo({ top: 0, behavior: "auto" });
     }
     mapPeek.hidden = !terminalOpen;

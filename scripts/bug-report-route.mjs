@@ -11,6 +11,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { privateDirectory } from "./lib/private-fs.mjs";
+import { isRecord } from "./lib/is-record.mjs";
 
 /** A learner-filed bug report: what the browser collected plus this computer's
  * service logs, written to one Markdown file. The clipboard only ever carries
@@ -95,7 +96,10 @@ function usageSection(path, limits) {
   for (const line of tail(path, 400_000).split("\n")) {
     if (!line.trim()) continue;
     try {
-      rows.push(JSON.parse(line));
+      // A bare `null` or number is valid JSON but not a usage row; reading a
+      // field of `null` would fail the whole report.
+      const row = JSON.parse(line);
+      if (isRecord(row)) rows.push(row);
     } catch {}
   }
   const recent = rows.slice(-limits.usageRows);
@@ -238,9 +242,7 @@ export function createBugReports({
         throw new HttpInputError(415, "Send the report as JSON");
       const body = await readJsonBody(req, limits.client + 200_000);
       if (
-        !body ||
-        typeof body !== "object" ||
-        Array.isArray(body) ||
+        !isRecord(body) ||
         !["save", "render"].includes(body.mode) ||
         typeof body.description !== "string" ||
         typeof body.client !== "string"

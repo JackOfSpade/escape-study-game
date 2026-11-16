@@ -206,15 +206,20 @@ export async function ensureBridge(options = {}) {
         else reject(Error("Bridge returned an invalid startup response"));
       });
     });
-    child.send({
-      version: 1,
-      directory: o.directory,
-      root: o.root,
-      port: o.port,
-      token: randomBytes(32).toString("hex"),
-      instance: randomBytes(16).toString("hex"),
-    });
+    // If the send below throws, nothing awaits `ready`; its later rejection
+    // (the child's exit) must not surface as an unhandled one.
+    ready.catch(() => {});
     try {
+      // Inside the try so a failed send still clears the startup timer and
+      // stops the child.
+      child.send({
+        version: 1,
+        directory: o.directory,
+        root: o.root,
+        port: o.port,
+        token: randomBytes(32).toString("hex"),
+        instance: randomBytes(16).toString("hex"),
+      });
       await ready;
       const started = record(o);
       verifyRecord(o, started);

@@ -207,6 +207,28 @@ test("a failed preparation is silent and a terminal still generates", async () =
   }
 });
 
+test("a generated question without a contract is rejected as malformed, not as a crash", async () => {
+  const { g, hall } = world();
+  let malformed = true;
+  const fake = await bridge((p) => {
+    const { contract: _contract, ...rest } = problem(p.contract);
+    return Response.json(malformed ? rest : problem(p.contract));
+  });
+  try {
+    await ensureProblem(g, hall, r);
+    assert.equal(hall.problem, undefined);
+    assert.match(hall.error ?? "", /Invalid or out-of-scope generated problem/);
+    assert.doesNotMatch(hall.error ?? "", /TypeError/);
+    assert.ok(hall.pendingGeneration, "the request stays saved for a retry");
+    malformed = false;
+    await ensureProblem(g, hall, r);
+    assert.equal(hall.error, undefined);
+    assert.ok(hall.problem);
+  } finally {
+    await fake.restore();
+  }
+});
+
 test("work waiting on the retired ChatGPT chat is freed for the game's terminal", async () => {
   const { g, hall, other } = world();
   const fake = await bridge((p) => Response.json(problem(p.contract)));

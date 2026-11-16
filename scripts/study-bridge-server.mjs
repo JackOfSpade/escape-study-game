@@ -2,6 +2,7 @@ import { HttpInputError, readJsonBody } from "./http-json.mjs";
 import { createServer } from "node:http";
 import { executionRoute } from "./execution-route.mjs";
 import { AI_OPERATIONS } from "./lib/ai-contracts.mjs";
+import { isRecord } from "./lib/is-record.mjs";
 
 /** Construct the actual loopback relay without launching Vite, for isolated transport verification. */
 export function createStudyBridgeServer({
@@ -70,12 +71,7 @@ export function createStudyBridgeServer({
         claude?.enabled()
       ) {
         const parsed = await readJsonBody(req);
-        if (
-          !parsed ||
-          typeof parsed !== "object" ||
-          Array.isArray(parsed) ||
-          !AI_OPERATIONS.includes(parsed.operation)
-        )
+        if (!isRecord(parsed) || !AI_OPERATIONS.includes(parsed.operation))
           throw new HttpInputError(400, "Unknown operation");
         // A saved request belongs to the provider that captured it.
         if (
@@ -129,6 +125,11 @@ export function createStudyBridgeServer({
       res.writeHead(404);
       res.end(JSON.stringify({ error: "Not found" }));
     } catch (err) {
+      // A route that failed after starting its reply cannot send a second
+      // status line; writeHead would throw from this handler and, as an
+      // unhandled rejection, end the whole relay.
+      if (res.destroyed) return;
+      if (res.headersSent) return void res.destroy();
       res.writeHead(err instanceof HttpInputError ? err.status : 502);
       res.end(JSON.stringify({ error: String(err) }));
     }

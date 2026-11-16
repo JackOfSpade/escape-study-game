@@ -502,3 +502,20 @@ test("a part declared on one turn is sent back with its stored id on the next tu
       ["generating-functions"],
     );
   }));
+
+test("a message whose question context cannot be captured is reported instead of rejecting unhandled", async () =>
+  fixture(async (g, e, calls) => {
+    // The roadmap no longer holds the question's track.
+    const stale: Roadmap = structuredClone(r);
+    delete (stale.tracks as Record<string, unknown>)[e.problem.contract.track];
+    await send(g, e, "tutor", "My answer", stale);
+    assert.equal(calls.length, 0);
+    assert.equal(e.tutor.at(-1).text, "My answer", "the message is kept");
+    assert.match(e.error, /could not be prepared/);
+    assert.ok(!e.tutorRequests?.length, "no request is left pending");
+    // The same conversation carries on once the context can be read again.
+    await send(g, e, "tutor", "My answer again", r);
+    assert.equal(calls.length, 1);
+    assert.equal(e.error, undefined);
+    assert.equal(e.tutor.at(-1).text, "What changes?");
+  }));

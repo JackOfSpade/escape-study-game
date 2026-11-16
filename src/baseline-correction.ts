@@ -47,7 +47,6 @@ export function reviewBaselineCorrections(
           mappings = p.mappings.filter((m) => m.scopeId === id),
           definition = p.definitions.find((d) => d.id === id);
         if (
-          !support.length ||
           !definition ||
           !p.completeScopes.includes(id) ||
           !definition.facets.every((f) =>

@@ -33,7 +33,6 @@ export interface RoadmapReview {
     conflict: boolean;
   }[];
 }
-const protectedNames = ["MERGE_RULES", "PY_CURRICULUM", "PE_CURRICULUM"];
 /** Review only. No text from an uploaded file executes or updates learning state.
  * Ancestry establishes byte lineage, never semantic validity or academic credit. */
 export async function reviewRoadmap(
@@ -85,15 +84,8 @@ export async function reviewRoadmap(
     };
     for (const detail of saved.resume?.issues ?? [])
       report.issues.push({ severity: "review", detail });
-    for (const name of protectedNames) {
-      const key = `${name.toLowerCase()}_sha256`;
-      if ((await sha256(incoming.blocks[name])) !== incoming.field(key))
-        throw Error(`Digest mismatch for ${name}`);
-      if (incoming.blocks[name] !== base.blocks[name])
-        throw Error(
-          `Protected ${name} changed; separate authorized policy migration required`,
-        );
-    }
+    // parseRoadmapDocument has already verified the protected digests and
+    // that the protected blocks equal the bundled source's.
     if (candidateHash === localHash) report.ancestry = "identical";
     else if (
       incoming.field("parent_file_sha256") === localHash &&

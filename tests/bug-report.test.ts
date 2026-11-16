@@ -163,3 +163,23 @@ test("saving writes one private file and copies only its path", async () => {
   // Rendering saves nothing, and only the newest two reports are kept.
   assert.equal(readdirSync(directory).length, 2);
 });
+
+test("a usage log line that is valid JSON but not a row never fails the report", async () => {
+  const scratch = mkdtempSync(join(tmpdir(), "bug-report-usage-"));
+  const usageLog = join(scratch, "usage.jsonl");
+  writeFileSync(
+    usageLog,
+    `null\n7\n[1]\n${JSON.stringify({ at: "t", operation: "tutor", outcome: "accepted", durationMs: 2500 })}\n`,
+  );
+  await withRoute({ usageLog }, async (post) => {
+    const response = await post({
+      mode: "render",
+      description: "",
+      client: "",
+    });
+    assert.equal(response.status, 200);
+    const { markdown } = await response.json();
+    assert.match(markdown, /Newest 1 of the usage log; 0 did not end accepted/);
+    assert.match(markdown, /tutor .*accepted .*2\.5/);
+  });
+});

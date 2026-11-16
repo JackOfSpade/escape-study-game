@@ -83,23 +83,52 @@ async function readJson(r: Response) {
   if (!isRecord(data)) throw Error("Malformed bridge response");
   return data;
 }
+/** One stream line: the final answer, or undefined after a progress line. */
+function streamEvent(line: string, onText: (text: string) => void) {
+  // Blank keep-alive lines carry nothing.
+  if (!line.trim()) return undefined;
+  let event: unknown;
+  try {
+    event = JSON.parse(line);
+  } catch {
+    throw Error("Malformed bridge response");
+  }
+  if (!isRecord(event)) throw Error("Malformed bridge response");
+  if (typeof event.error === "string") throw Error(event.error);
+  if (isRecord(event.answer)) return event.answer;
+  if (typeof event.text === "string")
+    try {
+      onText(event.text);
+    } catch {
+      // Progress is display only: a failed repaint must not cost the answer.
+    }
+  return undefined;
+}
 /** Each line is the text so far, then one final answer or error. */
 async function readStream(r: Response, onText: (text: string) => void) {
-  const reader = r.body!.pipeThrough(new TextDecoderStream()).getReader();
+  if (!r.body) throw Error("Malformed bridge response");
+  const reader = r.body.pipeThrough(new TextDecoderStream()).getReader();
   let buffer = "";
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) throw Error("The reply ended before its answer arrived");
-    buffer += value;
-    let at;
-    while ((at = buffer.indexOf("\n")) >= 0) {
-      const event: unknown = JSON.parse(buffer.slice(0, at));
-      buffer = buffer.slice(at + 1);
-      if (!isRecord(event)) throw Error("Malformed bridge response");
-      if (typeof event.error === "string") throw Error(event.error);
-      if (isRecord(event.answer)) return event.answer;
-      if (typeof event.text === "string") onText(event.text);
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) {
+        // A final line may arrive without its newline.
+        const answer = streamEvent(buffer, onText);
+        if (answer) return answer;
+        throw Error("The reply ended before its answer arrived");
+      }
+      buffer += value;
+      let at;
+      while ((at = buffer.indexOf("\n")) >= 0) {
+        const answer = streamEvent(buffer.slice(0, at), onText);
+        buffer = buffer.slice(at + 1);
+        if (answer) return answer;
+      }
     }
+  } finally {
+    // The answer or an error ends the exchange: never leave the stream open.
+    void reader.cancel().catch(() => {});
   }
 }
 interface BridgeRequestOptions {

@@ -7,6 +7,8 @@
  * byte it does not change is preserved by construction.
  */
 
+import { isRecord } from "./is-record.mjs";
+
 export const ROADMAP_EDIT_LIMITS = Object.freeze({
   maxEdits: 1000,
   maxFindLength: 20_000,
@@ -38,7 +40,7 @@ export function applyRoadmapEdits(local, edits) {
   let text = local;
   edits.forEach((edit, index) => {
     const label = `edits[${index}]`;
-    if (!edit || typeof edit !== "object" || Array.isArray(edit))
+    if (!isRecord(edit))
       throw Error(`${label} must be an object {find,replace}`);
     const { find, replace } = edit;
     if (typeof find !== "string" || !find)
@@ -76,8 +78,7 @@ export function applyRoadmapEdits(local, edits) {
  * `canonical` (older saved requests) or keeps local is returned unchanged.
  */
 export function expandRoadmapReconciliation(local, answer) {
-  if (!answer || typeof answer !== "object" || Array.isArray(answer))
-    return answer;
+  if (!isRecord(answer)) return answer;
   if (answer.outcome === KEEP_LOCAL || !Array.isArray(answer.edits))
     return answer;
   const { edits, ...rest } = answer;

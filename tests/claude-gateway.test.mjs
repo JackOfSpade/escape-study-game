@@ -357,6 +357,49 @@ test("a joined call survives one caller leaving and stops when all have", async 
   assert.equal(calls.length, 1);
 });
 
+test("a retry of a request whose every caller left starts afresh instead of inheriting the cancellation", async () => {
+  // The stopped process takes a moment to exit, as a real one does.
+  const children = [];
+  const spawn = (binary, args) => {
+    const child = new EventEmitter();
+    child.stdout = new PassThrough();
+    child.stderr = new PassThrough();
+    child.stdin = new PassThrough();
+    child.kill = () => {
+      if (child.killed) return;
+      child.killed = true;
+      setTimeout(() => child.emit("close", null), 20);
+    };
+    if (children.push(child) > 1)
+      setImmediate(() => {
+        const model = args[args.indexOf("--model") + 1];
+        child.stdout.write(
+          `${JSON.stringify({ type: "system", subtype: "init", model: `claude-${model}-5-5` })}\n`,
+        );
+        child.stdout.write(
+          `${JSON.stringify({ type: "result", subtype: "success", is_error: false, result: '{"ok":2}' })}\n`,
+        );
+        child.stdout.end();
+        child.emit("close", 0);
+      });
+    return child;
+  };
+  const g = createClaudeGateway({ env, cwd: dir, validate: () => {}, spawn });
+  const payload = { requestId: "reloaded" };
+  const left = new AbortController();
+  const first = g.run("complete", payload, { signal: left.signal });
+  await new Promise((r) => setImmediate(r));
+  left.abort();
+  // The page reloads and asks again before the first process has exited.
+  const retry = g.run("complete", payload);
+  await assert.rejects(first, { code: "CLAUDE_CANCELLED" });
+  assert.deepEqual(await retry, { ok: 2 });
+  assert.equal(children.length, 2);
+  // The stopped call's cleanup left the finished answer reachable by its id.
+  assert.deepEqual(await g.run("complete", payload), { ok: 2 });
+  assert.equal(children.length, 2);
+});
+
 test("a design conversation recovers after a restart or a lost session", async () => {
   const fail = (result) => ({
     result: { type: "result", subtype: "error", is_error: true, result },

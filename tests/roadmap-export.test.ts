@@ -429,3 +429,22 @@ test("roadmap export: preview-only scope generation cannot create a revision; pe
   );
   assert.equal(l.evidence.length, 2);
 });
+
+test("roadmap export: replacement patterns in facet text stay literal instead of expanding into the document", async () => {
+  const { l, issue, assess } = fixture();
+  const e = issue();
+  const description =
+    "Explain shell $$, the quoting forms $' and $`, and the regex token $&";
+  const definition = e.problem!.scopeDefinitions![0];
+  definition.facets[0].description = description;
+  l.scopes[definition.id].facets[0].description = description;
+  assess(e, ["purpose"], false);
+  const saved = await prepareRoadmapExport(r, l, undefined, at);
+  assert.ok(saved.content.includes(description));
+  for (const name of ["SHARED_PROGRESS", "PY_PROGRESS", "PE_PROGRESS"])
+    assert.equal(saved.content.split(`<!-- BEGIN ${name} -->`).length, 2);
+  // Nothing but the projected rows grew: the document was not spliced into itself.
+  assert.ok(saved.content.length < r.raw.length * 1.2);
+  const again = await prepareRoadmapExport(r, l, saved, at);
+  assert.equal(again.hash, saved.hash);
+});

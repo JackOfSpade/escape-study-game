@@ -40,7 +40,8 @@ export function historicalScope(
     if (!/^\| S\d{4}-EV\d+ \|/.test(line)) return false;
     const c = line.split("|").map((s) => s.trim());
     // Exact objective tokens prevent T01.1 matching T01.10 or PE/PY collisions.
-    const ids: string[] = c[4].match(/[TX]\d{2}\.\d+(?!\d)/g) ?? [];
+    // A truncated row has no objective cell; it matches nothing.
+    const ids: string[] = c[4]?.match(/[TX]\d{2}\.\d+(?!\d)/g) ?? [];
     return ids.includes(shortId) && new RegExp(`\\bD${depth}\\b`).test(c[5]);
   });
   return { sourceHash: r.sourceHash, gaps, evidenceRows };

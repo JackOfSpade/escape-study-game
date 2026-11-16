@@ -269,6 +269,8 @@ export async function parseRoadmapDocument(
     tracks,
     sharedProgress: "\n" + parsed.blocks.SHARED_PROGRESS,
   };
+  // Parsed once per track: the retention table below consults it per row.
+  const finals = {} as Record<Track, ReturnType<typeof finalRequirements>>;
   for (const t of ["PY", "PE"] as Track[]) {
     const s = tracks[t],
       other = tracks[t === "PY" ? "PE" : "PY"];
@@ -292,7 +294,7 @@ export async function parseRoadmapDocument(
       !c[1]?.startsWith(`Tier ${s.tier} / ${s.phase}`)
     )
       throw Error(`Shared ${t} dashboard contradicts track state`);
-    const defs = finalRequirements(result, t),
+    const defs = (finals[t] = finalRequirements(result, t)),
       allowed = [
         ...s.rotation,
         ...defs
@@ -388,7 +390,7 @@ export async function parseRoadmapDocument(
       const id = key ? `${key[1]}:${key[2]}` : "",
         depth = Number(key?.[3] ?? key?.[4]),
         o = tracks[t].objectives.find((o) => o.id === id),
-        final = finalRequirements(result, t).find(
+        final = finals[t].find(
           (d) => d.id === id && d.kind !== "environment" && d.selected,
         );
       if (
@@ -427,7 +429,7 @@ export async function parseRoadmapDocument(
     }
     const allowed = [
       ...tracks[t].rotation,
-      ...finalRequirements(result, t)
+      ...finals[t]
         .filter((d) => d.kind === "integration" && d.selected)
         .map((d) => d.name),
     ];

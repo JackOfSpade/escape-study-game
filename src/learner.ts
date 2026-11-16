@@ -84,6 +84,8 @@ export function initialLearner(
     );
   const cells: LearnerLedger["cells"] = {},
     reviews: LearnerLedger["reviews"] = {};
+  // Split the source once, and only when an objective carries a due review.
+  let sourceLines: string[] | undefined;
   for (const track of ["PY", "PE"] as const)
     for (const o of r.tracks[track].objectives) {
       cells[o.id] = {
@@ -95,9 +97,11 @@ export function initialLearner(
       if (o.reviewDue) {
         const ev = /S\d{4}-EV\d+/.exec(o.refs)?.[0],
           session = ev?.split("-")[0];
-        const row = r.raw
-          .split("\n")
-          .find((l) => session && l.startsWith(`| ${session} |`));
+        const row = session
+          ? (sourceLines ??= r.raw.split("\n")).find((l) =>
+              l.startsWith(`| ${session} |`),
+            )
+          : undefined;
         reviews[reviewKey(o.id, 1)] = {
           objectiveId: o.id,
           depth: 1,
@@ -818,6 +822,7 @@ function validateProposal(
     a.evidenceCutoffSequence ??
     e.history.reduce((latest, h) => Math.max(latest, h.seq), 0);
   const scopes = e.problem!.scopeDefinitions ?? [];
+  const sources = assistanceSources(e);
   for (const f of a.findings) {
     const d = f.depth ?? c.depth,
       def = l.scopes[scopeKey(f.objectiveId, d)];
@@ -896,7 +901,7 @@ function validateProposal(
           "An unchanged or unattributed supplied artifact is not independently authored code",
         );
       const latest = evidence.reduce((latest, h) => Math.max(latest, h.seq), 0);
-      for (const m of assistanceSources(e).filter(
+      for (const m of sources.filter(
         (m) =>
           m.kind !== "human" &&
           m.kind !== "system" &&
@@ -957,7 +962,7 @@ function validateProposal(
       );
   }
   for (const help of a.helpAttributions ?? [])
-    if (!assistanceSources(e).some((m) => m.id === help.messageId))
+    if (!sources.some((m) => m.id === help.messageId))
       throw Error("Unknown assistance reference");
 }
 
@@ -1228,22 +1233,13 @@ export function applyLearningAssessment(
       );
     if (complete) {
       setProgressStatus(cell, def.depth, "P");
+      const proofRefs = def.facets.flatMap((f) =>
+        cell.facets[`D${def.depth}:${f.id}`].evidenceIds.filter((ref) =>
+          independentProofValid(r, work, def.objectiveId, def.depth, f.id, ref),
+        ),
+      );
       cell.proofs[String(def.depth)] = [
-        ...new Set([
-          ...(cell.proofs[String(def.depth)] ?? []),
-          ...def.facets.flatMap((f) =>
-            cell.facets[`D${def.depth}:${f.id}`].evidenceIds.filter((ref) =>
-              independentProofValid(
-                r,
-                work,
-                def.objectiveId,
-                def.depth,
-                f.id,
-                ref,
-              ),
-            ),
-          ),
-        ]),
+        ...new Set([...(cell.proofs[String(def.depth)] ?? []), ...proofRefs]),
       ];
       const reviewId = reviewKey(def.objectiveId, def.depth),
         review = work.reviews[reviewId];
@@ -1267,11 +1263,6 @@ export function applyLearningAssessment(
                 ),
             )
           : [];
-      const proofRefs = def.facets.flatMap((f) =>
-        cell.facets[`D${def.depth}:${f.id}`].evidenceIds.filter((ref) =>
-          independentProofValid(r, work, def.objectiveId, def.depth, f.id, ref),
-        ),
-      );
       const actualTimes = work.evidence
         .filter((ev) => proofRefs.includes(ev.id) && ev.observedAt)
         .map((ev) => ev.observedAt!)

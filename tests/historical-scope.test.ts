@@ -101,3 +101,14 @@ test("generated questions cannot replace scheduler review/version or strip histo
     globalThis.fetch = originalFetch;
   }
 });
+
+test("a truncated evidence row matches no scope instead of failing the lookup", () => {
+  const source = structuredClone(r);
+  source.tracks.PY.progress = source.tracks.PY.progress.replace(
+    "### 0.5.1 ",
+    "| S9999-EV01 | S9999-A01 |\n\n### 0.5.1 ",
+  );
+  const scope = historicalScope(source, "PY", "PY:T01.1", 1);
+  assert.ok(scope.evidenceRows.length > 0);
+  assert.ok(!scope.evidenceRows.some((row) => row.includes("S9999-EV01")));
+});

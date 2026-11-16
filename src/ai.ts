@@ -28,6 +28,7 @@ import {
   TERMINAL_DIALOGUE_INSTRUCTION,
 } from "./knowledge-probe";
 import { bridgeRequest as request, status } from "./bridge-client";
+import { isRecord } from "./records";
 export { checkBridge, status, type BridgeStatus } from "./bridge-client";
 import { browserSteps } from "../scripts/browser-runner/spec.mjs";
 import {
@@ -218,6 +219,8 @@ function validateProblem(
     !Array.isArray(p.rubric) ||
     !p.rubric.every((x) => typeof x === "string") ||
     typeof p.starter !== "string" ||
+    // A reply without a contract is malformed, not a property-access crash.
+    !isRecord(p.contract) ||
     (p.runtime &&
       (!["python", "typescript"].includes(p.runtime.language) ||
         p.contract.depth < 2 ||
@@ -415,19 +418,24 @@ export function prepareNextQuestion(g: Game, r: Roadmap) {
   )
     return;
   const provider = activeProvider();
-  let contract: Contract;
+  let contract: Contract, payload: ReturnType<typeof generationPayload>;
+  // This runs on every interface tick: a schedule or ledger that cannot be
+  // read must skip the preparation, never throw into the frame.
   try {
     contract = spawnContract(r, study);
     study.learner ??= initialLearner(r);
     if (!stillSchedulable(r, g, contract)) return;
+    payload = generationPayload(
+      g,
+      r,
+      contract,
+      `gen-${g.id}-prepared-${crypto.randomUUID()}`,
+      "prepared",
+    );
   } catch {
     return;
   }
-  const requestId = `gen-${g.id}-prepared-${crypto.randomUUID()}`;
-  const operation = request<Problem>(
-    "generate",
-    generationPayload(g, r, contract, requestId, "prepared"),
-  )
+  const operation = request<Problem>("generate", payload)
     .then((problem) => {
       // A dropped profile or provider cannot leave its question behind.
       if (g.study !== study || status().mode !== provider) return;
@@ -493,15 +501,14 @@ async function ensureIndividualProblem(g: Game, e: Encounter, r: Roadmap) {
       e.pendingGeneration?.requestId ??
       `gen-${g.id}-${e.id}-${crypto.randomUUID()}`,
     study = g.study,
-    profile = study.profile,
-    native = live(g);
+    profile = study.profile;
   e.generation = generation;
   markGeneration(e, generation, "writing");
   let prepared: ReturnType<typeof takePrepared>,
     regenerate = false;
   try {
     let p: Problem;
-    if (native && !e.studyOnly && !e.pendingGeneration) {
+    if (!e.studyOnly && !e.pendingGeneration) {
       // Arriving during preparation joins that call rather than paying twice.
       if (preparing.get(study)) markGeneration(e, generation, "joining");
       await preparing.get(study);
@@ -511,9 +518,8 @@ async function ensureIndividualProblem(g: Game, e: Encounter, r: Roadmap) {
     }
     if (
       e.pendingGeneration &&
-      (!native ||
-        // Saves from before providers were recorded were ChatGPT handoffs.
-        status().mode !== (e.pendingGeneration.provider ?? "chatgpt-handoff"))
+      // Saves from before providers were recorded were ChatGPT handoffs.
+      status().mode !== (e.pendingGeneration.provider ?? "chatgpt-handoff")
     )
       throw Error(
         "Reconnect the original generation provider to retry this saved question",
@@ -546,10 +552,8 @@ async function ensureIndividualProblem(g: Game, e: Encounter, r: Roadmap) {
       return;
     markGeneration(e, generation, "checking");
     validateProblem(p, e, r, g, contract);
-    if (native) {
-      g.study.learner ??= initialLearner(r);
-      registerScopes(r, g.study.learner, { ...e, problem: p });
-    }
+    g.study.learner ??= initialLearner(r);
+    registerScopes(r, g.study.learner, { ...e, problem: p });
     e.problem = p;
     if (!e.studyOnly) adoptQuestionPacing(g, e.floor, p);
     delete e.error;
@@ -1394,7 +1398,7 @@ export async function send(
     ) {
       const provider = capturedProvider(problem);
       const id = `tutor-${g.id}-${e.id}-${g.seq}`;
-      const payload = {
+      const capture = () => ({
         requestId: id,
         sessionId: `${g.id}/${e.id}/private`,
         ...(e.mode === "solo" && e.state !== "consumed"
@@ -1444,11 +1448,20 @@ export async function send(
         ]
           .filter(Boolean)
           .join("\n\n"),
-      };
+      });
+      let payloadJson: string;
+      try {
+        payloadJson = JSON.stringify(capture());
+      } catch (err) {
+        // The message is recorded; a context that cannot be captured (a track
+        // the roadmap no longer holds, say) is reported, never left unhandled.
+        e.error = `Your message is saved, but its question context could not be prepared. ${String(err)}`;
+        return;
+      }
       (e.tutorRequests ??= []).push({
         id,
         provider,
-        payloadJson: JSON.stringify(payload),
+        payloadJson,
         questionSequence: e.tutor.at(-1)!.seq,
         state: "pending",
       });

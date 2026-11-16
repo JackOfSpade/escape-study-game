@@ -917,10 +917,14 @@ export function createClaudeGateway({
       if (now() - entry.at > 10 * 60_000) finished.delete(k);
     if (key && finished.has(key))
       return Promise.resolve(finished.get(key).answer);
-    const entry = (key && inFlight.get(key)) ?? {
-      cancel: new AbortController(),
-      callers: 0,
-    };
+    const current = key && inFlight.get(key);
+    // A call every caller has left is already being stopped. A retry that
+    // arrives before its process exits starts afresh instead of joining it
+    // and inheriting a cancellation it never asked for.
+    const entry =
+      current && !current.cancel.signal.aborted
+        ? current
+        : { cancel: new AbortController(), callers: 0 };
     entry.callers++;
     const leave = () => {
       if (--entry.callers === 0) entry.cancel.abort();
@@ -939,7 +943,12 @@ export function createClaudeGateway({
     });
     if (key) {
       inFlight.set(key, entry);
-      entry.promise.finally(() => inFlight.delete(key)).catch(() => {});
+      entry.promise
+        .finally(() => {
+          // A stopped call's replacement may already hold this key.
+          if (inFlight.get(key) === entry) inFlight.delete(key);
+        })
+        .catch(() => {});
     }
     return entry.promise;
   }

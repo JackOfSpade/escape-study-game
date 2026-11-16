@@ -369,7 +369,9 @@ export function projectIdentifierCounters(
   } else updated = updated.trimEnd() + "\n\n" + text;
   return raw.replace(
     `<!-- BEGIN SHARED_PROGRESS -->\n${old}<!-- END SHARED_PROGRESS -->`,
-    `<!-- BEGIN SHARED_PROGRESS -->\n${updated}<!-- END SHARED_PROGRESS -->`,
+    // A function, so "$" sequences in saved progress text stay literal.
+    () =>
+      `<!-- BEGIN SHARED_PROGRESS -->\n${updated}<!-- END SHARED_PROGRESS -->`,
   );
 }
 export function attemptDisposition(

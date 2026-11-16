@@ -1,5 +1,5 @@
 import { safeEqual } from "./lib/safe-equal.mjs";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import { dirname, join, resolve } from "node:path";
 import { createClaudeGateway } from "./claude-gateway.mjs";
 import { createStudyBridgeServer } from "./study-bridge-server.mjs";
@@ -98,7 +98,13 @@ export async function startBridgeService(boot, options = {}) {
   async function close() {
     if (closing) return;
     closing = true;
-    await speech.close();
+    // A speech folder that cannot be removed must not leave the listener up:
+    // the owner was already told the service is stopping.
+    await speech
+      .close()
+      .catch((error) =>
+        console.error(`Speech cleanup failed: ${error?.message ?? error}`),
+      );
     server.closeAllConnections();
     server.close(() => process.exit(0));
   }

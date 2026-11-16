@@ -296,7 +296,8 @@ export function curriculumReadiness(
     /^\| G\d+ \|/,
   )
     .filter((c) => {
-      if (c[6].startsWith("CLOSED")) return false;
+      // A truncated row has no status cell: it stays unresolved.
+      if (c[6]?.startsWith("CLOSED")) return false;
       const m = /^([TX]\d{2}\.\d+) \/ D([1-4])$/.exec(c[1]);
       if (!m) return true; // Unknown material scope cannot be silently certified.
       const id = `${track}:${m[1]}`,

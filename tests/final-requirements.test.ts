@@ -176,3 +176,18 @@ test("missing, duplicate or divergent final source records fail visibly", () => 
   l.sourceHash = "divergent";
   assert.throws(() => curriculumReadiness(r, l, "PY"), /source mismatch/);
 });
+
+test("a truncated gap row stays an unresolved gap instead of failing readiness", () => {
+  const source = structuredClone(r);
+  source.tracks.PY.progress = source.tracks.PY.progress.replace(
+    "### 0.7 ",
+    "| G9999 | T01.1 / D1 | truncated |\n\n### 0.7 ",
+  );
+  const report = curriculumReadiness(
+    source,
+    initialLearner(source, "test"),
+    "PY",
+  );
+  assert.ok(report.unresolvedMaterialGaps.includes("PY:G9999"));
+  assert.equal(report.curriculumTargetsMet, false);
+});
