@@ -217,6 +217,29 @@ test("the study terminal takes the wide workspace while the map keeps its readin
   expect(map).not.toBeNull();
   expect(mapPane).not.toBeNull();
   expect(input).not.toBeNull();
+  // The question is never boxed into a short scrolling pane, and an empty
+  // conversation leaves no hole between the heading and the composer.
+  const layout = await page.evaluate(() => {
+    const problem = document.querySelector<HTMLElement>("#problem")!;
+    const panel = document
+      .querySelector(".conversation-panel")!
+      .getBoundingClientRect();
+    const composer = document
+      .querySelector("#chat-form")!
+      .getBoundingClientRect();
+    return {
+      maxHeight: getComputedStyle(problem).maxHeight,
+      clipped: problem.scrollHeight > problem.clientHeight,
+      // Reserved room for messages that do not exist yet.
+      emptyMessages:
+        document.querySelector<HTMLElement>("#messages")!.offsetHeight,
+      slack: panel.bottom - composer.bottom,
+    };
+  });
+  expect(layout.maxHeight).toBe("none");
+  expect(layout.clipped).toBe(false);
+  expect(layout.emptyMessages).toBe(0);
+  expect(layout.slack).toBeLessThan(2);
   // The map keeps a readable measure; the question terminal no longer inherits
   // it, so the conversation and its composer get the rest of the page.
   expect(mapPane!.width).toBeGreaterThan(map!.width + 200);

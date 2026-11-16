@@ -89,6 +89,24 @@ test("headings, bullet and numbered lists, paragraphs and line breaks", () => {
   );
 });
 
+test("blank lines between items keep one list and its numbering", () => {
+  assert.equal(
+    markdownToHtml("1. a\n\n2. b\n\n3. c\n\nafter"),
+    "<ol><li>a</li><li>b</li><li>c</li></ol><p>after</p>",
+  );
+  assert.equal(
+    markdownToHtml("- a\n\n- b\n\n1. c"),
+    "<ul><li>a</li><li>b</li></ul><ol><li>c</li></ol>",
+  );
+});
+
+test("a numbered list resumed after other content keeps its number", () => {
+  assert.equal(
+    markdownToHtml("1. a\n\n```\nx\n```\n\n2. b"),
+    '<ol><li>a</li></ol><pre><code>x</code></pre><ol start="2"><li>b</li></ol>',
+  );
+});
+
 test("paragraph lines keep indentation relative to the shallowest line", () => {
   assert.equal(
     markdownToHtml("for v in vs:\n    if v > 4:\n\tcount += 1"),

@@ -104,10 +104,21 @@ export function markdownToHtml(text: string): string {
         : undefined;
     if (list) {
       const items: string[] = [];
-      for (let m; i < lines.length && (m = list.exec(lines[i])); i++)
-        items.push(`<li>${inline(m[1].trim())}</li>`);
+      const start = list === NUMBERED ? Number(/\d+/.exec(line)![0]) : 1;
+      for (;;) {
+        for (let m; i < lines.length && (m = list.exec(lines[i])); i++)
+          items.push(`<li>${inline(m[1].trim())}</li>`);
+        // Models separate long items with blank lines. That is still one
+        // list: splitting it would restart the numbering at every item.
+        let next = i;
+        while (next < lines.length && !lines[next].trim()) next++;
+        if (next === i || next >= lines.length || !list.test(lines[next]))
+          break;
+        i = next;
+      }
       const tag = list === BULLET ? "ul" : "ol";
-      out.push(`<${tag}>${items.join("")}</${tag}>`);
+      const attrs = tag === "ol" && start !== 1 ? ` start="${start}"` : "";
+      out.push(`<${tag}${attrs}>${items.join("")}</${tag}>`);
       continue;
     }
     const paragraph: string[] = [];
