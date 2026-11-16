@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Build downstream `tutor` and `assess` cases on questions a real `generate`
- * ladder arm produced. The game's real payload builders run against the same
+ * ladder arm produced. The app's real payload builders run against the same
  * stub bridge as build-study-cases.ts, so no network or model is needed.
  *
  * tsx scripts/ai-capture/build-downstream-cases.ts \
@@ -21,7 +21,7 @@ import { assess, checkBridge, edit, send } from "../../src/ai";
 import type {
   Contract,
   Encounter,
-  Game,
+  StudyRecord,
   Problem,
   Roadmap,
 } from "../../src/model";
@@ -105,15 +105,11 @@ export function problemFrom(answer: unknown): Problem {
 }
 
 /**
- * A game and encounter built exactly the way buildTutor/buildAssess build
+ * A record and encounter built exactly the way buildTutor/buildAssess build
  * them, except that the problem is the generated one. The scenario and seed
  * follow the generate case's index, so an arm's cases stay reproducible.
  */
-function encounterForProblem(
-  r: Roadmap,
-  index: number,
-  problem: Problem,
-) {
+function encounterForProblem(r: Roadmap, index: number, problem: Problem) {
   const generated = problem.contract;
   const scenario = scenarioFor(r, generated, index);
   const g = gameFor(20261200 + index, r);
@@ -144,7 +140,7 @@ function encounterForProblem(
  * next. The generated contract wins: bind the learner's next visit to it so
  * the encounter and its captured payload describe one consistent task.
  */
-function bindGeneratedContract(g: Game, generated: Contract) {
+function bindGeneratedContract(g: StudyRecord, generated: Contract) {
   const learner = g.study.learner!;
   learner.studyTurnPosition = generated.track === "PY" ? 0 : 1;
   learner.tracks[generated.track].tier = generated.depth;
@@ -153,7 +149,7 @@ function bindGeneratedContract(g: Game, generated: Contract) {
 }
 
 /** One learner turn through real `send`, captured from the stub bridge. */
-async function captureTutor(g: Game, e: Encounter, r: Roadmap) {
+async function captureTutor(g: StudyRecord, e: Encounter, r: Roadmap) {
   let captured: Record<string, unknown> | undefined;
   await withBridge(
     (operation, payload) => {
@@ -164,7 +160,7 @@ async function captureTutor(g: Game, e: Encounter, r: Roadmap) {
         complete: false,
       };
     },
-    () => send(g, e, "tutor", TUTOR_MESSAGE, r),
+    () => send(g, e, TUTOR_MESSAGE, r),
   );
   if (!captured) throw Error(`Tutor flow did not call the bridge for ${e.id}`);
   return captured;
@@ -172,7 +168,7 @@ async function captureTutor(g: Game, e: Encounter, r: Roadmap) {
 
 /** One honest partial attempt reviewed by the real `assess`, as buildAssess does. */
 async function captureAssess(
-  g: Game,
+  g: StudyRecord,
   e: Encounter,
   r: Roadmap,
   problem: Problem,

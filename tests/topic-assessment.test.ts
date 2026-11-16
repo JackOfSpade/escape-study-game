@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { Contract, Encounter, Game, Roadmap } from "../src/model";
+import type { Contract, Encounter, StudyRecord, Roadmap } from "../src/model";
 import type { RoadmapAdoptionReceipt } from "../src/roadmap-adoption-types";
 import {
   recordTopicAssessments,
@@ -92,7 +92,7 @@ function fixture() {
         continuations: [],
       },
     },
-  } as unknown as Game;
+  } as unknown as StudyRecord;
   const contract: Contract = {
     id: "synthetic-contract",
     track: "PY",
@@ -107,9 +107,7 @@ function fixture() {
   const e: Encounter = {
     id: "synthetic-question",
     runId: g.id,
-    floor: 0,
     mode: "solo",
-    reward: "stairs",
     state: "in-progress",
     problem: {
       title: "Synthetic original task",
@@ -123,14 +121,9 @@ function fixture() {
     revision: 0,
     history: [],
     tutor: [],
-    group: [],
     submissions: [],
     contributors: [],
-    chatCursor: 0,
     chatOpen: false,
-    recentSpeakers: [],
-    npcProgress: 0,
-    loot: [],
     scroll: 0,
     selection: [0, 0],
     directStudy: {
@@ -162,7 +155,7 @@ const old = (topicId: string, depth = 1): TopicAssessmentRecord => ({
 import { readFileSync } from "node:fs";
 import { checkBridge, ensureProblem, presentProblem, send } from "../src/ai";
 import { topicAssessmentTopics } from "../scripts/lib/topic-assessment.mjs";
-import { createPlayableGame } from "../src/world";
+import { createPlayableGame } from "./helpers/record";
 import { preparePracticeRooms } from "./helpers/practice-questions";
 
 const liveRoadmap: Roadmap = JSON.parse(
@@ -198,7 +191,7 @@ async function terminalFixture(
     await checkBridge();
     const g = createPlayableGame(717, liveRoadmap);
     preparePracticeRooms(g, liveRoadmap);
-    const e = g.encounters[g.floors[0].stations[0].encounter];
+    const e = g.encounters["question-0"];
     await ensureProblem(g, e, liveRoadmap);
     e.mode = "solo";
     e.owner = "human";
@@ -217,7 +210,7 @@ async function terminalFixture(
 
 test("a live terminal dialogue payload carries the topic assessment context; development does not", async () => {
   await terminalFixture("live", async (g, e, calls) => {
-    await send(g, e, "tutor", "My first answer", liveRoadmap);
+    await send(g, e, "My first answer", liveRoadmap);
     const topicIds = topicAssessmentTopics(e.problem.contract);
     assert.ok(topicIds.length > 0);
     assert.equal(calls[0].payload.mode, "terminal-dialogue");
@@ -227,7 +220,7 @@ test("a live terminal dialogue payload carries the topic assessment context; dev
     );
   });
   await terminalFixture("development", async (g, e, calls) => {
-    await send(g, e, "tutor", "My first answer", liveRoadmap);
+    await send(g, e, "My first answer", liveRoadmap);
     assert.equal(calls[0].payload.mode, "terminal-dialogue");
     assert.equal(calls[0].payload.topicAssessmentContext, undefined);
   });
@@ -235,10 +228,9 @@ test("a live terminal dialogue payload carries the topic assessment context; dev
 
 test("terminal dialogue records topic assessments only after a valid completed reply", async () => {
   await terminalFixture("live", async (g, e, calls, reply) => {
-    await send(g, e, "tutor", "My first answer", liveRoadmap);
+    await send(g, e, "My first answer", liveRoadmap);
     const topicIds: string[] = topicAssessmentTopics(e.problem.contract);
     assert.equal(g.study.topicAssessments, undefined);
-    const keys = g.survivors[0].keys ?? 0;
     // A completed reply with an invalid list applies nothing.
     reply(async () =>
       Response.json({
@@ -247,14 +239,13 @@ test("terminal dialogue records topic assessments only after a valid completed r
         topicAssessments: [{ topicId: "PY:T99", text: "Unknown topic." }],
       }),
     );
-    await send(g, e, "tutor", "My explanation", liveRoadmap);
+    await send(g, e, "My explanation", liveRoadmap);
     assert.notEqual(e.state, "consumed");
     assert.equal(e.submissions.length, 0);
-    assert.equal(g.survivors[0].keys ?? 0, keys);
     assert.equal(g.study.topicAssessments, undefined);
     // An unfinished reply leaves assessments unchanged.
     reply(async () => Response.json({ text: "Go on.", complete: false }));
-    await send(g, e, "tutor", "More detail", liveRoadmap);
+    await send(g, e, "More detail", liveRoadmap);
     assert.equal(g.study.topicAssessments, undefined);
     // A valid completion records the new text for each topic.
     reply(async () =>
@@ -267,9 +258,8 @@ test("terminal dialogue records topic assessments only after a valid completed r
         })),
       }),
     );
-    await send(g, e, "tutor", "Final explanation", liveRoadmap);
+    await send(g, e, "Final explanation", liveRoadmap);
     assert.equal(e.state, "consumed");
-    assert.equal(g.survivors[0].keys, keys + 1);
     const depth = e.problem.contract.depth;
     for (const topicId of topicIds)
       assert.equal(
@@ -291,7 +281,7 @@ test("terminal dialogue completion from an older question cannot overwrite a new
     await new Promise((resolve) => setTimeout(resolve, 5));
     presentProblem(g, e, liveRoadmap);
     assert.equal(e.problemPresentedAt, presentedAt);
-    await send(g, e, "tutor", "My first answer", liveRoadmap);
+    await send(g, e, "My first answer", liveRoadmap);
     assert.equal(e.problemPresentedAt, presentedAt);
     const topicIds: string[] = topicAssessmentTopics(e.problem.contract);
     const depth = e.problem.contract.depth;
@@ -319,7 +309,7 @@ test("terminal dialogue completion from an older question cannot overwrite a new
         })),
       }),
     );
-    await send(g, e, "tutor", "Final explanation", liveRoadmap);
+    await send(g, e, "Final explanation", liveRoadmap);
     assert.equal(e.state, "consumed");
     for (const topicId of topicIds)
       assert.equal(

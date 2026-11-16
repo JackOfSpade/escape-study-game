@@ -1,4 +1,4 @@
-import type { Game, Roadmap } from "./model";
+import type { StudyRecord, Roadmap } from "./model";
 import {
   workspaceAssessment,
   workspaceProgressHtml,
@@ -13,7 +13,7 @@ import {
 import { latestTopicAssessment } from "./topic-assessment";
 
 interface WorkspaceViewState {
-  game: Game;
+  game: StudyRecord;
   starting: boolean;
   saving: boolean;
   saveError: string;

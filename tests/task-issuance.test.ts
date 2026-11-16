@@ -2,21 +2,20 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { presentProblem } from "../src/ai";
+import { completeQuestion, presentProblem } from "../src/ai";
 import { eligible, initialStudy } from "../src/curriculum";
-import { complete } from "../src/engine";
 import {
   applyLearningAssessment,
   encounterKey,
+  interruptLearningAttempt,
   registerScopes,
 } from "../src/learner";
-import type { Assessment, Encounter, Game, Roadmap } from "../src/model";
+import type { Assessment, Encounter, StudyRecord, Roadmap } from "../src/model";
 import { decode, encode } from "../src/persistence";
 import { prepareRoadmapExport } from "../src/roadmap-export";
-import { retainRunLearning } from "../src/run-learning";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
-function question(g: Game, e: Encounter) {
+function question(g: StudyRecord, e: Encounter) {
   const c = eligible(r, g.study);
   e.problem = {
     title: "Synthetic unanswered assessment",
@@ -39,7 +38,7 @@ function question(g: Game, e: Encounter) {
 }
 function fixture() {
   const g = createGame(33, r, initialStudy(r, "live")),
-    e = g.encounters["f0-room0"];
+    e = g.encounters["question-0"];
   g.study.learner!.reviews = {};
   question(g, e);
   return { g, e, l: g.study.learner! };
@@ -74,13 +73,12 @@ test("presentation issues exactly one pending task, generation and reinspection 
     !exported.content.includes("PRIVATE_QUESTION_MUST_STAY_OUT_OF_ROADMAP"),
   );
 });
-test("unanswered issued work survives death/archive/reload and is superseded only by actual fresh linked issuance", async () => {
+test("unanswered issued work survives interruption and reload and is superseded only by actual fresh linked issuance", async () => {
   const { g, e, l } = fixture();
   presentProblem(g, e, r);
-  const old = structuredClone(e.problem),
-    id = l.attempts[0].id,
+  const id = l.attempts[0].id,
     cycle = l.cycle;
-  retainRunLearning(g);
+  interruptLearningAttempt(l, e);
   assert.equal(l.attempts[0].status, "interrupted");
   assert.equal(l.continuations.length, 1);
   const before = await prepareRoadmapExport(r, l);
@@ -88,37 +86,30 @@ test("unanswered issued work survives death/archive/reload and is superseded onl
     before.content,
     new RegExp(`\\| ${id} \\|[^\\n]*PENDING; INTERRUPTED`),
   );
-  retainRunLearning(g, true);
-  retainRunLearning(g, true);
+  interruptLearningAttempt(l, e);
+  interruptLearningAttempt(l, e);
   assert.equal(l.continuations.length, 1);
-  assert.equal(g.study.archives.length, 1);
   const restored = decode(encode(g)),
-    fresh = createGame(34, r, restored.study),
-    next = fresh.encounters[e.id];
+    next = restored.encounters["question-1"];
+  question(restored, next);
   assert.equal(
-    JSON.stringify(fresh.study.archives[0].problem),
-    JSON.stringify(old),
-  );
-  assert.equal(fresh.study.archives[0].workspace, "Supplied starter");
-  question(fresh, next);
-  assert.equal(
-    fresh.study.learner!.attempts.length,
+    restored.study.learner!.attempts.length,
     1,
     "unobserved generation is not replacement issuance",
   );
-  presentProblem(fresh, next, r);
-  const child = fresh.study.learner!.attempts[1];
+  presentProblem(restored, next, r);
+  const child = restored.study.learner!.attempts[1];
   assert.equal(child.parentAttempt, id);
   assert.notEqual(child.encounter, l.attempts[0].encounter);
-  assert.equal(fresh.study.learner!.cycle, cycle);
-  assert.equal(fresh.study.learner!.evidence.length, 0);
-  const after = await prepareRoadmapExport(r, fresh.study.learner!);
+  assert.equal(restored.study.learner!.cycle, cycle);
+  assert.equal(restored.study.learner!.evidence.length, 0);
+  const after = await prepareRoadmapExport(r, restored.study.learner!);
   assert.match(
     after.content,
     new RegExp(`\\| ${id} \\|[^\\n]*SUPERSEDED[^\\n]*${child.id}`),
   );
 });
-test("unknown or NPC-only assessment of an issued task cannot count a visit, create evidence, or use later work", () => {
+test("unknown assessment of an issued task cannot count a visit, create evidence, or use later work", () => {
   const { g, e, l } = fixture();
   presentProblem(g, e, r);
   const cycle = l.cycle,
@@ -167,54 +158,36 @@ test("unknown or NPC-only assessment of an issued task cannot count a visit, cre
   assert.equal(l.evidence.length, 0);
   assert.equal(l.attempts[0].status, "in-progress");
 });
-test("shared defender earns world access while unanswered study detaches from the consumed lock", () => {
+test("completing a question detaches its unanswered study from the consumed record", () => {
   const { g, e, l } = fixture();
   presentProblem(g, e, r);
   const cycle = l.cycle;
-  assert.ok(
-    complete(
-      g,
-      e.id,
-      "npc-actual-work",
-      ["human"],
-      "Synthetic completed shared work",
-    ),
-  );
-  assert.ok(g.survivors[0].access.includes(e.floor));
+  assert.ok(completeQuestion(g, e, "actual-work", "Synthetic completed work"));
   assert.equal(l.attempts[0].status, "interrupted");
   assert.equal(l.cycle, cycle);
   assert.equal(l.evidence.length, 0);
   presentProblem(g, e, r);
   assert.equal(l.attempts.length, 1);
-  const next = g.encounters["f0-room1"];
+  const next = g.encounters["question-1"];
   question(g, next);
   presentProblem(g, next, r);
   assert.equal(l.attempts[1].parentAttempt, l.attempts[0].id);
 });
-test("unobserved and unscheduled shared work stays outside formal issuance; development remains practice", () => {
+test("unscheduled work stays outside formal issuance; development remains practice", () => {
   const { g, e, l } = fixture(),
-    other = g.encounters["f0-room1"];
+    other = g.encounters["question-1"];
   question(g, other);
   other.problem!.contract.track =
     other.problem!.contract.track === "PY" ? "PE" : "PY";
   presentProblem(g, other, r);
   assert.equal(l.attempts.length, 0);
   assert.match(other.error!, /scheduled/);
-  assert.equal(retainRunLearning(g, true).length, 1);
-  assert.equal(g.study.archives[0], other);
-  assert.ok(!g.study.archives.includes(e));
   g.study.profile = "development";
   presentProblem(g, e, r);
   assert.equal(l.attempts.length, 0);
-  const unseen = g.encounters["f0-room2"];
+  const unseen = g.encounters["question-2"];
   question(g, unseen);
-  complete(
-    g,
-    unseen.id,
-    "unobserved-npc",
-    ["human"],
-    "Synthetic defender reward",
-  );
+  completeQuestion(g, unseen, "unobserved", "Synthetic reward");
   presentProblem(g, unseen, r);
   assert.equal(l.attempts.length, 0);
 });

@@ -1,4 +1,4 @@
-import { openGameMenu } from "./helpers/game-menu";
+import { openAgentMenu } from "./helpers/agent-menu";
 // Controlled source reviews through actual UI. No real learner results.
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
@@ -10,8 +10,6 @@ for (const outcome of ["assisted", "contradicted"] as const) {
     page,
   }) => {
     const g = await setup(false, false, outcome);
-    g.zombies = [];
-    g.nextSpawn = Number.MAX_SAFE_INTEGER;
     const fixture = recover(decode(encode(g)));
     const prepared = await withdraw(fixture, "U");
     expect(prepared.state, prepared.error).toBe("ready");
@@ -79,7 +77,7 @@ for (const outcome of ["assisted", "contradicted"] as const) {
     const before = await page.evaluate(() =>
       JSON.stringify((window as any).__deadAir.game.study.learner),
     );
-    await openGameMenu(page);
+    await openAgentMenu(page);
     await page.locator("#curriculum-button").click();
     await page.getByText("Review an updated roadmap", { exact: true }).click();
     await page.locator("#roadmap-review-file").setInputFiles({

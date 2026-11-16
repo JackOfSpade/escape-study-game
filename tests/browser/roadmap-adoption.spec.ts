@@ -1,6 +1,4 @@
-import { startDesignedRun } from "./helpers/designed-run";
-import { openGameMenu } from "./helpers/game-menu";
-import { selectTopDown } from "./helpers/view-mode";
+import { openAgentMenu, openApp, seedQuestions } from "./helpers/agent-menu";
 // Synthetic bridge responses exercise the real UI/adapter, not native semantic quality.
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
@@ -179,18 +177,16 @@ for (const scenario of [
       });
     });
     await page.goto("/");
-    await startDesignedRun(page);
+    await openApp(page);
+    await seedQuestions(page);
     // Roadmap menus are view-independent; headless WebGL is software-rendered.
-    await selectTopDown(page);
     const before = await page.evaluate(() => {
       const g = (window as any).__deadAir.game;
       g.study.profile = "live";
-      g.zombies = [];
-      g.nextSpawn = Number.MAX_SAFE_INTEGER;
-      g.encounters["f0-room0"].code = "private draft must survive adoption";
+      g.encounters["question-0"].code = "private draft must survive adoption";
       return JSON.stringify(g.study.learner);
     });
-    await openGameMenu(page);
+    await openAgentMenu(page);
     await page.locator("#curriculum-button").click();
     await page.getByText("Review an updated roadmap", { exact: true }).click();
     await page.locator("#roadmap-review-file").setInputFiles({
@@ -211,7 +207,7 @@ for (const scenario of [
       expect(calls).toBe(1);
       await page.reload();
       await page.waitForFunction(() => !!(window as any).__deadAir);
-      await openGameMenu(page);
+      await openAgentMenu(page);
       await page.locator("#curriculum-button").click();
       await page
         .getByRole("button", { name: "Retry saved reconciliation" })
@@ -223,7 +219,7 @@ for (const scenario of [
       await page.reload();
       await page.waitForFunction(() => !!(window as any).__deadAir);
       interruptedRelease();
-      await openGameMenu(page);
+      await openAgentMenu(page);
       await page.locator("#curriculum-button").click();
       // The reload ended the in-flight request: nothing was applied, and the
       // saved reconciliation can be retried exactly.
@@ -243,28 +239,16 @@ for (const scenario of [
       "pending",
     );
     await page.locator("#close-inspector").click();
-    await openGameMenu(page);
+    await openAgentMenu(page);
     await page.locator("#curriculum-button").click();
     await expect(page.locator("#roadmap-adoption-controls")).toContainText(
       "pending",
     );
-    const t = await page.evaluate(() => (window as any).__deadAir.game.time);
-    await page.waitForTimeout(300);
-    expect(await page.evaluate(() => (window as any).__deadAir.game.time)).toBe(
-      t,
-    );
-    expect(
-      await page.evaluate(() => (window as any).__deadAir.game.paused),
-    ).toBe(true);
-    // The inspector pauses survival, while its captured review request stays
-    // pending. Explicitly resume to check that background work never freezes
-    // the playable clock, then return to the same proposal.
+    // The captured review request stays pending while the menu is closed
+    // and reopened; return to the same proposal.
     await page.locator("#close-inspector").click();
-    await page.locator("#resume-game").click();
-    await expect
-      .poll(() => page.evaluate(() => (window as any).__deadAir.game.time))
-      .toBeGreaterThan(t + 0.2);
-    await openGameMenu(page);
+    await page.locator("#menu-close").click();
+    await openAgentMenu(page);
     await page.locator("#curriculum-button").click();
     await expect(page.locator("#roadmap-adoption-controls")).toContainText(
       "pending",
@@ -380,7 +364,7 @@ for (const scenario of [
         backups: g.study.roadmapAdoptionBackups.length,
         visits: g.study.visits.length,
         evidence: g.study.learner.evidence.length,
-        draft: g.encounters["f0-room0"].code,
+        draft: g.encounters["question-0"].code,
       };
     });
     expect(result).toEqual({
@@ -417,7 +401,7 @@ for (const scenario of [
               .status,
         ),
       ).toBe("P");
-    await openGameMenu(page);
+    await openAgentMenu(page);
     await page.locator("#curriculum-button").click();
     await expect(page.locator("#roadmap-adoption-controls")).toContainText(
       "1 reviewed import(s)",

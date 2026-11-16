@@ -5,14 +5,14 @@ import {
   eligibleLearning,
   registerScopes,
 } from "../../src/learner";
-import type { Game } from "../../src/model";
-import { createGame } from "../../src/world";
+import type { StudyRecord } from "../../src/model";
+import { createGame } from "./record";
 import { baselineFixture, roadmap as r } from "./baseline-correction";
 export const laterAt = "2026-10-17T16:00:00Z",
   laterId = "PY:T05.2",
   laterScope = `${laterId}/D1`;
 export function gradeScheduled(
-  g: Game,
+  g: StudyRecord,
   outcome: "independent" | "contradicted" | "assisted",
   at: string,
   n: number,
@@ -20,7 +20,7 @@ export function gradeScheduled(
 ) {
   const l = g.study.learner!,
     c = eligibleLearning(r, l, at),
-    e = structuredClone(g.encounters["f0-room0"]);
+    e = structuredClone(g.encounters["question-0"]);
   e.id = `synthetic-later-observation-${n}`;
   e.problem = {
     title: "Synthetic actual later observation",

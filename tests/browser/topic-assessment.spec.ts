@@ -3,7 +3,6 @@ import { mockClaudeStudy } from "./study-harness";
 
 async function enterStudy(page: Page) {
   await page.goto("/");
-  await page.locator("#study-only-toggle").click();
   await expect(page.locator("#study-workspace")).toBeVisible();
 }
 
@@ -18,7 +17,7 @@ test("the skill map has one tab stop, arrow navigation and keyboard disclosures"
   await expect(page.locator('.study-topic-toggle[tabindex="0"]')).toHaveCount(
     1,
   );
-  await page.locator("#study-only-exit").focus();
+  await page.locator("#study-menu").focus();
   await page.keyboard.press("Tab");
   await expect(page.locator('.study-topic-toggle[tabindex="0"]')).toBeFocused();
   await page.keyboard.press("Tab");

@@ -22,7 +22,7 @@ import {
   readIdentifierCounters,
 } from "../src/roadmap-identifiers";
 import { reviewRoadmap } from "../src/roadmap-review";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8")),
   at = "2026-10-16T16:00:00Z";
 function fixture(source = r) {

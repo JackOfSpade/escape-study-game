@@ -12,7 +12,7 @@ import type { Roadmap } from "../src/model";
 import { parseRoadmapDocument } from "../src/roadmap-document";
 import { prepareRoadmapExport, sha256 } from "../src/roadmap-export";
 import { reviewRoadmap } from "../src/roadmap-review";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 const at = "2026-10-16T16:00:00.000Z";
 function next(raw: string) {
@@ -27,7 +27,7 @@ function next(raw: string) {
 function fixture() {
   const l = initialLearner(r),
     g = createGame(7, r),
-    e = g.encounters["f0-room0"],
+    e = g.encounters["question-0"],
     contract = eligibleLearning(r, l, at);
   e.problem = {
     title: "Synthetic metadata fixture",

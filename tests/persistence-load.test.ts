@@ -11,7 +11,7 @@ import {
   rejectedCopy,
   save,
 } from "../src/persistence";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 
 const roadmap: Roadmap = JSON.parse(
   readFileSync("public/curriculum.json", "utf8"),
@@ -165,7 +165,7 @@ test("a copy refused while the other loads is reported with its exact bytes", as
 
 test("a draft larger than one megabyte has a full synchronous checkpoint before its durable write settles", async () => {
   const g = createGame(730, roadmap),
-    e = g.encounters["f0-room0"];
+    e = g.encounters["question-0"];
   e.workspace = "Synthetic unfinished answer ".repeat(45_000);
   const pending = save(g);
   assert.ok(copies.local && copies.local.length > 1_000_000);

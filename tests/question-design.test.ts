@@ -10,7 +10,7 @@ import {
   TERMINAL_DIALOGUE_INSTRUCTION,
 } from "../src/knowledge-probe";
 import type { Roadmap } from "../src/model";
-import { createPlayableGame } from "../src/world";
+import { createPlayableGame } from "./helpers/record";
 import {
   QUESTION_DESIGN_GUIDANCE,
   QUESTION_ADAPTATION_GUIDANCE,
@@ -70,8 +70,7 @@ test("live generation payload carries the minimal concrete problem policy and ke
   try {
     await checkBridge();
     const g = createPlayableGame(41, r, initialStudy(r, "live"));
-    g.status = "playing";
-    const e = g.encounters[g.floors[0].stations[0].encounter];
+    const e = g.encounters["question-0"];
     await ensureProblem(g, e, r);
     assert.equal(sent.length, 1);
     assert.equal(e.problem?.provenance, "claude-cli");
@@ -107,8 +106,7 @@ test("a saved generation retries with its exact captured payload and request ide
   try {
     await checkBridge();
     const g = createPlayableGame(42, r, initialStudy(r, "live"));
-    g.status = "playing";
-    const e = g.encounters[g.floors[0].stations[0].encounter];
+    const e = g.encounters["question-0"];
     const captured = {
       requestId: "gen-synthetic-saved",
       encounterId: e.id,

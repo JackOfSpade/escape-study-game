@@ -1,10 +1,8 @@
-import type { Encounter, Game, Message, Problem } from "./model";
-import { adoptQuestionPacing } from "./field-pacing";
-import { encounterKey, interruptLearningAttempt } from "./learner";
-import { onEscapeSegment } from "./escape-terminal";
+import type { Encounter, StudyRecord, Message, Problem } from "./model";
+import { encounterKey } from "./learner";
 import { segmentSummary } from "../scripts/lib/question-segments.mjs";
 
-/** One part of a long question: one terminal visit, one key. */
+/** One part of a long question: one conversation. */
 export interface QuestionSegment {
   goal: string;
   /** Zero-based indexes into the problem's rubric; each belongs to one segment. */
@@ -13,7 +11,7 @@ export interface QuestionSegment {
   facets: string[];
   estimatedSolveSeconds: number;
 }
-/** One terminal visit that worked a segment of the thread. */
+/** One conversation that worked a segment of the thread. */
 interface ThreadVisit {
   /** `encounterKey` of the terminal: `${runId}/${encounterId}`. */
   encounter: string;
@@ -21,15 +19,13 @@ interface ThreadVisit {
   segment: number;
   at: number;
   completed?: boolean;
-  /** Whether the human actually received the key (false after death). */
-  keyGranted?: boolean;
   summary?: string;
 }
 /**
- * The learner's unfinished question. It lives in study state, so it is saved
- * in the same atomic snapshot as the terminals and keys it refers to, and it
- * moves with the study state into the next run. The very next solo terminal
- * the human opens continues it, with its earlier conversation and progress.
+ * A learner's unfinished segmented question. It lives in study state, so it is
+ * saved in the same atomic snapshot as the conversations it refers to. Only
+ * saves from the retired game hold one: nothing starts a thread any more, but
+ * a saved one can still be completed and assessed.
  */
 export interface QuestionThread {
   id: string;
@@ -47,115 +43,13 @@ export const segmentCount = (p: Pick<Problem, "segments">) =>
   p.segments?.length || 1;
 
 /** The open thread, if any. A finished one stays as context for assessments. */
-export function openThread(g: Game) {
+export function openThread(g: StudyRecord) {
   const t = g.study.thread;
   return t && !t.finishedAt ? t : undefined;
 }
 
-/** A thread terminal: a solo world terminal, never a study-only or linked one. */
-const threadable = (e: Encounter) =>
-  e.mode === "solo" && !e.studyOnly && (!e.owner || e.owner === "human");
-
-/** The problem with the current segment's estimate, for field pacing. */
-function segmentPacing(p: Problem, segment: number): Problem {
-  const s = p.segments?.[segment];
-  return s
-    ? {
-        ...p,
-        segments: undefined,
-        estimatedSolveSeconds: s.estimatedSolveSeconds,
-      }
-    : p;
-}
-
-/** Start a thread when the human is first shown a question at a solo terminal. */
-export function startThread(g: Game, e: Encounter) {
-  if (
-    !threadable(e) ||
-    !e.problem ||
-    e.thread ||
-    e.state === "consumed" ||
-    openThread(g)
-  )
-    return undefined;
-  const key = encounterKey(e);
-  const t: QuestionThread = {
-    id: `thread-${key}`,
-    problem: structuredClone(e.problem),
-    segment: 0,
-    visits: [
-      { encounter: key, runId: e.runId ?? g.id, segment: 0, at: Date.now() },
-    ],
-    active: key,
-    startedAt: new Date().toISOString(),
-  };
-  g.study.thread = t;
-  e.thread = { id: t.id, segment: 0 };
-  return t;
-}
-
-/** A terminal that already holds another question the human started. */
-function holdsOtherWork(e: Encounter) {
-  return (
-    e.problemPresentedSequence !== undefined ||
-    e.tutor.some((m) => m.kind === "human") ||
-    e.submissions.some((s) => s.author === "human")
-  );
-}
-
-/**
- * On opening a terminal: continue the open thread there. Returns true when
- * `e` now works the thread's current segment. A terminal that is consumed,
- * study-only, linked, or already holds another started question is left as it
- * is; an earlier visit of this thread opens read-only.
- */
-export function bindThread(g: Game, e: Encounter) {
-  const t = openThread(g);
-  if (!t || !threadable(e) || g.encounters[e.id] !== e) return false;
-  const key = encounterKey(e);
-  if (e.thread) {
-    if (
-      e.thread.id !== t.id ||
-      e.thread.segment !== t.segment ||
-      e.state === "consumed"
-    )
-      return false;
-    moveActive(g, t, key);
-    return true;
-  }
-  if (e.state === "consumed" || holdsOtherWork(e)) return false;
-  moveActive(g, t, key);
-  e.problem = structuredClone(t.problem);
-  e.thread = { id: t.id, segment: t.segment };
-  delete e.pendingGeneration;
-  delete e.generation;
-  delete e.error;
-  if (e.revision === 0) e.workspace = e.problem.starter;
-  e.state = "in-progress";
-  t.visits.push({
-    encounter: key,
-    runId: e.runId ?? g.id,
-    segment: t.segment,
-    at: Date.now(),
-  });
-  adoptQuestionPacing(g, e.floor, segmentPacing(t.problem, t.segment));
-  return true;
-}
-
-/** Only one terminal can complete a segment: the one opened last. */
-function moveActive(g: Game, t: QuestionThread, key: string) {
-  if (t.active === key) return;
-  const previous = Object.values(g.encounters).find(
-    (x) => encounterKey(x) === t.active,
-  );
-  // The learning attempt follows the question to its new terminal.
-  if (previous && previous.state !== "consumed" && g.study.learner)
-    interruptLearningAttempt(g.study.learner, previous);
-  t.active = key;
-}
-
-/** Whether `e` is the terminal allowed to complete the thread's current segment. */
-export function isActiveVisit(g: Game, e: Encounter) {
+/** Whether `e` is the conversation allowed to complete the thread's current segment. */
+export function isActiveVisit(g: StudyRecord, e: Encounter) {
   const t = openThread(g);
   return (
     !!t &&
@@ -165,21 +59,21 @@ export function isActiveVisit(g: Game, e: Encounter) {
   );
 }
 
-/** A terminal that worked an earlier segment, or this one somewhere else. */
-export function isInactiveVisit(g: Game, e: Encounter) {
+/** A conversation that worked an earlier segment, or this one somewhere else. */
+export function isInactiveVisit(g: StudyRecord, e: Encounter) {
   return !!e.thread && !isActiveVisit(g, e) && e.state !== "consumed";
 }
 
 /**
  * Record a completed segment and advance. Idempotent: it acts only for the
  * active visit of the current segment, and the caller runs it in the same
- * synchronous step that consumed the terminal and granted its key, so one
- * snapshot always holds both or neither. Returns the thread when it finished.
+ * synchronous step that consumed the question, so one snapshot always holds
+ * both or neither. Returns the thread when it finished.
  */
 export function completeSegment(
-  g: Game,
+  g: StudyRecord,
   e: Encounter,
-  options: { keyGranted: boolean; summary?: unknown },
+  options: { summary?: unknown },
 ) {
   if (!isActiveVisit(g, e)) return undefined;
   const t = g.study.thread!;
@@ -189,7 +83,6 @@ export function completeSegment(
     .at(-1);
   if (visit) {
     visit.completed = true;
-    visit.keyGranted = options.keyGranted;
     const summary = segmentSummary(options.summary);
     if (summary) visit.summary = summary;
   }
@@ -200,13 +93,11 @@ export function completeSegment(
     t.finishedAt = new Date().toISOString();
     finished = t;
   }
-  // An escape task worked at this station ticks one step per segment.
-  onEscapeSegment(g, e);
   return finished;
 }
 
-/** Every terminal this thread visited that this save still holds. */
-export function threadEncounters(g: Game, t: QuestionThread) {
+/** Every conversation this thread visited that this save still holds. */
+export function threadEncounters(g: StudyRecord, t: QuestionThread) {
   const all = [...Object.values(g.encounters), ...g.study.archives];
   const keys = new Set(t.visits.map((v) => v.encounter));
   const found = new Map<string, Encounter>();
@@ -227,7 +118,7 @@ interface CarriedVisit {
   messages: Message[];
 }
 /** Earlier visits' conversations, oldest first, for display and the tutor. */
-export function carriedVisits(g: Game, e: Encounter): CarriedVisit[] {
+export function carriedVisits(g: StudyRecord, e: Encounter): CarriedVisit[] {
   const t = g.study.thread;
   if (!t || e.thread?.id !== t.id) return [];
   const self = encounterKey(e);
@@ -257,7 +148,7 @@ const MAX_CARRIED_TEXT = 4000;
 /** The segment block of a tutor payload: the current part, summaries of the
  * finished parts and this part's conversation from earlier visits. Finished
  * parts are summarized, so the prompt stays bounded however long the thread. */
-export function segmentPayload(g: Game, e: Encounter) {
+export function segmentPayload(g: StudyRecord, e: Encounter) {
   const t = g.study.thread;
   const p = e.problem;
   if (!t || !p || e.thread?.id !== t.id) return undefined;
@@ -292,7 +183,7 @@ export function segmentPayload(g: Game, e: Encounter) {
 }
 
 /** The part of a whole question an assessed visit covered, or undefined. */
-export function assessmentSegment(g: Game, e: Encounter) {
+export function assessmentSegment(g: StudyRecord, e: Encounter) {
   const t = g.study.thread;
   const p = e.problem;
   if (!e.thread || !p?.segments?.length) return undefined;
@@ -315,39 +206,7 @@ export function assessmentSegment(g: Game, e: Encounter) {
 }
 
 /** Assessment waits until the whole thread is finished. */
-export function assessmentDeferred(g: Game, e: Encounter) {
+export function assessmentDeferred(g: StudyRecord, e: Encounter) {
   const t = openThread(g);
   return !!t && e.thread?.id === t.id;
-}
-
-/**
- * The human's last message on this terminal, when its tutor request was cut
- * off by a reload, crash or relay restart and has not yet been resent. It is
- * resent once, as the same request, so the turn is neither lost nor doubled.
- */
-export function resendableRequest(e: Encounter) {
-  const job = e.tutorRequests?.at(-1);
-  const last = e.tutor.at(-1);
-  if (
-    !e.thread ||
-    !job ||
-    job.state !== "interrupted" ||
-    job.resent ||
-    !last ||
-    last.kind !== "human" ||
-    last.seq !== job.questionSequence
-  )
-    return undefined;
-  return job;
-}
-
-/** An unanswered message carried from an earlier run's terminal: offered as
- * the new terminal's draft instead of being copied as new evidence. */
-export function carriedUnanswered(g: Game, e: Encounter) {
-  if (e.tutor.length || e.chatDraft) return undefined;
-  const carried = carriedVisits(g, e).filter(
-    (v) => v.segment === e.thread?.segment && !v.completed,
-  );
-  const last = carried.at(-1)?.messages.at(-1);
-  return last?.kind === "human" ? last.text : undefined;
 }

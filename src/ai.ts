@@ -1,6 +1,5 @@
 import { fnv1a } from "./hash";
 import { QUESTION_DESIGN_GUIDANCE } from "../scripts/lib/study-question-policy.mjs";
-import { adoptQuestionPacing } from "./field-pacing";
 import {
   SEGMENT_GENERATION_GUIDANCE,
   validateQuestionSegments,
@@ -8,12 +7,9 @@ import {
 import {
   completeSegment,
   isActiveVisit,
-  openThread,
   segmentPayload,
-  startThread,
   threadEncounters,
 } from "./question-thread";
-import { roomEncounters, assignRoomProblem } from "./room-questions";
 import { completionVerdict } from "./completion-verdict";
 import { careerScopeGuidance, studyFocus } from "./career-profile";
 import {
@@ -32,46 +28,31 @@ import { isRecord } from "./records";
 export { checkBridge, status, type BridgeStatus } from "./bridge-client";
 import { browserSteps } from "../scripts/browser-runner/spec.mjs";
 import {
-  coverCatchupsWithRecordedLog,
-  generateCatchup,
-  unseenWork,
-  workKinds,
-} from "./chat-catchup";
-import {
   beginVisit,
   countStudyTurn,
   eligible,
   finishVisit,
 } from "./curriculum";
-import { complete } from "./engine";
-import { recordSpawn, spawnContract } from "./topic-spawn";
 import { reviewEnvironment } from "./environment-review";
-import { executionEvidence, runWorkspace } from "./execution";
-import { groupSnapshot, validateGroupReply } from "./group-grounding";
+import { executionEvidence } from "./execution";
 import { trackProgressContext } from "./imported-proof";
-import { encounterKey, initialLearner, registerScopes } from "./learner";
 import {
-  type Actor,
+  encounterKey,
+  initialLearner,
+  interruptLearningAttempt,
+  registerScopes,
+} from "./learner";
+import {
   type Provider,
   type Contract,
   type Encounter,
-  type Game,
+  type StudyRecord,
   type Message,
   type Problem,
   type Roadmap,
   type Submission,
-  event,
-  rand,
+  nextSeq,
 } from "./model";
-import {
-  hasHumanStudyContext,
-  npcProfile,
-  relevantFocus,
-  taskSkill,
-} from "./npc-cognition";
-import { materializeNpcWork } from "./npc-materialization";
-import { inspectNpcOutcome, outcomeIsVisible } from "./npc-outcome";
-import { humanUsingWorkspace, npcAtWorkstation } from "./npc-work-access";
 import { reconcileRoadmap } from "./roadmap-adoption";
 import { settleTutorRequest } from "./run-learning";
 import { assess } from "./learning-assessment";
@@ -81,14 +62,15 @@ import {
   validateTopicAssessments,
 } from "./topic-assessment";
 export { assess } from "./learning-assessment";
-import { canSee } from "./visibility";
-import { applyAutonomousProposal, proposalText } from "./workspace-proposals";
-const live = (g: Game) =>
+
+/** The stored author of every tutor message, in saved conversations too. */
+const TUTOR_AUTHOR = "Terminal AI";
+const live = (g: StudyRecord) =>
   g.study.profile === "live" && status().mode !== "development";
-const interactiveConnected = (g: Game) =>
+const interactiveConnected = (g: StudyRecord) =>
   live(g) ||
   (g.study.profile === "development" && status().mode !== "development");
-const completionConnected = (g: Game, e: Encounter) =>
+const completionConnected = (g: StudyRecord, e: Encounter) =>
   live(g) ||
   (g.study.profile === "development" &&
     e.problem?.provenance === "development" &&
@@ -105,103 +87,11 @@ const capturedProvider = (problem?: Problem): Provider =>
       : "claude-cli";
 const isAiProvenance = (p?: string): p is Provider =>
   p === "study-mode" || p === "chatgpt-handoff" || p === "claude-cli";
-const autonomousAllowed = () =>
-  status().capabilities.includes("autonomous-work");
-export function materializeObservedWork(g: Game, e: Encounter, retry = false) {
-  if (!live(g) || !status().capabilities.includes("materialize-work")) return;
-  const provider = activeProvider();
-  return materializeNpcWork(
-    g,
-    e,
-    (payload) =>
-      optionalProviderRequest(
-        g,
-        provider,
-        "materialize-work",
-        payload,
-        "materialize-work",
-        payload.autonomyAllowed === true || payload.background === true,
-      ),
-    retry,
-    {
-      allowAutonomous: autonomousAllowed(),
-      provider,
-    },
-  );
-}
-export function inspectCompletedNpcWork(
-  g: Game,
-  e: Encounter,
-  r: Roadmap,
-  retry = false,
-) {
-  if (!live(g) || !status().capabilities.includes("materialize-outcome")) {
-    e.outcomeNotice =
-      "Exact survivor solutions require the connected outcome-inspection capability. The simulated world result is preserved.";
-    return;
-  }
-  const provider = activeProvider();
-  return inspectNpcOutcome(
-    g,
-    e,
-    r,
-    {
-      provider,
-      request: (operation, payload) =>
-        optionalProviderRequest(
-          g,
-          provider,
-          operation,
-          payload,
-          "materialize-outcome",
-        ),
-      validate(p, c) {
-        if (!isAiProvenance(p.provenance))
-          throw Error(
-            "Reconstructed problem must retain its saved provider provenance",
-          );
-        validateProblem(p, e, r, g, c);
-        registerScopes(r, structuredClone(g.study.learner!), {
-          ...e,
-          problem: p,
-        });
-      },
-    },
-    retry,
-  );
-}
-async function optionalProviderRequest<
-  T extends object = Record<string, unknown>,
->(
-  g: Game,
-  provider: Provider,
-  operation: string,
-  payload: unknown,
-  capability = operation,
-  autonomous = false,
-) {
-  const connected = () =>
-    live(g) &&
-    status().mode === provider &&
-    status().capabilities.includes(capability) &&
-    (!autonomous || autonomousAllowed());
-  if (!connected())
-    throw Error(
-      "Reconnect the original provider; captured request remains saved",
-    );
-  const result = await request<T>(operation, payload);
-  if (!connected())
-    throw Error(
-      "Provider changed while request was pending; no result applied",
-    );
-  return result;
-}
-
 function validateProblem(
   p: Problem,
   e: Encounter,
   r: Roadmap,
-  g: Game,
+  g: StudyRecord,
   c = eligible(r, g.study),
 ) {
   try {
@@ -251,64 +141,23 @@ function validateProblem(
     throw Error(`Stale or altered learning contract for ${e.id}`);
   p.contract = structuredClone(c);
 }
-const generationCurrent = (g: Game, e: Encounter, id: string) =>
+const generationCurrent = (g: StudyRecord, e: Encounter, id: string) =>
   g.encounters[e.id] === e &&
   e.generation === id &&
   e.state !== "consumed" &&
   !e.problem;
-const roomGenerations = new WeakMap<Game, Map<string, Promise<void>>>();
-export async function ensureProblem(g: Game, e: Encounter, r: Roadmap) {
-  // A continued question belongs to the learner, never to the room.
-  if (e.thread && e.problem) return;
-  if (!e.questionRoom) return ensureIndividualProblem(g, e, r);
-  if (e.state === "consumed" || g.encounters[e.id] !== e) return;
-  const peers = roomEncounters(g, e);
-  // Only a question Claude wrote is shared; an old practice one never spreads.
-  const existing = peers.find(
-    (peer) =>
-      peer.problem && peer.problem.provenance !== "development" && !peer.thread,
-  );
-  if (existing?.problem) {
-    assignRoomProblem(g, existing, existing.problem);
-    return;
-  }
-  let pending = roomGenerations.get(g);
-  if (!pending) roomGenerations.set(g, (pending = new Map()));
-  const running = pending.get(e.questionRoom);
-  if (running) {
-    await running;
-    return;
-  }
-  // Retry the original captured generation instead of issuing a different question.
-  const source = peers.find((peer) => peer.pendingGeneration) ?? e;
-  const operation = (async () => {
-    await ensureIndividualProblem(g, source, r);
-    if (source.problem && g.encounters[source.id] === source)
-      assignRoomProblem(g, source, source.problem);
-    else for (const peer of peers) if (!peer.problem) peer.error = source.error;
-  })();
-  pending.set(e.questionRoom, operation);
-  try {
-    await operation;
-  } finally {
-    if (pending.get(e.questionRoom) === operation)
-      pending.delete(e.questionRoom);
-  }
-}
-
 const QUESTION_GENERATION_POLICY =
   "Diagnose before teaching. Write a standalone question: the prompt alone must supply the essential scenario, interface, implementation, data, timing and business-rule facts needed to answer without using the chat. For classification, list the concrete items to classify and their relevant behavior, lifetime and source without supplying their classifications. For tracing, debugging or critique, supply the relevant code, event sequence or evidence. Distinguish fixed facts from intentional design choices; if the learner may choose an example or an approach, say so explicitly rather than expecting them to infer an unspecified implementation. Ask a bounded task that matches the supplied scenario; never paste a capability statement into an unrelated generic story. Every requirement in the rubric must be visible in the question; do not grade unstated assumptions or add unrelated decisions, personal history or edge cases. Before returning the question, check that it can be answered from the prompt alone and repair missing context without revealing the solution. For D1, keep the learner workspace starter empty; put essential scenario or code-reading material in the prompt without supplying the key explanation, endpoint update, worked result or a leading solution hint. Do not interpret an objective's implementation verb as a D1 implementation requirement. Preserve legitimate prior context and assistance attribution without presenting supplied steps as fresh independent understanding. Use probeRecords: build the question around open gaps inside the eligible scope with the facet they blocked as the apex; only a gap marked reuseInScopeDefinitions may add its exact facet id to scopeDefinitions, and existing stable scope definitions are copied exactly; do not spend the question on established facets unless the scope requires them; re-ask what a closed gap blocked. The prompt is read by the learner: never mention the scheduled scope, objective IDs, tiers, depth, scheduling or that this is a formal visit; ask the question in plain language. Keep it minimal: write the smallest self-contained diagnostic that exercises the objective, with one main problem and at most one or two directly connected follow-ups. Include only the essential facts, not pasted project context or a full-project audit. For code review, include the actual code under review, including any required helper and its authorization semantics; a prose proposal supports design review only. Prefer short snippets, traces or evidence, and never turn an objective's scope verbs into a D1 implementation task. The visible task and rubric must match, without leaking the solution. An honestly integrative objective may stay integrative on a small feature. A narrow example never establishes unrelated facets or mastery. " +
   QUESTION_DESIGN_GUIDANCE;
-const QUESTION_PACING_GUIDANCE = SEGMENT_GENERATION_GUIDANCE;
+const QUESTION_SEGMENT_GUIDANCE = SEGMENT_GENERATION_GUIDANCE;
 const QUESTION_RUNTIME_SUPPORT = {
   scripts: ["python", "typescript"],
   react:
     "Optional D2+ TypeScript runtime: {language:typescript,environment:react,steps:[{kind:click|fill|press|expect-text|expect-count,selector:CSS,...}]}. Single TSX module default-exporting App; only installed React imports, no network, workers or external packages. At most eight bounded interaction/check steps. Runtime errors/DOM checks/preview are observations, never automatic correctness or ENV credit; TSX transpilation is not static TypeScript type checking. Docker runtime must be installed locally.",
 };
-/** The request for one generated question. It carries no run, floor or terminal
- * facts, which is what lets a prepared question serve any room. */
+/** The request for one generated question. */
 function generationPayload(
-  g: Game,
+  g: StudyRecord,
   r: Roadmap,
   contract: Contract,
   requestId: string,
@@ -321,7 +170,7 @@ function generationPayload(
     contract,
     careerScopeGuidance: careerScopeGuidance(contract, studyFocus(study)),
     generationPolicy: QUESTION_GENERATION_POLICY,
-    pacingGuidance: QUESTION_PACING_GUIDANCE,
+    segmentGuidance: QUESTION_SEGMENT_GUIDANCE,
     runtimeSupport: QUESTION_RUNTIME_SUPPORT,
     existingScopeDefinitions: study.learner?.scopes,
     probeRecords: probeRecordsForTrack(g, contract.track, contract),
@@ -337,38 +186,10 @@ export const streamingReply = (job: object) => streamingReplies.get(job);
 export function watchStreamingReplies(listener: () => void) {
   onStreamingReply = listener;
 }
-const preparing = new WeakMap<object, Promise<void>>();
-/** A failed preparation must wait, or a signed-out CLI would spend a call on
- * every interface tick. It backs off from one minute up to thirty. */
-const preparationBackoff = new WeakMap<
-  object,
-  { failures: number; retryAt: number }
->();
-/** Whether a prepared question is still the one the schedule would issue. */
-function stillSchedulable(r: Roadmap, g: Game, c: Contract) {
-  if (c.practice) return true;
-  if (g.study.learner?.attempts.some((a) => a.status === "in-progress"))
-    return false;
-  try {
-    const now = eligible(r, g.study);
-    return (
-      now.track === c.track &&
-      now.depth === c.depth &&
-      now.review === c.review &&
-      now.kind === c.kind &&
-      now.ledgerVersion === c.ledgerVersion &&
-      JSON.stringify(now.objectiveIds) === JSON.stringify(c.objectiveIds)
-    );
-  } catch {
-    return false;
-  }
-}
-/** Generate the next terminal's question ahead of time. It waits for the last
- * assessment so the question knows which gaps that answer closed or exposed. */
 /** Older saves can hold work waiting on a chat connection that no longer
- * exists. Free it so the player can carry on in the game's own terminal; the
- * question and the learner's own work stay. */
-export function releaseRetiredChatRequests(g: Game) {
+ * exists. Free it so the learner can carry on in the workspace; the question
+ * and the learner's own work stay. */
+export function releaseRetiredChatRequests(g: StudyRecord) {
   if (status().mode !== "claude-cli") return;
   for (const e of [...Object.values(g.encounters), ...g.study.archives]) {
     if (e.pendingGeneration && e.pendingGeneration.provider !== "claude-cli")
@@ -395,90 +216,16 @@ export function releaseRetiredChatRequests(g: Game) {
       }
   }
 }
-export function prepareNextQuestion(g: Game, r: Roadmap) {
-  const study = g.study;
-  if (
-    !live(g) ||
-    status().mode !== "claude-cli" ||
-    g.status !== "playing" ||
-    study.preparedQuestion ||
-    // The next terminal continues the open question; nothing new is needed.
-    openThread(g) ||
-    preparing.has(study) ||
-    (preparationBackoff.get(study)?.retryAt ?? 0) > Date.now() ||
-    study.assessments.some((a) => a.status === "pending") ||
-    Object.values(g.encounters).some(
-      (e) =>
-        !!e.generation ||
-        (e.history.length > 0 &&
-          e.state !== "consumed" &&
-          e.problemPresentedSequence !== undefined &&
-          e.owner === "human"),
-    )
-  )
-    return;
-  const provider = activeProvider();
-  let contract: Contract, payload: ReturnType<typeof generationPayload>;
-  // This runs on every interface tick: a schedule or ledger that cannot be
-  // read must skip the preparation, never throw into the frame.
-  try {
-    contract = spawnContract(r, study);
-    study.learner ??= initialLearner(r);
-    if (!stillSchedulable(r, g, contract)) return;
-    payload = generationPayload(
-      g,
-      r,
-      contract,
-      `gen-${g.id}-prepared-${crypto.randomUUID()}`,
-      "prepared",
-    );
-  } catch {
-    return;
-  }
-  const operation = request<Problem>("generate", payload)
-    .then((problem) => {
-      // A dropped profile or provider cannot leave its question behind.
-      if (g.study !== study || status().mode !== provider) return;
-      problem.provenance = provider;
-      study.preparedQuestion = { provider, contract, problem };
-      preparationBackoff.delete(study);
-    })
-    // A failed preparation is silent: opening a terminal generates as usual.
-    .catch(() => {
-      const failures = (preparationBackoff.get(study)?.failures ?? 0) + 1;
-      preparationBackoff.set(study, {
-        failures,
-        retryAt: Date.now() + Math.min(30, 2 ** (failures - 1)) * 60_000,
-      });
-    })
-    .finally(() => preparing.delete(study));
-  preparing.set(study, operation);
-}
-/** Hand over the ready question, dropping it if the schedule has moved on. */
-function takePrepared(g: Game, r: Roadmap) {
-  const prepared = g.study.preparedQuestion;
-  if (!prepared) return undefined;
-  delete g.study.preparedQuestion;
-  return prepared.provider === status().mode &&
-    stillSchedulable(r, g, prepared.contract)
-    ? prepared
-    : undefined;
-}
-/** Where a question request is, for the terminal's progress display. The
+/** Where a question request is, for the progress display. The
  * request is one bridge call, so these are the client-side stages around it. */
 type GenerationPhase = "joining" | "writing" | "checking";
 const generationProgresses = new WeakMap<
   Encounter,
   { id: string; phase: GenerationPhase; startedAt: number }
 >();
-/** The encounter whose request is writing this one's question: itself, or a
- * room peer whose single generation is shared with the whole room. */
-export function generatingEncounter(g: Game, e: Encounter) {
-  if (e.problem || e.state === "consumed") return undefined;
-  if (e.generation) return e;
-  return e.questionRoom
-    ? roomEncounters(g, e).find((peer) => peer.generation)
-    : undefined;
+/** The question's own request, while it is writing the problem. */
+export function generatingEncounter(e: Encounter) {
+  return !e.problem && e.state !== "consumed" && e.generation ? e : undefined;
 }
 export function generationProgress(e: Encounter) {
   const p = generationProgresses.get(e);
@@ -489,7 +236,7 @@ function markGeneration(e: Encounter, id: string, phase: GenerationPhase) {
   if (p?.id === id) p.phase = phase;
   else generationProgresses.set(e, { id, phase, startedAt: Date.now() });
 }
-async function ensureIndividualProblem(g: Game, e: Encounter, r: Roadmap) {
+export async function ensureProblem(g: StudyRecord, e: Encounter, r: Roadmap) {
   if (e.problem || e.state === "consumed") return;
   // Every question comes from Claude; there is no local stand-in.
   if (!live(g)) {
@@ -504,18 +251,7 @@ async function ensureIndividualProblem(g: Game, e: Encounter, r: Roadmap) {
     profile = study.profile;
   e.generation = generation;
   markGeneration(e, generation, "writing");
-  let prepared: ReturnType<typeof takePrepared>,
-    regenerate = false;
   try {
-    let p: Problem;
-    if (!e.studyOnly && !e.pendingGeneration) {
-      // Arriving during preparation joins that call rather than paying twice.
-      if (preparing.get(study)) markGeneration(e, generation, "joining");
-      await preparing.get(study);
-      markGeneration(e, generation, "writing");
-      if (!generationCurrent(g, e, generation)) return;
-      prepared = takePrepared(g, r);
-    }
     if (
       e.pendingGeneration &&
       // Saves from before providers were recorded were ChatGPT handoffs.
@@ -524,26 +260,21 @@ async function ensureIndividualProblem(g: Game, e: Encounter, r: Roadmap) {
       throw Error(
         "Reconnect the original generation provider to retry this saved question",
       );
-    // The spawn policy keeps the formal visit reachable and rotates other
-    // terminals across cooled topics; a saved generation keeps its contract.
+    // A saved generation keeps its contract.
     const contract =
-      prepared?.contract ??
       (e.pendingGeneration?.payload?.contract as Contract | undefined) ??
-      (e.studyOnly ? eligible(r, study) : spawnContract(r, study));
-    if (prepared) p = prepared.problem;
-    else {
-      const payload =
-        e.pendingGeneration?.payload ??
-        generationPayload(g, r, contract, generation, e.id);
-      const provider = activeProvider();
-      e.pendingGeneration = {
-        provider,
-        requestId: generation,
-        payload: structuredClone(payload),
-      };
-      p = await request<Problem>("generate", payload);
-      p.provenance = provider;
-    }
+      eligible(r, study);
+    const payload =
+      e.pendingGeneration?.payload ??
+      generationPayload(g, r, contract, generation, e.id);
+    const provider = activeProvider();
+    e.pendingGeneration = {
+      provider,
+      requestId: generation,
+      payload: structuredClone(payload),
+    };
+    const p = await request<Problem>("generate", payload);
+    p.provenance = provider;
     if (
       g.study !== study ||
       study.profile !== profile ||
@@ -555,17 +286,12 @@ async function ensureIndividualProblem(g: Game, e: Encounter, r: Roadmap) {
     g.study.learner ??= initialLearner(r);
     registerScopes(r, g.study.learner, { ...e, problem: p });
     e.problem = p;
-    if (!e.studyOnly) adoptQuestionPacing(g, e.floor, p);
     delete e.error;
     delete e.pendingGeneration;
     if (e.revision === 0 && !e.workspace) e.workspace = p.starter;
     e.state = "in-progress";
-    if (!e.studyOnly)
-      recordSpawn(g.study, p.contract, e.questionRoom ?? e.id, g.time);
   } catch (err) {
-    // A stale prepared question costs one fresh generation, not an error.
-    if (prepared) regenerate = true;
-    else if (
+    if (
       g.study === study &&
       study.profile === profile &&
       generationCurrent(g, e, generation)
@@ -574,16 +300,15 @@ async function ensureIndividualProblem(g: Game, e: Encounter, r: Roadmap) {
   } finally {
     if (e.generation === generation) delete e.generation;
   }
-  if (regenerate) await ensureIndividualProblem(g, e, r);
 }
 /** A workspace question that can be thrown away and written again. */
-const regenerable = (g: Game, e: Encounter) =>
+const regenerable = (g: StudyRecord, e: Encounter) =>
   !!e.studyOnly &&
   !!e.problem &&
   e.state !== "consumed" &&
   !e.generation &&
   g.encounters[e.id] === e;
-export const canRegenerate = (g: Game, e: Encounter) =>
+export const canRegenerate = (g: StudyRecord, e: Encounter) =>
   regenerable(g, e) && live(g) && status().mode === "claude-cli";
 /**
  * Discard a workspace question and its conversation and ask for a fresh one on
@@ -592,7 +317,7 @@ export const canRegenerate = (g: Game, e: Encounter) =>
  * encounter, no assessment runs, and what the discarded conversation recorded
  * about the learner is removed. The caller then prepares the question as usual.
  */
-export function regenerateQuestion(g: Game, e: Encounter, r: Roadmap) {
+export function regenerateQuestion(g: StudyRecord, e: Encounter, r: Roadmap) {
   if (!regenerable(g, e)) return false;
   const contract = structuredClone(e.problem!.contract);
   // Without this the identical request tends to return the same question.
@@ -640,7 +365,7 @@ export function regenerateQuestion(g: Game, e: Encounter, r: Roadmap) {
   return true;
 }
 export function edit(
-  g: Game,
+  g: StudyRecord,
   e: Encounter,
   text: string,
   revision: number,
@@ -661,14 +386,7 @@ export function edit(
   e.workspaceBase ??= old;
   e.workspace = text;
   e.revision++;
-  const ev = event(
-    g,
-    "edit",
-    "Human workspace edit saved.",
-    e.floor,
-    "human",
-    e.id,
-  );
+  const ev = { seq: nextSeq(g) };
   let prefix = 0;
   while (
     prefix < old.length &&
@@ -703,7 +421,7 @@ export function edit(
   });
   return true;
 }
-export function presentProblem(g: Game, e: Encounter, r?: Roadmap) {
+export function presentProblem(g: StudyRecord, e: Encounter, r?: Roadmap) {
   // A displayed scheduled assessment is issued even before an answer exists.
   // Generation alone, development practice and completed-lock inspection are not issuance.
   if (
@@ -716,23 +434,14 @@ export function presentProblem(g: Game, e: Encounter, r?: Roadmap) {
     try {
       beginVisit(r, g.study, e);
     } catch (err) {
-      // Unscheduled shared survival work remains available without becoming a personal visit.
+      // A question outside the schedule stays open without becoming a visit.
       e.error = String(err);
     }
   }
   if (!e.problem || e.problemPresentedSequence !== undefined) return;
-  const ev = event(
-    g,
-    "problem-presented",
-    "Task and supplied starter became available to the human.",
-    e.floor,
-    "generator",
-    e.id,
-  );
+  const ev = { seq: nextSeq(g) };
   e.problemPresentedSequence = ev.seq;
   if (e.problemPresentedAt === undefined) e.problemPresentedAt = Date.now();
-  // The question the human now sees is theirs until finished, wherever they go.
-  startThread(g, e);
   e.history.push({
     seq: ev.seq,
     author: "generator",
@@ -748,23 +457,15 @@ export function presentProblem(g: Game, e: Encounter, r?: Roadmap) {
   });
 }
 function message(
-  g: Game,
+  g: StudyRecord,
   e: Encounter,
-  channel: "group" | "tutor",
   author: string,
   kind: Message["kind"],
   text: string,
   provenance: string,
   sourceSeq?: number | number[],
 ) {
-  const ev = event(
-    g,
-    "message",
-    `${author}: ${text.slice(0, 120)}`,
-    e.floor,
-    author,
-    e.id,
-  );
+  const ev = { seq: nextSeq(g) };
   const m: Message = {
     id: `message-${ev.seq}`,
     author,
@@ -781,7 +482,7 @@ function message(
           ? sourceSeq
           : [sourceSeq],
   };
-  e[channel].push(m);
+  e.tutor.push(m);
   e.history.push({
     seq: ev.seq,
     author,
@@ -798,178 +499,19 @@ function message(
   });
   return m;
 }
-/** Record one attributed tutor/group message (shared with direct study). */
-export function presentMessages(
-  g: Game,
-  e: Encounter,
-  channel: "group" | "tutor",
-) {
-  for (const m of e[channel]) {
+/** Record that each tutor message became visible to the learner. */
+export function presentMessages(g: StudyRecord, e: Encounter) {
+  for (const m of e.tutor) {
     if (m.presented !== undefined) continue;
-    const ev = event(
-      g,
-      "message-presented",
-      `${m.author} message became visible.`,
-      e.floor,
-      m.author,
-      e.id,
-    );
-    m.presented = ev.seq;
+    const seq = nextSeq(g);
+    m.presented = seq;
     const original = e.history.find((h) => h.seq === m.seq);
-    if (original) original.presented = ev.seq;
-    for (const ref of m.sourceRefs ?? []) {
-      const proposal = e.history.find(
-        (h) =>
-          h.seq === ref && h.kind === "npc-proposal" && h.author === m.author,
-      );
-      if (proposal) proposal.presented = ev.seq;
-    }
+    if (original) original.presented = seq;
   }
-}
-export function openChat(g: Game, e: Encounter) {
-  if (e.chatOpen) return;
-  e.chatOpen = true;
-  if (live(g) && status().capabilities.includes("retrospective-group"))
-    return nativeCatchup(g, e);
-  // Below: a local recorded-work summary; nothing asynchronous to await.
-  e.catchupNotice = live(g)
-    ? "Recorded work summary · this bridge does not support retrospective dialogue."
-    : g.study.profile === "live"
-      ? "Recorded work summary · bridge catch-up unavailable."
-      : "Recorded work summary · development mode.";
-  const cutoff = g.seq;
-  const fresh = unseenWork(e, cutoff);
-  if (fresh.length > 3) {
-    const older = fresh.slice(0, -3);
-    const authors = [
-      ...new Set(
-        older.map(
-          (h) => g.survivors.find((a) => a.id === h.author)?.name ?? h.author,
-        ),
-      ),
-    ];
-    message(
-      g,
-      e,
-      "group",
-      "Room log",
-      "system",
-      `Catch-up summary: ${older.length} earlier work/activity events involving ${authors.join(", ")}. Their saved artifacts remain available; no unseen conversation or executed tests are implied.`,
-      "grounded-event-range-summary",
-      older.map((h) => h.seq),
-    );
-  }
-  for (const h of fresh.slice(-3)) {
-    const a = g.survivors.find((a) => a.id === h.author);
-    const technical = ["npc-thought", "npc-proposal"].includes(h.kind);
-    message(
-      g,
-      e,
-      "group",
-      technical ? h.author : "Room log",
-      technical ? "npc" : "system",
-      `${technical ? `Saved work summary${a && (!a.alive || a.escaped) ? ` from ${a.name}, who has since left` : ""}` : "Room update"}: ${h.text}`,
-      "grounded-development-catch-up",
-      h.seq,
-    );
-  }
-  e.chatCursor = cutoff;
-  coverCatchupsWithRecordedLog(e);
-  return undefined;
-}
-function nativeCatchup(g: Game, e: Encounter) {
-  const provider = activeProvider();
-  return generateCatchup(g, e, {
-    provider,
-    request: async (payload) => {
-      const connected = () =>
-        live(g) &&
-        status().mode === provider &&
-        status().capabilities.includes("retrospective-group");
-      if (!connected()) throw Error("Reconnect the original catch-up provider");
-      const result = await request("group", payload);
-      if (!connected())
-        throw Error("Catch-up provider changed; no dialogue applied");
-      return result;
-    },
-    append: (author, kind, text, provenance, refs) =>
-      message(g, e, "group", author, kind, text, provenance, refs),
-  });
-}
-export function retryChatCatchup(g: Game, e: Encounter) {
-  if (live(g) && status().capabilities.includes("retrospective-group"))
-    return nativeCatchup(g, e);
-  // Below: a local recorded-work summary; nothing asynchronous to await.
-  return Promise.resolve();
-}
-export function presentWorkLog(g: Game, e: Encounter) {
-  for (const h of e.history.filter(
-    (h) => workKinds.has(h.kind) && h.author !== "human",
-  )) {
-    if (h.presented !== undefined) continue;
-    const ev = event(
-      g,
-      "work-presented",
-      "Recorded group work became visible.",
-      e.floor,
-      h.author,
-      e.id,
-    );
-    h.presented = ev.seq;
-  }
-}
-export function closeChat(_g: Game, e: Encounter) {
-  e.chatOpen = false;
-  // Work while open remains work history, never invented timestamped dialogue.
-}
-
-export function npcCanRespond(g: Game, e: Encounter, a: Actor) {
-  return (
-    a.id !== "human" &&
-    a.alive &&
-    !a.escaped &&
-    !a.vault &&
-    !a.stairTravel &&
-    a.activity !== "fleeing" &&
-    a.floor === e.floor &&
-    a.intent === e.id &&
-    a.thought > 5 &&
-    g.zombies.every(
-      (z) =>
-        z.hp <= 0 ||
-        z.floor !== a.floor ||
-        Math.hypot(z.x - a.x, z.y - a.y) > 4 ||
-        !canSee(g.floors[a.floor], a, z, 4),
-    )
-  );
-}
-export function responders(g: Game, e: Encounter, text: string) {
-  const available = g.survivors.filter((a) => npcCanRespond(g, e, a));
-  const ranked = available
-    .map((a) => ({
-      a,
-      score:
-        (text.toLowerCase().includes(a.name.toLowerCase()) ? 4 : 0) +
-        taskSkill(a, e) * 0.8 +
-        npcProfile(a).strengths[relevantFocus(text)] * 0.6 +
-        ((e.npcWork ?? []).some(
-          (w) => w.actor === a.id && w.focus === relevantFocus(text),
-        )
-          ? 0.2
-          : 0) +
-        a.social * 0.25 +
-        (e.recentSpeakers.includes(a.id) ? -0.5 : 0) +
-        rand(g) * 1.5,
-    }))
-    .sort((a, b) => b.score - a.score);
-  const count = ranked.length > 2 && rand(g) < 0.2 ? 2 : 1;
-  return ranked
-    .slice(0, Math.min(count, Math.max(1, ranked.length - 1)))
-    .map((x) => x.a);
 }
 const tutorInFlight = new WeakMap<object, Promise<void>>();
 export function retryTutorRequest(
-  g: Game,
+  g: StudyRecord,
   e: Encounter,
   id: string,
   r?: Roadmap,
@@ -1024,7 +566,7 @@ export function retryTutorRequest(
               captured?.text !== current?.text))
         )
           throw Error(
-            "Saved terminal conversation changed during review; no reward applied",
+            "Saved terminal conversation changed during review; no credit applied",
           );
       };
       checkSnapshot();
@@ -1065,11 +607,11 @@ export function retryTutorRequest(
           )
         : undefined;
       checkSnapshot();
-      // Only the terminal opened last may finish the continued question's part.
+      // Only the conversation opened last may finish the continued question's part.
       if (dialogue && e.thread && !isActiveVisit(g, e)) answer.complete = false;
       if (dialogue && answer.complete === true && !r)
         throw Error(
-          "Reconnect this saved conversation with its curriculum before awarding access",
+          "Reconnect this saved conversation with its curriculum before accepting the answer",
         );
       if (
         dialogue &&
@@ -1078,7 +620,7 @@ export function retryTutorRequest(
         e.submissions.some((s) => s.status === "pending")
       )
         throw Error(
-          "An earlier answer check is still pending; no duplicate reward applied",
+          "An earlier answer check is still pending; no duplicate credit applied",
         );
       // Validate the whole assessment list before any completion effect.
       const topicUpdates =
@@ -1088,8 +630,7 @@ export function retryTutorRequest(
       const delivered = message(
         g,
         e,
-        "tutor",
-        "Terminal AI",
+        TUTOR_AUTHOR,
         "tutor",
         answer.text,
         job.provider,
@@ -1109,14 +650,7 @@ export function retryTutorRequest(
           })
         : [];
       if (dialogue && answer.complete === true && e.state !== "consumed") {
-        const ev = event(
-          g,
-          "submission",
-          "Terminal AI reviewed the captured conversation.",
-          e.floor,
-          "human",
-          e.id,
-        );
+        const ev = { seq: nextSeq(g) };
         const captured = [
           payload.workspace ? `Saved work:\n${payload.workspace}` : "",
           ...payload.messages
@@ -1150,19 +684,10 @@ export function retryTutorRequest(
           dialogueRequestId: job.id,
         };
         e.submissions.push(submission);
-        // The same rule engine.complete applies before handing the human a key.
-        const human = g.survivors.find((a) => a.id === "human");
-        const keyable =
-          !e.studyOnly &&
-          !!human?.alive &&
-          !human.escaped &&
-          g.status !== "dead" &&
-          g.status !== "escaped";
         applyCompletion(g, e, r!, submission, verdict);
-        // Same synchronous step as the key: one snapshot holds both or neither.
+        // Same synchronous step as the completion: one snapshot holds both or neither.
         if (e.thread && (e.state as string) === "consumed") {
           const finished = completeSegment(g, e, {
-            keyGranted: keyable,
             summary: answer.segmentSummary,
           });
           if (finished)
@@ -1189,391 +714,99 @@ export function retryTutorRequest(
   void operation.finally(() => tutorInFlight.delete(job));
   return operation;
 }
-const groupInFlight = new WeakMap<object, Promise<void>>();
-export function retryGroupRequest(
-  g: Game,
-  e: Encounter,
-  id: string,
-): Promise<void> {
-  const job = e.groupRequests?.find((j) => j.id === id);
-  if (!job || job.state === "applied" || job.state === "superseded")
-    return Promise.resolve();
-  const pending = groupInFlight.get(job);
-  if (pending) return pending;
-  const study = g.study,
-    profile = study.profile;
-  e.groupRequest = job.id;
-  if (job.error && e.error === job.error) delete e.error;
-  job.state = "pending";
-  delete job.error;
-  const operation = (async () => {
-    try {
-      const checkConnection = () => {
-        if (
-          g.study !== study ||
-          study.profile !== profile ||
-          g.encounters[e.id] !== e ||
-          !interactiveConnected(g) ||
-          status().mode !== job.provider
-        )
-          throw Error(
-            "Reconnect the original group connection and encounter to retry this saved question",
-          );
-      };
-      checkConnection();
-      const payload = JSON.parse(job.payloadJson);
-      const snapshot = payload as ReturnType<typeof groupSnapshot>;
-      if (
-        payload.requestId !== job.id ||
-        payload.sessionId !== `${e.runId}/${e.id}/public` ||
-        e.runId !== g.id ||
-        !e.group.some(
-          (m) => m.kind === "human" && m.seq === job.questionSequence,
-        ) ||
-        !Array.isArray(payload.speakers) ||
-        !payload.speakers.length
-      )
-        throw Error(
-          "Saved group request does not match its original public question",
-        );
-      if (e.revision !== snapshot.sourceRevision)
-        throw Error(
-          "Workspace changed since this saved group question; ask a new question for the current revision.",
-        );
-      const selected: Game["survivors"] = payload.speakers.map(
-        (speaker: { id: string }) => {
-          const actor = g.survivors.find((a) => a.id === speaker.id);
-          if (!actor)
-            throw Error("A saved group speaker is no longer available");
-          return actor;
-        },
-      );
-      // Delivery is atomic after validation. A persisted request marker makes
-      // an explicit retry idempotent even if its state was interrupted.
-      if (e.group.some((m) => m.kind === "npc" && m.requestId === job.id)) {
-        job.state = "applied";
-        return;
-      }
-      if (selected.some((actor) => !npcCanRespond(g, e, actor)))
-        throw Error(
-          "A saved group speaker is away or in danger; retry when they can respond.",
-        );
-      const requestId = job.id,
-        workspace = payload.workspace;
-      const reply = await request("group", payload);
-      if (e.groupRequest !== job.id) {
-        job.state = "superseded";
-        return;
-      }
-      checkConnection();
-      if (e.revision !== snapshot.sourceRevision)
-        throw Error(
-          "Workspace changed during group reply; your question remains saved. Ask again for the current revision.",
-        );
-      const messages = validateGroupReply(
-        reply,
-        snapshot,
-        selected.map((a) => a.id),
-        workspace,
-      );
-      if (e.state === "consumed" && messages.some((m) => m.patch))
-        throw Error(
-          "Completed survivor solutions are read-only; preserve the validated reconstruction",
-        );
-      if (messages.some((m) => m.patch) && e.mode !== "shared")
-        throw Error("Workspace candidates require a shared encounter");
-      if (
-        messages.some(
-          (m) =>
-            !npcCanRespond(
-              g,
-              e,
-              selected.find((a) => a.id === m.author)!,
-            ),
-        )
-      )
-        throw Error(
-          "A saved group speaker moved away or encountered danger; their reply remains available for retry.",
-        );
-      for (const m of messages) {
-        const a = selected.find((a) => a.id === m.author)!;
-        let proposalSequence: number | undefined;
-        if (m.kind === "proposal") {
-          const ev = event(
-            g,
-            "npc-proposal",
-            `${a.name} supplied an unvalidated candidate for revision ${snapshot.sourceRevision}.`,
-            e.floor,
-            a.id,
-            e.id,
-          );
-          proposalSequence = ev.seq;
-          e.history.push({
-            seq: ev.seq,
-            author: a.id,
-            kind: "npc-proposal",
-            text: m.patch ? proposalText(m.text, m.patch) : m.text,
-            delta: m.patch ? structuredClone(m.patch) : undefined,
-            at: g.time,
-            revision: snapshot.sourceRevision,
-            refs: m.refs.map(String),
-          });
-          if (m.patch) {
-            e.proposals ??= [];
-            e.proposals.push({
-              id: `${requestId}/${a.id}`,
-              author: a.id,
-              sourceRevision: snapshot.sourceRevision,
-              sourceSequence: snapshot.cutoff,
-              artifactSequence: ev.seq,
-              patch: structuredClone(m.patch),
-              state: "pending",
-            });
-          }
-        }
-        const delivered = message(
-          g,
-          e,
-          "group",
-          a.id,
-          "npc",
-          m.kind === "proposal"
-            ? `Candidate for workspace revision ${snapshot.sourceRevision} (not executed or validated):\n${m.patch ? proposalText(m.text, m.patch) : m.text}`
-            : m.text,
-          job.provider,
-          proposalSequence === undefined
-            ? m.refs
-            : [...m.refs, proposalSequence],
-        );
-        delivered.requestId = requestId;
-      }
-
-      job.state = "applied";
-    } catch (error) {
-      if ((job.state as string) === "superseded") return;
-      job.state = "interrupted";
-      job.error = String(error);
-      e.error = job.error;
-    } finally {
-      if (e.groupRequest === job.id) delete e.groupRequest;
-    }
-  })();
-  groupInFlight.set(job, operation);
-  void operation.finally(() => groupInFlight.delete(job));
-  return operation;
-}
 export async function send(
-  g: Game,
+  g: StudyRecord,
   e: Encounter,
-  channel: "group" | "tutor",
   text: string,
   r: Roadmap,
 ) {
-  const reconstruction = outcomeIsVisible(g, e, r)
-    ? e.outcomeInspection?.candidate
-    : undefined;
-  const problem = e.problem ?? reconstruction?.problem;
-  const workspace = reconstruction?.solution ?? e.workspace;
+  const problem = e.problem;
   if (!text.trim() || !problem) return;
-  if (
-    channel === "tutor" &&
-    e.tutorRequests?.some((j) => j.state === "pending")
-  )
-    return;
-  if (channel === "tutor")
-    for (const job of e.tutorRequests ?? [])
-      if (job.state === "interrupted") settleTutorRequest(job, "superseded");
+  if (e.tutorRequests?.some((j) => j.state === "pending")) return;
+  for (const job of e.tutorRequests ?? [])
+    if (job.state === "interrupted") settleTutorRequest(job, "superseded");
   delete e.error;
-  message(g, e, channel, "human", "human", text, "live-human");
+  message(g, e, "human", "human", text, "live-human");
   try {
     if (e.state !== "consumed") beginVisit(r, g.study, e);
   } catch {
-    /* Non-eligible participation stays world-only. */
+    /* Non-eligible participation stays unscheduled. */
   }
-  if (channel === "tutor") {
-    if (
-      e.mode === "solo" ||
-      g.study.profile === "live" ||
-      interactiveConnected(g)
-    ) {
-      const provider = capturedProvider(problem);
-      const id = `tutor-${g.id}-${e.id}-${g.seq}`;
-      const capture = () => ({
-        requestId: id,
-        sessionId: `${g.id}/${e.id}/private`,
-        ...(e.mode === "solo" && e.state !== "consumed"
-          ? {
-              mode: "terminal-dialogue",
-              responseFormat: TERMINAL_DIALOGUE_FORMAT,
-              instruction: TERMINAL_DIALOGUE_INSTRUCTION,
-              probe: encounterProbeContract(e, problem),
-              ...(e.thread ? { segment: segmentPayload(g, e) } : {}),
-              ...(g.study.profile === "live" && r
-                ? {
-                    topicAssessmentContext: topicAssessmentContext(
-                      g,
-                      r,
-                      problem.contract,
-                    ),
-                  }
-                : {}),
-            }
-          : {}),
-        problem,
-        workspace,
-        draftRevision: e.revision,
-        submissions: e.submissions.slice(-5).map((s) => ({
-          id: s.id,
-          revision: s.revision,
-          content: s.content,
-          status: s.status,
-          feedback: s.feedback,
-        })),
-        ...(reconstruction
-          ? {
-              retrospectiveOutcome:
-                "Reconstruction authored now from a simulated NPC-only completion; no historical execution or human assessment.",
-            }
-          : {}),
-        messages: structuredClone(e.tutor),
-        executions: (e.executions ?? [])
-          .filter((j) => j.status === "finished")
-          .map(executionEvidence),
-        learning: problem.contract,
-        prompt: text,
-        curriculum: r.tracks[problem.contract.track].curriculum,
-        progressContext: [
-          trackProgressContext(g.study.learner, r, problem.contract.track),
-          knowledgeProbeContext(g, problem.contract.track),
-        ]
-          .filter(Boolean)
-          .join("\n\n"),
-      });
-      let payloadJson: string;
-      try {
-        payloadJson = JSON.stringify(capture());
-      } catch (err) {
-        // The message is recorded; a context that cannot be captured (a track
-        // the roadmap no longer holds, say) is reported, never left unhandled.
-        e.error = `Your message is saved, but its question context could not be prepared. ${String(err)}`;
-        return;
-      }
-      (e.tutorRequests ??= []).push({
-        id,
-        provider,
-        payloadJson,
-        questionSequence: e.tutor.at(-1)!.seq,
-        state: "pending",
-      });
-      await retryTutorRequest(g, e, id, r);
-    } else {
-      e.error =
-        "The study connection is unavailable. Check that Claude CLI is installed and signed in, then retry. Your question and answer draft are saved.";
-    }
-    return;
-  }
-  if (g.study.profile === "live" && !live(g)) {
-    e.error =
-      "Live tutor connection unavailable. Your question and work remain saved.";
-    return;
-  }
-  const selected = responders(g, e, text);
-  e.recentSpeakers = selected.map((a) => a.id);
-  if (!selected.length) return;
-  if (interactiveConnected(g)) {
-    const requestId = `group-${g.id}-${e.id}-${g.seq}`;
-    for (const prior of e.groupRequests ?? [])
-      if (prior.state === "pending" || prior.state === "interrupted") {
-        prior.state = "superseded";
-        prior.error =
-          "A newer group question superseded this reply; its captured context remains retained.";
-      }
-    const snapshot = groupSnapshot(e, requestId, g.seq),
-      groupProvider = status().mode;
-    const payload = {
-      ...snapshot,
-      mode: "reply",
-      proposalFormat: {
-        kind: "single-range",
-        fields: ["prefix", "removed", "inserted"],
-        offsetUnit: "utf16-code-units",
-        maxChangedCharacters: 32000,
-        instruction:
-          "Optional patch on proposal messages only. Capture exact source text; no claim of application or test success. The human reviews before applying.",
-      },
-      sessionId: `${g.id}/${e.id}/public`,
-      speakers: selected.map((a) => ({
-        id: a.id,
-        name: a.name,
-        skill: taskSkill(a, e),
-        role: a.role,
-        profile: npcProfile(a),
-        activity: a.activity,
-      })),
-      problem,
-      workspace,
-      draftRevision: e.revision,
-      ...(reconstruction
-        ? {
-            retrospectiveOutcome:
-              "Read-only reconstructed NPC solution; no new edits or historical execution claims.",
-          }
-        : {}),
-      messages: e.group,
-      workRecords: (e.npcWork ?? []).slice(-16),
-    };
-    (e.groupRequests ??= []).push({
-      id: requestId,
-      provider: groupProvider as Provider,
-      payloadJson: JSON.stringify(payload),
-      questionSequence: e.group.at(-1)!.seq,
-      state: "pending",
-    });
-    await retryGroupRequest(g, e, requestId);
-  } else
-    for (const a of selected) {
-      const last = e.history
-        .filter((h) => h.author === a.id && h.kind === "npc-thought")
-        .at(-1);
-      message(
-        g,
-        e,
-        "group",
-        a.id,
-        "npc",
-        taskSkill(a, e) < 0.6
-          ? "I am still working through the contract. Which assumption makes your example hold?"
-          : last
-            ? `My last work note: ${last.text} I have not executed any code. Can you show the boundary you are worried about?`
-            : "I have a candidate idea, but have not validated it. Let’s trace your example against the stated constraints.",
-        "development-grounded-reply",
-        taskSkill(a, e) >= 0.6 ? last?.seq : undefined,
-      );
-    }
-}
-export async function submit(
-  g: Game,
-  e: Encounter,
-  r: Roadmap,
-  author = "human",
-  proposalId?: string,
-) {
-  const candidate = e.proposals?.find((p) => p.id === proposalId);
   if (
-    author !== "human" &&
-    (!live(g) ||
-      !autonomousAllowed() ||
-      (candidate?.provider ?? "study-mode") !== status().mode ||
-      !npcAtWorkstation(g, e, author) ||
-      humanUsingWorkspace(g, e) ||
-      !candidate?.autonomous ||
-      !candidate.appliedAutomatically ||
-      candidate.sourceProblem !== JSON.stringify(e.problem) ||
-      candidate.author !== author ||
-      candidate.appliedRevision !== e.revision ||
-      candidate.submissionId)
-  )
+    e.mode !== "solo" &&
+    g.study.profile !== "live" &&
+    !interactiveConnected(g)
+  ) {
+    e.error =
+      "The study connection is unavailable. Check that Claude CLI is installed and signed in, then retry. Your question and answer draft are saved.";
     return;
+  }
+  const provider = capturedProvider(problem);
+  const id = `tutor-${g.id}-${e.id}-${g.seq}`;
+  const capture = () => ({
+    requestId: id,
+    sessionId: `${g.id}/${e.id}/private`,
+    ...(e.mode === "solo" && e.state !== "consumed"
+      ? {
+          mode: "terminal-dialogue",
+          responseFormat: TERMINAL_DIALOGUE_FORMAT,
+          instruction: TERMINAL_DIALOGUE_INSTRUCTION,
+          probe: encounterProbeContract(e, problem),
+          ...(e.thread ? { segment: segmentPayload(g, e) } : {}),
+          ...(g.study.profile === "live" && r
+            ? {
+                topicAssessmentContext: topicAssessmentContext(
+                  g,
+                  r,
+                  problem.contract,
+                ),
+              }
+            : {}),
+        }
+      : {}),
+    problem,
+    workspace: e.workspace,
+    draftRevision: e.revision,
+    submissions: e.submissions.slice(-5).map((s) => ({
+      id: s.id,
+      revision: s.revision,
+      content: s.content,
+      status: s.status,
+      feedback: s.feedback,
+    })),
+    messages: structuredClone(e.tutor),
+    executions: (e.executions ?? [])
+      .filter((j) => j.status === "finished")
+      .map(executionEvidence),
+    learning: problem.contract,
+    prompt: text,
+    curriculum: r.tracks[problem.contract.track].curriculum,
+    progressContext: [
+      trackProgressContext(g.study.learner, r, problem.contract.track),
+      knowledgeProbeContext(g, problem.contract.track),
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
+  });
+  let payloadJson: string;
+  try {
+    payloadJson = JSON.stringify(capture());
+  } catch (err) {
+    // The message is recorded; a context that cannot be captured (a track
+    // the roadmap no longer holds, say) is reported, never left unhandled.
+    e.error = `Your message is saved, but its question context could not be prepared. ${String(err)}`;
+    return;
+  }
+  (e.tutorRequests ??= []).push({
+    id,
+    provider,
+    payloadJson,
+    questionSequence: e.tutor.at(-1)!.seq,
+    state: "pending",
+  });
+  await retryTutorRequest(g, e, id, r);
+}
+export async function submit(g: StudyRecord, e: Encounter, r: Roadmap) {
   if (
     !e.problem ||
     e.state === "consumed" ||
@@ -1581,35 +814,26 @@ export async function submit(
   )
     return;
   try {
-    if (author === "human") beginVisit(r, g.study, e);
+    beginVisit(r, g.study, e);
   } catch (err) {
     e.error = String(err);
   }
-  const ev = event(
-      g,
-      "submission",
-      "Submission captured; movement remains available.",
-      e.floor,
-      author,
-      e.id,
-    ),
-    s: Submission = {
-      id: `submit-${g.id}-${ev.seq}`,
-      revision: e.revision,
-      author,
-      content: e.workspace,
-      status: "pending" as "pending" | "complete" | "needs-work" | "error",
-      feedback: "Checking captured revision…",
-      seq: ev.seq,
-    };
+  const s: Submission = {
+    id: `submit-${g.id}-${nextSeq(g)}`,
+    revision: e.revision,
+    author: "human",
+    content: e.workspace,
+    status: "pending",
+    feedback: "Checking captured revision…",
+    seq: g.seq,
+  };
   e.submissions.push(s);
-  if (candidate && author !== "human") candidate.submissionId = s.id;
   e.state = "submitted";
   return retrySubmission(g, e, r, s.id);
 }
 const completionInFlight = new WeakMap<Submission, Promise<void>>();
 export function retrySubmission(
-  g: Game,
+  g: StudyRecord,
   e: Encounter,
   r: Roadmap,
   id: string,
@@ -1633,13 +857,12 @@ export function retrySubmission(
   return operation;
 }
 async function evaluateSubmission(
-  g: Game,
+  g: StudyRecord,
   e: Encounter,
   r: Roadmap,
   s: Submission,
 ) {
   if (!e.problem) return;
-  const author = s.author;
   s.status = "pending";
   s.feedback = "Checking captured revision…";
   e.state = "submitted";
@@ -1652,17 +875,6 @@ async function evaluateSubmission(
       throw Error(
         "Reconnect the original completion provider to retry this saved evaluation",
       );
-    if (author !== "human" && !autonomousAllowed())
-      throw Error(
-        "Unattended NPC work was disabled; captured submission retained without release",
-      );
-    if (author !== "human" && e.problem.runtime && !s.completionRequest) {
-      const job = await runWorkspace(g, e, r, author);
-      if (!job?.receipt?.executed)
-        throw Error(
-          "NPC runtime validation unavailable; captured submission retained without automatic retry",
-        );
-    }
     let result: { complete: boolean; feedback: string; qualified: string[] };
     if (!s.completionRequest) {
       // Bind a disconnected capture to the provider that wrote the question.
@@ -1672,22 +884,15 @@ async function evaluateSubmission(
         encounterId: e.id,
         problem: e.problem,
         submission: { ...s },
-        submitter: author,
+        submitter: s.author,
         responseFormat: {
           complete: "boolean",
           feedback: "string",
-          qualified: "array of survivor IDs",
+          qualified: "array of IDs",
         },
         instruction:
-          "Judge the exact submitted answer against the question and rubric. Accept only a semantically correct, sufficiently supported answer. Headings, answer length and chat activity are not proof. Return only the structured completion JSON; gameplay acceptance does not certify individual mastery.",
-        ...(author !== "human"
-          ? {
-              provider,
-              autonomyAllowed: true,
-            }
-          : {}),
-        history:
-          author === "human" ? e.history : groupSnapshot(e, s.id, s.seq).events,
+          "Judge the exact submitted answer against the question and rubric. Accept only a semantically correct, sufficiently supported answer. Headings, answer length and chat activity are not proof. Return only the structured completion JSON; answer acceptance does not certify individual mastery.",
+        history: e.history,
         executions: (e.executions ?? [])
           .filter(
             (j) =>
@@ -1727,17 +932,7 @@ async function evaluateSubmission(
         throw Error(
           "Saved completion request no longer matches its captured question and revision",
         );
-      result =
-        author === "human"
-          ? await request<typeof result>("complete", payload)
-          : await optionalProviderRequest<typeof result>(
-              g,
-              saved.provider,
-              "complete",
-              payload,
-              "autonomous-work",
-              true,
-            );
+      result = await request<typeof result>("complete", payload);
       if (
         !completionConnected(g, e) ||
         status().mode !== saved.provider ||
@@ -1764,163 +959,75 @@ async function evaluateSubmission(
 // Every validated completion uses this exactly-once reward and evidence path.
 // Only a validated provider reply may reach it; tests apply a fixed verdict here.
 export function applyCompletion(
-  g: Game,
+  g: StudyRecord,
   e: Encounter,
   r: Roadmap,
   s: Submission,
   result: ReturnType<typeof completionVerdict>,
   onAssessment?: () => void,
 ) {
-  const author = s.author;
   if ((e.state as string) === "consumed" || g.encounters[e.id] !== e) {
     if (e.accepted === s.id) return;
     s.status = "error";
     s.feedback =
-      "This evaluation was superseded; the accepted terminal record remains unchanged.";
+      "This evaluation was superseded; the accepted record remains unchanged.";
     return;
   }
   s.status = result.complete ? "complete" : "needs-work";
   s.feedback = result.feedback;
   if (result.complete) {
-    const allowed = new Set(
-      e.history
-        .filter(
-          (h) =>
-            [
-              "defense",
-              "edit",
-              "reasoning",
-              "test",
-              "npc-thought",
-              "npc-proposal",
-            ].includes(h.kind) && h.seq <= s.seq,
-        )
-        .map((h) => h.author),
+    const worked = e.history.some(
+      (h) =>
+        h.author === "human" &&
+        ["defense", "edit", "reasoning", "test"].includes(h.kind) &&
+        h.seq <= s.seq,
     );
-    const qualified = [
-      ...new Set([
-        ...e.contributors.filter((a) =>
-          e.history.some((h) => h.author === a && h.seq <= s.seq),
-        ),
-        ...result.qualified.filter((id) => allowed.has(id)),
-      ]),
-    ];
-    e.contributors = qualified;
-    if (author === "human") countStudyTurn(g.study, e);
-    complete(g, e.id, s.id, qualified, result.feedback);
+    e.contributors =
+      worked && result.qualified.includes("human") ? ["human"] : [];
+    countStudyTurn(g.study, e);
+    completeQuestion(g, e, s.id, result.feedback);
     e.workspace = s.content;
     e.revision = s.revision;
     finishVisit(r, g.study, e);
-    if (
-      // Variety practice records probe knowledge but is never assessed as a visit.
-      !e.problem?.contract.practice &&
-      (author === "human" ||
-        e.history.some(
-          (h) =>
-            h.author === "human" &&
-            ["edit", "reasoning", "test", "defense"].includes(h.kind) &&
-            h.seq <= s.seq,
-        ))
-    )
+    // Variety practice records probe knowledge but is never assessed as a visit.
+    if (!e.problem?.contract.practice)
       void assess(g, e, r, s.seq).then(onAssessment, onAssessment);
   } else {
     e.state = "in-progress";
-    if (author !== "human") {
-      const feedback = event(
-        g,
-        "validation",
-        "NPC submission needs more work.",
-        e.floor,
-        "validator",
-        e.id,
-      );
-      e.history.push({
-        seq: feedback.seq,
-        author: "validator",
-        kind: "validation",
-        text: `Semantic feedback for ${s.id}: ${result.feedback}. This is not a runtime receipt.`,
-        at: g.time,
-        revision: s.revision,
-        refs: [s.id],
-      });
-    }
   }
 }
-/** Opt-in public NPC work. Never retries a captured submission or failed batch. */
-const autonomousRuns = new WeakMap<Game, Promise<void>>();
-export function autonomousNpcWork(
-  g: Game,
-  r: Roadmap,
-): Promise<void> | undefined {
-  if (
-    !live(g) ||
-    !autonomousAllowed() ||
-    !status().capabilities.includes("materialize-work") ||
-    g.status !== "playing"
-  )
-    return;
-  const provider = activeProvider();
-  const running = autonomousRuns.get(g);
-  if (running) return running;
-  for (const e of Object.values(g.encounters)) {
-    if (
-      !hasHumanStudyContext(e) ||
-      !isAiProvenance(e.problem?.provenance) ||
-      e.mode !== "shared" ||
-      e.state === "consumed" ||
-      humanUsingWorkspace(g, e) ||
-      e.submissions.some((s) => s.status === "pending")
-    )
-      continue;
-    const p = e.proposals?.find(
-      (p) =>
-        p.autonomous &&
-        (p.provider ?? "study-mode") === provider &&
-        !p.submissionId &&
-        p.state !== "dismissed" &&
-        npcAtWorkstation(g, e, p.author) &&
-        (p.state === "pending"
-          ? p.sourceRevision === e.revision
-          : p.appliedAutomatically && p.appliedRevision === e.revision),
-    );
-    let task: Promise<void> | undefined;
-    if (p)
-      task = (async () => {
-        try {
-          if (p.state === "pending") applyAutonomousProposal(g, e, p.id);
-          await submit(g, e, r, p.author, p.id);
-        } catch (error) {
-          e.materializationNotice = String(error);
-          p.state = "dismissed";
-        }
-      })();
-    else
-      task = materializeNpcWork(
-        g,
-        e,
-        (payload) =>
-          optionalProviderRequest(
-            g,
-            provider,
-            "materialize-work",
-            payload,
-            "autonomous-work",
-            true,
-          ),
-        false,
-        { background: true, allowAutonomous: true, provider },
-      );
-    if (task) {
-      autonomousRuns.set(g, task);
-      void task.finally(() => autonomousRuns.delete(g));
-      return task;
-    }
+/** Close an answered question: its record is final and its attempt stays open
+ * only until a valid assessment settles it. A closed question stays closed. */
+export function completeQuestion(
+  g: StudyRecord,
+  e: Encounter,
+  submissionId: string,
+  provenance: string,
+) {
+  if (e.state === "consumed") return false;
+  e.state = "consumed";
+  if (g.study.learner) interruptLearningAttempt(g.study.learner, e);
+  e.accepted = submissionId;
+  const submission = e.submissions.find((s) => s.id === submissionId);
+  if (submission) {
+    submission.status = "complete";
+    submission.feedback = provenance;
+    e.workspace = submission.content;
+    e.revision = submission.revision;
   }
-  return undefined;
+  e.chatOpen = false;
+  e.history.push({
+    seq: nextSeq(g),
+    author: "system",
+    kind: "completion",
+    text: `Study question completed. ${provenance}`,
+    at: g.time,
+    revision: e.revision,
+  });
+  return true;
 }
-
 export function reviewEnvironmentObservation(
-  g: Game,
+  g: StudyRecord,
   r: Roadmap,
   id: string,
   retry = false,
@@ -1954,7 +1061,7 @@ export function reviewEnvironmentObservation(
 }
 
 export function reconcileUploadedRoadmap(
-  g: Game,
+  g: StudyRecord,
   r: Roadmap,
   candidate: string,
   retryId?: string,

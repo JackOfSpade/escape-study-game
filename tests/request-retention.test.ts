@@ -5,8 +5,7 @@ import { preparePracticeRooms } from "./helpers/practice-questions";
 import { checkBridge, retryTutorRequest, send } from "../src/ai";
 import type { Roadmap, TutorRequest } from "../src/model";
 import { decode, encode, recover } from "../src/persistence";
-import { retainRunLearning } from "../src/run-learning";
-import { createPlayableGame } from "../src/world";
+import { createPlayableGame } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 async function fixture(
   run: (
@@ -37,7 +36,7 @@ async function fixture(
     await checkBridge();
     const g = createPlayableGame(717, r);
     preparePracticeRooms(g, r);
-    const e = g.encounters[g.floors[0].stations[0].encounter];
+    const e = g.encounters["question-0"];
     e.mode = "solo";
     e.owner = "human";
     connected = true;
@@ -71,7 +70,7 @@ const released = (job: { payloadJson: string }) => {
 test("an applied tutor job releases curriculum and progressContext but keeps its identity", async () =>
   fixture(async (_g, e, calls, reply) => {
     reply(async () => Response.json({ text: "Go on", complete: false }));
-    await send(_g, e, "tutor", "My first answer", r);
+    await send(_g, e, "My first answer", r);
     assert.equal(calls.length, 1);
     assert.ok(calls[0].payload.curriculum.length > 100);
     assert.ok(calls[0].payload.progressContext.length > 100);
@@ -94,7 +93,7 @@ test("an applied tutor job releases curriculum and progressContext but keeps its
 test("an interrupted live job keeps its full payload through reload and retries identically", async () =>
   fixture(async (g, e, calls, reply) => {
     reply(async () => Response.json({ error: "outage" }, { status: 503 }));
-    await send(g, e, "tutor", "Captured answer", r);
+    await send(g, e, "Captured answer", r);
     const job = e.tutorRequests[0];
     assert.equal(job.state, "interrupted");
     assert.ok(hasContext(job));
@@ -114,28 +113,28 @@ test("an interrupted live job keeps its full payload through reload and retries 
 test("a newer message supersedes an interrupted job and releases its context", async () =>
   fixture(async (g, e, _calls, reply) => {
     reply(async () => Response.json({ error: "outage" }, { status: 503 }));
-    await send(g, e, "tutor", "First answer", r);
+    await send(g, e, "First answer", r);
     const old = e.tutorRequests[0];
     assert.equal(old.state, "interrupted");
     assert.ok(hasContext(old));
     reply(async () => Response.json({ text: "Keep going", complete: false }));
-    await send(g, e, "tutor", "Revised answer", r);
+    await send(g, e, "Revised answer", r);
     assert.equal(old.state, "superseded");
     assert.ok(released(old));
     assert.equal(parsed(old).requestId, old.id);
   }));
 
-test("archiving a run releases context from every tutor job, including interrupted ones", async () =>
+test("recovering an archived question releases context from every tutor job, including interrupted ones", async () =>
   fixture(async (g, e, _calls, reply) => {
     reply(async () => Response.json({ error: "outage" }, { status: 503 }));
-    await send(g, e, "tutor", "Unanswered answer", r);
+    await send(g, e, "Unanswered answer", r);
     assert.equal(e.tutorRequests[0].state, "interrupted");
     assert.ok(hasContext(e.tutorRequests[0]));
-    retainRunLearning(g, true);
-    const archived = g.study.archives.find((a: any) => a.id === e.id);
-    assert.ok(archived);
-    assert.equal(g.study.archives[0].id, e.id);
-    const job = g.study.archives[0].tutorRequests[0];
+    g.study.archives.push(g.encounters[e.id]);
+    delete g.encounters[e.id];
+    const restored = recover(decode(encode(g)));
+    assert.equal(restored.study.archives[0].id, e.id);
+    const job = restored.study.archives[0].tutorRequests![0];
     assert.equal(job.state, "interrupted");
     assert.ok(released(job));
     assert.equal(parsed(job).requestId, job.id);

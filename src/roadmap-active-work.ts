@@ -1,14 +1,14 @@
 import { PROVIDERS } from "./model";
 import { sha256 } from "./digest";
 import type { LearnerLedger, LearningAttempt } from "./learning-model";
-import type { Encounter, Game } from "./model";
+import type { Encounter, StudyRecord } from "./model";
 import type {
   ActiveAttemptSnapshot,
   RoadmapReconciliationJob,
 } from "./roadmap-adoption-types";
 import { receiptRows } from "./roadmap-structure";
 const key = (e: Encounter) => `${e.runId ?? "legacy"}/${e.id}`;
-const encounter = (g: Game, id: string) =>
+const encounter = (g: StudyRecord, id: string) =>
   [...Object.values(g.encounters), ...g.study.archives].find(
     (e) => key(e) === id,
   );
@@ -25,7 +25,7 @@ const workText = (e: Encounter) =>
         ["edit", "reasoning", "test", "execution"].includes(h.kind),
     ),
     tutor: e.tutor,
-    group: e.group.filter((m) => m.author === "human"),
+    group: (e.group ?? []).filter((m) => m.author === "human"),
     executions: (e.executions ?? []).filter((j) => j.author === "human"),
   });
 async function workHash(e: Encounter) {
@@ -38,7 +38,7 @@ async function workHash(e: Encounter) {
   return hash;
 }
 export async function captureActiveAttempts(
-  g: Game,
+  g: StudyRecord,
 ): Promise<ActiveAttemptSnapshot[]> {
   const result: ActiveAttemptSnapshot[] = [];
   for (const a of g.study.learner?.attempts ?? []) {
@@ -71,7 +71,7 @@ export const activeContextIdentity = (items: ActiveAttemptSnapshot[] = []) =>
       .sort((a, b) => a[0].localeCompare(b[0])),
   );
 export async function validateActiveAttemptWork(
-  g: Game,
+  g: StudyRecord,
   job: RoadmapReconciliationJob,
 ) {
   for (const update of job.proposal?.attemptUpdates ?? []) {
@@ -93,7 +93,10 @@ export async function validateActiveAttemptWork(
   }
 }
 /** Synchronous final check after async compilation, immediately before publication. */
-export function activeWorkSnapshot(g: Game, job: RoadmapReconciliationJob) {
+export function activeWorkSnapshot(
+  g: StudyRecord,
+  job: RoadmapReconciliationJob,
+) {
   return JSON.stringify(
     (job.proposal?.attemptUpdates ?? [])
       .filter((u) => u.resolveCurrent)

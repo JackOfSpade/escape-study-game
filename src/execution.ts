@@ -4,8 +4,12 @@ import {
   type BrowserStep,
 } from "../scripts/browser-runner/spec.mjs";
 import { eligible } from "./curriculum";
-import { event, type Encounter, type Game, type Roadmap } from "./model";
-import { humanUsingWorkspace, npcAtWorkstation } from "./npc-work-access";
+import {
+  nextSeq,
+  type Encounter,
+  type StudyRecord,
+  type Roadmap,
+} from "./model";
 import { sha256 } from "./digest";
 
 export interface ExecutionReceipt {
@@ -103,7 +107,7 @@ export function executionEvidence(job: WorkspaceExecution) {
   };
 }
 
-export function canRunWorkspace(g: Game, e: Encounter, r: Roadmap) {
+export function canRunWorkspace(g: StudyRecord, e: Encounter, r: Roadmap) {
   if (
     !e.problem?.runtime ||
     e.state === "consumed" ||
@@ -121,19 +125,8 @@ export function canRunWorkspace(g: Game, e: Encounter, r: Roadmap) {
   );
 }
 
-export async function runWorkspace(
-  g: Game,
-  e: Encounter,
-  r: Roadmap,
-  author = "human",
-) {
-  if (
-    author !== "human" &&
-    (!npcAtWorkstation(g, e, author) || humanUsingWorkspace(g, e))
-  )
-    throw Error(
-      "NPC execution requires an unattended workspace and its seated author",
-    );
+export async function runWorkspace(g: StudyRecord, e: Encounter, r: Roadmap) {
+  const author = "human";
   if (!canRunWorkspace(g, e, r))
     throw Error("This task has no eligible executable workspace");
   if (e.executions?.some((a) => a.status === "pending")) return;
@@ -220,16 +213,8 @@ export async function runWorkspace(
     job.receipt = receipt;
     job.status = "finished";
     if (receipt.executed) {
-      const ev = event(
-        g,
-        "execution",
-        `Ran ${job.language} workspace v${job.revision}.`,
-        e.floor,
-        "runner",
-        e.id,
-      );
       e.history.push({
-        seq: ev.seq,
+        seq: nextSeq(g),
         author: "runner",
         kind: "execution",
         executionId: job.id,

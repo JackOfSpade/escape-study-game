@@ -8,12 +8,12 @@ import {
   finalRequirements,
   finalRequirementStatus,
 } from "./final-requirements";
-import type { Game, Roadmap } from "./model";
+import type { StudyRecord, Roadmap } from "./model";
 import { download } from "./persistence";
 const refreshers = new WeakMap<HTMLElement, () => void>();
 export function renderEnvironmentObservations(
   host: HTMLElement,
-  g: Game,
+  g: StudyRecord,
   r: Roadmap,
   persist: () => unknown,
   review?: (id: string, retry: boolean) => Promise<void> | undefined,
@@ -25,7 +25,7 @@ export function renderEnvironmentObservations(
     runs = environmentExecutions(g).slice(-30);
   const section = document.createElement("details");
   section.id = "environment-observations";
-  section.innerHTML = `<summary>Practical environment observations</summary><p>Save your own practical work for review. A description is reported exposure; supplied output and runner receipts still need review. Saving never marks an ENV item passed, awards academic evidence or changes a tier gate. ${review ? "The connected reviewer can review a saved observation when you request it. Review is separate from academic mastery." : "ENV review is unavailable. Download packets and the full game backup for external review."}</p><form id="environment-form"><label>Environment skill <select id="environment-item">${definitions.map((d) => `<option value="${escape(d.id)}">${escape(d.id)} · ${escape(d.scope)}</option>`).join("")}</select></label><p id="environment-scope" class="muted"></p><label for="environment-statement">Your actions, environment, what ran and what you observed</label><textarea id="environment-statement" rows="5" maxlength="8000" required></textarea><label>Saved code run (optional) <select id="environment-run"><option value="">No saved runner receipt</option>${runs.map((v) => `<option value="${escape(v.key)}">${escape(v.job.language)} v${v.job.revision} · ${escape(v.e.id)} · ${escape(v.job.id.slice(0, 8))}</option>`).join("")}</select></label><label>Supporting output or shared text file (optional, 256 KiB) <input id="environment-output" type="file" accept=".txt,.log,.json,.md,.py,.ts,.tsx,.js,text/plain,application/json,text/markdown"></label><button type="submit">Save observation for review</button><p id="environment-status" role="status"></p></form><div id="environment-observation-list"></div>`;
+  section.innerHTML = `<summary>Practical environment observations</summary><p>Save your own practical work for review. A description is reported exposure; supplied output and runner receipts still need review. Saving never marks an ENV item passed, awards academic evidence or changes a tier gate. ${review ? "The connected reviewer can review a saved observation when you request it. Review is separate from academic mastery." : "ENV review is unavailable. Download packets and the full backup for external review."}</p><form id="environment-form"><label>Environment skill <select id="environment-item">${definitions.map((d) => `<option value="${escape(d.id)}">${escape(d.id)} · ${escape(d.scope)}</option>`).join("")}</select></label><p id="environment-scope" class="muted"></p><label for="environment-statement">Your actions, environment, what ran and what you observed</label><textarea id="environment-statement" rows="5" maxlength="8000" required></textarea><label>Saved code run (optional) <select id="environment-run"><option value="">No saved runner receipt</option>${runs.map((v) => `<option value="${escape(v.key)}">${escape(v.job.language)} v${v.job.revision} · ${escape(v.e.id)} · ${escape(v.job.id.slice(0, 8))}</option>`).join("")}</select></label><label>Supporting output or shared text file (optional, 256 KiB) <input id="environment-output" type="file" accept=".txt,.log,.json,.md,.py,.ts,.tsx,.js,text/plain,application/json,text/markdown"></label><button type="submit">Save observation for review</button><p id="environment-status" role="status"></p></form><div id="environment-observation-list"></div>`;
   host.append(section);
   const item = section.querySelector<HTMLSelectElement>("#environment-item")!;
   const showScope = () => {
@@ -163,7 +163,7 @@ export function renderEnvironmentObservations(
           "Observation packet saved locally for review. No ENV pass or academic credit awarded.";
       } catch (error) {
         status.textContent = recorded
-          ? `Observation retained in this run, but local save failed. Download its packet or a full game backup. ${String(error)}`
+          ? `Observation retained in this run, but local save failed. Download its packet or a full backup. ${String(error)}`
           : `Observation not saved: ${String(error)}`;
       } finally {
         button.disabled = false;

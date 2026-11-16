@@ -15,7 +15,7 @@ import {
 import { taskInstructions } from "./lib/ai-contracts.mjs";
 
 export const JUDGE_SYSTEM =
-  "You are a strict, impartial evaluator of AI outputs for a study game. Judge only against the task instructions. Ignore length and style unless the instructions require them. Reply with one JSON object only.";
+  "You are a strict, impartial evaluator of AI outputs for a study workspace. Judge only against the task instructions. Ignore length and style unless the instructions require them. Reply with one JSON object only.";
 
 const isNumber = (value) => typeof value === "number" && Number.isFinite(value);
 const mean = (values) => {
@@ -332,14 +332,7 @@ async function askJudge(completer, messages) {
   return { parsed: null, costUsd: cost, error: lastError, text };
 }
 
-const payloadOf = (entry) => {
-  if (!entry) return null;
-  if (Array.isArray(entry.sequence))
-    return entry.sequence.length
-      ? entry.sequence[entry.sequence.length - 1]
-      : null;
-  return entry.payload ?? null;
-};
+const payloadOf = (entry) => entry?.payload ?? null;
 
 const instructionsOf = (entry, operation, payload) => {
   const target = entry?.operation ?? operation;

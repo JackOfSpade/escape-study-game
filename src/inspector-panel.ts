@@ -18,31 +18,29 @@ import {
   inspectorSummaryHtml,
   knowledgeHtml,
   readinessHtml,
-  topicSpawnHtml,
 } from "./inspector-view";
 import { encounterKey } from "./learner";
-import type { Game, Provider, Roadmap } from "./model";
+import type { StudyRecord, Provider, Roadmap } from "./model";
 import { download } from "./persistence";
 import { renderRoadmapAdoption } from "./roadmap-adoption-ui";
 import { prepareRoadmapExport } from "./roadmap-export";
 import { presentRoadmapReview } from "./roadmap-exposure";
 import { reviewRoadmap } from "./roadmap-review";
-import { setTopicEnabled } from "./topic-spawn";
 
 interface InspectorHost {
-  /** The current game: an import replaces it. */
-  game(): Game;
+  /** The current record: an import replaces it. */
+  game(): StudyRecord;
   roadmap: Roadmap;
-  /** Saves the game; false when the save failed. */
+  /** Saves the record; false when the save failed. */
   persist(): Promise<boolean>;
-  /** Saves the game or throws with the reason. */
+  /** Saves the record or throws with the reason. */
   persistOrThrow(context?: string): Promise<void>;
   /** The last save failure, or "" when the last save worked. */
   saveError(): string;
   renderCareerControls(): void;
 }
 
-/** Returns the function that rebuilds the inspector from the current game. */
+/** Returns the function that rebuilds the inspector from the current record. */
 export function createInspector(host: InspectorHost) {
   const { roadmap } = host;
   function eligibleNow() {
@@ -69,20 +67,8 @@ export function createInspector(host: InspectorHost) {
     $("#inspector-content").insertAdjacentHTML("beforeend", readiness);
     $("#inspector-content").insertAdjacentHTML(
       "beforeend",
-      knowledgeHtml(host.game()) + topicSpawnHtml(host.game(), roadmap),
+      knowledgeHtml(host.game()),
     );
-    for (const box of $(
-      "#inspector-content",
-    ).querySelectorAll<HTMLInputElement>("[data-topic]"))
-      box.onchange = () => {
-        setTopicEnabled(
-          host.game().study,
-          box.dataset.topicTrack as "PY" | "PE",
-          box.dataset.topic!,
-          box.checked,
-        );
-        host.persist();
-      };
     renderEnvironmentObservations(
       $("#inspector-content"),
       host.game(),
@@ -302,7 +288,7 @@ export function createInspector(host: InspectorHost) {
       download("interview_prep_roadmap.md", roadmap.raw, "text/markdown");
     $("#evidence-export").onclick = () =>
       download(
-        "zombie-escape-study-game-evidence.json",
+        "learning-workspace-evidence.json",
         JSON.stringify(
           { study: host.game().study, encounters: host.game().encounters },
           null,

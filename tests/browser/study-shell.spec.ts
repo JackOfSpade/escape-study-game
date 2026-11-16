@@ -41,7 +41,7 @@ test("the app opens straight into the learning workspace with its own menu and s
   await expect(menu).toBeHidden();
   await page.locator("#study-menu").click();
   await expect(menu).toBeVisible();
-  await page.locator("#resume-game").click();
+  await page.locator("#menu-close").click();
   await expect(menu).toBeHidden();
   expect(errors).toEqual([]);
 });
@@ -96,7 +96,7 @@ test("without Claude the question is locked behind the connection steps and unlo
   await page.locator("#study-next").click();
   await expect(page.locator("#terminal-connect")).toBeVisible();
   await expect(page.locator("#problem-title")).toHaveText(
-    "Connect Claude to use this terminal",
+    "Connect Claude to open this question",
   );
   await expect(page.locator("#terminal-connect-steps li")).not.toHaveCount(0);
   await expect(page.locator("#terminal-body")).toBeHidden();

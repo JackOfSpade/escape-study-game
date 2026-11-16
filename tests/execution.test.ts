@@ -3,13 +3,12 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { edit } from "../src/ai";
 import { eligible, initialStudy } from "../src/curriculum";
-import { step } from "../src/engine";
 import { canRunWorkspace, runWorkspace } from "../src/execution";
 import { initialLearner, reconcileGates } from "../src/learner";
 import { type Roadmap } from "../src/model";
 import { decode, encode, recover } from "../src/persistence";
 import { sha256 } from "../src/roadmap-export";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 function fixture() {
   const g = createGame(0, r);
@@ -22,7 +21,7 @@ function fixture() {
   g.study.learner = l;
   const contract = eligible(r, g.study);
   assert.equal(contract.depth, 2);
-  const e = g.encounters["f0-room0"];
+  const e = g.encounters["question-0"];
   e.problem = {
     title: "Synthetic executable task",
     prompt: "Transport fixture only",
@@ -68,11 +67,6 @@ test("mock transport: a running code snapshot stays exact while edits, survival 
     await runWorkspace(g, e, r);
     assert.equal(e.executions!.length, 1);
     edit(g, e, "print(8)", e.revision);
-    g.survivors = g.survivors.slice(0, 1);
-    g.status = "playing";
-    g.nextSpawn = Number.MAX_SAFE_INTEGER;
-    step(g, 1 / 30);
-    assert.ok(g.time > 0);
     reply(
       new Response(
         JSON.stringify({

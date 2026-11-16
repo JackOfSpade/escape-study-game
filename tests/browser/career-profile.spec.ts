@@ -1,10 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
-  enterNativeGame,
-  flushNativeSave,
+  flushStudySave,
   mockClaudeStudy,
-  nativeState,
-  openNativeQuestion,
+  openStudyQuestion,
+  studyState,
 } from "./study-harness";
 
 async function inspect(page: Page) {
@@ -42,10 +41,9 @@ test("the role profile is explicit, reversible and persists without replacing is
   // Three full menu cycles and two page reloads in the first-person view.
   test.slow();
   const relay = await mockClaudeStudy(page);
-  await enterNativeGame(page);
-  const id = await openNativeQuestion(page);
+  const id = await openStudyQuestion(page);
   await expect.poll(() => relay.calls.length).toBe(1);
-  const pending = await nativeState(page, id),
+  const pending = await studyState(page, id),
     before = await sourceEvidence(page);
   await inspect(page);
   await expect(page.locator("#career-focus")).toHaveValue(
@@ -59,9 +57,9 @@ test("the role profile is explicit, reversible and persists without replacing is
   );
   await page.locator("#career-focus").selectOption("full");
   await expect(page.locator("#career-focus")).toHaveValue("full");
-  expect((await nativeState(page, id)).problem).toBe(pending.problem);
+  expect((await studyState(page, id)).problem).toBe(pending.problem);
   expect(await sourceEvidence(page)).toBe(before);
-  await flushNativeSave(page);
+  await flushStudySave(page);
   await page.reload();
   await page.waitForFunction(() => !!(window as any).__deadAir);
   await inspect(page);
@@ -71,9 +69,9 @@ test("the role profile is explicit, reversible and persists without replacing is
   await expect(page.locator("#career-focus")).toHaveValue(
     "product-feature-owner",
   );
-  expect((await nativeState(page, id)).problem).toBe(pending.problem);
+  expect((await studyState(page, id)).problem).toBe(pending.problem);
   expect(await sourceEvidence(page)).toBe(before);
-  await flushNativeSave(page);
+  await flushStudySave(page);
   await page.reload();
   await page.waitForFunction(() => !!(window as any).__deadAir);
   await inspect(page);

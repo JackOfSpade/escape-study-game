@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Build realistic ladder cases for the study calls `generate`, `tutor` and
- * `assess` without network access. The game's real payload builders run
+ * `assess` without network access. The app's real payload builders run
  * against a stub bridge that records each `(operation, payload)` and answers
  * just enough for the flow to proceed.
  *
@@ -20,8 +20,14 @@ import { fileURLToPath } from "node:url";
 import { assess, checkBridge, edit, ensureProblem, send } from "../../src/ai";
 import { eligible, initialStudy } from "../../src/curriculum";
 import { scopeKey, type ScopeDefinition } from "../../src/learning-model";
-import type { Contract, Game, Problem, Roadmap, Track } from "../../src/model";
-import { createPlayableGame } from "../../src/world";
+import type {
+  Contract,
+  StudyRecord,
+  Problem,
+  Roadmap,
+  Track,
+} from "../../src/model";
+import { createGame } from "../../tests/helpers/record";
 
 type StudyOperation = "generate" | "tutor" | "assess";
 export type StudyCase = {
@@ -30,11 +36,7 @@ export type StudyCase = {
   payload: Record<string, unknown>;
 };
 type StudyCaseBook = Record<StudyOperation, StudyCase[]>;
-const STUDY_OPERATIONS: StudyOperation[] = [
-  "generate",
-  "tutor",
-  "assess",
-];
+const STUDY_OPERATIONS: StudyOperation[] = ["generate", "tutor", "assess"];
 
 type Scenario = {
   track: Track;
@@ -377,23 +379,21 @@ async function withBridge(handler: Handler, run: () => Promise<void>) {
 }
 
 function gameFor(seed: number, r: Roadmap) {
-  const g = createPlayableGame(seed, r, initialStudy(r, "live"));
-  g.status = "playing";
+  const g = createGame(seed, r, initialStudy(r, "live"));
   return g;
 }
 
-function encounterFor(g: Game, index: number) {
+function encounterFor(g: StudyRecord, index: number) {
   const ids = Object.keys(g.encounters);
   const e = g.encounters[ids[index % ids.length]];
-  delete e.questionRoom;
   e.mode = "solo";
   e.state = "in-progress";
   return e;
 }
 
-/** Seed the live learner the way the unit tests do, then let the game schedule. */
+/** Seed the live learner the way the unit tests do, then let the scheduler choose. */
 function contractFor(
-  g: Game,
+  g: StudyRecord,
   r: Roadmap,
   scenario: Scenario,
   depth: number,
@@ -448,7 +448,7 @@ function scenarioFor(_r: Roadmap, contract: Contract, variant: number) {
   );
 }
 
-function seedProbes(g: Game, contract: Contract, variant: number) {
+function seedProbes(g: StudyRecord, contract: Contract, variant: number) {
   const base = {
     encounter: "f0-room0",
     runId: g.id,
@@ -613,7 +613,7 @@ async function buildTutor(
     },
     async () => {
       for (const text of learnerTexts) {
-        await send(g, e, "tutor", text, r);
+        await send(g, e, text, r);
         step++;
       }
     },

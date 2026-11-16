@@ -22,15 +22,15 @@ import {
   readIdentifierCounters,
 } from "../src/roadmap-identifiers";
 import { inspectMergedDocument } from "../src/roadmap-structure";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 for (const outcome of ["independent", "assisted", "contradicted"] as const)
   for (const seekBaselineGap of [false, true])
-    test(`a reviewed correction of an actual ${outcome} served game attempt preserves history, corrected projection and baseline gap=${seekBaselineGap}`, async () => {
+    test(`a reviewed correction of an actual ${outcome} served attempt preserves history, corrected projection and baseline gap=${seekBaselineGap}`, async () => {
       const g = createGame(7, r);
       g.study.profile = "live";
       const l = g.study.learner!;
-      let e = g.encounters["f0-room0"],
+      let e = g.encounters["question-0"],
         c = eligibleLearning(r, l, "2026-10-16T16:00:00Z"),
         attempt: ReturnType<typeof beginLearningAttempt> | undefined;
       // Honor actual due-review scheduling first; then correct a newly served
@@ -187,8 +187,7 @@ for (const outcome of ["independent", "assisted", "contradicted"] as const)
         readIdentifierCounters(raw, false).counters,
       );
       const before = structuredClone(l),
-        encounter = structuredClone(e),
-        actor = structuredClone(g.survivors[0]);
+        encounter = structuredClone(e);
       await reconcileRoadmap(g, r, raw, async (p) => {
         const prior = inspectMergedDocument(p.local).rows;
         return {
@@ -226,7 +225,6 @@ for (const outcome of ["independent", "assisted", "contradicted"] as const)
       assert.deepEqual(g.study.learner!.attempts, before.attempts);
       assert.deepEqual(g.study.learner!.evidence, before.evidence);
       assert.deepEqual(g.encounters[e.id], encounter);
-      assert.deepEqual(g.survivors[0], actor);
       for (const ev of before.evidence)
         assert.equal(
           independentProofValid(

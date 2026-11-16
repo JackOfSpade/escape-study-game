@@ -3,9 +3,9 @@ import { writeFile } from "node:fs/promises";
 import type { Server } from "node:http";
 // @ts-expect-error Isolated local execution server, no provider configured.
 import { createStudyBridgeServer } from "../../scripts/study-bridge-server.mjs";
-import { openGameMenu } from "./helpers/game-menu";
-import { enterLegacyBuilding } from "./helpers/legacy-world";
+import { openApp } from "./helpers/agent-menu";
 import { isolateRunnerBridge } from "./helpers/runner-bridge";
+import { flushStudySave } from "./study-harness";
 
 test("container workspace React API: immutable checks and preview survive later edits and reload without academic credit", async ({
   page,
@@ -22,7 +22,7 @@ test("container workspace React API: immutable checks and preview survive later 
     throw Error("No isolated execute server");
   await isolateRunnerBridge(page, `http://127.0.0.1:${address.port}`);
   try {
-    await enterLegacyBuilding(page);
+    await openApp(page);
     await page.evaluate(async () => {
       const d = (window as any).__deadAir,
         g = d.game,
@@ -34,7 +34,9 @@ test("container workspace React API: immutable checks and preview survive later 
         { initialLearner, reconcileGates } = await import(
           /* @vite-ignore */ root + "learner.ts"
         ),
-        { claimStation } = await import(/* @vite-ignore */ root + "engine.ts");
+        { question } = await import(
+          /* @vite-ignore */ "/tests/helpers/" + "record.ts"
+        );
       const l = initialLearner(r, "test");
       for (const o of r.tracks.PE.objectives) l.cells[o.id].states[0] = "P";
       l.reviews = {};
@@ -45,8 +47,7 @@ test("container workspace React API: immutable checks and preview survive later 
       const contract = eligible(r, g.study);
       if (contract.track !== "PE" || contract.depth !== 2)
         throw Error("Requires synthetic PE D2");
-      const e = g.encounters["f0-room0"],
-        s = g.floors[0].stations.find((s: any) => s.encounter === e.id);
+      const e = (g.encounters["question-0"] = question(g, "question-0"));
       e.problem = {
         title: "Synthetic React task / real browser execution",
         prompt: "Runtime API integration fixture only",
@@ -63,19 +64,13 @@ test("container workspace React API: immutable checks and preview survive later 
           ],
         },
       };
-      Object.assign(g.survivors[0], { floor: 0, x: s.x, y: s.y });
-      for (const a of g.survivors.slice(1)) a.escaped = true;
-      g.zombies = [];
-      g.nextSpawn = Number.MAX_SAFE_INTEGER;
-      g.surge.anchor = Number.MAX_SAFE_INTEGER;
-      claimStation(g, g.survivors[0], s.id);
     });
     const code =
       "import {useState} from 'react';export default function App(){const[n,setN]=useState(0);return <button onClick={()=>setN(n+1)}>Count {n}</button>}";
     const before = await page.evaluate(async (code) => {
       const d = (window as any).__deadAir,
         g = d.game,
-        e = g.encounters["f0-room0"],
+        e = g.encounters["question-0"],
         root = "/src/";
       const { edit } = await import(/* @vite-ignore */ root + "ai.ts"),
         { runWorkspace } = await import(
@@ -83,18 +78,16 @@ test("container workspace React API: immutable checks and preview survive later 
         );
       edit(g, e, code, e.revision, d.roadmap);
       void runWorkspace(g, e, d.roadmap);
-      return { time: g.time, status: e.executions[0].status };
+      return { status: e.executions[0].status };
     }, code);
     expect(before.status).toBe("pending");
     const draft = "export default ()=> <p>later draft</p>";
     await page.evaluate(async (draft) => {
       const d = (window as any).__deadAir,
-        e = d.game.encounters["f0-room0"],
+        e = d.game.encounters["question-0"],
         root = "/src/",
         { edit } = await import(/* @vite-ignore */ root + "ai.ts");
       edit(d.game, e, draft, e.revision, d.roadmap);
-      d.game.survivors[0].x = 21.5;
-      d.game.survivors[0].y = 31.5;
     }, draft);
     await expect(page.locator("#terminal")).toBeHidden();
     await expect
@@ -102,7 +95,7 @@ test("container workspace React API: immutable checks and preview survive later 
         () =>
           page.evaluate(
             () =>
-              (window as any).__deadAir.game.encounters["f0-room0"]
+              (window as any).__deadAir.game.encounters["question-0"]
                 .executions[0].status,
           ),
         { timeout: 30000 },
@@ -110,7 +103,7 @@ test("container workspace React API: immutable checks and preview survive later 
       .toBe("finished");
     const result = await page.evaluate(async () => {
       const g = (window as any).__deadAir.game,
-        e = g.encounters["f0-room0"],
+        e = g.encounters["question-0"],
         job = e.executions[0],
         root = "/src/",
         { executionText } = await import(
@@ -120,13 +113,12 @@ test("container workspace React API: immutable checks and preview survive later 
           /* @vite-ignore */ root + "execution.ts"
         );
       // Browser decoding of the actual checked data URL is diagnostic only;
-      // the normal gameplay tab intentionally has no embedded editor/preview.
+      // the study workspace intentionally has no embedded editor/preview.
       const image = new Image();
       image.src = job.preview.dataUrl;
       await image.decode();
       return {
         job,
-        time: g.time,
         evidence: g.study.learner.evidence.length,
         state: e.state,
         history: e.history.filter((h: any) => h.kind === "execution"),
@@ -146,7 +138,6 @@ test("container workspace React API: immutable checks and preview survive later 
       JSON.stringify(result.job.receipt),
     ).toBe(0);
     expect(JSON.parse(result.job.receipt.stdout).domText).toBe("Count 1");
-    expect(result.time).toBeGreaterThan(before.time);
     expect(result.evidence).toBe(0);
     expect(result.state).toBe("available");
     expect(result.draft).toBe(draft);
@@ -173,14 +164,11 @@ test("container workspace React API: immutable checks and preview survive later 
       path: previewPath,
       contentType: "image/jpeg",
     });
-    await openGameMenu(page);
-    await page.getByRole("button", { name: "Save run", exact: true }).click();
-    await expect(page.locator("#notice")).toContainText("Run saved locally");
-    await page.locator("#resume-game").click();
+    await flushStudySave(page);
     await page.reload();
     await page.waitForFunction(() => !!(window as any).__deadAir);
     const saved = await page.evaluate(() => {
-      const e = (window as any).__deadAir.game.encounters["f0-room0"];
+      const e = (window as any).__deadAir.game.encounters["question-0"];
       return { job: e.executions[0], draft: e.workspace };
     });
     expect(saved.job).toEqual(result.job);
@@ -206,7 +194,7 @@ test("container workspace React API: immutable checks and preview survive later 
     );
     await page.evaluate(async (code) => {
       const d = (window as any).__deadAir,
-        e = d.game.encounters["f0-room0"],
+        e = d.game.encounters["question-0"],
         root = "/src/",
         { edit } = await import(/* @vite-ignore */ root + "ai.ts"),
         { runWorkspace } = await import(
@@ -216,7 +204,8 @@ test("container workspace React API: immutable checks and preview survive later 
       await runWorkspace(d.game, e, d.roadmap);
     }, code);
     const rejected = await page.evaluate(
-      () => (window as any).__deadAir.game.encounters["f0-room0"].executions[1],
+      () =>
+        (window as any).__deadAir.game.encounters["question-0"].executions[1],
     );
     expect(rejected.status).toBe("error");
     expect(rejected.error).toContain("Invalid browser preview");

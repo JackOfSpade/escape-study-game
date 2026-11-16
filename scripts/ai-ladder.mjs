@@ -107,11 +107,6 @@ function normalizeCase(item, fallbackId) {
   if (typeof operation !== "string" || !operation)
     throw Error(`Case ${fallbackId} needs an operation`);
   const id = typeof item.id === "string" && item.id ? item.id : fallbackId;
-  if (operation === "design-run" && Array.isArray(item.sequence)) {
-    if (!item.sequence.length)
-      throw Error(`Design case ${id} needs at least one payload`);
-    return { id, operation, sequence: item.sequence };
-  }
   if (!item.payload || typeof item.payload !== "object")
     throw Error(`Case ${id} needs a payload object`);
   return { id, operation, payload: item.payload };
@@ -131,11 +126,9 @@ export function readCaseFile(file) {
   );
 }
 
-/** A replay-sample directory: one case per live call, one design conversation
- * per generationId, replayed in file-name order. */
+/** A replay-sample directory: one case per live call, in file-name order. */
 export function readReplayCases(directory) {
   const cases = [];
-  const designs = new Map();
   for (const operation of readdirSync(directory).sort()) {
     const folder = join(directory, operation);
     if (!statSync(folder).isDirectory()) continue;
@@ -150,23 +143,10 @@ export function readReplayCases(directory) {
       }
       const payload = sample?.payload;
       if (!payload || typeof payload !== "object") continue;
-      if (
-        operation === "design-run" &&
-        typeof payload.generationId === "string"
-      ) {
-        const group = designs.get(payload.generationId) ?? {
-          id: `design-run:${payload.generationId}`,
-          operation,
-          sequence: [],
-        };
-        group.sequence.push(payload);
-        designs.set(payload.generationId, group);
-      } else {
-        cases.push({ id: name.replace(/\.json$/, ""), operation, payload });
-      }
+      cases.push({ id: name.replace(/\.json$/, ""), operation, payload });
     }
   }
-  return [...cases, ...designs.values()];
+  return cases;
 }
 
 export function readCases(target) {
@@ -252,21 +232,14 @@ export async function runLadder({
         model: setting.model,
         effort: setting.effort,
       }),
-      sessionNamespace: `${ladderId}:${setting.setting}:${rep}`,
       usageLog: (row) => usageRows.push(row),
     });
-    const payloads = Array.isArray(entry.sequence)
-      ? entry.sequence
-      : [entry.payload];
     const answers = [];
     let outcome = "valid";
-    for (const payload of payloads) {
-      try {
-        answers.push(await gateway.run(entry.operation, payload));
-      } catch (error) {
-        outcome = outcomeOf(error);
-        break;
-      }
+    try {
+      answers.push(await gateway.run(entry.operation, entry.payload));
+    } catch (error) {
+      outcome = outcomeOf(error);
     }
     return {
       v: 1,

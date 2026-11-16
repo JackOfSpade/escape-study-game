@@ -137,9 +137,7 @@ export function beginVisit(r: Roadmap, s: StudyState, e: Encounter) {
     JSON.stringify(c.objectiveIds) !== JSON.stringify(next.objectiveIds) ||
     c.track !== next.track
   )
-    throw Error(
-      "Encounter is not the scheduled study visit; survival participation is allowed.",
-    );
+    throw Error("Encounter is not the scheduled study visit.");
   if (s.pending && s.pending.encounter !== key)
     throw Error(
       "Unfinished study visit remains bound to its original terminal.",
@@ -171,7 +169,7 @@ export function finishVisit(
   e: Encounter,
   at = new Date().toISOString(),
 ) {
-  if (s.profile === "live") return; // A world win is not a bounded academic visit.
+  if (s.profile === "live") return; // Live study records its visits in the learner ledger.
   const key = encounterKey(e);
   if (!s.pending || s.pending.encounter !== key) return;
   const c = s.pending.contract;
@@ -231,7 +229,7 @@ export function validateAssessment(r: Roadmap, e: Encounter, a: Assessment) {
     // Any earlier supplied solution is conservatively unresolved until a facet-aware reviewer checks dependencies.
     if (
       f.outcome === "independent" &&
-      [...e.group, ...e.tutor].some(
+      [...(e.group ?? []), ...e.tutor].some(
         (m) =>
           m.kind !== "human" &&
           m.kind !== "system" &&
@@ -255,7 +253,7 @@ export function evidencePacket(
   return {
     encounter: e.id,
     assessmentPolicy:
-      "A displayed assessment may already have a formal attempt ID without any human answer. Issuance, reading, physical defense, NPC work and shared success do not serve an academic visit or establish mastery. Judge only human technical artifacts at or before the captured cutoff. Without such artifacts return unresolved and unknown findings, without scope reviews or historical mappings. A usable visit requires actual human technical work.",
+      "A displayed assessment may already have a formal attempt ID without any human answer. Issuance, reading and assistant work do not serve an academic visit or establish mastery. Judge only human technical artifacts at or before the captured cutoff. Without such artifacts return unresolved and unknown findings, without scope reviews or historical mappings. A usable visit requires actual human technical work.",
     problem: e.problem,
     accepted: e.submissions.find(
       (s) => s.id === e.accepted && s.seq <= acceptedCutoff,
@@ -272,7 +270,7 @@ export function evidencePacket(
         (!["chat", "tutor", "npc-proposal"].includes(h.kind) ||
           (h.presented !== undefined && h.presented <= cutoff)),
     ),
-    group: e.group.filter(
+    group: (e.group ?? []).filter(
       (m) => m.presented !== undefined && m.presented <= cutoff,
     ),
     tutor: e.tutor.filter(
@@ -312,6 +310,6 @@ export function evidencePacket(
       (m) => m.presented !== undefined && m.presented <= cutoff,
     ),
     scopePolicy:
-      "Every earlier visible nonhuman assistance source requires a helpAttributions entry with its exact messageId and a rationale, even when unrelated or rejected. Use facets:[] when it supplied no used key step; never omit the source or count rejected NPC embellishment as human authorship. Full checkpoint passes require independent complete-scope evidence. Defense, NPC work, and supplied solutions never prove personal mastery. No execution claimed without actual runner output. scopeReviews.completeCoverage reviews whether the registered facet criteria fully cover the curriculum objective at the stated depth; it does NOT describe whether the current learner response is independent, correct or complete. Report those outcomes in findings. An assisted/unknown/incorrect response does not by itself make valid criteria incomplete. Withdrawing an already verified definition requires definitionIssue:{sourceHash,sourceQuote,missingCriterion}, with this exact sourceHash, an exact 20–2000-character quote from assessmentCriteria and a concrete missing criterion. Do not invent a definition issue to express a learner gap.",
+      "Every earlier visible nonhuman assistance source requires a helpAttributions entry with its exact messageId and a rationale, even when unrelated or rejected. Use facets:[] when it supplied no used key step; never omit the source or count rejected assistant embellishment as human authorship. Full checkpoint passes require independent complete-scope evidence. Assistant work and supplied solutions never prove personal mastery. No execution claimed without actual runner output. scopeReviews.completeCoverage reviews whether the registered facet criteria fully cover the curriculum objective at the stated depth; it does NOT describe whether the current learner response is independent, correct or complete. Report those outcomes in findings. An assisted/unknown/incorrect response does not by itself make valid criteria incomplete. Withdrawing an already verified definition requires definitionIssue:{sourceHash,sourceQuote,missingCriterion}, with this exact sourceHash, an exact 20–2000-character quote from assessmentCriteria and a concrete missing criterion. Do not invent a definition issue to express a learner gap.",
   };
 }

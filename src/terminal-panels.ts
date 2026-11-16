@@ -7,31 +7,28 @@
  * DOM when its content changed, because the terminal re-renders on every UI
  * tick and a rewrite would clear a selection the learner is making.
  */
-import { retryGroupRequest, retryTutorRequest, streamingReply } from "./ai";
+import { retryTutorRequest, streamingReply } from "./ai";
 import { $, setHtml } from "./dom";
 import { escapeHtml as escape } from "./html";
 import { encounterGaps, probeSummary } from "./knowledge-probe";
 import { encounterKey } from "./learner";
 import { markdownToHtml } from "./markdown";
-import type { Encounter, Game, Roadmap } from "./model";
+import type { Encounter, StudyRecord, Roadmap } from "./model";
 import {
   carriedVisits,
   isInactiveVisit,
   segmentCount,
 } from "./question-thread";
-import { unfinishedEarlierVisits } from "./room-questions";
-
-type Channel = "tutor" | "group";
 
 /** What the question's conversation partner is called. */
 const TUTOR = "Tutor";
-/** Replies saved by the archived game carry its speaker name. */
+/** Every saved reply carries this stored speaker name. */
 const speakerLabel = (author: string) =>
   author === "Terminal AI" ? TUTOR : author;
 
 interface TerminalPanelHost {
-  /** The current game: a restart or an import replaces it. */
-  game(): Game;
+  /** The current record: an import replaces it. */
+  game(): StudyRecord;
   roadmap: Roadmap;
   persist(): unknown;
   /** Re-render whichever terminal is open. */
@@ -41,7 +38,7 @@ interface TerminalPanelHost {
 }
 
 /** Where a terminal's question came from and how it relates to earlier work. */
-export function provenanceText(game: Game, e: Encounter): string {
+export function provenanceText(game: StudyRecord, e: Encounter): string {
   let text =
     e.problem?.provenance === "claude-cli"
       ? "Claude CLI"
@@ -59,20 +56,13 @@ export function provenanceText(game: Game, e: Encounter): string {
     const count = segmentCount(e.problem);
     const goal = e.problem.segments?.[e.thread.segment]?.goal;
     text += isInactiveVisit(game, e)
-      ? " · This question continues at the terminal you opened most recently; this one is read-only history."
+      ? " · This question continues in the conversation you opened most recently; this one is read-only history."
       : count > 1
-        ? ` · Part ${e.thread.segment + 1} of ${count}${goal ? `: ${goal.replace(/[.!?]+$/, "")}` : ""}. Finishing this part earns a key; the next terminal continues the question.`
+        ? ` · Part ${e.thread.segment + 1} of ${count}${goal ? `: ${goal.replace(/[.!?]+$/, "")}` : ""}. Finishing this part moves the question on to its next part.`
         : carriedVisits(game, e).length
           ? " · Continued question: your earlier conversation and progress are kept."
           : "";
   }
-  const earlier = unfinishedEarlierVisits(game, e);
-  if (earlier.runs)
-    text += ` · Started in ${earlier.runs === 1 ? "an earlier run" : `${earlier.runs} earlier runs`} but not completed there, so it is asked again: a new run never inherits an unfinished lock. ${
-      earlier.established
-        ? `${earlier.established} facet${earlier.established === 1 ? "" : "s"} you established then ${earlier.established === 1 ? "is" : "are"} carried over and will not be re-asked.`
-        : "Nothing was established before that conversation stopped."
-    }`;
   if (
     game.study.learner?.attempts.some(
       (a) =>
@@ -80,12 +70,12 @@ export function provenanceText(game: Game, e: Encounter): string {
     )
   )
     text +=
-      " · Resolved in your imported roadmap. Your original puzzle and draft remain playable; finishing grants gameplay rewards without another academic visit.";
+      " · Resolved in your imported roadmap. Your original question and draft remain open; finishing it does not start another academic visit.";
   return text;
 }
 
 /** The line above a solo conversation: its outcome, or how the probe stands. */
-export function dialogueStatus(game: Game, e: Encounter) {
+export function dialogueStatus(game: StudyRecord, e: Encounter) {
   const probeLine = probeSummary(e);
   const conceded = encounterGaps(game, e);
   const text =
@@ -103,13 +93,10 @@ export function dialogueStatus(game: Game, e: Encounter) {
 
 export function createTerminalPanels(host: TerminalPanelHost) {
   const { roadmap } = host;
-  const speaker = (game: Game, author: string) =>
-    game.survivors.find((a) => a.id === author)?.name;
-
-  /** Saved private or group questions that are waiting or were interrupted. */
-  function requestStatus(e: Encounter, tab: Channel) {
+  /** Saved questions that are waiting or were interrupted. */
+  function requestStatus(e: Encounter) {
     const box = $("#tutor-request-status");
-    const saved = (tab === "tutor" ? e.tutorRequests : e.groupRequests) ?? [];
+    const saved = e.tutorRequests ?? [];
     const open = saved.filter(
       (j) => j.state !== "applied" && j.state !== "superseded",
     );
@@ -126,7 +113,7 @@ export function createTerminalPanels(host: TerminalPanelHost) {
               j.state === "pending"
                 ? "Waiting for a reply."
                 : escape(j.error ?? "Saved question interrupted.")
-            }${j.state === "interrupted" ? `<button class="quiet" data-question-retry="${escape(j.id)}" data-channel="${tab}">Retry saved ${tab === "tutor" ? "private" : "group"} question</button>` : ""}</p>`,
+            }${j.state === "interrupted" ? `<button class="quiet" data-question-retry="${escape(j.id)}">Retry saved question</button>` : ""}</p>`,
         )
         .join("");
     if (!setHtml(box, html)) return;
@@ -135,19 +122,14 @@ export function createTerminalPanels(host: TerminalPanelHost) {
     ))
       button.onclick = () => {
         const id = button.dataset.questionRetry!;
-        host.settle(
-          button.dataset.channel === "tutor"
-            ? retryTutorRequest(host.game(), e, id, roadmap)
-            : retryGroupRequest(host.game(), e, id),
-          e,
-        );
+        host.settle(retryTutorRequest(host.game(), e, id, roadmap), e);
         host.persist();
         host.render();
       };
   }
 
   /** The conversation: earlier visits, this visit, then a reply still arriving. */
-  function messages(e: Encounter, tab: Channel) {
+  function messages(e: Encounter) {
     const game = host.game();
     const bubble = (
       kind: string,
@@ -159,26 +141,24 @@ export function createTerminalPanels(host: TerminalPanelHost) {
     const said = (m: Encounter["tutor"][number], carried = false) =>
       bubble(
         m.kind,
-        escape(speaker(game, m.author) ?? speakerLabel(m.author)),
+        escape(m.author === "human" ? "You" : speakerLabel(m.author)),
         m.text,
         carried,
       );
     const html =
-      (tab === "tutor" ? carriedVisits(game, e) : [])
+      carriedVisits(game, e)
         .map(
           (v) =>
             `<div class="message system carried"><strong>Earlier visit · part ${v.segment + 1}${v.completed ? " · completed" : ""}</strong></div>` +
             v.messages.map((m) => said(m, true)).join(""),
         )
         .join("") +
-      e[tab].map((m) => said(m)).join("") +
-      (tab === "tutor"
-        ? (e.tutorRequests ?? [])
-            .map((j) => (j.state === "pending" ? streamingReply(j) : undefined))
-            .filter((text): text is string => !!text)
-            .map((text) => bubble("tutor", TUTOR, text))
-            .join("")
-        : "");
+      e.tutor.map((m) => said(m)).join("") +
+      (e.tutorRequests ?? [])
+        .map((j) => (j.state === "pending" ? streamingReply(j) : undefined))
+        .filter((text): text is string => !!text)
+        .map((text) => bubble("tutor", TUTOR, text))
+        .join("");
     const box = $("#messages");
     if (setHtml(box, html)) box.scrollTop = box.scrollHeight;
   }

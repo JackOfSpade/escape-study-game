@@ -1,8 +1,0 @@
-{
-  "source": "c0b711ba020aed971162930b5f4d4e3d52327250bbcf13e9aef79a7e6225bfa7",
-  "schema": "all-src-typescript-v1",
-  "archive": "docs/evidence/source-snapshots/c0b711ba020aed971162930b5f4d4e3d52327250bbcf13e9aef79a7e6225bfa7.tar.gz",
-  "archiveSha256": "be164c22856dea6ca5411520e32d2ab72e8e9339c53314886a55a80df276975a",
-  "fileCount": 59,
-  "scope": "Exact TypeScript game/learning sources; not a full release package or native configuration export"
-}

@@ -1,9 +1,0 @@
-
-Running 2 tests using 1 worker
-
-(node:35777) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-(Use `node --trace-warnings ...` to show where the warning was created)
-  ✓  1 tests/browser/observation-retraction.spec.ts:8:3 › reviewed assisted observation retraction preserves audit and unknown status through explicit adoption and reload (2.9s)
-  ✓  2 tests/browser/observation-retraction.spec.ts:8:3 › reviewed contradicted observation retraction preserves audit and unknown status through explicit adoption and reload (2.8s)
-
-  2 passed (6.1s)

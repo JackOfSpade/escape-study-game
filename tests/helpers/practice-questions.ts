@@ -1,21 +1,24 @@
 import { eligible } from "../../src/curriculum";
-import { fnv1a } from "../../src/hash";
 import { openGaps } from "../../src/knowledge-probe";
 import {
   type Contract,
-  type Game,
+  type StudyRecord,
   type Roadmap,
   type Problem,
-  rand,
 } from "../../src/model";
-import { assignRoomProblem } from "../../src/room-questions";
-import { recordSpawn, spawnContract } from "../../src/topic-spawn";
 /**
- * Test fixture only: synthetic questions for worlds that never reach Claude.
- * The game itself has no local questions; every real question comes from Claude.
+ * Test fixture only: synthetic questions for records that never reach Claude.
+ * The app itself has no local questions; every real question comes from Claude.
  */
+/** A small seeded generator, so a fixture question is the same on every run. */
+function rand(g: StudyRecord & { rng?: number }) {
+  let t = (g.rng = ((g.rng ?? 1) + 0x6d2b79f5) >>> 0);
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
 /** Gaps the learner declared on this question's own objective, so the extra line is never off-topic. */
-function gapLine(g: Game, contract: Contract) {
+function gapLine(g: StudyRecord, contract: Contract) {
   const gaps = openGaps(g)
     .filter(
       (r) =>
@@ -29,7 +32,7 @@ function gapLine(g: Game, contract: Contract) {
     : "";
 }
 export function devProblem(
-  g: Game,
+  g: StudyRecord & { rng?: number },
   r: Roadmap,
   contract: Contract = eligible(r, g.study),
 ): Problem {
@@ -82,14 +85,18 @@ export function devProblem(
     contract,
   };
 }
-/** What the game used to do at world creation: give every room a synthetic question. */
-export function preparePracticeRooms(g: Game, roadmap: Roadmap) {
+/** Give every unasked question of a development record a synthetic problem. */
+export function preparePracticeRooms(g: StudyRecord, roadmap: Roadmap) {
   if (g.study.profile !== "development") return;
   for (const e of Object.values(g.encounters)) {
-    if (!e.questionRoom || e.problem || e.state === "consumed") continue;
-    const rng = fnv1a(e.questionRoom, g.seed);
-    const contract = spawnContract(roadmap, g.study);
-    assignRoomProblem(g, e, devProblem({ ...g, rng }, roadmap, contract));
-    recordSpawn(g.study, contract, e.questionRoom, g.time);
+    if (e.problem || e.state === "consumed") continue;
+    const contract = eligible(roadmap, g.study);
+    e.problem = devProblem(
+      Object.assign({ rng: g.seq + e.id.length }, g),
+      roadmap,
+      contract,
+    );
+    if (!e.workspace && e.revision === 0) e.workspace = e.problem.starter;
+    e.state = "in-progress";
   }
 }

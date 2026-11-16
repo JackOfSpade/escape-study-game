@@ -19,7 +19,7 @@ import {
   readIdentifierCounters,
 } from "../src/roadmap-identifiers";
 import { inspectMergedDocument } from "../src/roadmap-structure";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 const attempt =
   "| S0007-A98 | S0007 / 2026-10-16 | T02.1 D1 branch-local task | PENDING; no inference | — | Synthetic allocated task, not a visit |";
@@ -161,7 +161,7 @@ test("distinct branch-issued task and dependent observations survive explicit ad
   assert.equal(restored.study.learner!.evidence.length, 0);
   assert.equal(restored.study.learner!.identifierCounters!.evidence.S0007, 100);
   const learner = restored.study.learner!,
-    encounter = restored.encounters["f0-room0"];
+    encounter = restored.encounters["question-0"];
   encounter.problem = {
     title: "Synthetic later actual study",
     prompt: "Continue eligible scope",

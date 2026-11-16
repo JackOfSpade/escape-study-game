@@ -19,7 +19,7 @@ import {
   readIdentifierCounters,
 } from "../src/roadmap-identifiers";
 import { inspectMergedDocument } from "../src/roadmap-structure";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 const excerpt =
   "Synthetic independent changed-context reasoning covers the complete reviewed requirement; actual runtime execution was not claimed.";
@@ -151,7 +151,7 @@ for (const [track, name] of [
     const copy = recover(decode(encode(g))),
       learner = copy.study.learner!;
     assert.equal(finalRequirementStatus(r, learner, requirement), "P");
-    const e = copy.encounters["f0-room0"];
+    const e = copy.encounters["question-0"];
     e.problem = {
       title: "Later synthetic actual study",
       prompt: "Continue scope",

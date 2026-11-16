@@ -45,12 +45,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run import:curriculum
-      # The sorted file list covers the entire existing root suite, including
-      # every deterministic GameTest fixture. Two processes keep physics stable.
+      # The sorted file list covers the entire existing root suite.
       - run: node scripts/ci-tests.mjs ${{ matrix.shard }}/4
 
   browser:
-    name: Isolated offline Chromium gameplay smoke
+    name: Isolated offline Chromium study smoke
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

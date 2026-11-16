@@ -3,15 +3,6 @@ import { defineConfig } from "@playwright/test";
 // No persistent study bridge, existing server, real learner state or provider.
 export default defineConfig({
   testDir: "./tests/browser",
-  testMatch: [
-    "game-test-lab.spec.ts",
-    "keyboard-access.spec.ts",
-    "pause-controls.spec.ts",
-    "run-designer.spec.ts",
-    "run-design-dressing.spec.ts",
-    "authored-scene.spec.ts",
-    "environment-surfaces.spec.ts",
-  ],
   workers: 1,
   retries: 0,
   timeout: 30000,

@@ -13,7 +13,7 @@ import {
 import type { Assessment, Encounter, Roadmap } from "../src/model";
 import { prepareRoadmapExport, sha256 } from "../src/roadmap-export";
 import { reviewRoadmap } from "../src/roadmap-review";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 const at = "2026-10-15T16:00:00.000Z";
 // Isolated synthetic adapter fixtures: no game save or real human progress is
@@ -386,7 +386,7 @@ test("roadmap export: preview-only scope generation cannot create a revision; pe
   assess(e);
   const first = await prepareRoadmapExport(r, l, undefined, at);
   const c = eligibleLearning(r, l, at),
-    preview = createGame(99, r).encounters["f0-room0"];
+    preview = createGame(99, r).encounters["question-0"];
   preview.problem = {
     title: "preview",
     prompt: "preview",

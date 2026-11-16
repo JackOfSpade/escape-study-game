@@ -1,12 +1,12 @@
 import { escapeHtml as escape } from "./html";
-import type { Provider, Game, Roadmap } from "./model";
+import type { Provider, StudyRecord, Roadmap } from "./model";
 import { download } from "./persistence";
 import { adoptReconciledRoadmap } from "./roadmap-adoption";
 import type { RoadmapReconciliation } from "./roadmap-adoption-types";
 import { presentRoadmapReview } from "./roadmap-exposure";
 interface Options {
   provider?: Provider;
-  getGame: () => Game;
+  getGame: () => StudyRecord;
   r: Roadmap;
   persist: () => Promise<unknown>;
   reconcile?: (
@@ -62,7 +62,7 @@ export function renderRoadmapAdoption(host: HTMLElement, options: Options) {
       (j) =>
         `<article><strong>${escape(j.id)} · ${escape(j.state)}</strong><p>${escape(j.error ?? j.proposal?.rationale ?? j.keepLocal?.rationale ?? "Saved source-bound review request. No learning change is applied.")}</p>${j.state === "kept-local" ? "<p>The review recommends keeping your local roadmap. Nothing was changed and there is nothing to adopt.</p>" : ""}${
           j.proposal?.attemptUpdates?.length
-            ? `<p>${j.proposal.attemptUpdates.length} reviewed attempt update(s). Both previous and updated dispositions are retained in the complete file's audit history; no new gameplay study visit is recorded.</p><p>Invalidating an attempt withdraws judgments supported only by it; it does not create a new failure. Other supported knowledge and gaps remain.</p>${
+            ? `<p>${j.proposal.attemptUpdates.length} reviewed attempt update(s). Both previous and updated dispositions are retained in the complete file's audit history; no new study visit is recorded.</p><p>Invalidating an attempt withdraws judgments supported only by it; it does not create a new failure. Other supported knowledge and gaps remain.</p>${
                 j.proposal.attemptUpdates.some((u) => u.correctionDecision)
                   ? `<p>Closed assessment correction. Original task and observations remain in history; withdrawn evidence cannot certify current learning.</p><ul>${j.proposal.attemptUpdates
                       .filter((u) => u.correctionDecision)
@@ -72,7 +72,7 @@ export function renderRoadmapAdoption(host: HTMLElement, options: Options) {
                       )
                       .join("")}</ul>`
                   : ""
-              }${baselineReview(j.proposal, r)}${j.proposal.attemptUpdates.some((u) => u.resolveCurrent) ? "<p>An explicitly resolved current attempt keeps its original puzzle and draft for gameplay, without another academic assessment or visit.</p>" : ""}`
+              }${baselineReview(j.proposal, r)}${j.proposal.attemptUpdates.some((u) => u.resolveCurrent) ? "<p>An explicitly resolved current attempt keeps its original question and draft, without another academic assessment or visit.</p>" : ""}`
             : ""
         }${j.proposal?.retentionUpdates?.length ? `<p>Reviewed retention correction for ${escape(j.proposal.retentionUpdates.map((u) => u.scopeId).join(", "))}. Dates and verification counts are recomputed from the remaining valid recorded reviews. Original review transactions remain in the complete file audit; this creates no new study visit or observation.</p>` : ""}${j.proposal?.branchConflicts?.length ? `<details><summary>${j.proposal.branchConflicts.length} unresolved source-qualified branch conflict(s)</summary><p>Both histories are preserved under their original IDs. Incoming conflicting records and dependent observations are retained in the complete file's portable audit and excluded from imported learning and practical proof. No IDs are renumbered.</p><p>${escape(j.proposal.branchRationale ?? "")}</p><pre>${escape(j.proposal.branchConflicts.map((c) => `${c.track}:${c.id}`).join("\n"))}</pre></details>` : ""}<p>Local ${escape(j.payload.localHash)} · incoming ${escape(j.payload.candidateHash)}</p>${
           j.review
@@ -127,7 +127,7 @@ export function renderRoadmapAdoption(host: HTMLElement, options: Options) {
   };
   const review = async (text: string, id?: string) => {
     try {
-      status("Reviewing the captured files. Survival continues.");
+      status("Reviewing the captured files.");
       const pending = reconcile?.(text, id, refresh);
       refresh();
       await pending;

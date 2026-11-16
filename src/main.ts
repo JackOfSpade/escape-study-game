@@ -1,6 +1,5 @@
 import {
   checkBridge,
-  closeChat,
   edit,
   ensureProblem,
   generatingEncounter,
@@ -9,7 +8,6 @@ import {
   presentProblem,
   releaseRetiredChatRequests,
   retrySubmission,
-  retryTutorRequest,
   send,
   status,
   submit,
@@ -27,13 +25,13 @@ import { displayScale } from "./display-scale";
 import { $, setHtml, setNodeText, setText } from "./dom";
 import { canRunWorkspace, runWorkspace } from "./execution";
 import { executionText } from "./execution-presentation";
-import gameShell from "./game-shell.html?raw";
+import studyShell from "./study-shell.html?raw";
 import { escapeHtml as escape } from "./html";
 import { createInspector } from "./inspector-panel";
 import { encounterKey } from "./learner";
 import { moveToLiveStudy } from "./live-study";
 import { markdownToHtml } from "./markdown";
-import type { Encounter, Game, Roadmap } from "./model";
+import type { Encounter, StudyRecord, Roadmap } from "./model";
 import {
   decode,
   download,
@@ -44,11 +42,6 @@ import {
   rejectedCopy,
   save,
 } from "./persistence";
-import {
-  bindThread,
-  carriedUnanswered,
-  resendableRequest,
-} from "./question-thread";
 import { LOG_KEY, RunLogs } from "./run-logs";
 import { readDurable, writeDurable } from "./storage";
 import { installStudySession } from "./study-session";
@@ -65,43 +58,37 @@ import {
   provenanceText,
 } from "./terminal-panels";
 import { settleRequest } from "./terminal-request";
-import { submissionView, terminalChannel } from "./terminal-view";
-import { presentSharedWorkspace } from "./workspace-exposure";
-import { createPlayableGame as createGame } from "./world";
+import { submissionView } from "./terminal-view";
+import { emptyRecord } from "./record";
 
 const app = $("#app");
 const roadmap: Roadmap = await fetch("/curriculum.json").then((r) => r.json());
-let game: Game,
+let game: StudyRecord,
   saveError = "",
   saveRecoveryError = "",
   /** The encounter open in the terminal, if any. */
   active: string | undefined,
-  tab: "tutor" | "group" = "tutor",
   lastUI = 0,
   editorRevision = 0,
   /** The learner's latest question, open or still being prepared. */
   lastQuestion: string | undefined;
 try {
   const saved = await load();
-  game = recover(
-    saved ?? newSave(crypto.getRandomValues(new Uint32Array(1))[0]),
-  );
+  game = recover(saved ?? newSave());
 } catch (err) {
-  game = newSave(123456);
+  game = newSave();
   saveRecoveryError = `Saved progress could not be loaded: ${String(err)}. Existing checkpoints have been protected. Retry loading, or export recovery data before restoring a backup.`;
   saveError = saveRecoveryError;
 }
-/** A save file is a whole game record: the learning state lives inside it. A
- * first visit starts from an empty one, marked as never played. */
-function newSave(seed: number) {
+/** The save is one record holding the learning state, its questions and the
+ * settings. A first visit starts from an empty one. */
+function newSave() {
   const study = initialStudy(roadmap, "live");
   activateRunFocus(study);
-  const fresh = createGame(seed, roadmap, study);
-  fresh.preparingRun = true;
-  return fresh;
+  return emptyRecord(study);
 }
 /** Apply the saved role profile, or the default one, to a study state. */
-function activateRunFocus(study: Game["study"]) {
+function activateRunFocus(study: StudyRecord["study"]) {
   activateCareerFocus(
     roadmap,
     study,
@@ -110,7 +97,7 @@ function activateRunFocus(study: Game["study"]) {
 }
 moveToLiveStudy(game, roadmap);
 activateRunFocus(game.study);
-function latestStudyEncounter(g: Game): string | undefined {
+function latestStudyEncounter(g: StudyRecord): string | undefined {
   const saved = g.lastStudyEncounter && g.encounters[g.lastStudyEncounter];
   if (
     saved &&
@@ -137,7 +124,7 @@ const runLogs = new RunLogs({
 });
 await runLogs.load();
 await checkBridge();
-app.innerHTML = gameShell;
+app.innerHTML = studyShell;
 // One stored copy was refused while the other loaded. The first save replaces
 // it, so its bytes are offered for download while they are still in memory.
 const refusedCopy = rejectedCopy();
@@ -167,7 +154,6 @@ async function persist() {
   // A placeholder record must never overwrite a checkpoint that failed to load
   // or recover. Only a validated, explicitly imported backup releases this guard.
   if (saveRecoveryError) return false;
-  runLogs.capture(game);
   const token = ++saveToken;
   try {
     await save(game);
@@ -300,7 +286,7 @@ function studyMenu(open: boolean) {
   $("#settings-toggle").focus();
 }
 $("#study-menu").onclick = () => studyMenu(true);
-$("#resume-game").onclick = () => studyMenu(false);
+$("#menu-close").onclick = () => studyMenu(false);
 $("#pause-menu").addEventListener("cancel", (event) => {
   event.preventDefault();
   if (menuPanel) closePanel(menuPanel);
@@ -397,7 +383,7 @@ $("#reconnect").onclick = () => {
 // ---- Backups and recovery --------------------------------------------------
 
 $("#export").onclick = () =>
-  download("zombie-escape-study-game-run.json", encode(game));
+  download("learning-workspace-backup.json", encode(game));
 $("#import").onchange = async () => {
   const file = $<HTMLInputElement>("#import").files?.[0];
   if (file) await restoreRunBackup(file);
@@ -405,10 +391,7 @@ $("#import").onchange = async () => {
 $("#save-recovery-retry").onclick = () => window.location.reload();
 $("#save-recovery-export").onclick = async () => {
   try {
-    download(
-      "zombie-escape-study-game-recovery.json",
-      await exportRecoveryBackup(),
-    );
+    download("learning-workspace-recovery.json", await exportRecoveryBackup());
   } catch (error) {
     setText(
       "#save-recovery-status",
@@ -510,13 +493,12 @@ mountBugReport({
       .then((r) => r.json())
       .then((health) => String(health.build).slice(0, 16))
       .catch(() => undefined);
-    runLogs.capture(game, true);
     return {
       url: location.origin + location.pathname,
       build,
       userAgent: navigator.userAgent,
       viewport: `${innerWidth}×${innerHeight} at ${devicePixelRatio}x`,
-      view: $("#study-workspace").dataset.view ?? "world",
+      view: $("#study-workspace").dataset.view ?? "question",
       terminalOpen: !!active,
       connection: `${status().mode}${status().reason ? ` (${status().reason})` : ""}: ${status().detail}`,
       saveError: saveError || undefined,
@@ -590,7 +572,7 @@ function closeTerminal() {
     if (e) {
       e.scroll = editor.scrollTop;
       e.selection = [editor.selectionStart, editor.selectionEnd];
-      closeChat(game, e);
+      e.chatOpen = false;
     }
   }
   active = undefined;
@@ -598,27 +580,9 @@ function closeTerminal() {
   editor.blur();
   void persist();
 }
-/** Continue the unfinished question at the terminal being opened, and resend
- * a turn a reload or relay restart cut off. Saved at once, so the binding and
- * the resend survive the next crash too. */
-function continueThread(e: Encounter) {
-  if (!bindThread(game, e)) return;
-  const draft = carriedUnanswered(game, e);
-  if (draft) e.chatDraft = draft;
-  const job = resendableRequest(e);
-  if (job) {
-    job.resent = true;
-    void retryTutorRequest(game, e, job.id, roadmap).then(() => {
-      void persist();
-      if (active === e.id) renderTerminal();
-    });
-  }
-  void persist();
-}
 /** Opens a question in the workspace's terminal. */
 function openStudyTerminal(e: Encounter) {
   if (active && active !== e.id) closeTerminal();
-  continueThread(e);
   lastQuestion = e.id;
   game.lastStudyEncounter = e.id;
   active = e.id;
@@ -698,7 +662,7 @@ const generationSeen = new Map<string, number>();
 /** Live stages and elapsed time while Claude writes this terminal's question.
  * The request is a single call, so the stages are the client's own. */
 function generationHtml(e: Encounter) {
-  const source = generatingEncounter(game, e);
+  const source = generatingEncounter(e);
   if (!source?.generation) return undefined;
   const progress = generationProgress(source);
   const phase = progress?.phase ?? "writing";
@@ -738,35 +702,27 @@ function renderTerminal(force = false) {
   $("#terminal-body").hidden = locked;
   if (locked) {
     setText("#terminal-type", "QUESTION LOCKED");
-    setText("#problem-title", "Connect Claude to use this terminal");
+    setText("#problem-title", "Connect Claude to open this question");
     setText("#terminal-provenance", "Your work is saved.");
     renderConnectionSteps();
     return;
   }
   renderHeading(e);
   renderAnswer(e, force);
-  presentMessages(game, e, tab);
-  terminalPanels.requestStatus(e, tab);
-  terminalPanels.messages(e, tab);
+  presentMessages(game, e);
+  terminalPanels.requestStatus(e);
+  terminalPanels.messages(e);
 }
 /** The question, its title and what the conversation beside it is for. */
 function renderHeading(e: Encounter) {
   const composer = $<HTMLTextAreaElement>("#chat-input");
-  tab = terminalChannel(e);
-  setText("#conversation-title", tab === "tutor" ? "Answer" : "Group chat");
+  setText("#conversation-title", "Answer");
   // The panel is titled "Answer" and needs no further instruction.
-  $("#conversation-context").hidden = tab === "tutor";
-  setText(
-    "#conversation-context",
-    tab === "tutor"
-      ? ""
-      : "Discuss with your group. They can read the current answer draft. Chatting does not submit it.",
-  );
+  $("#conversation-context").hidden = true;
+  setText("#conversation-context", "");
   setText(
     "#answer-context",
-    tab === "tutor"
-      ? "This is your submission. Your tutor can help in the panel beside it."
-      : "This is the group's submission draft. Use group chat beside it to discuss changes.",
+    "This is your submission. Your tutor can help in the panel beside it.",
   );
   const dialogue = e.mode === "solo";
   $("#terminal").classList.toggle("dialogue-terminal", dialogue);
@@ -817,7 +773,6 @@ function renderAnswer(e: Encounter, force: boolean) {
   if (force || document.activeElement !== editor || e.state === "consumed") {
     if (editor.value !== e.workspace) editor.value = e.workspace;
     editorRevision = e.revision;
-    presentSharedWorkspace(game, e);
     if (force) {
       editor.scrollTop = e.scroll;
       editor.setSelectionRange(...e.selection);
@@ -946,23 +901,16 @@ $("#chat-form").onsubmit = (ev) => {
   const e = game.encounters[active],
     input = $<HTMLTextAreaElement>("#chat-input"),
     text = input.value;
-  if (
-    !text.trim() ||
-    (tab === "tutor" && e.tutorRequests?.some((j) => j.state === "pending"))
-  ) {
+  if (!text.trim() || e.tutorRequests?.some((j) => j.state === "pending")) {
     runLogs.record(game, "terminal-message-blocked", {
-      channel: tab,
       reason: !text.trim() ? "empty" : "tutor-pending",
     });
     return;
   }
   input.value = "";
   e.chatDraft = "";
-  runLogs.record(game, "terminal-message", {
-    channel: tab,
-    chars: text.length,
-  });
-  startTerminalRequest(() => send(game, e, tab, text, roadmap));
+  runLogs.record(game, "terminal-message", { chars: text.length });
+  startTerminalRequest(() => send(game, e, text, roadmap));
 };
 
 // ---- Page lifecycle ---------------------------------------------------------
@@ -981,7 +929,7 @@ document.addEventListener("visibilitychange", () => {
 function ui() {
   $("#log-status").textContent =
     runLogs.error ||
-    "Logs stay on this browser: newest 3 games, at most 256 KB each. Older diagnostics are deleted automatically; learning is retained.";
+    "Logs stay on this browser: newest 3 records, at most 256 KB each. Older diagnostics are deleted automatically; learning is retained.";
   syncLearningView(game.study);
   studySession.renderStatus();
   studySession.renderWorkspace();
@@ -1012,7 +960,6 @@ Object.assign(window, {
     },
     /** The newest three records' diagnostics, read by agents, never a download. */
     logs() {
-      runLogs.capture(game, true);
       return runLogs.export();
     },
   },

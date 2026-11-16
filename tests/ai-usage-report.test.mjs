@@ -13,8 +13,6 @@ const base = {
   v: 1,
   at: "2026-01-01T00:00:00.000Z",
   operation: "tutor",
-  phase: null,
-  conversationTurn: 1,
   alias: "sonnet",
   effort: "medium",
   model: "claude-sonnet-5-5",
@@ -53,7 +51,7 @@ const ROWS = [
     firstTextMs: 40,
   }),
   row({
-    conversationTurn: 2,
+    operation: "assess",
     attempt: 0,
     outcome: "accepted",
     durationMs: 400,
@@ -63,8 +61,6 @@ const ROWS = [
   }),
   row({
     operation: "generate",
-    phase: "content-batch",
-    conversationTurn: null,
     attempt: 0,
     outcome: "usage-limit",
     durationMs: 500,
@@ -81,13 +77,9 @@ test("usage groups measure accept rate, cost, tokens and latency", () => {
   const report = summarizeUsage(ROWS);
   assert.equal(report.calls, 5);
   assert.equal(report.groups, 3);
-  const first = report.summary.find(
-    (group) => group.operation === "tutor" && group.turn === "first",
-  );
+  const first = report.summary.find((group) => group.operation === "tutor");
   assert.deepEqual(first, {
     operation: "tutor",
-    phase: null,
-    turn: "first",
     alias: "sonnet",
     effort: "medium",
     model: "claude-sonnet-5-5",
@@ -103,9 +95,7 @@ test("usage groups measure accept rate, cost, tokens and latency", () => {
     p95DurationMs: 300,
     p95FirstTextMs: 40,
   });
-  const reply = report.summary.find(
-    (group) => group.operation === "tutor" && group.turn === "reply",
-  );
+  const reply = report.summary.find((group) => group.operation === "assess");
   assert.equal(reply.calls, 1);
   assert.equal(reply.firstTryAcceptRate, 1);
   assert.equal(reply.correctionTurns, 0);
@@ -118,8 +108,6 @@ test("usage groups measure accept rate, cost, tokens and latency", () => {
   assert.equal(reply.p95DurationMs, 400);
   assert.equal(reply.p95FirstTextMs, null);
   const failed = report.summary.find((group) => group.operation === "generate");
-  assert.equal(failed.phase, "content-batch");
-  assert.equal(failed.turn, "");
   assert.equal(failed.effort, "xhigh");
   assert.equal(failed.model, null);
   assert.equal(failed.firstTryAcceptRate, 0);
@@ -173,11 +161,8 @@ test("the plain-text report is an aligned table with a totals line", () => {
     malformed: 1,
     files: ["claude-usage.jsonl"],
   }).split("\n");
-  assert.match(text[0], /^operation\s+phase\s+turn\s+alias:effort\s+model/);
-  assert.match(
-    text[1],
-    /^tutor\s+-\s+reply\s+sonnet:medium\s+claude-sonnet-5-5/,
-  );
+  assert.match(text[0], /^operation\s+alias:effort\s+model/);
+  assert.match(text[1], /^assess\s+sonnet:medium\s+claude-sonnet-5-5/);
   assert.equal(
     text.at(-1),
     "1 calls across 1 group(s) in 1 file(s); 1 malformed line(s)",

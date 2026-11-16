@@ -1,5 +1,4 @@
-import { startDesignedRun } from "./helpers/designed-run";
-import { openGameMenu } from "./helpers/game-menu";
+import { openAgentMenu, openApp } from "./helpers/agent-menu";
 // Synthetic native protocol and source rows, not real learner certification.
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
@@ -103,15 +102,13 @@ test("closed assessment correction requires a source decision, reviews exact aut
     });
   });
   await page.goto("/");
-  await startDesignedRun(page);
+  await openApp(page);
   const local = await page.evaluate(
     async ({ initial, excerpt, scope }) => {
       const root = "/src/",
         g = (window as any).__deadAir.game,
         r = await (await fetch("/curriculum.json")).json();
       g.study.profile = "live";
-      g.zombies = [];
-      g.nextSpawn = Number.MAX_SAFE_INTEGER;
       const { reconcileRoadmap, adoptReconciledRoadmap } = await import(
         root + "roadmap-adoption.ts"
       );
@@ -189,7 +186,7 @@ test("closed assessment correction requires a source decision, reviews exact aut
   const before = await page.evaluate(() =>
     JSON.stringify((window as any).__deadAir.game.study.learner),
   );
-  await openGameMenu(page);
+  await openAgentMenu(page);
   await page.locator("#curriculum-button").click();
   await page.getByText("Review an updated roadmap", { exact: true }).click();
   await page.locator("#roadmap-review-file").setInputFiles({

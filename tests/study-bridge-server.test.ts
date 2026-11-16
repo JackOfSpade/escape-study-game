@@ -180,23 +180,10 @@ test("relay rejects a saved request captured under another provider before it re
       headers: { "Content-Type": "application/json", Origin: origin },
       body: JSON.stringify(body),
     });
-  const operations = [
-    "materialize-work",
-    "materialize-outcome",
-    "review-environment",
-    "group",
-    "complete",
-    "tutor",
-  ];
+  const operations = ["review-environment", "complete", "tutor"];
   const payload = (operation: string, provider?: string) => ({
     requestId: `synthetic-${operation}`,
     ...(provider ? { provider } : {}),
-    mode:
-      operation === "group"
-        ? "catch-up"
-        : operation === "complete"
-          ? "retrospective-npc-outcome"
-          : undefined,
   });
   try {
     for (const operation of operations)

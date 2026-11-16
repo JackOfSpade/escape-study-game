@@ -1,5 +1,5 @@
 import { isRecord } from "./records";
-/** Provider transport only; gameplay and learning remain in their owning modules. */
+/** Provider transport only; learning stays in its owning modules. */
 type DisconnectReason =
   "relay-unreachable" | "gateway-off" | "cli-missing" | "signed-out";
 const REASONS: readonly unknown[] = [
@@ -9,7 +9,7 @@ const REASONS: readonly unknown[] = [
   "signed-out",
 ];
 export interface BridgeStatus {
-  /** "development" means Claude is not connected, so terminals are locked. */
+  /** "development" means Claude is not connected, so questions are locked. */
   mode: "development" | "claude-cli";
   label: string;
   reason?: DisconnectReason;

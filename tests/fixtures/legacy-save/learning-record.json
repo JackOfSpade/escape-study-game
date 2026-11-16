@@ -1,0 +1,2365 @@
+{
+  "id": "run-00000000-0000-4000-8000-000000000001",
+  "study": {
+    "profile": "live",
+    "learner": {
+      "identifierCounters": {
+        "nextSession": 8,
+        "nextGap": 49,
+        "nextDecision": 28,
+        "attempts": {
+          "S0001": 3,
+          "S0002": 27,
+          "S0003": 5,
+          "S0004": 14,
+          "S0005": 14,
+          "S0006": 19,
+          "S0007": 3
+        },
+        "evidence": {
+          "S0001": 11,
+          "S0002": 37,
+          "S0003": 4,
+          "S0004": 14,
+          "S0005": 12,
+          "S0006": 19,
+          "S0007": 2
+        }
+      },
+      "schema": 1,
+      "mode": "live",
+      "sourceHash": "645d41c58c9211a9a37e0ae749361ac4a6341aaa05336ffffe6050d6d68889ef",
+      "version": 0,
+      "cycle": 0,
+      "cycleOffset": 0,
+      "cells": {
+        "PY:T01.1": {
+          "states": ["P", "G", "U", "—"],
+          "facets": {
+            "f1": {
+              "outcome": "independent",
+              "evidenceIds": ["ev-1"],
+              "updatedAt": "2026-01-14T09:00:00.000Z"
+            }
+          },
+          "proofs": {
+            "f1": ["ev-1"]
+          },
+          "sourceRefs": "D1 gap: G0001; independent ordering facet S0004-EV09; D2 gap: G0007; S0001-EV01"
+        },
+        "PY:T01.2": {
+          "states": ["G", "G", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "D1 gap G0002 narrowed by independent time-cost derivation S0004-EV13; D2 gap G0008; earlier evidence S0001-EV02–EV06, S0002-EV06, EV27, EV29"
+        },
+        "PY:T01.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Independent narrow invariant facets S0001-EV07, S0002-EV19; remaining scope G0003"
+        },
+        "PY:T01.4": {
+          "states": ["U", "G", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "D1 remains unknown; future D2 gap: G0004; S0001-EV08; related D2 representation gap: G0007"
+        },
+        "PY:T01.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Preserved facet: S0001-EV09; unknown scope: G0005"
+        },
+        "PY:T02.1": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Independent purpose facet S0002-EV01; fresh processed-prefix meaning S0005-EV04; G0009"
+        },
+        "PY:T02.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Unknown D1 scope G0012; related copying/index-boundary exposure in S0002-EV09, not a direct checkpoint proof"
+        },
+        "PY:T02.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T02.4": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T02.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Unassessed direct-scan applicability G0025; superseded original scope does not earn evidence"
+        },
+        "PY:T03.1": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Independent representation facet S0002-EV17; remaining scope G0015"
+        },
+        "PY:T03.2": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Independent aggregate-state facet S0002-EV18; assisted trace S0002-EV20; G0016"
+        },
+        "PY:T03.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Independent complement/seen-state facet S0006-EV13; remaining validity/initial-state scope G0047"
+        },
+        "PY:T03.4": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T03.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T04.1": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Independent order-relation facet S0002-EV35; missing completeness/assumption link G0023"
+        },
+        "PY:T04.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Independent below-target movement facet S0002-EV36; remaining comparison/range/boundary scope G0024"
+        },
+        "PY:T04.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T04.4": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T04.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T05.1": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T05.2": {
+          "states": ["P", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "D1=S0004-EV06"
+        },
+        "PY:T05.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T05.4": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T05.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T06.1": {
+          "states": ["P", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "D1=S0005-EV07; earlier guided evidence S0002-EV03–EV07; G0010 CLOSED"
+        },
+        "PY:T06.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T06.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "No independent queue/level-state assessment; the connection following S0002-A22 was supplied by the AI"
+        },
+        "PY:T06.4": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T06.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T07.1": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Fresh independent reference-preservation reasoning S0006-EV16; earlier ambiguity/assistance S0002-EV21, EV23; G0017 remains only for remaining boundary breadth"
+        },
+        "PY:T07.2": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Fresh independent pre-rewire preservation/order facet S0006-EV17; earlier assisted reconnection S0002-EV24; G0018 narrowed to remaining boundary breadth"
+        },
+        "PY:T07.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T07.4": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T07.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T08.1": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T08.2": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "S0002-EV08 independent halving intuition; S0005-EV10 adds independent candidate-range meaning but empty-range absence conclusion was taught; G0011"
+        },
+        "PY:T08.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T08.4": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T08.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T09.1": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "S0006-EV02 independently strengthens the suffix return contract and simple trace; earlier base-case/risk S0002-EV10 and guided repair S0002-EV11–EV12; G0013 remains narrowly open"
+        },
+        "PY:T09.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T09.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T09.4": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T09.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T10.1": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Independent BFS/level-order purpose S0002-EV31; remaining scope G0021"
+        },
+        "PY:T10.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T10.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T10.4": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T10.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T11.1": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Valid sorted alternative S0002-EV25; observed cost gap S0002-EV26; guided correction S0002-EV28; G0019"
+        },
+        "PY:T11.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Unscored unfamiliarity report S0002-EV30; unknown scope G0020, not an observed heap-operation failure"
+        },
+        "PY:T11.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T11.4": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T11.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T12.1": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Independent graph-style representation attempt S0003-EV01; exact topology/node-edge/undirected modelling gap G0026"
+        },
+        "PY:T12.2": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Independent visited-state facet S0003-EV02; successful-target stopping restated after prior solution S0003-EV03; remaining independent traversal/termination scope G0027"
+        },
+        "PY:T12.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T12.4": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T12.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T13.1": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T13.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T13.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T13.4": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "S0006-EV06 independently distinguishes repeated subproblem work from termination; memoization mechanism was then taught. Earlier S0002-EV13–EV14; G0014 narrowed"
+        },
+        "PY:T13.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T14.1": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "S0005-EV06; G0035"
+        },
+        "PY:T14.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T14.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T14.4": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Original ambiguous rationale S0002-EV32 excluded from failure; qualified response S0002-EV33 follows instruction; unknown independent scope G0022"
+        },
+        "PY:T14.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T15.1": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Assisted bit/parity model S0004-EV01, S0004-EV02; D1 gap G0028"
+        },
+        "PY:T15.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T15.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T15.4": {
+          "states": ["U", "U", "—", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T15.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T16.1": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Independent clarification facets S0001-EV10, S0002-EV15, EV16, EV22, EV34 plus fresh ordering-contract clarification S0006-EV09; remaining scope G0006"
+        },
+        "PY:T16.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T16.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T16.4": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T16.5": {
+          "states": ["U", "U", "U", "U"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T01.1": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T01.2": {
+          "states": ["P", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "D1=S0004-EV03"
+        },
+        "PE:T01.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T01.4": {
+          "states": ["U", "U", "U", "U"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T01.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T02.1": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "S0005-EV01; G0032"
+        },
+        "PE:T02.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T02.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T02.4": {
+          "states": ["G", "U", "—", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "S0005-EV02; G0033"
+        },
+        "PE:T02.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T03.1": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "S0006-EV05; G0040"
+        },
+        "PE:T03.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T03.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T03.4": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T03.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T04.1": {
+          "states": ["U", "U", "—", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T04.2": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Initial propagation-direction gap S0004-EV04; guided correction S0004-EV05; G0029"
+        },
+        "PE:T04.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T04.4": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T04.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T05.1": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T05.2": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "S0005-EV03; G0034"
+        },
+        "PE:T05.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T05.4": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T05.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T06.1": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "S0005-EV09; G0037"
+        },
+        "PE:T06.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T06.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T06.4": {
+          "states": ["P", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "D1=S0005-EV05"
+        },
+        "PE:T06.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T07.1": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "S0006-EV07; G0041"
+        },
+        "PE:T07.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T07.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T07.4": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T07.5": {
+          "states": ["U", "U", "U", "U"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T08.1": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Guided semantic-control correction S0006-EV11; G0043"
+        },
+        "PE:T08.2": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Independent keyboard-interaction concern S0006-EV10; focusability/native behavior taught; G0044"
+        },
+        "PE:T08.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T08.4": {
+          "states": ["U", "U", "—", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T08.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T09.1": {
+          "states": ["P", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "D1=S0006-EV14"
+        },
+        "PE:T09.2": {
+          "states": ["U", "U", "—", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T09.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T09.4": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T09.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T10.1": {
+          "states": ["P", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "D1=S0004-EV07"
+        },
+        "PE:T10.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T10.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T10.4": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T10.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T11.1": {
+          "states": ["P", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "D1=S0006-EV04"
+        },
+        "PE:T11.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T11.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T11.4": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T11.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T12.1": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "S0005-EV11; G0038"
+        },
+        "PE:T12.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T12.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T12.4": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T12.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T13.1": {
+          "states": ["P", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "D1=S0004-EV08"
+        },
+        "PE:T13.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T13.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T13.4": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T13.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T14.1": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T14.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T14.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T14.4": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T14.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T15.1": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Independent permission-regression facet S0006-EV01; G0039"
+        },
+        "PE:T15.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T15.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T15.4": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T15.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T16.1": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Independent deploy-versus-release distinction S0006-EV08; G0042"
+        },
+        "PE:T16.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T16.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T16.4": {
+          "states": ["U", "U", "U", "U"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T16.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T17.1": {
+          "states": ["P", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "D1=S0006-EV12"
+        },
+        "PE:T17.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T17.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T17.4": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T17.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T18.1": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Independent loading/error-state facets S0004-EV10; remaining D1 scope G0030"
+        },
+        "PE:T18.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T18.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T18.4": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T18.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T19.1": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T19.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T19.3": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "S0005-EV08; G0036"
+        },
+        "PE:T19.4": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T19.5": {
+          "states": ["U", "U", "U", "U"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T20.1": {
+          "states": ["P", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "D1=S0004-EV11"
+        },
+        "PE:T20.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T20.3": {
+          "states": ["U", "U", "—", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T20.4": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Independent verification instinct with overclaim about tool certainty S0004-EV12; G0031"
+        },
+        "PE:T20.5": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:X03.1": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Invalid ambiguous attempt A14; guided fallback UX S0006-EV15; G0045"
+        },
+        "PE:X03.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:X03.3": {
+          "states": ["U", "U", "U", "U"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:X07.1": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:X07.2": {
+          "states": ["G", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Independent bidirectional-flow facet S0006-EV18; G0046"
+        },
+        "PE:X07.3": {
+          "states": ["U", "U", "U", "U"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:X08.1": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "Independent closure-instance/lexical-state facet S0007-EV01; remaining D1 runtime scope G0048"
+        },
+        "PE:X08.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:X08.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:X09.1": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:X09.2": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:X09.3": {
+          "states": ["U", "U", "U", "—"],
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        }
+      },
+      "scopes": {},
+      "verifiedScopes": [],
+      "tracks": {
+        "PY": {
+          "tier": 1,
+          "cleared": 0,
+          "phase": "REPAIR_VERIFY",
+          "queue": ["T11", "T10", "T14", "T04", "T12", "T15", "T05"],
+          "lap": 2,
+          "suspended": []
+        },
+        "PE": {
+          "tier": 1,
+          "cleared": 0,
+          "phase": "DIAGNOSE_ALL",
+          "queue": ["X09"],
+          "lap": 1,
+          "suspended": []
+        }
+      },
+      "reviews": {
+        "PY:T05.2/D1": {
+          "objectiveId": "PY:T05.2",
+          "depth": 1,
+          "due": "2026-09-18",
+          "stage": 0,
+          "verifiedReviews": 0,
+          "sequence": "S0004",
+          "lastIndependentDate": "2026-09-15"
+        },
+        "PY:T06.1/D1": {
+          "objectiveId": "PY:T06.1",
+          "depth": 1,
+          "due": "2026-09-19",
+          "stage": 0,
+          "verifiedReviews": 0,
+          "sequence": "S0005",
+          "lastIndependentDate": "2026-09-16"
+        },
+        "PE:T01.2/D1": {
+          "objectiveId": "PE:T01.2",
+          "depth": 1,
+          "due": "2026-09-18",
+          "stage": 0,
+          "verifiedReviews": 0,
+          "sequence": "S0004",
+          "lastIndependentDate": "2026-09-15"
+        },
+        "PE:T06.4/D1": {
+          "objectiveId": "PE:T06.4",
+          "depth": 1,
+          "due": "2026-09-19",
+          "stage": 0,
+          "verifiedReviews": 0,
+          "sequence": "S0005",
+          "lastIndependentDate": "2026-09-16"
+        },
+        "PE:T09.1/D1": {
+          "objectiveId": "PE:T09.1",
+          "depth": 1,
+          "due": "2026-09-21",
+          "stage": 0,
+          "verifiedReviews": 0,
+          "sequence": "S0006",
+          "lastIndependentDate": "2026-09-17"
+        },
+        "PE:T10.1/D1": {
+          "objectiveId": "PE:T10.1",
+          "depth": 1,
+          "due": "2026-09-18",
+          "stage": 0,
+          "verifiedReviews": 0,
+          "sequence": "S0004",
+          "lastIndependentDate": "2026-09-15"
+        },
+        "PE:T11.1/D1": {
+          "objectiveId": "PE:T11.1",
+          "depth": 1,
+          "due": "2026-09-21",
+          "stage": 0,
+          "verifiedReviews": 0,
+          "sequence": "S0006",
+          "lastIndependentDate": "2026-09-17"
+        },
+        "PE:T13.1/D1": {
+          "objectiveId": "PE:T13.1",
+          "depth": 1,
+          "due": "2026-09-18",
+          "stage": 0,
+          "verifiedReviews": 0,
+          "sequence": "S0004",
+          "lastIndependentDate": "2026-09-15"
+        },
+        "PE:T17.1/D1": {
+          "objectiveId": "PE:T17.1",
+          "depth": 1,
+          "due": "2026-09-21",
+          "stage": 0,
+          "verifiedReviews": 0,
+          "sequence": "S0006",
+          "lastIndependentDate": "2026-09-17"
+        },
+        "PE:T20.1/D1": {
+          "objectiveId": "PE:T20.1",
+          "depth": 1,
+          "due": "2026-09-18",
+          "stage": 0,
+          "verifiedReviews": 0,
+          "sequence": "S0004",
+          "lastIndependentDate": "2026-09-15"
+        },
+        "PY:T01.1/D1": {
+          "objectiveId": "PY:T01.1",
+          "depth": 1,
+          "due": "2026-01-17",
+          "stage": 1,
+          "verifiedReviews": 1,
+          "lastIndependentAt": "2026-01-14T09:00:00.000Z"
+        }
+      },
+      "sessions": [
+        {
+          "id": "S0004",
+          "status": "imported"
+        },
+        {
+          "id": "S0005",
+          "status": "imported"
+        },
+        {
+          "id": "S0006",
+          "status": "imported"
+        },
+        {
+          "id": "S0007",
+          "status": "open"
+        },
+        {
+          "id": "S0099",
+          "status": "open",
+          "startedAt": "2026-01-15T09:00:00.000Z"
+        }
+      ],
+      "attempts": [
+        {
+          "id": "at-1",
+          "session": "S0099",
+          "encounter": "run-00000000-0000-4000-8000-000000000001/q-0",
+          "contract": {
+            "id": "c-0",
+            "track": "PY",
+            "objectiveIds": ["PY:T01.1"],
+            "scopes": ["PY:T01.1/D1"],
+            "depth": 1,
+            "phase": "build",
+            "review": false,
+            "ledgerVersion": 3,
+            "priorEvidence": []
+          },
+          "status": "served",
+          "startedAt": "2026-01-14T08:30:00.000Z",
+          "endedAt": "2026-01-14T09:00:00.000Z"
+        },
+        {
+          "id": "at-2",
+          "session": "S0099",
+          "encounter": "run-00000000-0000-4000-8000-000000000001/q-1",
+          "contract": {
+            "id": "c-1",
+            "track": "PY",
+            "objectiveIds": ["PY:T01.1"],
+            "scopes": ["PY:T01.1/D1"],
+            "depth": 1,
+            "phase": "build",
+            "review": false,
+            "ledgerVersion": 3,
+            "priorEvidence": []
+          },
+          "status": "in-progress",
+          "startedAt": "2026-01-15T09:30:00.000Z"
+        }
+      ],
+      "evidence": [
+        {
+          "provider": "claude-cli",
+          "id": "ev-1",
+          "attemptId": "at-1",
+          "encounter": "run-00000000-0000-4000-8000-000000000001/q-0",
+          "objectiveId": "PY:T01.1",
+          "depth": 1,
+          "facet": "f1",
+          "outcome": "independent",
+          "artifactSequences": [1],
+          "helpMessageIds": [],
+          "at": "2026-01-14T09:00:00.000Z",
+          "execution": "executed",
+          "rationale": "Wrote the invariant unprompted."
+        }
+      ],
+      "receipts": {
+        "as-1": {
+          "signature": "sig",
+          "version": 4,
+          "evidenceIds": ["ev-1"]
+        }
+      },
+      "continuations": [],
+      "finalProgress": {
+        "PY:T01": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T02": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T03": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T04": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T05": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T06": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T07": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T08": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T09": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T10": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T11": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T12": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T13": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T14": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T15": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:T16": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:I01": {
+          "kind": "integration",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:I02": {
+          "kind": "integration",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:I03": {
+          "kind": "integration",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:I04": {
+          "kind": "integration",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:I05": {
+          "kind": "integration",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PY:I06": {
+          "kind": "integration",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T01": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T02": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T03": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T04": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T05": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T06": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T07": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T08": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T09": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T10": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T11": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T12": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T13": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T14": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T15": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T16": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T17": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T18": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T19": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:T20": {
+          "kind": "transfer",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:I01": {
+          "kind": "integration",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:I02": {
+          "kind": "integration",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:I03": {
+          "kind": "integration",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:I05": {
+          "kind": "integration",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        },
+        "PE:I06": {
+          "kind": "integration",
+          "status": "U",
+          "facets": {},
+          "proofs": {},
+          "sourceRefs": "—"
+        }
+      },
+      "currentSession": "S0099",
+      "studyTurnPosition": 7,
+      "careerFocus": "full",
+      "retentionHistory": [
+        {
+          "scopeId": "PY:T01.1/D1",
+          "assessmentId": "as-1",
+          "attemptId": "at-1",
+          "at": "2026-01-14T09:00:00.000Z",
+          "evidenceIds": ["ev-1"],
+          "before": {
+            "objectiveId": "PY:T01.1",
+            "depth": 1,
+            "due": "2026-01-14",
+            "stage": 0,
+            "verifiedReviews": 0
+          },
+          "after": {
+            "objectiveId": "PY:T01.1",
+            "depth": 1,
+            "due": "2026-01-17",
+            "stage": 1,
+            "verifiedReviews": 1,
+            "lastIndependentAt": "2026-01-14T09:00:00.000Z"
+          }
+        }
+      ],
+      "environmentEvidence": []
+    },
+    "version": 5,
+    "cycle": 2,
+    "cycleOffset": 0,
+    "queues": {
+      "PY": ["T11", "T10", "T14", "T04", "T12", "T15", "T05"],
+      "PE": ["X09"]
+    },
+    "phases": {
+      "PY": "REPAIR_VERIFY",
+      "PE": "DIAGNOSE_ALL"
+    },
+    "reviewsServed": [],
+    "visits": [
+      {
+        "id": "v-1",
+        "contract": {
+          "id": "c-0",
+          "track": "PY",
+          "objectiveIds": ["PY:T01.1"],
+          "scopes": ["PY:T01.1/D1"],
+          "depth": 1,
+          "phase": "build",
+          "review": false,
+          "ledgerVersion": 3,
+          "priorEvidence": []
+        },
+        "encounter": "run-00000000-0000-4000-8000-000000000001/q-0",
+        "at": "2026-01-14T09:00:00.000Z"
+      }
+    ],
+    "assessments": [
+      {
+        "id": "as-1",
+        "encounter": "run-00000000-0000-4000-8000-000000000001/q-0",
+        "sourceVersion": 4,
+        "findings": [
+          {
+            "objectiveId": "PY:T01.1",
+            "facet": "f1",
+            "payloadJson": "{}",
+            "questionFingerprint": "fp1",
+            "state": "applied"
+          }
+        ],
+        "status": "applied",
+        "provenance": "claude-cli",
+        "evidenceCutoffSequence": 2,
+        "visitOutcome": "usable"
+      },
+      {
+        "id": "as-2",
+        "encounter": "run-00000000-0000-4000-8000-000000000001/q-1",
+        "sourceVersion": 5,
+        "findings": [],
+        "status": "review-required",
+        "provenance": "Application restarted during assessment. Evidence cutoff and request identity retained for retry."
+      }
+    ],
+    "archives": [
+      {
+        "id": "q-0",
+        "runId": "run-00000000-0000-4000-8000-000000000001",
+        "floor": 0,
+        "mode": "solo",
+        "reward": "loot",
+        "state": "consumed",
+        "workspace": "def solve(xs):\n    return sorted(xs)\n",
+        "revision": 4,
+        "history": [
+          {
+            "seq": 1,
+            "author": "human",
+            "kind": "edit",
+            "text": "done",
+            "at": 5,
+            "revision": 1
+          }
+        ],
+        "group": [],
+        "tutor": [
+          {
+            "id": "a1",
+            "author": "tutor",
+            "kind": "tutor",
+            "text": "Archived tutoring turn.",
+            "seq": 1,
+            "worldTime": 3.5,
+            "provenance": "claude-cli",
+            "presented": 1
+          }
+        ],
+        "submissions": [
+          {
+            "id": "s0",
+            "revision": 2,
+            "author": "human",
+            "content": "done",
+            "status": "complete",
+            "feedback": "Correct.",
+            "seq": 2
+          }
+        ],
+        "contributors": ["human"],
+        "chatCursor": 0,
+        "chatOpen": false,
+        "recentSpeakers": [],
+        "npcProgress": 0,
+        "loot": [],
+        "scroll": 0,
+        "selection": [0, 0],
+        "questionRoom": "f0-room0",
+        "studyOnly": true,
+        "owner": "human",
+        "problem": {
+          "title": "Question q-0",
+          "prompt": "Explain and implement: Question q-0.",
+          "rubric": ["Names the invariant", "Handles the empty input"],
+          "starter": "def solve(xs):\n    pass\n",
+          "provenance": "claude-cli",
+          "contract": {
+            "id": "c-0",
+            "track": "PY",
+            "objectiveIds": ["PY:T01.1"],
+            "scopes": ["PY:T01.1/D1"],
+            "depth": 1,
+            "phase": "build",
+            "review": false,
+            "ledgerVersion": 3,
+            "priorEvidence": []
+          },
+          "estimatedSolveSeconds": 480
+        },
+        "workspaceBase": "def solve(xs):\n    pass\n",
+        "problemPresentedSequence": 1,
+        "problemPresentedAt": 1760000000000,
+        "accepted": "s0",
+        "tutorRequests": [
+          {
+            "id": "tr0",
+            "provider": "claude-cli",
+            "payloadJson": "{\"old\":true}",
+            "questionSequence": 1,
+            "state": "applied",
+            "responseMessageId": "a1"
+          }
+        ]
+      }
+    ],
+    "careerFocus": "full",
+    "studyTurnPosition": 7,
+    "pending": {
+      "contract": {
+        "id": "c-1",
+        "track": "PY",
+        "objectiveIds": ["PY:T01.1"],
+        "scopes": ["PY:T01.1/D1"],
+        "depth": 1,
+        "phase": "build",
+        "review": false,
+        "ledgerVersion": 3,
+        "priorEvidence": []
+      },
+      "encounter": "run-00000000-0000-4000-8000-000000000001/q-1"
+    },
+    "session": "S0099",
+    "topicAssessments": {
+      "PY:PY:T01.1": {
+        "topicId": "PY:T01.1",
+        "depth": 1,
+        "text": "Solid on invariants; shaky on edge cases.",
+        "updatedAt": "2026-01-14T09:30:00.000Z",
+        "encounter": "run-00000000-0000-4000-8000-000000000001/q-0",
+        "runId": "run-00000000-0000-4000-8000-000000000001",
+        "questionFingerprint": "fp1",
+        "requestId": "rq1"
+      }
+    },
+    "knowledgeGaps": [
+      {
+        "id": "gap-run-00000000-0000-4000-8000-000000000001/q-1-f2",
+        "encounter": "run-00000000-0000-4000-8000-000000000001/q-1",
+        "runId": "run-00000000-0000-4000-8000-000000000001",
+        "track": "PY",
+        "objectiveIds": ["PY:T01.1"],
+        "depth": 1,
+        "facet": {
+          "id": "f2",
+          "description": "Empty input"
+        },
+        "statement": "I do not know how to handle empty input",
+        "requestId": "tr1",
+        "at": "2026-01-15T10:05:00.000Z"
+      }
+    ],
+    "knowledgeEstablished": [
+      {
+        "id": "est-run-00000000-0000-4000-8000-000000000001/q-1-f1",
+        "encounter": "run-00000000-0000-4000-8000-000000000001/q-1",
+        "runId": "run-00000000-0000-4000-8000-000000000001",
+        "track": "PY",
+        "objectiveIds": ["PY:T01.1"],
+        "depth": 1,
+        "facet": {
+          "id": "f1",
+          "description": "Loop invariant"
+        },
+        "status": "demonstrated",
+        "requestId": "tr1",
+        "at": "2026-01-15T10:01:00.000Z"
+      }
+    ],
+    "topicSpawn": {
+      "disabled": ["PE:PE-99"],
+      "recent": [
+        {
+          "key": "PY:PY:T01.1",
+          "at": 100,
+          "profile": "live"
+        }
+      ]
+    },
+    "thread": {
+      "id": "thr-1",
+      "problem": {
+        "title": "Long question",
+        "prompt": "Explain and implement: Long question.",
+        "rubric": ["Names the invariant", "Handles the empty input"],
+        "starter": "def solve(xs):\n    pass\n",
+        "provenance": "claude-cli",
+        "contract": {
+          "id": "c-1",
+          "track": "PY",
+          "objectiveIds": ["PY:T01.1"],
+          "scopes": ["PY:T01.1/D1"],
+          "depth": 1,
+          "phase": "build",
+          "review": false,
+          "ledgerVersion": 3,
+          "priorEvidence": []
+        },
+        "estimatedSolveSeconds": 480
+      },
+      "segment": 1,
+      "visits": [
+        {
+          "encounter": "run-00000000-0000-4000-8000-000000000001/q-0",
+          "runId": "run-00000000-0000-4000-8000-000000000001",
+          "segment": 0,
+          "at": 50,
+          "completed": true,
+          "keyGranted": true,
+          "summary": "Part one done"
+        }
+      ],
+      "active": "run-00000000-0000-4000-8000-000000000001/q-1",
+      "startedAt": "2026-01-14T08:00:00.000Z"
+    },
+    "environmentObservations": [
+      {
+        "schema": 1,
+        "id": "eo-1",
+        "sourceHash": "645d41c58c9211a9a37e0ae749361ac4a6341aaa05336ffffe6050d6d68889ef",
+        "envId": "ENV-1",
+        "sourceScope": "PE:T01.1/D1",
+        "capturedAt": "2026-01-15T11:00:00.000Z",
+        "profile": "live",
+        "status": "pending-review",
+        "independence": "unassessed",
+        "learnerStatement": "The service restarted after the config change.",
+        "fingerprint": "fpenv"
+      }
+    ],
+    "roadmapReconciliations": [
+      {
+        "id": "rr-1",
+        "state": "interrupted",
+        "error": "Roadmap review interrupted; explicit retry retains its exact snapshot."
+      }
+    ]
+  },
+  "encounters": {
+    "q-1": {
+      "id": "q-1",
+      "runId": "run-00000000-0000-4000-8000-000000000001",
+      "floor": 0,
+      "mode": "solo",
+      "reward": "loot",
+      "state": "in-progress",
+      "workspace": "def solve(xs):\n    return sorted(xs)\n",
+      "revision": 4,
+      "history": [
+        {
+          "seq": 1,
+          "author": "human",
+          "kind": "edit",
+          "text": "def solve(xs):\n    return sorted(xs)\n",
+          "at": 10,
+          "revision": 1
+        },
+        {
+          "seq": 2,
+          "author": "runner",
+          "kind": "execution",
+          "text": "{\"id\":\"x\"}",
+          "at": 20,
+          "revision": 2,
+          "executionId": "ex-1"
+        },
+        {
+          "seq": 3,
+          "author": "tutor",
+          "kind": "tutor",
+          "text": "Hint given",
+          "at": 30,
+          "revision": 3
+        }
+      ],
+      "group": [],
+      "tutor": [
+        {
+          "id": "m1",
+          "author": "tutor",
+          "kind": "tutor",
+          "text": "What is the invariant of your loop?",
+          "seq": 1,
+          "worldTime": 3.5,
+          "provenance": "claude-cli",
+          "presented": 1
+        },
+        {
+          "id": "m2",
+          "author": "human",
+          "kind": "human",
+          "text": "The prefix is always sorted.",
+          "seq": 2,
+          "worldTime": 7,
+          "provenance": "human",
+          "presented": 2
+        },
+        {
+          "id": "m3",
+          "author": "tutor",
+          "kind": "tutor",
+          "text": "Good. What about empty input?",
+          "seq": 3,
+          "worldTime": 10.5,
+          "provenance": "claude-cli",
+          "presented": 3
+        }
+      ],
+      "submissions": [
+        {
+          "id": "s1",
+          "revision": 3,
+          "author": "human",
+          "content": "def solve(xs):\n    return sorted(xs)\n",
+          "status": "needs-work",
+          "feedback": "Empty input unhandled.",
+          "seq": 4
+        },
+        {
+          "id": "s2",
+          "revision": 4,
+          "author": "human",
+          "content": "def solve(xs):\n    return sorted(xs) if xs else []\n",
+          "status": "error",
+          "feedback": "Application restarted during evaluation. Retry the exact saved evaluation; its captured revision is retained.",
+          "seq": 5,
+          "completionRequest": {
+            "provider": "claude-cli",
+            "payloadJson": "{\"pending\":true}"
+          }
+        }
+      ],
+      "contributors": ["human"],
+      "chatCursor": 0,
+      "chatOpen": false,
+      "recentSpeakers": [],
+      "npcProgress": 0,
+      "loot": [],
+      "scroll": 7,
+      "selection": [3, 9],
+      "questionRoom": "f0-room0",
+      "studyOnly": true,
+      "owner": "human",
+      "problem": {
+        "title": "Question q-1",
+        "prompt": "Explain and implement: Question q-1.",
+        "rubric": ["Names the invariant", "Handles the empty input"],
+        "starter": "def solve(xs):\n    pass\n",
+        "provenance": "claude-cli",
+        "contract": {
+          "id": "c-1",
+          "track": "PY",
+          "objectiveIds": ["PY:T01.1"],
+          "scopes": ["PY:T01.1/D1"],
+          "depth": 1,
+          "phase": "build",
+          "review": false,
+          "ledgerVersion": 3,
+          "priorEvidence": []
+        },
+        "estimatedSolveSeconds": 480
+      },
+      "workspaceBase": "def solve(xs):\n    pass\n",
+      "problemPresentedSequence": 1,
+      "problemPresentedAt": 1760000000000,
+      "executions": [
+        {
+          "id": "ex-1",
+          "revision": 2,
+          "language": "python",
+          "code": "print(1)",
+          "artifactSequences": [2],
+          "status": "finished",
+          "receipt": {
+            "id": "r1",
+            "language": "python",
+            "status": "completed",
+            "executed": true,
+            "stdout": "1\n",
+            "exitCode": 0
+          }
+        },
+        {
+          "id": "ex-2",
+          "revision": 4,
+          "language": "python",
+          "code": "print(2)",
+          "artifactSequences": [],
+          "status": "interrupted",
+          "error": "Application restarted during execution. Captured code retained; run again to retry."
+        }
+      ],
+      "tutorRequests": [
+        {
+          "id": "tr1",
+          "provider": "claude-cli",
+          "payloadJson": "{}",
+          "questionSequence": 1,
+          "state": "applied",
+          "responseMessageId": "m3"
+        },
+        {
+          "id": "tr2",
+          "provider": "claude-cli",
+          "payloadJson": "{\"q\":1}",
+          "questionSequence": 1,
+          "state": "interrupted",
+          "error": "Application restarted; retry the exact saved private question."
+        }
+      ],
+      "probe": {
+        "facets": [
+          {
+            "id": "f1",
+            "description": "Loop invariant"
+          },
+          {
+            "id": "f2",
+            "description": "Empty input"
+          }
+        ],
+        "turns": [
+          {
+            "requestId": "tr1",
+            "questionSequence": 1,
+            "at": "2026-01-15T10:00:00.000Z",
+            "complete": false,
+            "outcome": "continue",
+            "findings": [
+              {
+                "id": "f1",
+                "status": "demonstrated"
+              }
+            ]
+          }
+        ]
+      },
+      "chatDraft": "Maybe use a heap?"
+    },
+    "q-2": {
+      "id": "q-2",
+      "runId": "run-00000000-0000-4000-8000-000000000001",
+      "floor": 0,
+      "mode": "solo",
+      "reward": "loot",
+      "state": "available",
+      "workspace": "def solve(xs):\n    return sorted(xs)\n",
+      "revision": 4,
+      "history": [],
+      "group": [],
+      "tutor": [],
+      "submissions": [],
+      "contributors": ["human"],
+      "chatCursor": 0,
+      "chatOpen": false,
+      "recentSpeakers": [],
+      "npcProgress": 0,
+      "loot": [],
+      "scroll": 0,
+      "selection": [0, 0],
+      "questionRoom": "f0-room0",
+      "studyOnly": true,
+      "owner": "human",
+      "workspaceBase": "def solve(xs):\n    pass\n",
+      "problemPresentedSequence": 1,
+      "problemPresentedAt": 1760000000000,
+      "pendingGeneration": {
+        "provider": "claude-cli",
+        "requestId": "gen-1",
+        "payload": {
+          "want": "q2"
+        }
+      }
+    },
+    "f0-room0": {
+      "id": "f0-room0",
+      "runId": "run-79cde672-0a84-4e74-8478-dd37e14cad85",
+      "floor": 0,
+      "mode": "solo",
+      "reward": "stairs",
+      "state": "available",
+      "workspace": "",
+      "revision": 0,
+      "history": [],
+      "group": [],
+      "tutor": [],
+      "submissions": [],
+      "contributors": [],
+      "chatCursor": 0,
+      "chatOpen": false,
+      "recentSpeakers": [],
+      "npcProgress": 0,
+      "loot": [],
+      "scroll": 0,
+      "selection": [0, 0],
+      "questionRoom": "f0-room0"
+    },
+    "f0-room1": {
+      "id": "f0-room1",
+      "runId": "run-79cde672-0a84-4e74-8478-dd37e14cad85",
+      "floor": 0,
+      "mode": "solo",
+      "reward": "stairs",
+      "state": "available",
+      "workspace": "",
+      "revision": 0,
+      "history": [],
+      "group": [],
+      "tutor": [],
+      "submissions": [],
+      "contributors": [],
+      "chatCursor": 0,
+      "chatOpen": false,
+      "recentSpeakers": [],
+      "npcProgress": 0,
+      "loot": [],
+      "scroll": 0,
+      "selection": [0, 0],
+      "questionRoom": "f0-room1"
+    },
+    "f0-room1-solo1": {
+      "id": "f0-room1-solo1",
+      "runId": "run-79cde672-0a84-4e74-8478-dd37e14cad85",
+      "floor": 0,
+      "mode": "solo",
+      "reward": "stairs",
+      "state": "available",
+      "workspace": "",
+      "revision": 0,
+      "history": [],
+      "group": [],
+      "tutor": [],
+      "submissions": [],
+      "contributors": [],
+      "chatCursor": 0,
+      "chatOpen": false,
+      "recentSpeakers": [],
+      "npcProgress": 0,
+      "loot": [],
+      "scroll": 0,
+      "selection": [0, 0],
+      "questionRoom": "f0-room1"
+    }
+  },
+  "settings": {
+    "displayScale": 1.25,
+    "volume": 0.3,
+    "captions": true,
+    "reducedFlash": true,
+    "view": "top-down",
+    "npcVoices": false
+  },
+  "notice": "Run saved locally.",
+  "lastStudyEncounter": "q-1",
+  "studyWorkspace": {
+    "enabled": true,
+    "wasPaused": false,
+    "encounter": "q-1"
+  }
+}

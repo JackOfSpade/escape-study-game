@@ -5,7 +5,7 @@ import { assess, checkBridge, edit } from "../src/ai";
 import { eligible, evidencePacket, initialStudy } from "../src/curriculum";
 import type { Roadmap } from "../src/model";
 import { decode, encode, recover } from "../src/persistence";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 
 const roadmap: Roadmap = JSON.parse(
   readFileSync("public/curriculum.json", "utf8"),
@@ -14,7 +14,7 @@ function fixture() {
   const r = structuredClone(roadmap),
     g = createGame(725, r);
   g.study = initialStudy(r, "live");
-  const e = g.encounters["f0-room0"],
+  const e = g.encounters["question-0"],
     contract = eligible(r, g.study);
   e.problem = {
     title: "Synthetic assessment lifecycle",

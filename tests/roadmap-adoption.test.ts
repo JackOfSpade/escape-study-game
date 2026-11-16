@@ -4,7 +4,6 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { presentProblem } from "../src/ai";
 import { evidencePacket } from "../src/curriculum";
-import { groupSnapshot } from "../src/group-grounding";
 import {
   applyLearningAssessment,
   beginLearningAttempt,
@@ -12,7 +11,6 @@ import {
   registerScopes,
 } from "../src/learner";
 import type { Roadmap } from "../src/model";
-import { npcWorkContext } from "../src/npc-cognition";
 import { decode, encode, recover } from "../src/persistence";
 import {
   adoptReconciledRoadmap,
@@ -25,14 +23,11 @@ import type {
 } from "../src/roadmap-adoption-types";
 import { prepareRoadmapExport, sha256 } from "../src/roadmap-export";
 import { presentRoadmapReview } from "../src/roadmap-exposure";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 function fixture() {
   const g = createGame(7, r);
   g.study.profile = "live";
-  g.status = "playing";
-  g.zombies = [];
-  g.nextSpawn = Number.MAX_SAFE_INTEGER;
   return { g, l: g.study.learner! };
 }
 function revision(raw: string, parent: string, n = 10) {
@@ -61,7 +56,7 @@ function reply(p: RoadmapReconciliationPayload): RoadmapReconciliation {
       "Synthetic native review only; not genuine semantic certification",
   };
 }
-test("the reconcile instruction names the game's own evidence modes and incoming descendant records", async () => {
+test("the reconcile instruction names the app's own evidence modes and incoming descendant records", async () => {
   const { g } = fixture();
   let instruction = "";
   await reconcileRoadmap(g, r, candidate(), async (p) => {
@@ -100,15 +95,11 @@ test("the reconcile instruction spells out the definitions and mappings shapes",
     "instruction does not spell out the mappings entry shape",
   );
 });
-test("visible roadmap material is private assistance at its actual presentation cutoff, never NPC context or human proof", () => {
+test("visible roadmap material is private assistance at its actual presentation cutoff, never human proof", () => {
   const { g, l } = fixture(),
-    h = g.survivors[0],
-    e = g.encounters["f0-room0"],
-    station = g.floors[0].stations.find((s) => s.encounter === e.id)!;
-  g.floors[0].furniture = [];
-  g.floors[0].tiles = Array.from({ length: 34 }, () => Array(44).fill(0));
-  Object.assign(h, { x: station.x, y: station.y, station: station.id });
-  e.humanEngaged = true;
+    e = g.encounters["question-0"];
+  g.seq = 5;
+  e.problemPresentedSequence = g.seq;
   e.problem = {
     title: "Synthetic open task",
     prompt: "Independent boundary check",
@@ -118,8 +109,7 @@ test("visible roadmap material is private assistance at its actual presentation 
     contract: eligibleLearning(r, l, "2026-10-16T16:00:00Z"),
   };
   const before = JSON.stringify(l),
-    cutoff = g.seq,
-    context = npcWorkContext(e);
+    cutoff = g.seq;
   presentRoadmapReview(
     g,
     "review/proposal/summary",
@@ -129,7 +119,12 @@ test("visible roadmap material is private assistance at its actual presentation 
   assert.equal(source.kind, "source-view");
   assert.equal(source.author, "roadmap");
   assert.equal(source.presented, source.seq);
-  assert.equal(evidencePacket(e, r, cutoff).assistanceSources.length, 0);
+  assert.equal(
+    evidencePacket(e, r, cutoff).assistanceSources.filter(
+      (s) => s.provenance === "visible-private-roadmap-review",
+    ).length,
+    0,
+  );
   const packet = evidencePacket(e, r);
   assert.ok(
     packet.assistanceSources.some(
@@ -138,13 +133,6 @@ test("visible roadmap material is private assistance at its actual presentation 
         s.provenance === "visible-private-roadmap-review",
     ),
   );
-  assert.equal(
-    JSON.stringify(groupSnapshot(e, "public", g.seq)).includes(
-      "PRIVATE_REVIEW_MATERIAL",
-    ),
-    false,
-  );
-  assert.equal(npcWorkContext(e), context);
   assert.equal(JSON.stringify(l), before);
   assert.equal(g.study.visits.length, 0);
   const count = e.history.length;
@@ -162,7 +150,7 @@ test("visible roadmap material is private assistance at its actual presentation 
   );
   assert.equal(restored.encounters[e.id].history.length, count);
 });
-test("roadmap inspection away from an active reachable question creates no assistance exposure or study attempt", () => {
+test("roadmap inspection with no presented question creates no assistance exposure or study attempt", () => {
   const { g, l } = fixture(),
     before = JSON.stringify(l);
   presentRoadmapReview(g, "review/away", "Administrative file inspection");
@@ -170,9 +158,9 @@ test("roadmap inspection away from an active reachable question creates no assis
   assert.equal(JSON.stringify(l), before);
   assert.equal(g.study.visits.length, 0);
 });
-test("source review after leaving a retained question still records private assistance without changing archived or unobserved tasks", () => {
+test("source review of a retained question records private assistance without changing archived or unpresented tasks", () => {
   const { g, l } = fixture(),
-    e = g.encounters["f0-room0"];
+    e = g.encounters["question-0"];
   e.problem = {
     title: "Synthetic previously viewed task",
     prompt: "Retained question",
@@ -182,16 +170,14 @@ test("source review after leaving a retained question still records private assi
     contract: eligibleLearning(r, l, "2026-10-16T16:00:00Z"),
   };
   presentProblem(g, e);
-  const before = JSON.stringify(l),
-    publicBefore = npcWorkContext(e);
-  const unobserved = g.encounters["f0-room1"];
+  const before = JSON.stringify(l);
+  const unobserved = g.encounters["question-1"];
   unobserved.problem = structuredClone(e.problem);
   const archived = structuredClone(e);
   archived.runId = "old-frozen-run";
   g.study.archives.push(archived);
   const archiveBefore = JSON.stringify(archived),
     cutoff = g.seq;
-  g.survivors[0].station = undefined;
   presentRoadmapReview(
     g,
     "detached/progress/diff",
@@ -208,20 +194,12 @@ test("source review after leaving a retained question still records private assi
     ),
     false,
   );
-  assert.equal(
-    JSON.stringify(groupSnapshot(e, "public", g.seq)).includes(
-      "PRIVATE_SOURCE_AFTER_LEAVING",
-    ),
-    false,
-  );
-  assert.equal(npcWorkContext(e), publicBefore);
   assert.equal(unobserved.history.length, 0);
   assert.equal(JSON.stringify(archived), archiveBefore);
   assert.equal(JSON.stringify(l), before);
 });
-test("explicit adoption publishes the reviewed complete parent atomically without replacing world/work or creating study activity", async () => {
+test("explicit adoption publishes the reviewed complete parent atomically without replacing work or creating study activity", async () => {
   const { g, l } = fixture(),
-    world = JSON.stringify(g.floors),
     encounters = JSON.stringify(g.encounters),
     sessions = JSON.stringify(l.sessions),
     incoming = candidate();
@@ -233,7 +211,6 @@ test("explicit adoption publishes the reviewed complete parent atomically withou
   await adoptReconciledRoadmap(g, r, j.id);
   assert.equal(j.state, "applied");
   assert.equal(g.study.roadmapExport!.content, incoming);
-  assert.equal(JSON.stringify(g.floors), world);
   assert.equal(JSON.stringify(g.encounters), encounters);
   assert.equal(JSON.stringify(g.study.learner!.sessions), sessions);
   assert.equal(g.study.learner!.attempts.length, 0);
@@ -380,7 +357,7 @@ test("a stale local learner or a pending source-bound request cannot be overwrit
     await reconcileRoadmap(g, r, candidate(), async (p) => reply(p));
     const j = g.study.roadmapReconciliations![0];
     if (reason === "version") l.version++;
-    else g.encounters["f0-room0"].generation = "pending";
+    else g.encounters["question-0"].generation = "pending";
     const before = JSON.stringify(g.study.learner);
     await assert.rejects(adoptReconciledRoadmap(g, r, j.id), /stale|pending/);
     assert.equal(JSON.stringify(g.study.learner), before);
@@ -580,7 +557,7 @@ for (const provider of ["study-mode", "chatgpt-handoff"] as const)
     assert.equal(l.reviews["PE:X09.1/D1"].due, "2026-10-19");
     const restored = recover(decode(encode(g))),
       ledger = restored.study.learner!,
-      e = restored.encounters["f0-room0"],
+      e = restored.encounters["question-0"],
       c = eligibleLearning(r, ledger, "2026-10-16T16:00:00Z");
     e.problem = {
       title: "Synthetic new actual game study",

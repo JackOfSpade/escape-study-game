@@ -15,7 +15,6 @@ import type {
 } from "../src/environment-status";
 import { curriculumReadiness } from "../src/final-requirements";
 import type { Roadmap } from "../src/model";
-import { event } from "../src/model";
 import { decode, encode, recover } from "../src/persistence";
 import {
   adoptReconciledRoadmap,
@@ -23,7 +22,7 @@ import {
 } from "../src/roadmap-adoption";
 import { prepareRoadmapExport, sha256 } from "../src/roadmap-export";
 import { reviewRoadmap } from "../src/roadmap-review";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 
 async function waitUntil(
   ready: () => boolean,
@@ -401,7 +400,7 @@ test("ENV-only export preserves protected bytes, academic sections and scheduler
 test("mixed academic-attempt exports also include ENV receipts without conflating evidence types", async () => {
   const { g, o, l } = await fixture();
   await reviewEnvironment(g, r, o.id, async (p) => judgment(p));
-  const e = g.encounters["f0-room0"];
+  const e = g.encounters["question-0"];
   e.problem = {
     title: "Fixture question",
     prompt: "Fixture",
@@ -439,9 +438,9 @@ test("a packet captured under development remains raw evidence that a later live
 });
 test("runner-backed practical review uses the captured human source and cutoff assistance, including after archive", async () => {
   const g = createGame(7, r),
-    e = g.encounters["f0-room0"];
+    e = g.encounters["question-0"];
   g.study.profile = "live";
-  const help = event(g, "tutor", "Private guided fixture", 0, "tutor", e.id);
+  const help = { seq: ++g.seq };
   e.tutor.push({
     id: "private-before",
     author: "tutor",
@@ -484,7 +483,7 @@ test("runner-backed practical review uses the captured human source and cutoff a
       receipt,
     },
   ];
-  const ran = event(g, "execution", "Fixture execution", 0, "runner", e.id);
+  const ran = { seq: ++g.seq };
   e.history.push({
     seq: ran.seq,
     author: "runner",

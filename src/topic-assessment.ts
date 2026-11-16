@@ -8,7 +8,7 @@ import type { ScopeDefinition } from "./learning-model";
 import type {
   Contract,
   Encounter,
-  Game,
+  StudyRecord,
   Roadmap,
   StudyState,
   Track,
@@ -122,7 +122,7 @@ export function validateTopicAssessments(
 
 /** Called only after the enclosing question completion has been fully validated. */
 export function recordTopicAssessments(
-  g: Game,
+  g: StudyRecord,
   e: Encounter,
   values: unknown,
   metadata: TopicAssessmentMetadata = {},
@@ -233,11 +233,12 @@ function boundedText(text: string, maxChars: number) {
 const topicOf = (id: string) => /^(PY|PE):[TXI]\d{2}/.exec(id)?.[0];
 const onTopics = (ids: readonly string[], topics: readonly string[]) =>
   ids.some((id) => topics.includes(topicOf(id) ?? ""));
-const encounterKey = (g: Game, e: Encounter) => `${e.runId ?? g.id}/${e.id}`;
+const encounterKey = (g: StudyRecord, e: Encounter) =>
+  `${e.runId ?? g.id}/${e.id}`;
 
 /** This is saved in the immutable request before the current native conversation begins. */
 export function topicAssessmentContext(
-  g: Game,
+  g: StudyRecord,
   r: Roadmap,
   contract: Contract,
 ) {
@@ -359,7 +360,9 @@ export function topicAssessmentContext(
         e.submissions.some((submission) => submission.status === "complete");
       const humanEvidence =
         e.directStudy?.state === "applied" ||
-        [...e.tutor, ...e.group].some((message) => message.kind === "human") ||
+        [...e.tutor, ...(e.group ?? [])].some(
+          (message) => message.kind === "human",
+        ) ||
         e.history.some((artifact) => artifact.author === "human");
       return complete && humanEvidence;
     })
@@ -381,7 +384,7 @@ export function topicAssessmentContext(
       },
       messages: [
         ...e.tutor.map((message) => ({ ...message, channel: "private-tutor" })),
-        ...e.group.map((message) => ({ ...message, channel: "group" })),
+        ...(e.group ?? []).map((message) => ({ ...message, channel: "group" })),
       ].sort((a, b) => a.seq - b.seq),
       learnerArtifacts: e.history.filter(
         (artifact) => artifact.author === "human",
@@ -411,7 +414,7 @@ export function topicAssessmentContext(
     sourceHash: r.sourceHash,
     frozenBeforeCurrentConversation: true,
     contextPolicy:
-      "Use this supplied saved history plus the current native question conversation. No other chats or files are available from these references. Historical records and prior AI narratives can support cautious inference but are not current learner answers. Attribute tutor/NPC explanations as assistance. Unknown, observed gap, and predicted gap are different. Output topic assessments only for topicIds; cross-topic evidence is context, not authority to update other topics. Coverage below explicitly reports every omitted row or source character.",
+      "Use this supplied saved history plus the current native question conversation. No other chats or files are available from these references. Historical records and prior AI narratives can support cautious inference but are not current learner answers. Attribute tutor explanations as assistance. Unknown, observed gap, and predicted gap are different. Output topic assessments only for topicIds; cross-topic evidence is context, not authority to update other topics. Coverage below explicitly reports every omitted row or source character.",
     topics: boundedRows(topics, 20_000),
     priorAssessments: boundedRows(priorAssessments, 16_000),
     observations: {

@@ -11,7 +11,7 @@ import {
 } from "../src/roadmap-adoption";
 import type { RoadmapReconciliationPayload } from "../src/roadmap-adoption-types";
 import { prepareRoadmapExport } from "../src/roadmap-export";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 const oldRow = r.raw.split("\n").find((s) => s.startsWith("| S0004-A13 |"))!;
 const observation =
@@ -100,7 +100,7 @@ test("reviewed historical continuation retains exact before/after rows in a port
   );
   assert.equal(restored.study.roadmapAdoptionBackups![0].local, r.raw);
   const l = restored.study.learner!,
-    e = restored.encounters["f0-room0"],
+    e = restored.encounters["question-0"],
     c = eligibleLearning(r, l, "2026-10-16T16:00:00Z");
   e.problem = {
     title: "Synthetic later actual game study",
@@ -208,10 +208,10 @@ test("later reconciliation cannot strip or rewrite a prior portable attempt audi
     assert.equal(g.study.roadmapExport!.content, local.content);
   }
 });
-test("a historical disposition declaration cannot resolve an actual current game attempt or replace its draft/session", async () => {
+test("a historical disposition declaration cannot resolve an actual current attempt or replace its draft/session", async () => {
   const g = fixture(),
     l = g.study.learner!,
-    e = g.encounters["f0-room0"],
+    e = g.encounters["question-0"],
     c = eligibleLearning(r, l, "2026-10-16T16:00:00Z");
   e.problem = {
     title: "Synthetic active task",
@@ -250,7 +250,7 @@ test("a historical disposition declaration cannot resolve an actual current game
   }));
   const job = g.study.roadmapReconciliations![0];
   assert.equal(job.state, "error");
-  assert.match(job.error!, /current game's attempt/);
+  assert.match(job.error!, /current attempt/);
   assert.equal(JSON.stringify(l), before);
   assert.equal(e.workspace, "private unfinished draft");
   assert.equal(g.study.roadmapExport!.hash, local.hash);

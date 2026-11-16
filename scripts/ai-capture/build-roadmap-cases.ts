@@ -36,7 +36,7 @@ import type { Roadmap } from "../../src/model";
 import { reconcileRoadmap } from "../../src/roadmap-adoption";
 import type { RoadmapReconciliation } from "../../src/roadmap-adoption-types";
 import { prepareRoadmapExport } from "../../src/roadmap-export";
-import { createGame } from "../../src/world";
+import { createGame } from "../../tests/helpers/record";
 
 export const RECONCILE_OPERATION = "reconcile-roadmap" as const;
 const DEFAULT_COUNT = 6;
@@ -382,7 +382,7 @@ function recordAdministrativeRevision(raw: string, recipe: AdoptRecipe) {
  * candidate is a sibling revision whose only changes are administrative rows:
  * no recorded observation, objective, gate or rule block moves, and the change
  * is fully recorded as revision 10 (DEC0028, advanced counters, a
- * revision-history row and updated save anchors), so the game accepts adoption
+ * revision-history row and updated save anchors), so the app accepts adoption
  * once each changed row is resolved as "incoming".
  */
 export const ADOPT_RECIPES: AdoptRecipe[] = [
@@ -479,7 +479,7 @@ async function capturePayload(
 
 /**
  * Start a reconciliation with an intercepted requester and hand back both the
- * captured payload and the game that owns it, so a caller can resume the same
+ * captured payload and the record that owns it, so a caller can resume the same
  * saved request offline. No provider is contacted.
  */
 async function openReconciliation(
@@ -674,19 +674,16 @@ if (entry === fileURLToPath(import.meta.url)) {
   );
 }
 
-/** A fresh live game, mirroring the study fixture the reference test proves. */
+/** A fresh live record, mirroring the study fixture the reference test proves. */
 function liveStudy(roadmap: Roadmap) {
   const g = createGame(7, roadmap);
   g.study.profile = "live";
-  g.status = "playing";
-  g.zombies = [];
-  g.nextSpawn = Number.MAX_SAFE_INTEGER;
   if (!g.study.learner) throw Error("a live study profile has no learner");
   return { g, l: g.study.learner };
 }
 
 /**
- * Run real study through the game's own learner functions and export the
+ * Run real study through the learner functions and export the
  * resulting descendant revision. One round records an independent observation
  * on a single facet without completing the checkpoint scope; the full three
  * rounds complete it and pass the checkpoint.

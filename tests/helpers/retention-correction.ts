@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { closeLearningSession, eligibleLearning } from "../../src/learner";
 import type { ReviewRecord } from "../../src/learning-model";
-import type { Game } from "../../src/model";
+import type { StudyRecord } from "../../src/model";
 import type {
   RoadmapReconciliation,
   RoadmapReconciliationPayload,
@@ -13,11 +13,11 @@ import {
   readIdentifierCounters,
 } from "../../src/roadmap-identifiers";
 import { inspectMergedDocument } from "../../src/roadmap-structure";
-import { createGame } from "../../src/world";
+import { createGame } from "./record";
 import { roadmap as r } from "./baseline-correction";
 import { gradeScheduled, laterId, laterScope } from "./later-baseline-evidence";
 export { laterId, laterScope, r };
-export function recordTargetReview(g: Game, at: string) {
+export function recordTargetReview(g: StudyRecord, at: string) {
   closeLearningSession(g.study.learner!);
   for (let n = 0; n < 100; n++) {
     const l = g.study.learner!,
@@ -50,7 +50,7 @@ export function retentionFixture(count = 2) {
   return { g, events };
 }
 export async function retentionCorrection(
-  g: Game,
+  g: StudyRecord,
   tasks: string[],
   expected: ReviewRecord,
 ) {

@@ -1,5 +1,5 @@
 # Repository instructions for Claude Code
 
-Read and follow [AGENTS.md](AGENTS.md), including the automated GameTest workflow. The Test Lab is for agents to create, load and run deterministic suites directly from the shell; no user-operated editor or browser session is required.
-
-Start with `npm run --silent test:game -- --list --json -`. After gameplay changes, run `npm run --silent test:agents` and inspect `.artifacts/game-tests/report.json`. See [the scenario authoring guide](docs/GAME_TEST_LAB.md) for custom fixtures and replay commands.
+Read and follow [AGENTS.md](AGENTS.md). In short: this is a study-only app (the old escape game is gone and lives
+only in git history), the learner's saved record and the pinned curriculum files must be protected, and changes are
+verified with `npm run typecheck`, `npm test`, `npx playwright test` and `npm run build`.

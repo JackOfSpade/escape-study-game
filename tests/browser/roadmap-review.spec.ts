@@ -1,4 +1,4 @@
-import { openGameMenu } from "./helpers/game-menu";
+import { openAgentMenu } from "./helpers/agent-menu";
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { localHandoff } from "../helpers/local-handoff";
@@ -68,21 +68,18 @@ test("Claude CLI roadmap review survives reload with exact files and provider, t
     await page.waitForFunction(() => !!(window as any).__deadAir);
     await page.evaluate(async () => {
       const root = "/src/",
-        { createGame } = await import(root + "world.ts"),
+        { createGame } = await import(
+          /* @vite-ignore */ "/tests/helpers/" + "record.ts"
+        ),
         { save } = await import(root + "persistence.ts");
       const r = await (await fetch("/curriculum.json")).json(),
         g = createGame(7, r);
       g.study.profile = "live";
-      g.status = "playing";
-      g.zombies = [];
-      g.nextSpawn = Number.MAX_SAFE_INTEGER;
-      for (const a of g.survivors.slice(1)) a.escaped = true;
       Object.assign((window as any).__deadAir.game, g);
       await save((window as any).__deadAir.game);
     });
     await page.reload();
-    await expect(page.locator("#bridge-label")).toContainText("Claude CLI");
-    await openGameMenu(page);
+    await openAgentMenu(page);
     await page.locator("#curriculum-button").click();
     await page.getByText("Review an updated roadmap", { exact: true }).click();
     await page.locator("#roadmap-review-file").setInputFiles({
@@ -110,12 +107,14 @@ test("Claude CLI roadmap review survives reload with exact files and provider, t
         .getByRole("button", { name: "Adopt reviewed roadmap", exact: true })
         .count(),
     ).toBe(0);
-    await openGameMenu(page);
+    await openAgentMenu(page);
     await page.getByRole("button", { name: "Save run", exact: true }).click();
     // The click resolves before the async save; reloading earlier loses it.
-    await expect(page.locator("#notice")).toContainText("Run saved locally");
+    await expect(page.locator("#pause-save-status")).toContainText(
+      "Run saved locally",
+    );
     await page.reload();
-    await openGameMenu(page);
+    await openAgentMenu(page);
     await page.locator("#curriculum-button").click();
     const failed = jobs.length;
     outage = false;

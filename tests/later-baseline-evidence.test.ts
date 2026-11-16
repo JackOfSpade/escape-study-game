@@ -12,7 +12,7 @@ import {
   reconcileRoadmap,
 } from "../src/roadmap-adoption";
 import { prepareRoadmapExport } from "../src/roadmap-export";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 import {
   baselineFixture,
   roadmap as r,
@@ -38,8 +38,7 @@ for (const outcome of ["independent", "contradicted", "assisted"] as const)
       assert.equal(l.reviews[scope].stage, 1);
     }
     const before = structuredClone(l),
-      artifact = structuredClone(e),
-      actor = structuredClone(g.survivors[0]);
+      artifact = structuredClone(e);
     await reconcileRoadmap(g, r, fixture.raw, async (p) => fixture.proposal(p));
     const job = g.study.roadmapReconciliations!.at(-1)!;
     assert.equal(job.state, "ready", job.error);
@@ -73,7 +72,6 @@ for (const outcome of ["independent", "contradicted", "assisted"] as const)
     assert.deepEqual(current.reviews, before.reviews);
     assert.deepEqual(current.cells[id].facets, before.cells[id].facets);
     assert.deepEqual(e, artifact);
-    assert.deepEqual(g.survivors[0], actor);
     assert.equal(current.cycle, before.cycle);
     const ev = current.evidence.find((ev) => ev.objectiveId === id)!;
     assert.equal(

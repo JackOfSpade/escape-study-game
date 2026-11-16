@@ -118,9 +118,7 @@ export function importedMappingValid(
       c[5].startsWith("GAME_AI_ASSESSED_") &&
       (!game || /\/ ([^:]+):/.exec(c[4])?.[1] !== m.facet)
     )
-      throw Error(
-        "Imported game evidence outcome or named facet does not match",
-      );
+      throw Error("Imported evidence outcome or named facet does not match");
     const numeric = /^[0-3](?:$|\s)/.test(c[7]) ? Number(c[7][0]) : undefined;
     if (
       !game &&
@@ -187,10 +185,7 @@ export function importedProofValid(
 }
 export const adoptedSourceText = (l?: LearnerLedger) =>
   l?.roadmapAdoptions?.at(-1)?.proposal.canonical;
-const adoptedTrackProgress = (
-  l: LearnerLedger | undefined,
-  track: Track,
-) =>
+const adoptedTrackProgress = (l: LearnerLedger | undefined, track: Track) =>
   adoptedSourceText(l)
     ?.split(`<!-- BEGIN ${track}_PROGRESS -->`)[1]
     ?.split(`<!-- END ${track}_PROGRESS -->`)[0];

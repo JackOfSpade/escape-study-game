@@ -7,7 +7,7 @@
 import { assess, canRegenerate, checkBridge, regenerateQuestion } from "./ai";
 import { $, setText } from "./dom";
 import { encounterKey } from "./learner";
-import type { Encounter, Game, Roadmap } from "./model";
+import type { Encounter, StudyRecord, Roadmap } from "./model";
 import {
   nextWorkspaceQuestion,
   workspaceAssessment,
@@ -17,10 +17,10 @@ import {
 import { createStudyWorkspaceView } from "./study-workspace-view";
 
 interface StudySessionHost {
-  /** The current game: a restart or an import replaces it. */
-  game(): Game;
+  /** The current record: an import replaces it. */
+  game(): StudyRecord;
   roadmap: Roadmap;
-  /** Saves the game; false when the save failed. */
+  /** Saves the record; false when the save failed. */
   persist(): Promise<boolean>;
   /** The last save failure, or "" when the last save worked. */
   saveError(): string;

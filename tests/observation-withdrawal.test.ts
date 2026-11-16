@@ -70,7 +70,7 @@ test("later reviewed invalidation withdraws an older imported pass without chang
     ),
     false,
   );
-  const e = copy.encounters["f0-room0"];
+  const e = copy.encounters["question-0"];
   e.problem = {
     title: "Later synthetic study",
     prompt: "Continue eligible scope",

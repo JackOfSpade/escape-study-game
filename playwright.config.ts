@@ -1,13 +1,12 @@
 import { defineConfig } from "@playwright/test";
 // Tests import source modules directly. Reusing a production server can serve
 // a stale bundle and 404 those imports, so own an isolated Vite instance.
-const port = Number(process.env.GAME_TEST_PORT ?? "5278");
+const port = Number(process.env.STUDY_TEST_PORT ?? "5278");
 if (!Number.isInteger(port) || port < 1 || port > 65535)
-  throw Error("GAME_TEST_PORT must be an integer from 1 to 65535");
+  throw Error("STUDY_TEST_PORT must be an integer from 1 to 65535");
 export default defineConfig({
   testDir: "./tests/browser",
-  // Live keyboard/RAF survival cases model one player. Competing game pages
-  // delay controller input independently of simulation and can exhaust cover.
+  // Specs share one browser storage origin and one synthetic relay each.
   workers: 1,
   timeout: 30000,
   use: {

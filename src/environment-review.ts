@@ -7,7 +7,7 @@ import {
 } from "./environment-status";
 import { finalRequirements } from "./final-requirements";
 import { encounterKey } from "./learner";
-import type { Provider, Game, Roadmap } from "./model";
+import type { Provider, StudyRecord, Roadmap } from "./model";
 export interface EnvironmentReviewJob {
   id: string;
   observationId: string;
@@ -48,7 +48,7 @@ const running = new WeakMap<
 >();
 /** Explicit human-requested review; no study visit, academic evidence, or gate mutation. */
 export function reviewEnvironment(
-  g: Game,
+  g: StudyRecord,
   r: Roadmap,
   observationId: string,
   request: (p: EnvironmentReviewPayload) => Promise<unknown>,
@@ -112,7 +112,7 @@ export function reviewEnvironment(
                 tutor: e.tutor.filter(
                   (m) => m.seq <= o.execution!.executionSequence,
                 ),
-                group: e.group.filter(
+                group: (e.group ?? []).filter(
                   (m) => m.seq <= o.execution!.executionSequence,
                 ),
               },

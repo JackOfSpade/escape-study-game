@@ -1,4 +1,4 @@
-import { openGameMenu } from "./helpers/game-menu";
+import { openAgentMenu } from "./helpers/agent-menu";
 // Actual UI with synthetic grades, not native semantic or human achievement proof.
 import { expect, test } from "@playwright/test";
 import { encode } from "../../src/persistence";
@@ -45,7 +45,7 @@ test("correcting an older original score retains an actually recorded later pass
   }, encode(g));
   await page.reload();
   await page.waitForFunction(() => !!(window as any).__deadAir);
-  await openGameMenu(page);
+  await openAgentMenu(page);
   await page.locator("#curriculum-button").click();
   await page.getByText("Review an updated roadmap", { exact: true }).click();
   await page.locator("#roadmap-review-file").setInputFiles({
