@@ -1426,24 +1426,14 @@ body.reduced * {
   position: static;
   width: 100%;
   max-width: 100%;
-  height: auto;
-  min-height: calc(var(--view-height) - 150px);
   margin: 0;
-  overflow-x: hidden;
 }
 #study-terminal-slot #terminal[hidden] {
   display: none;
 }
-#study-terminal-slot #terminal-body {
-  overflow-x: hidden;
-}
 #study-terminal-slot .terminal-layout {
   grid-template-columns: minmax(0, 1.15fr) minmax(420px, 0.85fr);
   gap: 28px;
-}
-#study-terminal-slot .conversation-panel {
-  height: auto;
-  min-height: 280px;
 }
 #study-terminal-slot #chat-input {
   min-height: 96px;

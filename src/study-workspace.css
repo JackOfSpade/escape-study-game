@@ -20,14 +20,44 @@ html.study-only body {
   --editor: #141b25;
   --study-success: #8cd1aa;
 }
+/* The workspace is exactly one viewport tall and the document never scrolls.
+   Whatever is too long scrolls inside its own pane: the skill map's topic
+   list, the question, or the conversation. */
+html.study-only,
+html.study-only body {
+  overflow: hidden;
+}
 #study-workspace {
-  min-height: var(--view-height);
+  height: var(--view-height);
+  overflow: hidden;
   background: var(--bg);
   padding: 56px 28px;
 }
 .study-workspace-inner {
+  display: flex;
+  flex-direction: column;
   width: min(100%, 1720px);
+  height: 100%;
+  min-height: 0;
   margin: 0 auto;
+}
+.study-workspace-toolbar,
+.study-session {
+  flex: none;
+}
+/* The map gives up height before anything else does, and its topic lists
+   scroll inside it. Only a window too short for even that scrolls the map as
+   a whole. */
+#study-progress {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+#study-workspace[data-view="question"] #study-terminal-slot {
+  flex: 1 1 0;
+  min-height: 0;
 }
 /* Reading surfaces (map, session card) keep a comfortable measure; the
    question terminal below is free to use the full workspace width. */
@@ -154,7 +184,8 @@ header[aria-label="Game controls"] {
 
 /* A top-down topic tree keeps the current tier visible in a split browser pane. */
 .study-progress {
-  display: block;
+  display: flex;
+  flex-direction: column;
 }
 .study-skill-map {
   --study-map-line: #50617b;
@@ -162,9 +193,19 @@ header[aria-label="Game controls"] {
   border-radius: 12px;
   background: var(--panel);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 auto;
+  min-height: min-content;
 }
 .study-map-tier {
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 auto;
   padding: 24px 20px 0;
+}
+.study-map-tier > :not(.study-map-scroll) {
+  flex: none;
 }
 .study-map-tier + .study-map-tier {
   border-top: 1px solid var(--line);
@@ -224,6 +265,8 @@ header[aria-label="Game controls"] {
     min(440px, calc(var(--view-height) * 0.52)),
     calc(var(--view-height) - 590px)
   );
+  flex: 0 1 auto;
+  min-height: 120px;
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-gutter: stable both-edges;
@@ -722,16 +765,43 @@ header[aria-label="Game controls"] {
   }
 }
 
-/* The open question. The page scrolls as one document: the question is never
-   boxed into a short pane of its own, and the answer column follows the reader
-   down a long question. */
+/* The open question fills the rest of the viewport. Its two halves scroll
+   independently: a long question scrolls under a fixed heading while the
+   answer column stays put, and a long conversation scrolls its messages while
+   the question and the composer stay put. */
 #study-terminal-slot #terminal {
-  overflow-x: clip;
-  overflow-y: visible;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
-#study-terminal-slot #terminal-body {
-  overflow: visible;
+#study-terminal-slot .terminal-heading,
+#study-terminal-slot #terminal-provenance {
+  flex: none;
+}
+#study-terminal-slot #terminal-connect {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+#study-terminal-slot #terminal-body:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
   padding: 24px;
+}
+#study-terminal-slot .terminal-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+}
+#study-terminal-slot .answer-panel {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 12px;
 }
 #study-terminal-slot .terminal-heading {
   padding: 20px 24px;
@@ -771,10 +841,11 @@ header[aria-label="Game controls"] {
 /* The answer column is only as tall as its conversation, so the composer sits
    directly under the heading until there is something to scroll. */
 #study-terminal-slot .conversation-panel {
-  top: 16px;
+  position: static;
+  align-self: start;
   height: auto;
   min-height: 0;
-  max-height: calc(var(--view-height) - 32px);
+  max-height: 100%;
 }
 #study-terminal-slot .conversation-panel h3 {
   margin-bottom: 12px;
@@ -782,6 +853,7 @@ header[aria-label="Game controls"] {
 #study-terminal-slot #messages {
   flex: 0 1 auto;
   min-height: 0;
+  overscroll-behavior: contain;
   padding: 0 4px 0 0;
 }
 #study-terminal-slot #messages:empty {
@@ -828,15 +900,26 @@ header[aria-label="Game controls"] {
   font-size: 14px;
 }
 @media (max-width: 760px) {
-  #study-terminal-slot #terminal-body {
+  /* Stacked: one column, so the terminal body is the single scroller. */
+  #study-terminal-slot #terminal-body:not([hidden]) {
+    display: block;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 16px;
+  }
+  #study-terminal-slot .terminal-layout {
+    grid-template-rows: none;
+  }
+  #study-terminal-slot .answer-panel {
+    overflow: visible;
+    padding-right: 0;
   }
   #study-terminal-slot .terminal-heading {
     padding: 16px;
   }
-  /* Stacked: the divider runs across, and the page does the scrolling. */
+  /* Stacked: the divider runs across. */
   #study-terminal-slot .conversation-panel {
-    position: static;
     max-height: none;
     padding: 20px 0 0;
     border-left: 0;
