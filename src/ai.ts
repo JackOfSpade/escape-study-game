@@ -296,9 +296,7 @@ export async function ensureProblem(g: Game, e: Encounter, r: Roadmap) {
 const QUESTION_GENERATION_POLICY =
   "Diagnose before teaching. Write a standalone question: the prompt alone must supply the essential scenario, interface, implementation, data, timing and business-rule facts needed to answer without using the chat. For classification, list the concrete items to classify and their relevant behavior, lifetime and source without supplying their classifications. For tracing, debugging or critique, supply the relevant code, event sequence or evidence. Distinguish fixed facts from intentional design choices; if the learner may choose an example or an approach, say so explicitly rather than expecting them to infer an unspecified implementation. Ask a bounded task that matches the supplied scenario; never paste a capability statement into an unrelated generic story. Every requirement in the rubric must be visible in the question; do not grade unstated assumptions or add unrelated decisions, personal history or edge cases. Before returning the question, check that it can be answered from the prompt alone and repair missing context without revealing the solution. For D1, keep the learner workspace starter empty; put essential scenario or code-reading material in the prompt without supplying the key explanation, endpoint update, worked result or a leading solution hint. Do not interpret an objective's implementation verb as a D1 implementation requirement. Preserve legitimate prior context and assistance attribution without presenting supplied steps as fresh independent understanding. Use probeRecords: build the question around open gaps inside the eligible scope with the facet they blocked as the apex; only a gap marked reuseInScopeDefinitions may add its exact facet id to scopeDefinitions, and existing stable scope definitions are copied exactly; do not spend the question on established facets unless the scope requires them; re-ask what a closed gap blocked. The prompt is read by the learner: never mention the scheduled scope, objective IDs, tiers, depth, scheduling or that this is a formal visit; ask the question in plain language. Keep it minimal: write the smallest self-contained diagnostic that exercises the objective, with one main problem and at most one or two directly connected follow-ups. Include only the essential facts, not pasted project context or a full-project audit. For code review, include the actual code under review, including any required helper and its authorization semantics; a prose proposal supports design review only. Prefer short snippets, traces or evidence, and never turn an objective's scope verbs into a D1 implementation task. The visible task and rubric must match, without leaking the solution. An honestly integrative objective may stay integrative on a small feature. A narrow example never establishes unrelated facets or mastery. " +
   QUESTION_DESIGN_GUIDANCE;
-const QUESTION_PACING_GUIDANCE =
-  SEGMENT_GENERATION_GUIDANCE +
-  " The game applies its own slower-player margin and safety bounds.";
+const QUESTION_PACING_GUIDANCE = SEGMENT_GENERATION_GUIDANCE;
 const QUESTION_RUNTIME_SUPPORT = {
   scripts: ["python", "typescript"],
   react:
@@ -593,6 +591,11 @@ export const canRegenerate = (g: Game, e: Encounter) =>
 export function regenerateQuestion(g: Game, e: Encounter, r: Roadmap) {
   if (!regenerable(g, e)) return false;
   const contract = structuredClone(e.problem!.contract);
+  // Without this the identical request tends to return the same question.
+  const replaces = {
+    title: e.problem!.title,
+    prompt: e.problem!.prompt.slice(0, 1200),
+  };
   const key = encounterKey(e);
   const mine = (record: { encounter: string }) =>
     record.encounter === key || record.encounter === e.id;
@@ -625,9 +628,10 @@ export function regenerateQuestion(g: Game, e: Encounter, r: Roadmap) {
   e.pendingGeneration = {
     provider: activeProvider(),
     requestId,
-    payload: structuredClone(
-      generationPayload(g, r, contract, requestId, e.id),
-    ),
+    payload: structuredClone({
+      ...generationPayload(g, r, contract, requestId, e.id),
+      replaces,
+    }),
   };
   return true;
 }

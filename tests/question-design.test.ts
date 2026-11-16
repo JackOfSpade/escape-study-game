@@ -216,3 +216,14 @@ test("the terminal helper line asks focused questions without most-at-once press
   );
   assert.doesNotMatch(source, /establishes the most at once/);
 });
+
+test("study prompts carry no game framing and ask for interview-realistic questions", () => {
+  for (const operation of ["generate", "tutor"]) {
+    const text = taskInstructions(operation, {});
+    assert.doesNotMatch(text, /zombie-escape|gameplay|the game\b/i, operation);
+  }
+  const generate = taskInstructions("generate", {});
+  assert.match(generate, /real software engineering interview/);
+  assert.match(generate, /Never set the question in a game, story/);
+  assert.match(generate, /payload\.replaces/);
+});
