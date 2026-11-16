@@ -164,12 +164,7 @@
           <span class="eyebrow" id="terminal-type"></span>
           <h2 id="problem-title">Connecting…</h2>
         </div>
-        <div class="terminal-heading-actions">
-          <button id="regenerate-question" class="quiet study-app-only" hidden>
-            Regenerate question
-          </button>
-          <button id="leave" class="quiet">Leave terminal</button>
-        </div>
+        <button id="leave" class="quiet">Leave terminal</button>
       </div>
       <div id="terminal-provenance" class="provenance"></div>
       <section id="terminal-connect" aria-live="polite" hidden>
@@ -291,6 +286,9 @@
       <h2 id="study-session-title" tabindex="-1">Continue learning</h2>
       <div class="study-actions">
         <button id="study-next">Start next question</button>
+        <button id="study-regenerate" class="quiet" hidden>
+          Regenerate question
+        </button>
         <button id="study-review-retry" class="quiet" hidden>
           Retry progress review
         </button>

@@ -47,6 +47,7 @@ html.study-only body {
 #study-workspace[data-view="question"] #study-progress,
 #study-workspace[data-view="question"] .study-session h2,
 #study-workspace[data-view="question"] #study-next,
+#study-workspace[data-view="question"] #study-regenerate,
 #study-workspace[data-view="map"] #study-terminal-slot {
   display: none;
 }
@@ -65,7 +66,9 @@ html.study-only body {
   background: none;
 }
 #study-workspace[data-view="question"]
-  .study-actions:not(:has(button:not([hidden]):not(#study-next))) {
+  .study-actions:not(
+    :has(button:not([hidden]):not(#study-next):not(#study-regenerate))
+  ) {
   display: none;
 }
 .study-label {
