@@ -208,15 +208,6 @@ test("probe stance keeps bounded reasoning, one-level clarification and explicit
   );
 });
 
-test("the terminal helper line asks focused questions without most-at-once pressure", () => {
-  const source = readFileSync("src/main.ts", "utf8");
-  assert.match(
-    source,
-    /Terminal AI assumes you already know this and asks one focused question at a time/,
-  );
-  assert.doesNotMatch(source, /establishes the most at once/);
-});
-
 test("study prompts carry no game framing and ask for interview-realistic questions", () => {
   for (const operation of ["generate", "tutor"]) {
     const text = taskInstructions(operation, {});

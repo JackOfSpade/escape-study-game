@@ -226,6 +226,19 @@ export async function exportRecoveryBackup() {
     2,
   );
 }
+/** A stored copy that failed validation while the other copy loaded. */
+export interface RejectedCopy {
+  store: "durable" | "local";
+  /** The stored bytes exactly as they were read. */
+  raw: string;
+  reason: string;
+}
+let rejected: RejectedCopy | undefined;
+/** The copy the last `load()` refused although it returned the other one.
+ * It may have been the newer checkpoint, and the next save replaces it. */
+export function rejectedCopy() {
+  return rejected;
+}
 export async function load() {
   const { durable, local, durableError, localError } = await storedCopies();
   // An unreadable store may hold a newer checkpoint than the readable copy.
@@ -235,11 +248,20 @@ export async function load() {
       "Saved checkpoints could not be read. Reload to retry storage access, or export a recovery backup before importing another run.",
     );
   const valid: { serial: number; game: Game }[] = [];
-  for (const raw of [durable, local])
+  const refused: RejectedCopy[] = [];
+  for (const [store, raw] of [
+    ["durable", durable],
+    ["local", local],
+  ] as const)
     if (raw !== null)
       try {
         valid.push(unpack(raw));
-      } catch {}
+      } catch (error) {
+        refused.push({ store, raw, reason: String(error) });
+      }
+  // A refused copy has no readable serial, so it may be the newer one. Keep
+  // its bytes: the next save overwrites it in storage.
+  rejected = valid.length ? refused[0] : undefined;
   if (!valid.length) {
     if (durable !== null || local !== null)
       throw Error(

@@ -6,9 +6,9 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      input: { game: "index.html", lab: "lab.html" },
+      input: { game: "index.html" },
       output: {
-        // Cache the physics dependency separately from frequently changed game code.
+        // Cache dependencies separately from frequently changed app code.
         manualChunks: (id) =>
           id.includes("/node_modules/") ? "vendor" : undefined,
       },

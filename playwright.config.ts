@@ -19,11 +19,8 @@ export default defineConfig({
     command: `npm run client -- --port ${port} --strictPort`,
     // Never reach the player's real study relay: a live run would ask real
     // Claude to prepare questions. Specs that need Claude mock /api themselves.
-    // The archived escape game is reachable only in a build made with this
-    // flag; these specs are what still exercise it.
     env: {
       STUDY_BRIDGE_URL: "http://127.0.0.1:9",
-      VITE_ARCHIVED_GAME: "1",
     },
     url: `http://127.0.0.1:${port}`,
     reuseExistingServer: false,

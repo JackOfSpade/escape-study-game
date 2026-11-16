@@ -103,6 +103,16 @@ test("a cut-off reply resumes after reload with the exact history, and the next 
   await expect(page.locator("#terminal-provenance")).toContainText(
     "Part 1 of 2: Trace the loop. Finishing",
   );
+  // The line is written once, not rebuilt on every UI tick: rebuilding it
+  // replaced its text node and dropped any selection the reader was making.
+  expect(
+    await page.evaluate(async () => {
+      const line = document.querySelector("#terminal-provenance")!;
+      const node = line.firstChild;
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      return line.firstChild === node;
+    }),
+  ).toBe(true);
 
   await say(page, "It visits every index once");
   await expect.poll(() => relay.tutorCalls().length).toBe(1);

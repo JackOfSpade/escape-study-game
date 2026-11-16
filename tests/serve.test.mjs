@@ -19,7 +19,6 @@ async function fixture(t) {
   const root = join(directory, "dist");
   await mkdir(join(root, "assets"), { recursive: true });
   await writeFile(join(root, "index.html"), "<title>Synthetic game</title>");
-  await writeFile(join(root, "lab.html"), "<title>Synthetic lab</title>");
   await writeFile(
     join(root, "assets/game-abcdefgh.js"),
     "export const game = 1;",
@@ -64,9 +63,9 @@ async function fixture(t) {
   };
 }
 
-test("production serves built game/lab with fresh HTML and immutable hashed assets", async (t) => {
+test("production serves the built app with fresh HTML and immutable hashed assets", async (t) => {
   const { url } = await fixture(t);
-  for (const path of ["/", "/index.html", "/lab.html"]) {
+  for (const path of ["/", "/index.html"]) {
     const response = await fetch(url + path);
     assert.equal(response.status, 200);
     assert.match(response.headers.get("content-type"), /text\/html/);

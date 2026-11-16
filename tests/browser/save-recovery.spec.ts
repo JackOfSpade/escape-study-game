@@ -189,3 +189,45 @@ test("an unreadable checkpoint stays protected through lifecycle saves until a v
     ),
   ).toBe("Synthetic unfinished answer restored from backup");
 });
+
+test("a damaged copy beside a valid one is offered for download before a save replaces it", async ({
+  page,
+}) => {
+  await mockClaudeStudy(page);
+  await page.goto("/");
+  await page.waitForFunction(() => !!(window as any).__deadAir?.game);
+  const noticeHidden = () =>
+    page.evaluate(
+      () => document.querySelector<HTMLElement>("#study-load-notice")!.hidden,
+    );
+  expect(await noticeHidden()).toBe(true);
+  // A full save writes both copies; the durable one stays valid below.
+  await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+  await flushNativeSave(page);
+  expect(await rawDurableSave(page)).not.toBeNull();
+  await page.addInitScript(() => {
+    if (!sessionStorage.getItem("synthetic-damaged-copy-seeded")) {
+      localStorage.setItem("dead-air-save-v1", "synthetic damaged local copy");
+      sessionStorage.setItem("synthetic-damaged-copy-seeded", "1");
+    }
+  });
+  await page.reload();
+  await page.waitForFunction(() => !!(window as any).__deadAir?.game);
+  expect(await noticeHidden()).toBe(false);
+  // Saving goes on as usual and replaces the damaged bytes in storage...
+  await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+  await flushNativeSave(page);
+  expect(
+    await page.evaluate(() => localStorage.getItem("dead-air-save-v1")),
+  ).not.toBe("synthetic damaged local copy");
+  // ...but the page still holds them for the learner to keep.
+  const downloading = page.waitForEvent("download");
+  await page.locator("#study-load-notice-save").dispatchEvent("click");
+  const kept = JSON.parse(
+    await readFile((await (await downloading).path())!, "utf8"),
+  );
+  expect(kept.store).toBe("local");
+  expect(kept.raw).toBe("synthetic damaged local copy");
+  await page.locator("#study-load-notice-dismiss").dispatchEvent("click");
+  expect(await noticeHidden()).toBe(true);
+});

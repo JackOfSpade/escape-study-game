@@ -1,285 +1,28 @@
-<div class="game-layout">
-  <header aria-label="Game controls">
-    <button id="study-only-toggle" class="quiet game-control">
-      Study only
-    </button>
-    <button
-      id="pause-toggle"
-      class="quiet game-control"
-      aria-label="Pause · Esc"
-      title="Pause · Esc"
-      aria-controls="pause-menu"
-      aria-haspopup="dialog"
-    >
-      <svg viewBox="0 0 20 20" aria-hidden="true">
-        <path d="M7 5v10M13 5v10" /></svg
-      ><span>Pause</span>
-    </button>
-  </header>
-  <main>
-    <section class="world">
-      <div class="viewport">
-        <div class="world-top">
-          <div>
-            <span class="eyebrow" id="floor-label"></span>
-            <h1 id="floor-name"></h1>
-          </div>
-        </div>
-        <canvas
-          id="view3d"
-          aria-label="First-person survival game. Move the mouse to look around. Use WASD to move, left/right arrows to turn, up/down arrows to look up and down, E to interact, F to try, use or read something, Enter to talk, J for the journal, and Escape to pause and release the mouse."
-          tabindex="0"
-          hidden
-        ></canvas>
-        <canvas
-          id="world"
-          aria-label="Top-down survival game. Use WASD or arrow keys to move."
-          tabindex="0"
-        ></canvas>
-        <div id="first-person-hud" hidden>
-          <div id="damage-vignette" hidden></div>
-          <span class="crosshair" aria-hidden="true"></span>
-          <span id="interaction-prompt"></span>
-          <span id="pointer-hint"
-            >Click to capture mouse · Move mouse to look · WASD move · Esc
-            pauses</span
-          >
-        </div>
-        <div id="reply-pause" class="reply-pause" hidden>
-          <div class="reply-pause-card">
-            <span class="reply-pause-icon" aria-hidden="true"></span>
-            <strong>Game paused</strong>
-            <span id="reply-pause-detail"></span>
-          </div>
-        </div>
-        <div id="world-loading" class="reply-pause" hidden>
-          <div class="reply-pause-card">
-            <span class="reply-pause-icon" aria-hidden="true"></span>
-            <strong id="world-loading-text"></strong>
-            <span class="muted">The world is paused while it is built.</span>
-          </div>
-        </div>
-        <div id="start-card" class="overlay"></div>
-        <section
-          id="epilogue-panel"
-          class="overlay epilogue"
-          aria-labelledby="epilogue-title"
-          hidden
-        >
-          <span class="eyebrow">LAST GAME</span>
-          <h2 id="epilogue-title">How the last game ended</h2>
-          <div id="epilogue-text" class="epilogue-text"></div>
-          <p class="muted">Preparing a new building…</p>
-        </section>
-        <div id="spectator" class="spectator" hidden>
-          <span class="eyebrow">SPECTATING</span>
-          <div id="spectator-floors" role="group" aria-label="Floor"></div>
-          <button id="spectator-summary" class="quiet">Run summary</button>
-        </div>
-        <div
-          id="world-caption"
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-        ></div>
-        <div id="hud" class="hud" aria-label="Survivor status">
-          <div class="hud-health">
-            <div class="hud-track"><div id="hud-health-fill"></div></div>
-            <strong id="hud-health">100</strong>
-          </div>
-          <span id="hud-keys" class="hud-item">0 keys</span
-          ><span id="hud-pickup" class="hud-item" hidden></span>
-        </div>
-        <div
-          id="reward-toast"
-          class="reward-toast"
-          role="status"
-          aria-live="assertive"
-          aria-atomic="true"
-          hidden
-        >
-          <svg class="reward-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="8" cy="12" r="4" />
-            <path d="M12 12h9M18 12v3M21 12v2" />
-          </svg>
-          Key granted
-        </div>
-        <div id="inventory" class="inventory" aria-label="Equipment"></div>
-        <p id="notice" role="status"></p>
-      </div>
-    </section>
-    <aside class="dashboard" hidden aria-hidden="true">
-      <section class="vitals">
-        <div class="eyebrow">SURVIVOR / YOU</div>
-        <div class="vital-row">
-          <strong id="health">100</strong><span>HEALTH</span>
-        </div>
-        <div class="health-track"><div id="health-fill"></div></div>
-        <div class="population">
-          <div><strong id="alive"></strong><span>STILL HERE</span></div>
-          <div><strong id="rescued">0</strong><span>EXTRACTED</span></div>
-          <div><strong id="lost">0</strong><span>LOST</span></div>
-        </div>
-      </section>
-      <section class="objective">
-        <span class="eyebrow">NEXT MOVE</span>
-        <h2 id="next-title">Make it inside.</h2>
-        <p id="next-description">
-          Stay ahead of the horde. Prepare a room, earn your stair credential,
-          and keep climbing.
-        </p>
-        <div id="pickup"></div>
-      </section>
-      <section>
-        <div class="section-row">
-          <span class="eyebrow">ACCESS / <span id="weight"></span></span
-          ><span class="muted">personal access</span>
-        </div>
-      </section>
-      <section class="curriculum">
-        <div class="section-row">
-          <span class="eyebrow">LEARNING CONTINUITY</span>
-        </div>
-        <p class="muted" id="schedule"></p>
-      </section>
-      <section class="feed">
-        <span class="eyebrow">BUILDING FREQUENCY</span>
-        <div id="event-feed"></div>
-      </section>
-      <section class="escape-task">
-        <span class="eyebrow">TASK</span>
-        <p id="task-indicator" hidden></p>
-      </section>
-      <section id="journal-panel" class="journal" aria-label="Journal" hidden>
-        <div class="section-row">
-          <span class="eyebrow">JOURNAL</span>
-          <span class="muted">J closes</span>
-        </div>
-        <div id="journal-lines"></div>
-      </section>
-    </aside>
-    <section id="terminal" hidden>
-      <div class="terminal-heading">
-        <div>
-          <span class="eyebrow" id="terminal-type"></span>
-          <h2 id="problem-title">Connecting…</h2>
-        </div>
-        <button id="leave" class="quiet">Leave terminal</button>
-      </div>
-      <div id="terminal-provenance" class="provenance"></div>
-      <section id="terminal-connect" aria-live="polite" hidden>
-        <p id="terminal-connect-problem"></p>
-        <ol id="terminal-connect-steps"></ol>
-        <p class="muted">
-          This terminal opens by itself as soon as Claude is connected.
-        </p>
-        <button id="terminal-connect-retry" class="quiet">Check again</button>
-      </section>
-      <div id="terminal-body">
-        <div class="terminal-layout">
-          <section class="answer-panel" aria-label="Room question">
-            <article id="problem"></article>
-            <section id="npc-outcome" hidden>
-              <p id="npc-outcome-status" class="muted"></p>
-              <button id="inspect-npc-outcome" class="quiet">
-                Inspect survivor solution
-              </button>
-              <div id="npc-outcome-body"></div>
-            </section>
-            <details id="saved-answer" hidden>
-              <summary>Previously saved work</summary>
-              <pre id="saved-answer-text"></pre>
-            </details>
-            <div id="legacy-answer">
-              <label class="editor-label" for="workspace"
-                >Answer to submit <span id="revision"></span></label
-              ><textarea
-                id="workspace"
-                spellcheck="false"
-                aria-label="Answer to submit"
-                placeholder="Write your answer here. Explain your reasoning where the question asks for it."
-                aria-describedby="answer-context"
-              ></textarea>
-              <p id="answer-context" class="muted"></p>
-              <div class="submit-row">
-                <button id="submit">Submit answer</button
-                ><button id="run-code" class="quiet" hidden>Run code</button
-                ><span
-                  id="submission-status"
-                  role="status"
-                  aria-live="polite"
-                ></span>
-              </div>
-            </div>
-            <p id="submission-help" class="muted"></p>
-            <button id="retry-submission" class="quiet" hidden>
-              Retry answer check
-            </button>
-            <details id="execution-results" hidden>
-              <summary>Saved code runs</summary>
-              <figure id="execution-preview" hidden></figure>
-              <pre id="execution-output"></pre>
-            </details>
-            <div id="loot"></div>
-          </section>
-          <aside
-            class="conversation-panel"
-            aria-labelledby="conversation-title"
-          >
-            <h3 id="conversation-title">Terminal AI</h3>
-            <p id="final-question-notice" role="status" hidden>
-              You were lost, but you can finish this question. No key or access
-              is granted after the run ends; your answers still count as
-              learning evidence.
-            </p>
-            <p id="dialogue-status" class="muted" role="status" hidden></p>
-            <p id="conversation-context" class="muted"></p>
-            <p
-              id="dialogue-reward"
-              class="dialogue-reward"
-              role="status"
-              hidden
-            >
-              Key granted
-            </p>
-            <div id="workspace-proposals" hidden></div>
-            <div id="messages" aria-live="polite"></div>
-            <p id="catchup-status" class="muted" hidden></p>
-            <button id="retry-catchup" class="quiet" hidden>
-              Retry group catch-up
-            </button>
-            <p id="team-work-status" class="muted" hidden></p>
-            <button id="retry-team-work" class="quiet" hidden>
-              Retry saved team work
-            </button>
-            <details id="work-log" hidden>
-              <summary>Recorded group work</summary>
-              <div id="work-log-body"></div>
-            </details>
-            <div id="tutor-request-status" hidden></div>
-            <form id="chat-form">
-              <textarea
-                rows="3"
-                id="chat-input"
-                autocomplete="off"
-                aria-label="Message"
-              ></textarea>
-            </form>
-          </aside>
-        </div>
-      </div>
-    </section>
-  </main>
-</div>
+<section
+  id="save-recovery"
+  class="save-recovery"
+  aria-labelledby="save-recovery-title"
+  hidden
+>
+  <span class="eyebrow">SAVED PROGRESS</span>
+  <h2 id="save-recovery-title">Save needs recovery.</h2>
+  <p id="save-recovery-status" class="save-result failed" role="status"></p>
+  <button id="save-recovery-retry">Retry loading</button>
+  <button id="save-recovery-export" class="quiet">Export recovery data</button>
+  <label class="file-label"
+    >Restore a run backup
+    <input
+      id="save-recovery-import"
+      type="file"
+      accept=".json,application/json"
+  /></label>
+</section>
 <section id="study-workspace" aria-label="Learning workspace" hidden>
   <div class="study-workspace-inner">
     <div class="study-workspace-toolbar">
-      <button id="study-only-exit" class="quiet game-only">
-        Exit study view
-      </button>
       <button id="study-map-peek" class="quiet" hidden>Skill map</button>
       <button class="quiet" data-bug-report>Report a bug</button>
-      <button id="study-menu" class="quiet study-app-only">Menu · Esc</button>
+      <button id="study-menu" class="quiet">Menu · Esc</button>
     </div>
     <div id="study-progress" class="study-progress"></div>
     <section class="study-session" aria-labelledby="study-session-title">
@@ -299,16 +42,104 @@
       </div>
       <p id="study-message" role="status" aria-live="polite"></p>
       <p id="study-save-status" role="status" aria-live="polite"></p>
+      <div id="study-load-notice" role="alert" hidden>
+        <p>
+          One of this browser's two saved copies failed its integrity check and
+          was not loaded. The other copy was opened and may be older. Saving
+          replaces the damaged copy, so keep it now if your progress looks out
+          of date.
+        </p>
+        <button id="study-load-notice-save" class="quiet">
+          Save the damaged copy to a file
+        </button>
+        <button id="study-load-notice-dismiss" class="quiet">Dismiss</button>
+      </div>
     </section>
-    <div id="study-terminal-slot"></div>
+    <div id="study-terminal-slot">
+      <section id="terminal" hidden>
+        <div class="terminal-heading">
+          <div>
+            <span class="eyebrow" id="terminal-type"></span>
+            <h2 id="problem-title">Connecting…</h2>
+          </div>
+        </div>
+        <div id="terminal-provenance" class="provenance"></div>
+        <section id="terminal-connect" aria-live="polite" hidden>
+          <p id="terminal-connect-problem"></p>
+          <ol id="terminal-connect-steps"></ol>
+          <p class="muted">
+            This terminal opens by itself as soon as Claude is connected.
+          </p>
+          <button id="terminal-connect-retry" class="quiet">Check again</button>
+        </section>
+        <div id="terminal-body">
+          <div class="terminal-layout">
+            <section class="answer-panel" aria-label="Question">
+              <article id="problem"></article>
+              <details id="saved-answer" hidden>
+                <summary>Previously saved work</summary>
+                <pre id="saved-answer-text"></pre>
+              </details>
+              <div id="legacy-answer">
+                <label class="editor-label" for="workspace"
+                  >Answer to submit <span id="revision"></span></label
+                ><textarea
+                  id="workspace"
+                  spellcheck="false"
+                  aria-label="Answer to submit"
+                  placeholder="Write your answer here. Explain your reasoning where the question asks for it."
+                  aria-describedby="answer-context"
+                ></textarea>
+                <p id="answer-context" class="muted"></p>
+                <div class="submit-row">
+                  <button id="submit">Submit answer</button
+                  ><button id="run-code" class="quiet" hidden>Run code</button
+                  ><span
+                    id="submission-status"
+                    role="status"
+                    aria-live="polite"
+                  ></span>
+                </div>
+              </div>
+              <p id="submission-help" class="muted"></p>
+              <button id="retry-submission" class="quiet" hidden>
+                Retry answer check
+              </button>
+              <details id="execution-results" hidden>
+                <summary>Saved code runs</summary>
+                <figure id="execution-preview" hidden></figure>
+                <pre id="execution-output"></pre>
+              </details>
+            </section>
+            <aside
+              class="conversation-panel"
+              aria-labelledby="conversation-title"
+            >
+              <h3 id="conversation-title">Answer</h3>
+              <p id="dialogue-status" class="muted" role="status" hidden></p>
+              <p id="conversation-context" class="muted"></p>
+              <div id="messages" aria-live="polite"></div>
+              <div id="tutor-request-status" hidden></div>
+              <form id="chat-form">
+                <textarea
+                  rows="3"
+                  id="chat-input"
+                  autocomplete="off"
+                  aria-label="Message"
+                ></textarea>
+              </form>
+            </aside>
+          </div>
+        </div>
+      </section>
+    </div>
   </div>
 </section>
 <dialog id="pause-menu" aria-labelledby="pause-title">
   <div id="pause-home">
-    <span class="eyebrow" id="pause-eyebrow">ZOMBIE ESCAPE</span>
-    <h2 id="pause-title">Game paused</h2>
-    <button id="resume-game">Resume · Esc</button>
-    <button id="study-only-menu" class="quiet game-only">Study only</button>
+    <span class="eyebrow" id="pause-eyebrow">LEARNING WORKSPACE</span>
+    <h2 id="pause-title">Menu</h2>
+    <button id="resume-game">Close · Esc</button>
     <button
       id="settings-toggle"
       class="quiet"
@@ -317,29 +148,6 @@
     >
       Settings
     </button>
-    <button id="restart-game" class="quiet game-only">
-      Restart run · keep learning progress
-    </button>
-    <button id="generate-run" class="quiet game-only">
-      New game · a new building and a new catastrophe
-    </button>
-    <button id="save-quit" class="quiet game-only">Save and quit</button>
-    <section
-      class="pause-controls game-only"
-      aria-labelledby="pause-controls-title"
-    >
-      <span class="eyebrow" id="pause-controls-title">CONTROLS</span>
-      <ul class="controls">
-        <li><kbd>WASD</kbd> move</li>
-        <li id="arrow-hint"><kbd>←/→</kbd> turn · <kbd>↑/↓</kbd> walk</li>
-        <li><kbd>E</kbd> interact</li>
-        <li><kbd>F</kbd> try, use or read something</li>
-        <li><kbd>Enter</kbd> talk out loud</li>
-        <li><kbd>J</kbd> journal</li>
-        <li><kbd>Space</kbd> jump barricade</li>
-        <li><kbd>Esc</kbd> pause / resume</li>
-      </ul>
-    </section>
     <div id="agent-tools" class="agent-only">
       <span class="eyebrow">AGENT TOOLS</span>
       <button
@@ -351,19 +159,12 @@
         Inspect ↗
       </button>
       <button id="save-button" class="quiet">Save run</button>
-      <p class="game-only">
-        <a href="/lab.html" target="_blank" rel="noopener">Open Test Lab ↗</a>
-      </p>
-      <div class="menu-connection">
-        <span class="live-dot" aria-hidden="true"></span
-        ><span id="bridge-label"></span>
-      </div>
     </div>
     <p id="pause-save-status" role="status"></p>
   </div>
   <div id="pause-panel-header" hidden>
-    <button id="pause-back" class="quiet" aria-label="Back to pause menu">
-      ← Back to pause menu
+    <button id="pause-back" class="quiet" aria-label="Back to menu">
+      ← Back to menu
     </button>
   </div>
   <div id="pause-panels" hidden>
@@ -385,7 +186,7 @@
       <div id="inspector-content"></div>
     </div>
     <div id="settings" role="region" aria-labelledby="settings-title" hidden>
-      <h2 id="settings-title">Transmission settings</h2>
+      <h2 id="settings-title">Settings</h2>
       <label class="career-focus-label" for="settings-career-focus"
         >Preparation target</label
       >
@@ -396,14 +197,9 @@
         <option value="full">Full original curriculum</option>
       </select>
       <p id="settings-career-summary" class="muted"></p>
-      <label for="game-view" class="game-only">Game view</label>
-      <select id="game-view" class="game-only">
-        <option value="first-person">First person · mouse look</option>
-        <option value="top-down">Classic · top down</option>
-      </select>
       <label class="display-size" for="display-scale">
         <span
-          ><span id="display-scale-label">Game and text size</span>
+          ><span id="display-scale-label">Text size</span>
           <output id="display-scale-value" for="display-scale"
             >100%</output
           ></span
@@ -417,35 +213,6 @@
           value="100"
         />
       </label>
-      <p id="audio-status" class="muted game-only"></p>
-      <label class="game-only"
-        >Sound level
-        <input id="volume" type="range" min="0" max="1" step="0.05" /></label
-      ><label class="game-only"
-        ><input id="captions" type="checkbox" /> Surge visual cues & sound
-        captions</label
-      ><label class="game-only"
-        ><input id="npc-voices" type="checkbox" /> NPC voices
-        (computer-generated)</label
-      >
-      <p id="npc-voice-status" class="muted game-only">
-        Brief contextual speech. Voice clips are discarded after use.
-      </p>
-      <p class="muted game-only">
-        NPC lines are written by your AI connection. Clips stay temporary on
-        this computer.
-      </p>
-      <label class="game-only"
-        ><input id="reduced" type="checkbox" /> Reduced motion</label
-      >
-      <label class="game-only"
-        ><input id="pass-all-doors" type="checkbox" /> Dev: pass all
-        doors</label
-      >
-      <p class="muted game-only">
-        Playtesting only. You pass every locked door and staircase without a key
-        or credential. NPCs and zombies are unaffected.
-      </p>
       <details id="study-connection-settings">
         <summary>Study connection</summary>
         <p>
@@ -490,15 +257,5 @@
       <button id="bug-report-close" class="quiet">Close</button>
     </div>
     <p id="bug-report-status" role="status" aria-live="polite"></p>
-  </div>
-</dialog>
-<dialog id="gender-dialog" class="gender-dialog" aria-labelledby="gender-title">
-  <div class="gender-card">
-    <span class="eyebrow">NEW GAME</span>
-    <h2 id="gender-title">Character Voice</h2>
-    <div class="gender-actions">
-      <button type="button" id="gender-man">Male</button>
-      <button type="button" id="gender-woman">Female</button>
-    </div>
   </div>
 </dialog>

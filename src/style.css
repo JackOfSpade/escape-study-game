@@ -15,7 +15,6 @@
   --display-scale: 1;
   --view-width: calc(100vw / var(--display-scale));
   --view-height: calc(100vh / var(--display-scale));
-  --hud-inset: 20px;
   color-scheme: dark;
 }
 * {
@@ -29,26 +28,6 @@ body {
   :root {
     --view-height: calc(100dvh / var(--display-scale));
   }
-}
-/* Reflow at the available scaled width. Fixed panels stay outside this
-   container so they remain attached to the browser viewport while scrolling. */
-.game-layout {
-  container-type: inline-size;
-  height: var(--view-height);
-  overflow: hidden;
-}
-body.surge {
-  --bg: #1a1526;
-  --panel: #2d2438;
-  --line: #665068;
-  --ink: #f8e9cb;
-  --muted: #c7b1ca;
-  --accent: #efd081;
-  --terminal: #e9b1e9;
-  --editor: #211a31;
-  --danger: #ff91a3;
-  background: var(--bg);
-  color: var(--ink);
 }
 button,
 input,
@@ -89,101 +68,15 @@ summary:focus-visible {
 [hidden] {
   display: none !important;
 }
-header {
-  position: absolute;
-  top: var(--hud-inset);
-  right: var(--hud-inset);
-  z-index: 5;
-}
-button.game-control {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  height: 36px;
-  min-width: 36px;
-  padding: 8px;
-  background: #0b1418e8;
-  border-color: #52635b70;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px #0003;
-}
-.game-control svg {
-  width: 18px;
-  height: 18px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-/* Diagnostic controls are available to agent tooling, never in player menus. */
+/* Diagnostic controls are available to agent tooling, never in the menu. */
 body:not(.agent-tools) .agent-only {
   display: none !important;
-}
-.menu-connection {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding-top: 18px;
-  margin-top: 18px;
-  border-top: 1px solid var(--line);
-  line-height: 1.6;
-}
-.menu-connection .live-dot {
-  flex-shrink: 0;
-  margin-top: 5px;
-}
-.live-dot {
-  width: 6px;
-  height: 6px;
-  background: var(--accent);
-  border-radius: 50%;
-}
-main {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  gap: 0;
-}
-.world {
-  min-width: 0;
-  min-height: 0;
-  width: 100%;
-  height: 100%;
-}
-.world-top {
-  position: absolute;
-  top: var(--hud-inset);
-  left: var(--hud-inset);
-  max-width: calc(100% - 110px);
-  pointer-events: none;
-  color: var(--ink);
-  text-shadow: 0 2px 5px #000;
-}
-.world-top h1 {
-  font-size: 15px;
-  margin-top: 4px;
-  line-height: 1.2;
-}
-.world-top .eyebrow {
-  font-size: 9px;
 }
 .eyebrow {
   font-size: 10px;
   letter-spacing: 1.8px;
   color: var(--muted);
   font-weight: 700;
-}
-h1 {
-  font:
-    500 19px "Space Grotesk",
-    sans-serif;
-  letter-spacing: 0.7px;
-  margin: 8px 0 0;
 }
 h2 {
   font:
@@ -194,395 +87,9 @@ h2 {
 p {
   line-height: 1.6;
 }
-.viewport {
-  height: 100%;
-  background: #0b1418;
-  position: relative;
-  overflow: hidden;
-}
-canvas {
-  width: 100%;
-  height: 100%;
-  display: block;
-  outline: none;
-}
-/* Key help lives in the Esc menu instead of over the game. */
-.pause-controls {
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
-}
-.controls {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 8px 14px;
-  margin: 8px 0 0;
-  padding: 0;
-  list-style: none;
-  color: var(--muted);
-  font-size: 11px;
-}
-kbd {
-  font:
-    10px ui-monospace,
-    monospace;
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  padding: 2px 4px;
-  margin-right: 4px;
-}
-/* Gameplay feedback appears briefly, then fades; the run's opening story is
-   shown on the title card instead. */
-#notice {
-  position: absolute;
-  left: var(--hud-inset);
-  bottom: var(--hud-inset);
-  opacity: 0;
-  transition: opacity 0.6s ease;
-  max-width: min(560px, calc(100% - 2 * var(--hud-inset)));
-  font-size: 12px;
-  color: var(--accent);
-  margin: 0;
-  padding: 7px 10px;
-  border-radius: 6px;
-  background: #0b1418d9;
-  pointer-events: none;
-}
-#notice.shown {
-  opacity: 1;
-  transition-duration: 0.15s;
-}
-#notice:empty {
-  display: none;
-}
-/* The dashboard keeps the data elements the game writes to; while playing
-   the survivor status lives in the in-frame HUD instead of a side panel. */
-.dashboard {
-  display: none;
-}
-.hud {
-  position: absolute;
-  left: var(--hud-inset);
-  top: calc(var(--hud-inset) + 54px);
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 8px 12px;
-  background: rgba(11, 20, 24, 0.72);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  font: 12px monospace;
-  color: var(--ink);
-  pointer-events: none;
-  text-shadow: 0 1px 2px #000;
-  will-change: transform;
-}
-.hud-health {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.hud-health strong {
-  font:
-    500 18px "Space Grotesk",
-    sans-serif;
-  min-width: 36px;
-}
-.hud-track {
-  width: 90px;
-  height: 4px;
-  background: var(--line);
-  border-radius: 2px;
-  overflow: hidden;
-}
-#hud-health-fill {
-  height: 100%;
-  background: var(--accent);
-}
-.hud > *,
-.hud-item {
-  white-space: nowrap;
-}
-.hud-item {
-  color: var(--muted);
-}
-/* A granted key is announced where the player is looking: a small pill over
-   the world, one pulse on the HUD count and a line in the open terminal. */
-.reward-toast {
-  position: absolute;
-  left: 50%;
-  top: 14%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 12px 5px 10px;
-  border-radius: 999px;
-  background: rgba(11, 20, 24, 0.82);
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  white-space: nowrap;
-  pointer-events: none;
-  animation: reward-toast 2400ms ease-out forwards;
-}
-.reward-icon {
-  width: 14px;
-  height: 14px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-}
-.hud-item.gained {
-  display: inline-block;
-  transform-origin: left center;
-  color: var(--accent);
-  animation: hud-pulse 600ms ease-out;
-}
-.dialogue-reward {
-  margin: 0 0 10px;
-  color: var(--accent);
-  font-size: 11px;
-  animation: reward-in-flat 240ms ease-out;
-}
-@keyframes reward-toast {
-  0% {
-    opacity: 0;
-    transform: translateX(-50%) translateY(-6px);
-  }
-  10%,
-  80% {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-  100% {
-    opacity: 0;
-    transform: translateX(-50%) translateY(0);
-  }
-}
-@keyframes reward-in-flat {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-@keyframes hud-pulse {
-  0% {
-    transform: scale(1);
-  }
-  40% {
-    transform: scale(1.15);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-/* Equipment controls overlay the frame's bottom edge; keys-only runs show nothing. */
-.inventory {
-  position: absolute;
-  right: 15px;
-  bottom: 15px;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 6px;
-  align-items: center;
-  max-width: 50%;
-  will-change: transform;
-}
-.inventory:empty {
-  display: none;
-}
-/* After the run ends the frozen building can be watched floor by floor; the
-   bar replaces the survivor HUD at the same corner and sits under the card. */
-body.spectating .hud,
-body.spectating .inventory {
-  display: none;
-}
-.spectator {
-  position: absolute;
-  left: var(--hud-inset);
-  top: calc(var(--hud-inset) + 54px);
-  max-width: calc(100% - 2 * var(--hud-inset));
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding: 8px 12px;
-  background: rgba(11, 20, 24, 0.82);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  font: 12px monospace;
-  color: var(--ink);
-}
-.spectator[hidden] {
-  display: none;
-}
-#spectator-floors {
-  display: flex;
-  gap: 4px;
-}
-#spectator-floors button {
-  min-width: 34px;
-  padding: 4px 8px;
-  font: 11px monospace;
-}
-#spectator-floors button.active {
-  background: var(--accent);
-  color: #0b1418;
-}
-#view3d.mouse-captured {
-  cursor: none;
-}
-/* Narrow viewports (terminal open, phones): stack the HUD rows. */
-.terminal-open .hud {
-  flex-wrap: wrap;
-  gap: 6px;
-  max-width: calc(100% - 2 * var(--hud-inset));
-}
-@container (max-width: 600px) {
-  .hud {
-    gap: 8px;
-    padding: 6px 8px;
-  }
-  .hud-track {
-    width: 50px;
-  }
-}
 .muted {
   font-size: 11px;
   color: var(--muted);
-}
-.item {
-  padding: 10px 8px;
-  background: var(--panel);
-  color: var(--ink);
-  text-align: left;
-  border: 1px solid var(--line);
-  min-width: 85px;
-}
-.item strong {
-  font-size: 11px;
-  text-transform: capitalize;
-}
-.item small {
-  display: block;
-  font-size: 9px;
-  color: var(--muted);
-  margin-top: 8px;
-}
-.overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    rgba(10, 23, 27, 0.97),
-    rgba(10, 23, 27, 0.6)
-  );
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  flex-direction: column;
-  padding: 8%;
-  z-index: 2;
-  overflow: auto;
-}
-.overlay.finished {
-  background: linear-gradient(
-    90deg,
-    rgba(10, 23, 27, 0.99) 0%,
-    rgba(10, 23, 27, 0.96) 48%,
-    rgba(10, 23, 27, 0.72) 100%
-  );
-}
-.overlay h2 {
-  font-size: clamp(32px, calc(var(--view-width) * 0.04), 68px);
-  line-height: 1.02;
-  letter-spacing: -2px;
-  margin: 20px 0;
-}
-.overlay p {
-  color: #a7bcbb;
-  font-size: 14px;
-  margin-bottom: 25px;
-}
-.overlay small {
-  color: #93aaa7;
-  font-size: 10px;
-  max-width: 380px;
-  line-height: 1.6;
-  margin-top: 18px;
-}
-.overlay .quiet {
-  margin-top: 10px;
-}
-/* The opening title card: a black screen carrying the designer's title and
-   backstory in the designer's typography. */
-.overlay.title-card {
-  background: #000;
-  align-items: center;
-  justify-content: safe center;
-  text-align: center;
-}
-.title-card-inner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  max-width: min(760px, 100%);
-  animation: title-card-in 1.6s ease both;
-}
-.overlay .title-card-title {
-  line-height: 1.08;
-  letter-spacing: normal;
-  margin: 0 0 28px;
-  overflow-wrap: anywhere;
-}
-.title-card-story {
-  line-height: 1.6;
-}
-.overlay .title-card-story p {
-  color: inherit;
-  font-size: inherit;
-  margin: 0 0 1em;
-}
-.title-card #start {
-  margin-top: 24px;
-}
-@keyframes title-card-in {
-  from {
-    opacity: 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .title-card-inner {
-    animation: none;
-  }
-}
-.overlay .save-result {
-  color: var(--accent);
-}
-.overlay .save-result.failed {
-  color: var(--danger);
-}
-#world-caption {
-  position: absolute;
-  bottom: 104px;
-  left: var(--hud-inset);
-  color: var(--accent);
-  font-size: 12px;
-  text-shadow: 0 2px 4px #000;
-}
-.terminal-open .dashboard {
-  display: none;
-}
-.terminal-open .world-top {
-  max-width: calc(100% - 2 * var(--hud-inset));
 }
 #terminal {
   background: var(--panel);
@@ -620,7 +127,7 @@ body.spectating .inventory {
 }
 /* Where a question came from and how it was scheduled is diagnostic detail:
    the workspace keeps it in the page for bug reports and shows none of it. */
-.study-app #terminal-provenance {
+#terminal-provenance {
   display: none;
 }
 #terminal-body {
@@ -756,14 +263,6 @@ body.spectating .inventory {
   border-radius: 4px;
   font-size: 11px;
 }
-#loot button {
-  margin: 5px;
-  font-size: 11px;
-  padding: 8px;
-}
-#loot p {
-  font-size: 11px;
-}
 #settings,
 #inspector {
   padding: 22px;
@@ -829,11 +328,6 @@ pre {
 #inspector details {
   margin-top: 25px;
 }
-body.reduced * {
-  scroll-behavior: auto !important;
-  animation: none !important;
-  transition: none !important;
-}
 @container (max-width: 1000px) {
   .terminal-heading {
     padding: 10px;
@@ -841,101 +335,6 @@ body.reduced * {
   .terminal-heading h2 {
     font-size: 15px;
   }
-}
-@container (max-width: 760px) {
-  header,
-  .world {
-    --hud-inset: 12px;
-  }
-  .world-top,
-  .terminal-open .world-top {
-    max-width: calc(100% - 90px);
-  }
-  .world-top h1 {
-    font-size: 12px;
-  }
-  .world-top .eyebrow {
-    letter-spacing: 1px;
-    font-size: 8px;
-  }
-  .game-control span {
-    display: none;
-  }
-  .overlay h2 {
-    font-size: 40px;
-  }
-  .overlay {
-    padding: 7%;
-  }
-  .overlay p {
-    font-size: 12px;
-  }
-  .overlay {
-    padding-top: 86px;
-    padding-bottom: 80px;
-  }
-  .inventory {
-    max-width: calc(100% - 24px);
-    bottom: 104px;
-  }
-}
-
-#work-log {
-  margin: 10px 0;
-  font-size: 12px;
-}
-#work-log-body {
-  max-height: 220px;
-  overflow: auto;
-  white-space: pre-wrap;
-}
-#work-log-body p {
-  padding: 8px;
-  border-bottom: 1px solid var(--line);
-}
-
-#workspace-proposals {
-  margin: 8px 0;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-}
-#workspace-proposals p {
-  font-size: 12px;
-}
-#workspace-proposals details {
-  margin: 8px 0;
-}
-#workspace-proposals summary {
-  cursor: pointer;
-}
-#workspace-proposals pre {
-  max-height: 220px;
-  overflow: auto;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-#workspace-proposals button {
-  margin: 4px 8px 4px 0;
-}
-
-#world-caption:not(:empty) {
-  max-width: calc(100% - 30px);
-  padding: 6px 9px;
-  border-radius: 4px;
-  background: #10191de8;
-}
-
-.equipment-guide {
-  flex-basis: 100%;
-  font-size: 11px;
-  line-height: 1.6;
-}
-.equipment-guide summary {
-  cursor: pointer;
-}
-.item {
-  flex: 1 1 115px;
 }
 
 #environment-observations form {
@@ -1048,9 +447,6 @@ body.reduced * {
 }
 
 /* One answer area with one mode-specific conversation alongside it. */
-.terminal-open main {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-}
 .terminal-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(240px, 0.8fr);
@@ -1074,13 +470,6 @@ body.reduced * {
 .conversation-panel h3 {
   margin: 0 0 8px;
   font-size: 16px;
-}
-#final-question-notice {
-  margin: 0 0 8px;
-  padding: 8px 10px;
-  border-left: 3px solid var(--line);
-  font-size: 12px;
-  line-height: 1.5;
 }
 #conversation-context,
 #answer-context,
@@ -1131,46 +520,6 @@ body.reduced * {
 .conversation-panel #chat-form {
   flex-shrink: 0;
 }
-@container (max-width: 1100px) {
-  .terminal-open main {
-    display: flex;
-    flex-direction: column;
-  }
-  .terminal-open .world {
-    height: clamp(160px, calc(var(--view-height) * 0.28), 260px);
-    flex-shrink: 0;
-  }
-  .terminal-open #terminal {
-    flex: 1;
-    height: auto;
-    min-height: 0;
-    margin: 0 8px 8px;
-  }
-  .terminal-open .hud,
-  .terminal-open .spectator {
-    top: auto;
-    bottom: 10px;
-  }
-  .terminal-open #notice,
-  .terminal-open .inventory {
-    display: none;
-  }
-  @media (max-height: 600px) {
-    .terminal-open .world {
-      height: 64px;
-    }
-    .terminal-open .hud {
-      display: none;
-    }
-    .terminal-open #terminal {
-      display: block;
-      overflow: auto;
-    }
-    .terminal-open #terminal-body {
-      overflow: visible;
-    }
-  }
-}
 @container (max-width: 760px) {
   .terminal-layout {
     grid-template-columns: 1fr;
@@ -1181,60 +530,6 @@ body.reduced * {
     border-left: 0;
     border-top: 1px solid var(--line);
     padding: 18px 0 0;
-  }
-}
-
-/* Solo study workspace: keep the simulation visible while giving work most of the screen. */
-@container (min-width: 1101px) {
-  .force-fields.terminal-open main {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  }
-}
-.force-fields .terminal-layout {
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 1fr);
-  gap: 24px;
-}
-.force-fields .conversation-panel {
-  height: max(420px, calc(var(--view-height) - 255px));
-}
-.force-fields #workspace {
-  min-height: 300px;
-  line-height: 1.7;
-}
-.force-fields #messages {
-  padding: 12px 4px;
-  scrollbar-gutter: stable;
-}
-.force-fields .message {
-  padding: 12px 14px;
-  border-radius: 12px;
-  line-height: 1.6;
-}
-.force-fields .message.human {
-  background: var(--editor);
-  margin-left: 24px;
-}
-.force-fields #chat-form {
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 8px;
-}
-.force-fields #chat-input {
-  min-width: 0;
-  border: 0;
-  background: transparent;
-  font-size: 14px;
-}
-.force-fields #loot,
-.force-fields .controls li:nth-child(3) {
-  display: none;
-}
-@container (max-width: 760px) {
-  .force-fields .terminal-layout {
-    grid-template-columns: 1fr;
-  }
-  .force-fields .conversation-panel {
-    height: 420px;
   }
 }
 
@@ -1278,138 +573,6 @@ body.reduced * {
 .career-focus-label {
   display: block;
   margin: 16px 0 6px;
-}
-.run-design-dialog {
-  width: min(480px, calc(var(--view-width) - 32px));
-  max-height: calc(var(--view-height) - 32px);
-  overflow: auto;
-  padding: 32px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--bg);
-  color: var(--ink);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
-}
-.run-design-dialog h2 {
-  margin: 12px 0;
-  font:
-    500 clamp(1.5rem, 4vw, 1.9rem) / 1.2 "Space Grotesk",
-    sans-serif;
-  letter-spacing: -0.6px;
-}
-.run-design-dialog::backdrop {
-  background: rgba(4, 13, 16, 0.9);
-  backdrop-filter: blur(6px);
-}
-.run-design-state {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-}
-#run-design-loading {
-  display: inline-flex;
-  flex: 0 0 auto;
-  padding-top: 3px;
-}
-.run-design-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(167, 188, 187, 0.25);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: run-design-spin 1s linear infinite;
-}
-@keyframes run-design-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .run-design-spinner {
-    animation: none;
-  }
-}
-#run-design-steps {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  padding: 0;
-  margin: 28px 0;
-  list-style: none;
-}
-#run-design-steps li {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 9px;
-  color: var(--muted);
-  font-size: 12px;
-}
-#run-design-steps li:not(:last-child)::before {
-  position: absolute;
-  top: 13px;
-  left: calc(50% + 18px);
-  right: calc(-50% + 18px);
-  height: 1px;
-  background: var(--line);
-  content: "";
-}
-.run-design-step-marker {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  font-size: 11px;
-}
-#run-design-steps li[data-state="active"] {
-  color: var(--ink);
-}
-#run-design-steps li[data-state="active"] .run-design-step-marker {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-#run-design-steps li[data-state="complete"]::before {
-  background: var(--accent);
-}
-#run-design-steps li[data-state="complete"] .run-design-step-marker {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--bg);
-  font-size: 0;
-}
-#run-design-steps li[data-state="complete"] .run-design-step-marker::after {
-  content: "✓";
-  font-size: 14px;
-}
-.run-design-dialog[data-state="error"] #run-design-status {
-  color: var(--danger);
-}
-.run-design-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-}
-#run-design-cancel {
-  margin-left: auto;
-  padding: 10px;
-  border-color: transparent;
-  color: var(--muted);
-  font-size: 13px;
-}
-#run-design-status {
-  margin: 0;
-  color: var(--muted);
-  font-size: 14px;
-  line-height: 1.6;
-  overflow-wrap: anywhere;
-}
-@media (max-width: 480px) {
-  .run-design-dialog {
-    padding: 24px;
-  }
 }
 #career-focus {
   max-width: 100%;
@@ -1528,53 +691,6 @@ body.reduced * {
   color: var(--ink);
 }
 
-/* The simulation is held while Claude writes or replies: say so over the game. */
-.reply-pause {
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  display: grid;
-  place-items: center;
-  background: rgb(5 10 12 / 0.55);
-  backdrop-filter: grayscale(0.8) blur(1px);
-  pointer-events: none;
-}
-.reply-pause[hidden] {
-  display: none;
-}
-.reply-pause-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  max-width: min(320px, 85%);
-  padding: 18px 22px;
-  text-align: center;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.5;
-}
-.reply-pause-card strong {
-  color: var(--ink);
-  font-size: 18px;
-  letter-spacing: 0.5px;
-}
-.reply-pause-icon {
-  width: 22px;
-  height: 26px;
-  border-left: 7px solid var(--accent);
-  border-right: 7px solid var(--accent);
-  animation: reply-pause-pulse 1.6s ease-in-out infinite;
-}
-@keyframes reply-pause-pulse {
-  50% {
-    opacity: 0.35;
-  }
-}
-
 /* Question generation: an indeterminate bar, stages and an elapsed clock. */
 .generation-progress {
   display: flex;
@@ -1653,46 +769,11 @@ body.reduced * {
 }
 @media (prefers-reduced-motion: reduce) {
   .generation-bar span,
-  .generation-steps li.active::before,
-  .reply-pause-icon {
+  .generation-steps li.active::before {
     animation: none;
   }
 }
 
-/* Escape redesign: journal panel, task indicator, epilogue panel, gender ask. */
-.journal {
-  border-top: 1px solid var(--line, #2a2a2a);
-  padding-top: 10px;
-}
-#journal-lines p,
-#task-indicator,
-.epilogue-text {
-  margin: 0 0 6px;
-  font-size: 13px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-}
-#task-indicator::before {
-  content: "▸ ";
-  color: var(--accent);
-}
-.overlay.epilogue {
-  background: #000;
-  color: #fff;
-  align-items: center;
-  justify-content: safe center;
-  text-align: left;
-  padding: 32px;
-}
-.overlay.epilogue .epilogue-text {
-  max-width: min(640px, 100%);
-  font-size: 16px;
-  line-height: 1.65;
-}
-body.epilogue-open .dashboard,
-body.epilogue-open .world-top {
-  visibility: hidden;
-}
 .bug-report {
   border: 1px solid var(--line, #303a4a);
   border-radius: 8px;
@@ -1753,45 +834,22 @@ body.epilogue-open .world-top {
 #bug-report-status[data-kind="error"] {
   color: #f0b27a;
 }
-.gender-dialog {
-  border: 1px solid var(--line, #2a2a2a);
-  background: #0b0b0b;
-  color: #fff;
-  padding: 0;
-  max-width: min(460px, 92vw);
-}
-.gender-dialog::backdrop {
-  background: rgb(0 0 0 / 78%);
-}
-.gender-card {
+/* A checkpoint that failed to load: the workspace stays closed until it is
+   retried, exported or replaced by a backup. */
+.save-recovery {
+  max-width: 560px;
+  margin: 12vh auto 0;
   padding: 28px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
 }
-.gender-card h2 {
-  margin: 8px 0 12px;
-  font-size: 24px;
+.save-recovery button {
+  margin: 0 8px 8px 0;
 }
-.gender-card p {
-  margin: 0 0 20px;
-  font-size: 14px;
-  line-height: 1.55;
+.save-result {
+  color: var(--accent);
 }
-.gender-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-.gender-actions button {
-  flex: 1 1 160px;
-}
-
-/* The app is a learning workspace: controls of the archived game are never
-   shown, and workspace-only controls appear only there. */
-.study-app .game-only {
-  display: none !important;
-}
-.study-app-only {
-  display: none !important;
-}
-.study-app .study-app-only {
-  display: revert !important;
+.save-result.failed {
+  color: var(--danger);
 }

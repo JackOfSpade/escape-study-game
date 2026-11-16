@@ -8,6 +8,7 @@ import {
   encode,
   exportRecoveryBackup,
   load,
+  rejectedCopy,
   save,
 } from "../src/persistence";
 import { createGame } from "../src/world";
@@ -132,6 +133,34 @@ test("recovery export preserves damaged bytes and reports unreadable copies", as
   assert.match(partial.durableError, /Synthetic disk error/);
   copies.durableError = false;
   copies.durable = copies.local = null;
+});
+
+test("a copy refused while the other loads is reported with its exact bytes", async () => {
+  const g = createGame(731, roadmap);
+  const good = JSON.stringify({ format: 2, serial: 5, data: encode(g) });
+  copies.durable = copies.local = good;
+  assert.equal((await load())!.id, g.id);
+  assert.equal(rejectedCopy(), undefined, "two valid copies refuse nothing");
+  // The damaged copy could be the newer checkpoint: its serial is unreadable.
+  copies.durable = `${good.slice(0, -40)}synthetic damage`;
+  assert.equal((await load())!.id, g.id);
+  assert.deepEqual(
+    { store: rejectedCopy()?.store, raw: rejectedCopy()?.raw },
+    { store: "durable", raw: copies.durable },
+  );
+  assert.ok(rejectedCopy()!.reason);
+  copies.durable = good;
+  copies.local = "synthetic damaged local save";
+  assert.equal((await load())!.id, g.id);
+  assert.equal(rejectedCopy()?.store, "local");
+  assert.equal(rejectedCopy()?.raw, "synthetic damaged local save");
+  // Nothing loaded at all is the existing integrity failure, not a notice.
+  copies.durable = "synthetic damaged durable save";
+  await assert.rejects(load(), /integrity checks/);
+  assert.equal(rejectedCopy(), undefined);
+  copies.durable = copies.local = null;
+  assert.equal(await load(), null);
+  assert.equal(rejectedCopy(), undefined);
 });
 
 test("a draft larger than one megabyte has a full synchronous checkpoint before its durable write settles", async () => {
