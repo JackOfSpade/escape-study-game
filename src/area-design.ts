@@ -22,16 +22,16 @@ import {
 } from "./world";
 
 /** One design request, resolved with the answer or rejected. */
-export type AreaSend = NonNullable<DesignOptions<Game>["send"]>;
+type AreaSend = NonNullable<DesignOptions<Game>["send"]>;
 
-export interface AreaDesignOptions {
+interface AreaDesignOptions {
   roadmap: Roadmap;
   signal: AbortSignal;
   send?: AreaSend;
 }
 
 /** A finished design: its accepted design and a game built from it. */
-export interface AreaDesign {
+interface AreaDesign {
   game: Game;
   saved: SavedRunDesign;
 }
@@ -113,9 +113,4 @@ export function startAreaDesign(
   );
   running.set(stub.id, promise);
   return promise;
-}
-
-/** The saved design for an area, once its design resolved. */
-export function areaDesignResult(stubId: string): SavedRunDesign | undefined {
-  return designs.get(stubId);
 }

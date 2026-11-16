@@ -34,7 +34,7 @@ interface Style {
 }
 
 /** The weather kinds a run design can carry. */
-export type WeatherKind = Exclude<RunWeather, "none">;
+type WeatherKind = Exclude<RunWeather, "none">;
 
 const STYLES: Record<WeatherKind, Style> = {
   rain: {

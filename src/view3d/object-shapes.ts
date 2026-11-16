@@ -19,7 +19,7 @@ import type {
  * (-z) and tapering to nothing at the front (+z), extruded across x. Each
  * face has its own vertices so shading is flat, and uv is present so it
  * merges with the stock primitives. */
-export function unitWedge(): BufferGeometry {
+function unitWedge(): BufferGeometry {
   const A = [-0.5, -0.5, -0.5],
     B = [0.5, -0.5, -0.5],
     C = [-0.5, 0.5, -0.5],
@@ -76,7 +76,7 @@ export function unitWedge(): BufferGeometry {
 /** A ring filling the unit box: its hole axis is z (a ring facing the front)
  * and the tube is stretched along that axis so the ring is as thick as the
  * box is deep. */
-export function unitTorus(): BufferGeometry {
+function unitTorus(): BufferGeometry {
   const tube = 0.15,
     g = new TorusGeometry(0.5 - tube, tube, 8, 24);
   g.scale(1, 1, 0.5 / tube);
@@ -86,7 +86,7 @@ export function unitTorus(): BufferGeometry {
 /** A half-sphere filling the unit box: its flat base sits at -0.5 on the
  * dome's own axis and its crown touches +0.5. The base ring spans the full
  * width, so the part's w×d×h scale still gives the dome its extents. */
-export function unitDome(): BufferGeometry {
+function unitDome(): BufferGeometry {
   const g = new SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
   g.scale(0.5, 1, 0.5);
   g.translate(0, -0.5, 0);
@@ -96,7 +96,7 @@ export function unitDome(): BufferGeometry {
 
 /** A capsule filling the unit box: the barrel is stretched to the box width
  * while the caps still touch both ends of the axis, like a cylinder. */
-export function unitCapsule(): BufferGeometry {
+function unitCapsule(): BufferGeometry {
   const radius = 0.25,
     g = new CapsuleGeometry(radius, 1 - radius * 2, 6, 16);
   g.scale(0.5 / radius, 1, 0.5 / radius);
@@ -107,7 +107,7 @@ export function unitCapsule(): BufferGeometry {
 /** A six-sided prism filling the unit box. A regular hexagon of circumradius
  * 0.5 is only √3/2 deep, so the shallow direction is stretched to reach every
  * face; starting 30° off the front puts a flat side toward it. */
-export function unitHexPrism(): BufferGeometry {
+function unitHexPrism(): BufferGeometry {
   const g = new CylinderGeometry(0.5, 0.5, 1, 6, 1, false, Math.PI / 6);
   g.scale(1, 1, 1 / Math.cos(Math.PI / 6));
   g.computeVertexNormals();
@@ -116,7 +116,7 @@ export function unitHexPrism(): BufferGeometry {
 
 /** A four-sided cone turned 45° so its base edges follow the box sides, then
  * widened onto the box corners; its apex is the centre of the top face. */
-export function unitPyramid(): BufferGeometry {
+function unitPyramid(): BufferGeometry {
   const g = new ConeGeometry(0.5, 1, 4);
   g.rotateY(Math.PI / 4);
   g.scale(Math.SQRT2, 1, Math.SQRT2);

@@ -20,7 +20,7 @@ export interface ProbeFacet {
   /** For a sub-facet the tutor declared: the facet it is a prerequisite part of. */
   partOf?: string;
 }
-export type ProbeFindingStatus = "demonstrated" | "implied" | "gap";
+type ProbeFindingStatus = "demonstrated" | "implied" | "gap";
 export interface ProbeFinding {
   id: string;
   status: ProbeFindingStatus;
@@ -36,19 +36,19 @@ export interface ProbeFinding {
 export const SUB_FACET_DEPTH = 2;
 /** How many sub-facets one reply may declare. */
 export const SUB_FACETS_PER_REPLY = 16;
-export type AnswerFluency = "fluent" | "partial" | "guessing" | "declared-gap";
-export interface AnswerSignal {
+type AnswerFluency = "fluent" | "partial" | "guessing" | "declared-gap";
+interface AnswerSignal {
   fluency: AnswerFluency;
   note?: string;
 }
-export type ProbeOutcome = "continue" | "solved" | "gap";
+type ProbeOutcome = "continue" | "solved" | "gap";
 export interface ProbeReply {
   complete: boolean;
   outcome: ProbeOutcome;
   findings: ProbeFinding[];
   signal?: AnswerSignal;
 }
-export interface ProbeTurn extends ProbeReply {
+interface ProbeTurn extends ProbeReply {
   requestId: string;
   questionSequence: number;
   at: string;
@@ -100,8 +100,8 @@ export interface KnowledgeEstablishedRecord {
   provider: string;
   at: string;
 }
-export type FacetState = ProbeFindingStatus | "open";
-export interface ProbeState {
+type FacetState = ProbeFindingStatus | "open";
+interface ProbeState {
   facets: (ProbeFacet & { status: FacetState; impliedBy?: string })[];
   established: number;
   gaps: number;
@@ -696,7 +696,7 @@ export function knowledgeProbeContext(g: Game, track: string): string {
 }
 
 /** Bounded probe records for one track, for the question generator. */
-export interface ProbeRecords {
+interface ProbeRecords {
   note: string;
   established: {
     facetId: string;

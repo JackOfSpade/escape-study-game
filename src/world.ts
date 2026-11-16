@@ -52,7 +52,7 @@ import type { SurfaceSlot } from "./environment-contract.mjs";
 type WorldBlueprint = RunDesign | RunStructure;
 
 /** The drawn outdoors of a version 3 design, if it has one. */
-export function designedOutdoors(
+function designedOutdoors(
   blueprint: unknown,
 ): import("./outdoor-plan.mjs").OutdoorPlan | undefined {
   const setting =

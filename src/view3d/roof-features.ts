@@ -5,15 +5,12 @@ import {
   ConeGeometry,
   CylinderGeometry,
   Float32BufferAttribute,
-  Group,
   Mesh,
   MeshBasicMaterial,
-  type Material,
   Quaternion,
   SphereGeometry,
   Vector3,
 } from "three";
-import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type {
   RunCustomObject,
   RunObjectMotion,
@@ -31,7 +28,7 @@ import {
 } from "./object-shapes";
 
 type V3 = [number, number, number];
-export interface RoofFeatureParts {
+interface RoofFeatureParts {
   /** Lit, vertex-coloured structure. */
   solid: BufferGeometry[];
   /** Unlit emissive lamps (aviation lights, display faces). */
@@ -41,7 +38,7 @@ export interface RoofFeatureParts {
    * PartAnimator. Empty for a feature that stands still. */
   animated: AnimatedRoofPart[];
 }
-export interface AnimatedRoofPart {
+interface AnimatedRoofPart {
   /** Centred on the pivot, tilted, vertex-coloured. */
   geometry: BufferGeometry;
   lamp: boolean;
@@ -69,7 +66,7 @@ function colorize(geometry: BufferGeometry, color: string) {
 /** One composed part's geometry, centred on its own middle: scaled to its
  * extents, then tipped by pitch (toward the front, +z) and roll (toward +x)
  * about that centre. Motion is not baked in. */
-export function composedPartGeometry(part: RunObjectPart): BufferGeometry {
+function composedPartGeometry(part: RunObjectPart): BufferGeometry {
   const g = objectGeometry(part.shape, part.axis);
   g.scale(part.w, part.h, part.d);
   const tilt = partTilt(part);
@@ -142,46 +139,6 @@ export class PartAnimator {
     for (const e of this.entries) e.material?.dispose();
     this.entries.length = 0;
   }
-}
-
-/** A recipe's parts as meshes in the object's own frame (x across, recipe y
- * on the z axis, up on y), tilted about each part's centre. Still parts are
- * merged into one solid and one lamp mesh; moving parts are separate meshes
- * registered with `animator`, which the caller updates each frame. The group
- * owns its geometry; materials stay with the caller. */
-export function composedPartsGroup(
-  parts: readonly RunObjectPart[],
-  materials: { solid: Material; lamp: Material },
-  animator: PartAnimator,
-): Group {
-  const group = new Group(),
-    still = { solid: [] as BufferGeometry[], lamp: [] as BufferGeometry[] };
-  parts.forEach((part, i) => {
-    const geometry = composedPartGeometry(part),
-      lamp = part.finish === "glow",
-      pivot = new Vector3(part.x, part.z + part.h / 2, part.y);
-    colorize(geometry, part.color);
-    const motion = effectiveMotion(part.motion, part.finish);
-    if (motion === "none") {
-      geometry.translate(pivot.x, pivot.y, pivot.z);
-      (lamp ? still.lamp : still.solid).push(geometry);
-      return;
-    }
-    const mesh = new Mesh(geometry, lamp ? materials.lamp : materials.solid);
-    mesh.position.copy(pivot);
-    group.add(mesh);
-    animator.add(mesh, pivot, 0, motion, part.rate, motionPhase(i));
-  });
-  for (const [list, material] of [
-    [still.solid, materials.solid],
-    [still.lamp, materials.lamp],
-  ] as const)
-    if (list.length) {
-      const mesh = new Mesh(mergeGeometries(list)!, material);
-      for (const g of list) g.dispose();
-      group.add(mesh);
-    }
-  return group;
 }
 
 /** Visual-only rooftop dressing in a local frame whose +z points out of the

@@ -6,7 +6,7 @@ import { roofIndexOf, H, type Floor, type Point, distance } from "./model";
 export const STAIRWELL_RADIUS = 1.15;
 /** Fresh floors carve each staircase into the boundary wall as a two-cell-wide,
  * two-cell-deep well whose open side faces the room. */
-export const STAIRWELL_SIZE = 2;
+const STAIRWELL_SIZE = 2;
 export interface Stairwell {
   kind: "up" | "down";
   marker: Point;

@@ -15,7 +15,7 @@ import type { Game } from "./model";
 import { speakAsPlayer } from "./npc-voice";
 
 /** Speaks a player line; the live voice director (src/npc-voice.ts) fits this. */
-export interface PlayerVoiceSpeaker {
+interface PlayerVoiceSpeaker {
   speakAsPlayer(
     game: Game,
     text: string,
@@ -35,7 +35,7 @@ export function setPlayerVoiceDirector(
   voiceDirector = director;
 }
 
-export interface PlayerChatHost {
+interface PlayerChatHost {
   /** The current game, or undefined while none is running. */
   game(): Game | undefined;
   /** Player yaw in radians (0 = +x), from the first-person controls. */
@@ -49,9 +49,9 @@ export interface PlayerChatHost {
   log?(type: string, data?: unknown): void;
 }
 
-export const PLAYER_CHAT_LIMITS = Object.freeze({ characters: 200 });
+const PLAYER_CHAT_LIMITS = Object.freeze({ characters: 200 });
 
-export type ChatKeyAction = "open" | "send" | "close" | "swallow" | "pass";
+type ChatKeyAction = "open" | "send" | "close" | "swallow" | "pass";
 
 export interface ChatKeyState {
   /** True while the chat box is on screen. */
@@ -89,7 +89,7 @@ export function chatKeyAction(s: ChatKeyState): ChatKeyAction {
 }
 
 /** Why the current game cannot speak for the player, if it cannot. */
-export type ChatBlockedReason =
+type ChatBlockedReason =
   "no-game" | "no-escape" | "not-playing" | "paused" | "voices-off";
 
 /** The first reason this game cannot speak for the player, or undefined. */

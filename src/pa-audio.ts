@@ -70,7 +70,7 @@ export function synthesizePaImpulse(sampleRate: number): Float32Array {
 }
 
 /** Load `/audio/pa-ir.wav` when the deployment ships one; errors are ignored. */
-export async function loadPaImpulse(
+async function loadPaImpulse(
   ctx: BaseAudioContext,
   fetcher: typeof fetch = fetch,
 ): Promise<AudioBuffer | undefined> {

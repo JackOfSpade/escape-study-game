@@ -14,7 +14,7 @@ export interface QuestionSegment {
   estimatedSolveSeconds: number;
 }
 /** One terminal visit that worked a segment of the thread. */
-export interface ThreadVisit {
+interface ThreadVisit {
   /** `encounterKey` of the terminal: `${runId}/${encounterId}`. */
   encounter: string;
   runId: string;
@@ -57,7 +57,7 @@ const threadable = (e: Encounter) =>
   e.mode === "solo" && !e.studyOnly && (!e.owner || e.owner === "human");
 
 /** The problem with the current segment's estimate, for field pacing. */
-export function segmentPacing(p: Problem, segment: number): Problem {
+function segmentPacing(p: Problem, segment: number): Problem {
   const s = p.segments?.[segment];
   return s
     ? {
@@ -220,7 +220,7 @@ export function threadEncounters(g: Game, t: QuestionThread) {
     .filter((e, i, list): e is Encounter => !!e && list.indexOf(e) === i);
 }
 
-export interface CarriedVisit {
+interface CarriedVisit {
   segment: number;
   encounter: string;
   completed: boolean;

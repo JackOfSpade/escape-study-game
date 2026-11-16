@@ -38,7 +38,7 @@ export const ON_AIR_LABEL_CONTEXT =
   "onAirLight lit sign: the few words it shows while a broadcast is live, such as ON AIR.";
 export const ENVIRONMENT_BUILDER_VERSION = "environment-v1";
 
-export interface SurfacePose {
+interface SurfacePose {
   x: number;
   y: number;
   /** Elevation above this floor, not absolute building elevation. */
@@ -88,7 +88,7 @@ export function surfaceWorldPose(
 }
 
 /** The same bounded set that receives the existing solid papers/mugs/frames. */
-export function seededDressingHosts(floor: Floor, seed: number) {
+function seededDressingHosts(floor: Floor, seed: number) {
   const desks = floor.furniture
     .filter((o) => !o.appearance && hasDeskStory(o))
     .sort(
@@ -104,20 +104,20 @@ export function seededDressingHosts(floor: Floor, seed: number) {
   return { desks, boards };
 }
 
-export interface CityFacadeAddress {
+interface CityFacadeAddress {
   id: string;
   x: number;
   y: number;
   w: number;
   h: number;
 }
-export function cityObstacleId(o: CityObstacle) {
+function cityObstacleId(o: CityObstacle) {
   const key = `${o.kind}/${o.x}/${o.y}/${o.w}/${o.h}`;
   return `block-${interiorHash(0, 0, key).toString(16)}-${interiorHash(1, 0, key).toString(16)}`;
 }
 /** Physical address slices, identified by obstacle and side rather than a
  * global counter that renumbers unrelated signs when another block is added. */
-export function cityFacadeAddresses(o: CityObstacle): CityFacadeAddress[] {
+function cityFacadeAddresses(o: CityObstacle): CityFacadeAddress[] {
   const result: CityFacadeAddress[] = [],
     depth = Math.min(6, o.h / 2),
     sideDepth = Math.min(6, o.w / 2),
@@ -144,7 +144,7 @@ export function cityFacadeAddresses(o: CityObstacle): CityFacadeAddress[] {
         });
   return result;
 }
-export function cityFacadeSignFaces(floor: Floor, a: CityFacadeAddress) {
+function cityFacadeSignFaces(floor: Floor, a: CityFacadeAddress) {
   if (
     Math.hypot(
       Math.max(0, Math.abs(a.x - 22) - a.w / 2),

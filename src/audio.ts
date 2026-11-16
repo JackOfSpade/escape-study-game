@@ -39,7 +39,7 @@ interface Voice {
   /** Speech only: the distance at which this delivery stops carrying. */
   range?: number;
 }
-export interface AnnouncementPlayback {
+interface AnnouncementPlayback {
   id: string;
   /** Shown as a caption; the PA has no speech bubble. */
   text: string;
@@ -62,11 +62,11 @@ const MIN_SPEECH_GAIN = 0.001;
 /** Source level of each delivery before distance and walls. A whisper is far
  * quieter than ordinary speech and a raised, urgent voice louder, so what the
  * player hears matches what nearby survivors can hear. */
-export const SPEECH_LEVEL: Readonly<Record<NpcSpeechDelivery, number>> =
+const SPEECH_LEVEL: Readonly<Record<NpcSpeechDelivery, number>> =
   Object.freeze({ whisper: 0.12, calm: 0.45, relieved: 0.45, urgent: 0.65 });
 /** Speech carries as far for the player as for survivors (npc-hearing.ts),
  * fading out over the last quarter of that range instead of cutting off. */
-export function speechFade(distance: number, range: number) {
+function speechFade(distance: number, range: number) {
   if (!Number.isFinite(distance) || distance >= range) return 0;
   const start = range * 0.75;
   return distance <= start ? 1 : (range - distance) / (range - start);

@@ -22,14 +22,14 @@ import {
 import { applySocialOutcome, outcomeContext } from "./npc-social-runtime";
 import type { NpcOutcome, NpcSocial, Utterance } from "./escape-types";
 
-export const ESCAPE_CONVERSATION_LIMITS = Object.freeze({
+const ESCAPE_CONVERSATION_LIMITS = Object.freeze({
   utterances: 40,
   visibleFacts: 12,
   heard: 6,
   replyGapSeconds: [1.2, 3] as const,
 });
 
-export interface ConverseContext {
+interface ConverseContext {
   /** Why this NPC is about to speak; defaults to a reply. */
   reason?: string;
   /** Actor id this line is aimed at, if any. */
@@ -54,14 +54,14 @@ export interface ConversePayload {
   reason: string;
 }
 
-export interface ConverseAnswer {
+interface ConverseAnswer {
   requestId?: string;
   speakerId?: string;
   text?: string;
   outcome?: unknown;
 }
 
-export interface ConverseResult {
+interface ConverseResult {
   text: string;
   outcome: NpcOutcome;
   /** Set when the AI's outcome failed validation and was dropped. */
@@ -104,7 +104,7 @@ export function visibleFactsFor(g: Game, npc: Actor): string[] {
 }
 
 /** The last utterances this NPC heard, oldest first, at most six. */
-export function heardByNpc(g: Game, npcId: string) {
+function heardByNpc(g: Game, npcId: string) {
   const all = utterances.get(g) ?? [];
   return all
     .filter((u) => u.heardBy.includes(npcId))

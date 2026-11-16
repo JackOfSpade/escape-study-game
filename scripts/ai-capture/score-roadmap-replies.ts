@@ -28,9 +28,9 @@ import {
 /** Must match `KEEP_LOCAL` in scripts/lib/roadmap-edits.mjs. */
 const KEEP_LOCAL = "keep-local";
 
-export type ReplyClassification = "adoptable" | "rejected" | "keep-local";
+type ReplyClassification = "adoptable" | "rejected" | "keep-local";
 
-export type ScoredRoadmapReply = {
+type ScoredRoadmapReply = {
   caseId: string;
   setting: string;
   rep: number | null;
@@ -39,7 +39,7 @@ export type ScoredRoadmapReply = {
   error?: string;
 };
 
-export type SettingScore = {
+type SettingScore = {
   setting: string;
   adoptable: number;
   rejected: number;
@@ -48,7 +48,7 @@ export type SettingScore = {
   adoptableRate: number;
 };
 
-export type RoadmapScore = {
+type RoadmapScore = {
   rows: ScoredRoadmapReply[];
   settings: SettingScore[];
 };
@@ -69,7 +69,7 @@ function lastAnswer(row: Record<string, unknown>) {
  * binding hashes are replaced with the fresh payload's values, so the reply is
  * graded on its content rather than on a stale snapshot.
  */
-export async function classifyRoadmapReply({
+async function classifyRoadmapReply({
   item,
   answer,
   roadmap,
@@ -184,7 +184,7 @@ export async function scoreRoadmapReplies({
 const percent = (value: number) =>
   Number.isFinite(value) ? `${Math.round(value * 100)}%` : "-";
 
-export function formatRoadmapScore(score: RoadmapScore): string {
+function formatRoadmapScore(score: RoadmapScore): string {
   const headers = [
     "setting",
     "adoptable",
@@ -222,7 +222,7 @@ export function formatRoadmapScore(score: RoadmapScore): string {
 }
 
 /** Read a JSONL ladder results file, skipping blank or unreadable lines. */
-export function readResultRows(file: string): Record<string, unknown>[] {
+function readResultRows(file: string): Record<string, unknown>[] {
   return readFileSync(resolve(file), "utf8")
     .split("\n")
     .filter((line) => line.trim())

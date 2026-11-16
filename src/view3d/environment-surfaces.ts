@@ -24,7 +24,7 @@ import {
 import { InstancePool } from "./instances";
 import type { InteriorLightmap } from "./interior-lightmap";
 
-export const ENVIRONMENT_ATLAS_EDGE = 2048;
+const ENVIRONMENT_ATLAS_EDGE = 2048;
 /** Street signs are read from a distance, so the atlas needs mipmaps and the
  * steepest anisotropic filtering three.js will clamp to on this device. */
 export const ENVIRONMENT_ATLAS_ANISOTROPY = 8;
@@ -32,7 +32,7 @@ const GUTTER = 4;
 
 /** A view may drop authored slots (for example shop signs above rock lots)
  * before any atlas space or instance is spent on them. */
-export type SurfaceFilter = (surface: SurfaceSlot) => boolean;
+type SurfaceFilter = (surface: SurfaceSlot) => boolean;
 
 interface Tile {
   surface: SurfaceSlot;
@@ -41,7 +41,7 @@ interface Tile {
   width: number;
   height: number;
 }
-export interface EnvironmentAtlasPage {
+interface EnvironmentAtlasPage {
   width: number;
   height: number;
   tiles: Tile[];
@@ -119,7 +119,7 @@ export function environmentAtlasPages(
 
 /** An interpreter for validated drawing data. It executes only these four
  * drawing primitives; strings are never parsed as SVG, HTML, paths or code. */
-export function paintEnvironmentDrawing(
+function paintEnvironmentDrawing(
   ctx: CanvasRenderingContext2D,
   drawing: Drawing,
   width: number,

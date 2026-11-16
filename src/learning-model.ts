@@ -22,17 +22,17 @@ export interface HistoricalFacetMapping {
   /** Exact source observation excerpt required for an independent part of a MIXED row. */
   sourceExcerpts?: Record<string, string>;
 }
-export interface HistoricalFacetReview extends HistoricalFacetMapping {
+interface HistoricalFacetReview extends HistoricalFacetMapping {
   assessmentId: string;
   reviewedAt: string;
 }
-export interface LearningCell {
+interface LearningCell {
   states: CellState[];
   proofs: Record<string, string[]>;
   facets: Record<string, FacetProof>;
   sourceRefs: string;
 }
-export interface FinalProgress {
+interface FinalProgress {
   kind: "transfer" | "integration";
   status: CellState;
   proofs: Record<string, string[]>;
@@ -129,7 +129,7 @@ export interface LearningAttempt {
   endedAt?: string;
   parentAttempt?: string;
 }
-export interface TrackState {
+interface TrackState {
   tier: number;
   cleared: number;
   phase: string;
@@ -214,7 +214,7 @@ export const studyRatioPosition = (s: {
   studyTurnPosition?: number;
 }) => s.studyTurnPosition ?? (s.cycle + (s.cycleOffset ?? 0)) % 3;
 
-export const FACET_OUTCOMES: readonly FacetProof["outcome"][] = [
+const FACET_OUTCOMES: readonly FacetProof["outcome"][] = [
   "independent",
   "assisted",
   "unknown",

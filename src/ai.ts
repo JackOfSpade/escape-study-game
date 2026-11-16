@@ -102,7 +102,7 @@ const capturedProvider = (problem?: Problem): Provider =>
     : isAiProvenance(problem?.provenance)
       ? problem.provenance
       : "claude-cli";
-export const isAiProvenance = (p?: string): p is Provider =>
+const isAiProvenance = (p?: string): p is Provider =>
   p === "study-mode" || p === "chatgpt-handoff" || p === "claude-cli";
 const autonomousAllowed = () =>
   status().capabilities.includes("autonomous-work");
@@ -458,7 +458,7 @@ function takePrepared(g: Game, r: Roadmap) {
 }
 /** Where a question request is, for the terminal's progress display. The
  * request is one bridge call, so these are the client-side stages around it. */
-export type GenerationPhase = "joining" | "writing" | "checking";
+type GenerationPhase = "joining" | "writing" | "checking";
 const generationProgresses = new WeakMap<
   Encounter,
   { id: string; phase: GenerationPhase; startedAt: number }

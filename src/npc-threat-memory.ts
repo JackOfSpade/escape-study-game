@@ -1,7 +1,7 @@
 import { type Actor, type Game, type Zombie, distance } from "./model";
 import { canSee, sightRadius } from "./visibility";
 export const THREAT_MEMORY = { seconds: 6, max: 8, sampleSeconds: 0.25 };
-export interface ThreatObservation {
+interface ThreatObservation {
   id: string;
   x: number;
   y: number;

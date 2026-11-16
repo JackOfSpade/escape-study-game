@@ -11,13 +11,13 @@ import { hallSectors, inRect, type Rect, type Sector } from "./floor-plan";
  * sheer edge. Walking, routing, sight and sound stay the flat per-storey
  * systems they were; the level only says how high the floor, the furniture and
  * the people standing on a cell are. */
-export const LEVEL_UNIT = 0.15;
+const LEVEL_UNIT = 0.15;
 /** Largest height difference between neighbouring cells, in units. */
 export const LEVEL_STEP_UNITS = 2;
 /** Ceiling of a hall above its lowest ordinary floor, in metres. Other rooms
  * keep the 2.82 m ceiling. */
 export const HALL_CEILING = 3.38;
-export const ROOM_CEILING = 2.82;
+const ROOM_CEILING = 2.82;
 
 export interface FloorLevels {
   /** Inclusive cell rectangle the units cover. */

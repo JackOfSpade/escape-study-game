@@ -25,7 +25,7 @@ import type { Game } from "./model";
 import { isRecord } from "./records";
 
 /** One bridge call: the operation name, its payload, and the raw answer. */
-export type EscapeRequest = (
+type EscapeRequest = (
   operation: string,
   payload: unknown,
 ) => Promise<unknown>;
@@ -71,7 +71,7 @@ function regionKinds(regions: unknown): string[] {
 
 /** The physical place the threat has to fit, read defensively: an old save or
  * a design from before `setting.outdoors` may lack any of it. */
-export function physicalSetting(design: unknown): Record<string, unknown> {
+function physicalSetting(design: unknown): Record<string, unknown> {
   const setting =
     isRecord(design) && isRecord(design.setting) ? design.setting : undefined;
   if (!setting) return {};
@@ -108,7 +108,7 @@ export function physicalSetting(design: unknown): Record<string, unknown> {
 /** Why a catastrophe request produced no usable spec. */
 type CatastropheFailure = "request-failed" | "malformed" | "invalid";
 /** How a new game's catastrophe was prepared, for the local run log. */
-export interface CatastrophePreparation {
+interface CatastrophePreparation {
   /** `offline` means the deterministic fallback already on the game stayed. */
   source: "ai" | "offline";
   /** Model requests made (2 when a repeat of a recent threat was re-asked). */

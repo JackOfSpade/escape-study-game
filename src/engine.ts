@@ -164,7 +164,7 @@ export const human = (g: Game) => g.survivors[0];
  */
 export const decisionCalls = { npc: 0, zombie: 0 };
 /** Perception range after any obscuring hazard front at the actor's cell. */
-export function actorSightRange(
+function actorSightRange(
   g: Game,
   a: { floor: number; x: number; y: number },
   base = sightRadius(g.floors[a.floor]),
@@ -442,7 +442,7 @@ export function extractionFloor(g: Game) {
   return primaryExtraction(g).floor;
 }
 /** The pickup covering this point, if the actor stands inside one. */
-export function extractionAt(
+function extractionAt(
   g: Game,
   floor: number,
   point: Point,
@@ -452,7 +452,7 @@ export function extractionAt(
   );
 }
 /** True when an actor stands inside a pickup on that pickup's floor. */
-export function onExtraction(
+function onExtraction(
   g: Game,
   a: Pick<Actor, "floor" | "x" | "y">,
 ): boolean {
@@ -1485,7 +1485,7 @@ export function nearestStairMarker(
  * positions, floors and ids. With no extra sites every actor is tier 0, which
  * is exactly the pre-sites simulation.
  */
-export type DetailTier = 0 | 1 | 2;
+type DetailTier = 0 | 1 | 2;
 
 /** Tiles between two footprints that still count as neighbouring sites. */
 const SITE_NEIGHBOUR_GAP = 8;

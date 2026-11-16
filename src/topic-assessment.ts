@@ -30,11 +30,11 @@ export interface TopicAssessmentRecord {
   /** Original question creation time; a late old completion cannot replace newer insight. */
   startedAt?: number;
 }
-export interface TopicAssessmentValue {
+interface TopicAssessmentValue {
   topicId: string;
   text: string;
 }
-export interface TopicAssessmentMetadata {
+interface TopicAssessmentMetadata {
   updatedAt?: string;
   requestId?: string;
   questionFingerprint?: string;

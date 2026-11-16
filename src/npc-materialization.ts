@@ -47,7 +47,7 @@ export interface Materialization {
   error?: string;
 }
 const running = new WeakMap<Encounter, Promise<void>>();
-export function observedSharedWork(g: Game, e: Encounter) {
+function observedSharedWork(g: Game, e: Encounter) {
   const a = human(g),
     station = g.floors[a.floor].stations.find(
       (s) => s.id === a.station && s.encounter === e.id,

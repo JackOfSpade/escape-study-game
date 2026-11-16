@@ -282,7 +282,7 @@ export function condenseTimeline(
   }));
 }
 
-export type EpiloguePacket = {
+type EpiloguePacket = {
   title: string;
   premise: string;
   publicStory: string;

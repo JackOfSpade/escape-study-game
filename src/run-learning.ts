@@ -3,13 +3,13 @@ import type { Encounter, Game, TutorRequest } from "./model";
 import { isRecord } from "./records";
 
 /** Static roadmap texts re-derivable from the curriculum; never re-read once settled. */
-export const RELEASED_REQUEST_FIELDS = [
+const RELEASED_REQUEST_FIELDS = [
   "curriculum",
   "progressContext",
 ] as const;
 
 /** Drop static context from a stored request; keeps every auditable field. */
-export function releaseRequestContext(job: { payloadJson: string }): boolean {
+function releaseRequestContext(job: { payloadJson: string }): boolean {
   let payload: unknown;
   try {
     payload = JSON.parse(job.payloadJson);

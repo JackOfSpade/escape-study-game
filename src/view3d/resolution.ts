@@ -1,4 +1,4 @@
-export interface ResolutionSample {
+interface ResolutionSample {
   gpuMs?: number;
   stalled?: boolean;
 }

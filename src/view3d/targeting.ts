@@ -30,7 +30,7 @@ export function rayFootprintDistance(
 }
 
 /** The complete slab interval also supports height-aware presentation rays. */
-export function rayFootprintInterval(
+function rayFootprintInterval(
   origin: Point,
   dx: number,
   dy: number,
@@ -77,7 +77,7 @@ export function lootSlot(station: Point, index: number, out: Point): Point {
   return out;
 }
 
-export interface ReachableFootprint<T> {
+interface ReachableFootprint<T> {
   footprint: Box;
   reach: number;
   /** Equal priorities retain nearest-hit ordering. */
@@ -113,7 +113,7 @@ export function targetFootprint<T>(
   return target;
 }
 
-export type LookTarget =
+type LookTarget =
   | { kind: "station"; station: Station }
   | { kind: "door"; object: Furniture }
   | { kind: "grip"; object: Furniture }

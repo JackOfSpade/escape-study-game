@@ -25,7 +25,7 @@ import { createTestWorld, entity, spawn } from "./world";
 import { populateCity } from "../world";
 import { FLOOR_HEIGHT, sampleStairRoute } from "../stair-route";
 export const TEST_DT = 1 / 30;
-export interface CheckResult {
+interface CheckResult {
   name: string;
   status: "pending" | "passed" | "failed";
   tick: number;

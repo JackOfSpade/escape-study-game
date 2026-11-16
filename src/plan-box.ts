@@ -8,7 +8,7 @@
 import { PLAN_LIMITS } from "./escape-plan";
 import type { Game } from "./model";
 
-export interface PlanBoxHost {
+interface PlanBoxHost {
   /** The current game, or undefined while none is running. */
   game(): Game | undefined;
   /** True while another text field owns the keyboard. */
@@ -19,7 +19,7 @@ export interface PlanBoxHost {
   log?(type: string, data?: unknown): void;
 }
 
-export type PlanKeyAction = "open" | "send" | "close" | "pass";
+type PlanKeyAction = "open" | "send" | "close" | "pass";
 
 /** A game in which a plan can be made right now. */
 export function planable(game: Game | undefined): boolean {

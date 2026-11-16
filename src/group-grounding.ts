@@ -14,7 +14,7 @@ export interface GroupSnapshot {
     "id" | "revision" | "status" | "receipt" | "environment" | "steps"
   >[];
 }
-export interface GroupReply {
+interface GroupReply {
   patch?: WorkspacePatch;
   author: string;
   kind: "question" | "proposal" | "observation";

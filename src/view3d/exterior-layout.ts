@@ -1,11 +1,11 @@
 import type { BuildingFootprint, Floor, Point } from "../model";
 
-export interface StreetProp extends Point {
+interface StreetProp extends Point {
   kind: "car" | "streetlight" | "cone" | "debris";
   w: number;
   h: number;
 }
-export interface StreetLayout {
+interface StreetLayout {
   front: number;
   left: number;
   right: number;
@@ -14,7 +14,7 @@ export interface StreetLayout {
 }
 
 /** Whether a world cell lies inside one building footprint. */
-export function footprintContains(b: BuildingFootprint, x: number, y: number) {
+function footprintContains(b: BuildingFootprint, x: number, y: number) {
   if (y < b.top || y >= b.bottom) return false;
   const row = b.rows[Math.floor(y)];
   return !!row && x >= row.left && x < row.right;
@@ -178,7 +178,7 @@ export function exteriorWallTiles(floor: Floor) {
   );
 }
 
-export interface CityBlock extends Point {
+interface CityBlock extends Point {
   w: number;
   d: number;
   stories: number;
@@ -186,7 +186,7 @@ export interface CityBlock extends Point {
   damaged: boolean;
   distant: boolean;
 }
-export interface CityLayout {
+interface CityLayout {
   left: number;
   right: number;
   north: number;
@@ -197,7 +197,7 @@ export interface CityLayout {
 /** Fake lots keep clear of real buildings by this many tiles. */
 export const SITE_MARGIN = 6;
 
-export interface LotBox {
+interface LotBox {
   x: number;
   /** Centre along the other horizontal axis; `z` is accepted too. */
   y?: number;
@@ -403,7 +403,7 @@ export function cityLayout(floor: Floor): CityLayout | undefined {
   };
 }
 
-export interface CityGroundRectangle {
+interface CityGroundRectangle {
   x: number;
   z: number;
   w: number;
@@ -540,11 +540,6 @@ export function roadGround(ground?: string) {
   return (
     !ground || ground === "asphalt" || ground === "cobble" || ground === "tile"
   );
-}
-
-/** The designed surroundings of the ground floor, if any. */
-export function surroundingsOf(floor: Floor) {
-  return floor.setting?.surroundings;
 }
 
 /** A visual-only plot cut into the face of a solid lot. The lot keeps its

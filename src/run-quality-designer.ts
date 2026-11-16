@@ -22,8 +22,8 @@ import type { ProvisionalRun } from "./world";
 import type { RunDesignActivity, RunDesignStage } from "./run-design-progress";
 
 /** These are runaway guards, not a target number of calls or a quality score. */
-export const QUALITY_REPAIR_ATTEMPTS = 8;
-export const QUALITY_REVIEW_ROUNDS = 8;
+const QUALITY_REPAIR_ATTEMPTS = 8;
+const QUALITY_REVIEW_ROUNDS = 8;
 const STALLED_ROUNDS = 2;
 const FINAL_WORLD_PAUSE = "The final saved world could not be prepared";
 type WorldRequest = Extract<

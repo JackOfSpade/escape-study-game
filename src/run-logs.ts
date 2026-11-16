@@ -55,7 +55,7 @@ interface RunCache {
   prefixBytes: number;
 }
 /** Operation counters used by regression tests and the benchmark. */
-export interface RunLogStats {
+interface RunLogStats {
   /** Individual entries serialized (record/restore), never whole runs. */
   entrySerializations: number;
   /** Full `{version, runs}` documents built; one per executed write. */

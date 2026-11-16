@@ -32,7 +32,7 @@ export function movementInput(
   };
 }
 
-export const ARROW_TURN_SPEED = 2.6;
+const ARROW_TURN_SPEED = 2.6;
 export const ARROW_PITCH_SPEED = 1.4;
 
 /** Arrow turning is separate from translation; positive yaw turns right. */

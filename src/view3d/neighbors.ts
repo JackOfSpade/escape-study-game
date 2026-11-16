@@ -14,7 +14,7 @@ import type { RunNeighborStyle } from "../setting-catalog.mjs";
  * the exact collision box) the city plan gave it; every piece below stays
  * inside that footprint and only changes what stands there. */
 export type NeighborStyle = Exclude<RunNeighborStyle, "buildings">;
-export type NeighborLayer = "solid" | "glow" | "ice";
+type NeighborLayer = "solid" | "glow" | "ice";
 export interface Footprint {
   /** Centre. */
   x: number;
@@ -27,10 +27,6 @@ export type NeighborEmit = (
   color: string,
   layer: NeighborLayer,
 ) => void;
-/** Shared across a whole city so the piece count stays bounded. */
-export interface NeighborBudget {
-  left: number;
-}
 
 const hashInt = (value: number) => {
   let v = Math.imul(value ^ 0x5bd1e995, 0x45d9f3b);

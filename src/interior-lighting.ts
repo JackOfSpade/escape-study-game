@@ -11,8 +11,8 @@ import {
 } from "./model";
 import { floorCols, floorRows, inRaster, toLocal, type Site } from "./site";
 
-export type InteriorPower = "lit" | "dim" | "outage";
-export interface LightingZone {
+type InteriorPower = "lit" | "dim" | "outage";
+interface LightingZone {
   id: string;
   rect: Rect;
   power: InteriorPower;
@@ -20,7 +20,7 @@ export interface LightingZone {
   /** Site the zone belongs to; absent on the start building. */
   site?: string;
 }
-export interface CeilingFixture extends Point {
+interface CeilingFixture extends Point {
   id: string;
   level: number;
   color: string;
@@ -37,7 +37,7 @@ export function litFixtureColor(
 ): string {
   return floor?.setting?.interior.light ?? DEFAULT_LIT_FIXTURE;
 }
-export interface WallStory extends Point {
+interface WallStory extends Point {
   /** Normal pointing out of the wall, into the room. */
   nx: number;
   ny: number;
@@ -46,7 +46,7 @@ export interface WallStory extends Point {
   story: number;
 }
 /** One building standing on a floor, and the floor data that names its rooms. */
-export interface InteriorRegion {
+interface InteriorRegion {
   /** Stamped site id; absent on the start building. */
   site?: string;
   /** World footprint of the building (rows indexed by absolute y). */
@@ -596,7 +596,7 @@ export function poolIrradiance(intensity: number, d: number) {
 /** The ceiling plane above each floor, just over the fixtures. */
 export const CEILING_HEIGHT = 2.82;
 /** Interior shaders sample the lightmap this far off a surface. */
-export const SURFACE_OFFSET = 0.3;
+const SURFACE_OFFSET = 0.3;
 /** Wall heights with a baked light value; shaders interpolate between them. */
 export const WALL_SAMPLE_HEIGHTS = [0.2, 1.2, 2.4] as const;
 /** 0.5 m texels cannot hold the peak right above a lamp, which its housing
@@ -607,14 +607,14 @@ const lightWindow = (r: number) =>
 
 /** Irradiance on the ceiling at horizontal distance `d` from a fixture. The
  * lamp hangs just under it, which makes the bright glow around every fixture. */
-export function ceilingIrradiance(intensity: number, d: number) {
+function ceilingIrradiance(intensity: number, d: number) {
   const dy = CEILING_HEIGHT - FIXTURE_HEIGHT,
     r = Math.hypot(Math.max(d, CEILING_PEAK_RADIUS), dy);
   return ((intensity * dy) / r ** 3) * lightWindow(r);
 }
 
 /** Irradiance on a wall squarely facing a fixture, `d` metres away. */
-export function wallIrradiance(intensity: number, d: number, height: number) {
+function wallIrradiance(intensity: number, d: number, height: number) {
   const r = Math.hypot(d, FIXTURE_HEIGHT - height);
   return ((intensity * d) / r ** 3) * lightWindow(r);
 }

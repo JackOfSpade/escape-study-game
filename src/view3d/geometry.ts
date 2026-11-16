@@ -1,6 +1,6 @@
 import type { Floor } from "../model";
 
-export interface WallRectangle {
+interface WallRectangle {
   x: number;
   y: number;
   w: number;

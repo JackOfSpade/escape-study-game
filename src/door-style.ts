@@ -73,7 +73,7 @@ export function doorSeeThrough(style: DoorStyle) {
     style.window === "full"
   );
 }
-export interface DoorLeafLayout {
+interface DoorLeafLayout {
   /** Hinge position along the door span, measured from its centre. */
   hinge: number;
   /** Direction the leaf extends from its hinge. */

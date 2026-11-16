@@ -29,9 +29,9 @@ import type { Actor, Game } from "./model";
 import { isRecord } from "./records";
 
 /** Close enough to a step's spot to be doing it. */
-export const PLAN_REACH = 1.8;
+const PLAN_REACH = 1.8;
 /** Close enough to a person to be asking them. */
-export const PLAN_ASK_REACH = 2.4;
+const PLAN_ASK_REACH = 2.4;
 /** Moving faster than this (m/s) is walking, not working. */
 const STILL_SPEED = 0.35;
 export const PLAN_LIMITS = Object.freeze({
@@ -268,7 +268,7 @@ export function fallbackTruth(seed: number): TruthSheet {
 }
 
 /** The game's truth sheet, created from the seed the first time it is needed. */
-export function ensureTruth(g: Game): TruthSheet | undefined {
+function ensureTruth(g: Game): TruthSheet | undefined {
   const escape = g.escape;
   if (!escape) return undefined;
   escape.truth ??= fallbackTruth(g.seed);
@@ -279,7 +279,7 @@ export function ensureTruth(g: Game): TruthSheet | undefined {
 /* Anchors: the places a plan may happen at                            */
 /* ------------------------------------------------------------------ */
 
-export interface PlanAnchor {
+interface PlanAnchor {
   id: string;
   name: string;
   floor: number;
@@ -349,7 +349,7 @@ export function planAnchors(g: Game): PlanAnchor[] {
 /* Building a plan                                                     */
 /* ------------------------------------------------------------------ */
 
-export interface PlanAnswer {
+interface PlanAnswer {
   verdict: "possible" | "impossible";
   reply: string;
   means: PlanMeans;
@@ -633,7 +633,7 @@ export function stepSpot(
 }
 
 /** What the caller must do to the world after a tick. */
-export type PlanEffect =
+type PlanEffect =
   | { kind: "none" }
   | { kind: "harm"; amount: number; cause: string }
   | { kind: "die"; cause: string }

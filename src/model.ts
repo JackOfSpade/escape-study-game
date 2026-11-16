@@ -173,7 +173,7 @@ export interface Point {
   x: number;
   y: number;
 }
-export interface PhysicsMotion {
+interface PhysicsMotion {
   x: number;
   y: number;
   angular: number;

@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { PRESETS } from "../../src/gametest/presets";
 import { parseScenario, type Scenario } from "../../src/gametest/schema";
-export interface GameTestInput {
+interface GameTestInput {
   source: string;
   scenario?: Scenario;
   error?: string;

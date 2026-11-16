@@ -55,7 +55,7 @@ export interface CaptureCase {
   operation: Operation;
   payload: Record<string, unknown>;
 }
-export type CaseBook = Record<Operation, CaptureCase[]>;
+type CaseBook = Record<Operation, CaptureCase[]>;
 type Capture = (operation: string, payload: unknown) => void;
 
 const roadmap: Roadmap = JSON.parse(
@@ -614,7 +614,7 @@ export async function buildCases({
 }
 
 /** Write one JSON case array per operation plus the count index. */
-export async function writeCases(out: string, perOp = 12) {
+async function writeCases(out: string, perOp = 12) {
   const book = await buildCases({ perOp }),
     target = resolve(out);
   mkdirSync(target, { recursive: true, mode: 0o700 });

@@ -27,10 +27,10 @@ import { BODY_RADIUS } from "./physics";
 import { FLOOR_HEIGHT } from "./stair-route";
 import { furnitureHeightOf } from "./view3d/furniture-height";
 
-export const ELEVATED_HEIGHT = 1.7;
-export const ELEVATED_STEP = 0.3;
-export const ELEVATED_SNAP = 0.3;
-export const ELEVATED_GRAVITY = 20;
+const ELEVATED_HEIGHT = 1.7;
+const ELEVATED_STEP = 0.3;
+const ELEVATED_SNAP = 0.3;
+const ELEVATED_GRAVITY = 20;
 export const ELEVATED_JUMP_APEX = 1.1;
 const EPS = 1e-7;
 const AIR_ACCELERATION = 6;
@@ -68,7 +68,7 @@ interface Rectangle {
   /** Guards follow the flight slope, unlike its individual stair treads. */
   rise?: number;
 }
-export interface ElevatedStep {
+interface ElevatedStep {
   surface?: ElevatedSurface;
   landed?: { surface: ElevatedSurface; drop: number };
 }

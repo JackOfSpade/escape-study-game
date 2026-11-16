@@ -39,7 +39,7 @@ export interface EnvironmentObservation {
     authorshipAndAssistance: "unassessed; full attributed work and tutor history remain in the game backup";
   };
 }
-export interface EnvironmentObservationInput {
+interface EnvironmentObservationInput {
   envId: string;
   statement: string;
   executionKey?: string;

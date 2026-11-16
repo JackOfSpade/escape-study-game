@@ -12,7 +12,7 @@ import {
   type OutdoorSolidKind,
 } from "./outdoor-plan.mjs";
 
-export interface CityRectangle extends Point {
+interface CityRectangle extends Point {
   w: number;
   h: number;
 }

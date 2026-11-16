@@ -22,8 +22,8 @@ export interface StairCore {
   y: number;
 }
 export const CORE_WIDTH = 4;
-export const CORE_LANDING = 2;
-export const CORE_FLIGHT = 5;
+const CORE_LANDING = 2;
+const CORE_FLIGHT = 5;
 export const CORE_LENGTH = 2 * CORE_LANDING + CORE_FLIGHT;
 
 export const coreRect = (c: StairCore): Rect => ({
@@ -33,7 +33,7 @@ export const coreRect = (c: StairCore): Rect => ({
   y2: c.y + CORE_LENGTH - 1,
 });
 
-export interface CoreFlight {
+interface CoreFlight {
   /** The five by two cells the flight covers. */
   cells: Rect;
   /** Marker on the lower level's landing, at the foot of the flight. */
@@ -86,9 +86,9 @@ export function floorCores(
   ];
 }
 
-export type CoreCell = "landing" | "flight" | "opening" | "floor";
+type CoreCell = "landing" | "flight" | "opening" | "floor";
 /** What a cell of a floor is to a core standing on it, if it is in one. */
-export function coreCellOf(
+function coreCellOf(
   core: FloorCore,
   level: number,
   x: number,

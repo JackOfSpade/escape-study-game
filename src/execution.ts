@@ -25,7 +25,7 @@ export interface ExecutionReceipt {
   stderr?: string;
   detail?: string;
 }
-export interface ExecutionPreview {
+interface ExecutionPreview {
   dataUrl: string;
   width: number;
   height: number;

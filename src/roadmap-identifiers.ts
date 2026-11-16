@@ -12,7 +12,7 @@ export interface IdentifierCounters {
 const heading = "S0.7 Shared identifier counters";
 const positive = (value: unknown) =>
   typeof value === "number" && Number.isSafeInteger(value) && value > 0;
-export function validateIdentifierCounters(c: IdentifierCounters) {
+function validateIdentifierCounters(c: IdentifierCounters) {
   if (
     !c ||
     !positive(c.nextSession) ||
@@ -72,7 +72,7 @@ const next = (n: number) => {
 };
 /** Only actual progress-row identities count as allocated. Curriculum examples,
  * quoted history and the next-counter declaration are not issued tasks. */
-export function recordedIdentifierCounters(raw: string): IdentifierCounters {
+function recordedIdentifierCounters(raw: string): IdentifierCounters {
   const c: IdentifierCounters = {
     nextSession: 1,
     nextGap: 1,

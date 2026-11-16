@@ -3,7 +3,7 @@
  * computer's service logs and writes one Markdown file. "Copy to clipboard"
  * copies that file's path and the learner's own words, never the report body. */
 
-export interface BugReportQuestion {
+interface BugReportQuestion {
   title: string;
   /** The scheduling and provenance line the workspace no longer displays. */
   provenance: string;
@@ -16,7 +16,7 @@ export interface BugReportQuestion {
   requests: { state: string; error?: string }[];
   draft?: string;
 }
-export interface BugReportSnapshot {
+interface BugReportSnapshot {
   url: string;
   build?: string;
   userAgent: string;
@@ -33,7 +33,7 @@ export interface BugReportSnapshot {
 }
 
 /** Characters of browser diagnostics kept; the newest entries win. */
-export const CLIENT_REPORT_LIMIT = 600_000;
+const CLIENT_REPORT_LIMIT = 600_000;
 const DRAFT_KEY = "bug-report-draft";
 
 const fence = (text: string, language = "text") =>

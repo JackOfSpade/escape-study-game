@@ -30,7 +30,7 @@ export interface HunterBehaviour {
   spawn: "single" | "breeding" | "waves";
 }
 
-export interface HazardBehaviour {
+interface HazardBehaviour {
   kind: "hazard";
   medium: "fire" | "smoke" | "water" | "gas" | "vacuum" | "cold";
   /** Tiles per second the front advances, 0.02..1.5. */
@@ -42,10 +42,10 @@ export interface HazardBehaviour {
   obscures: number;
 }
 
-export type PerceptionTrigger =
+type PerceptionTrigger =
   "sees-own-reflection" | "makes-sound" | "in-darkness" | "looks-at-entity";
 
-export interface PerceptionRuleBehaviour {
+interface PerceptionRuleBehaviour {
   kind: "perception-rule";
   trigger: PerceptionTrigger;
   /** Sound threshold for makes-sound, 0..10 on the actor noise scale. */
@@ -56,7 +56,7 @@ export interface PerceptionRuleBehaviour {
   warning: "none" | "whisper" | "frost" | "flicker" | "ringing";
 }
 
-export interface CollapseBehaviour {
+interface CollapseBehaviour {
   kind: "collapse";
   targets: ("power" | "doors" | "structure" | "life-support")[];
   /** Seconds between failures once active, 10..600. */
@@ -609,7 +609,7 @@ export interface EscapeState {
 }
 
 /** An inactive area. The active area's floors live in `Game.floors`. */
-export interface ParkedArea {
+interface ParkedArea {
   /**
    * The whole parked area as its own game, without `study` and `escape`
    * (those always live on the active game and move with the player).

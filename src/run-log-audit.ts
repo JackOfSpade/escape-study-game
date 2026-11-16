@@ -7,7 +7,7 @@ export const AUDIT_LIMITS = {
   events: 96,
   spectator: 24,
 };
-export interface AuditEntry {
+interface AuditEntry {
   at: number;
   type: string;
   data: unknown;

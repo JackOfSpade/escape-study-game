@@ -155,7 +155,7 @@ export function historicalReviewAuthorized(
   }
 }
 
-export function historicalMappingKey(m: HistoricalFacetMapping) {
+function historicalMappingKey(m: HistoricalFacetMapping) {
   return JSON.stringify([
     m.scopeId,
     m.facet,

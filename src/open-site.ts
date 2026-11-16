@@ -10,7 +10,7 @@
 import type { ExtractionPoint, Floor, Game } from "./model";
 
 /** The catalogue form of a place; absent (older designs) means enclosed. */
-export type SiteForm = "enclosed" | "open";
+type SiteForm = "enclosed" | "open";
 
 /** Only a version 3 blueprint can name a form; everything else is a building. */
 export function siteFormOf(blueprint: unknown): SiteForm {
@@ -41,9 +41,9 @@ export function isSolidOpenFloor(
 }
 
 /** Longest pickup radius an open site offers for its ground pad. */
-export const OPEN_PAD_RADIUS = 2.2;
+const OPEN_PAD_RADIUS = 2.2;
 /** Smallest radius the pad keeps even on a tight, furnished ground floor. */
-export const OPEN_PAD_MIN_RADIUS = 1.2;
+const OPEN_PAD_MIN_RADIUS = 1.2;
 
 function walkable(floor: Floor, x: number, y: number): boolean {
   return floor.tiles?.[y]?.[x] === 0;
@@ -53,7 +53,7 @@ function walkable(floor: Floor, x: number, y: number): boolean {
  * True when every tile whose centre the pickup disc covers is walkable ground,
  * so the pad never claims a cell the floorplan made solid.
  */
-export function padDiscIsWalkable(
+function padDiscIsWalkable(
   floor: Floor,
   x: number,
   y: number,

@@ -6,16 +6,16 @@ import type { StairTravel } from "./stair-travel";
 /** Shared by the walking motor and renderer. Three/world Y is elevation. */
 export const FLOOR_HEIGHT = 3.6;
 export const STAIR_ROUTE_WIDTH = 1.6;
-export interface StairRoutePoint {
+interface StairRoutePoint {
   x: number;
   y: number;
   z: number;
 }
-export interface StairRoute {
+interface StairRoute {
   points: StairRoutePoint[];
   length: number;
 }
-export interface CityStairBase extends Point {
+interface CityStairBase extends Point {
   w: number;
   h: number;
   start: Point;

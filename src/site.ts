@@ -114,7 +114,7 @@ export function sitesOf(g: Pick<Game, "floors" | "sites">): Site[] {
 }
 
 /** Sites that have a storey on this floor. */
-export function sitesOnFloor(
+function sitesOnFloor(
   g: Pick<Game, "floors" | "sites">,
   floor: number,
 ): Site[] {
@@ -166,12 +166,6 @@ export function stairMarkers(
   }
   return out;
 }
-
-/**
- * Retained for callers that still widen `Game`; the field itself now lives on
- * `Game` in src/model.ts and needs no cast.
- */
-export type GameWithExtraction = Game & { extraction?: ExtractionPoint };
 
 /**
  * Every extraction point in the world, the start building's first: its own

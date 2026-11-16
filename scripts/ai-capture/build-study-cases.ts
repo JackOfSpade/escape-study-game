@@ -23,14 +23,14 @@ import { scopeKey, type ScopeDefinition } from "../../src/learning-model";
 import type { Contract, Game, Problem, Roadmap, Track } from "../../src/model";
 import { createPlayableGame } from "../../src/world";
 
-export type StudyOperation = "generate" | "tutor" | "assess";
+type StudyOperation = "generate" | "tutor" | "assess";
 export type StudyCase = {
   id: string;
   operation: StudyOperation;
   payload: Record<string, unknown>;
 };
-export type StudyCaseBook = Record<StudyOperation, StudyCase[]>;
-export const STUDY_OPERATIONS: StudyOperation[] = [
+type StudyCaseBook = Record<StudyOperation, StudyCase[]>;
+const STUDY_OPERATIONS: StudyOperation[] = [
   "generate",
   "tutor",
   "assess",
@@ -748,7 +748,7 @@ export async function buildStudyCases({
 }
 
 /** Write one case file per operation and merge counts into index.json. */
-export async function writeStudyCases(out: string, perOp = 16) {
+async function writeStudyCases(out: string, perOp = 16) {
   const book = await buildStudyCases({ perOp });
   const target = resolve(out);
   mkdirSync(target, { recursive: true, mode: 0o700 });

@@ -29,7 +29,7 @@ function upMarkerOf(g: Game, z: Zombie): StairMarker | undefined {
   }
   return best;
 }
-export type StairArrival =
+type StairArrival =
   | { kind: "wait" | "cancel" }
   | { kind: "arrive"; floor: number; position: Point }
   | { kind: "furniture"; floor: number; position: Point; object: Furniture }

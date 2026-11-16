@@ -6,7 +6,7 @@ import { floorSectors, inRect, type Rect } from "./floor-plan";
  * and navigation see jagged cells, while the renderers draw one smooth wall
  * across them. Everything here is integer or plain arithmetic (no engine
  * trigonometry), so plans and validation are identical on every engine. */
-export type CornerStyle = "chamfered" | "rounded" | "octagon";
+type CornerStyle = "chamfered" | "rounded" | "octagon";
 export interface CarvedCorner {
   /** The corner cell itself (the outermost cell of the open room corner). */
   x: number;
@@ -24,7 +24,7 @@ export interface CarvedCorner {
 }
 
 /** Carved cells per row away from the wall, a non-increasing staircase. */
-export function cornerRows(style: CornerStyle, size: number): number[] {
+function cornerRows(style: CornerStyle, size: number): number[] {
   const rows: number[] = [];
   for (let v = 0; v < size; v++) {
     let n = 0;
@@ -105,7 +105,7 @@ export function carvedCells(f: Pick<Floor, "generation">): Point[] {
 const clamp = (v: number, lo: number, hi: number) =>
   Math.max(lo, Math.min(hi, v));
 /** Staircase size wanted for a rectangle of the given shorter side. */
-export function cornerSize(
+function cornerSize(
   style: CornerStyle,
   shorter: number,
   subRoom: boolean,

@@ -143,7 +143,7 @@ export const SUSPICIOUS_ACTIONS = [
   "unlock",
 ] as const;
 
-export type SuspiciousAction = (typeof SUSPICIOUS_ACTIONS)[number];
+type SuspiciousAction = (typeof SUSPICIOUS_ACTIONS)[number];
 
 const ENGINEER_ROLE = /\b(?:engineer|technician|mechanic)\b/i;
 const SCIENTIST_ROLE = /\b(?:scientist|researcher|doctor)\b/i;
@@ -175,7 +175,7 @@ export function actionPlausibility(playerRole: string, action: string): number {
   return action === "take" ? 0.3 : 0.1;
 }
 
-export type SuspicionResponse =
+type SuspicionResponse =
   "ignore" | "question" | "watch" | "report" | "intervene" | "detain";
 
 /**
@@ -432,7 +432,7 @@ export function chooseNextSpeaker(
 
 export type LeadGoal = Extract<SocialGoal, { kind: "lead" }>;
 
-export type LeadEvent = "lost-player" | "found-player" | "gave-up";
+type LeadEvent = "lost-player" | "found-player" | "gave-up";
 
 /**
  * Lead check-back state machine. A check happens only at `nextCheck`; a

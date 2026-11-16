@@ -26,7 +26,7 @@ export interface CityApproachState {
   recoveryWaypoint?: number;
   recoveryRetryAt?: number;
 }
-export interface CityApproachTarget {
+interface CityApproachTarget {
   point: Point;
   speed: number;
   finalDoor: boolean;

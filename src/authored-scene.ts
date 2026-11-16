@@ -36,11 +36,11 @@ import {
   furnitureSurfaceHeight,
 } from "./view3d/furniture-height";
 
-export interface ResolvedSceneRoom extends Omit<SceneRoomDesign, "furniture"> {
+interface ResolvedSceneRoom extends Omit<SceneRoomDesign, "furniture"> {
   /** Wall face normal points into this room; visual center is 1.65m high. */
   plaque: Point & { nx: number; ny: number };
 }
-export interface ResolvedSceneFurniture {
+interface ResolvedSceneFurniture {
   id: string;
   designId: string;
   room: number;

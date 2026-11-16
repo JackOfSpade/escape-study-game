@@ -72,7 +72,7 @@ export function panelIsLit(
   );
 }
 
-export interface LimbPose {
+interface LimbPose {
   x: number;
   y: number;
   rotation: number;

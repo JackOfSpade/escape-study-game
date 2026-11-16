@@ -242,8 +242,7 @@ export const NPC_VOICE_GROUPS = Object.freeze({
     "poised",
   ] as const),
 });
-export type NpcVoiceSlot = (typeof NPC_VOICE_SLOTS)[number];
-export type NpcVoiceGender = keyof typeof NPC_VOICE_GROUPS;
+type NpcVoiceSlot = (typeof NPC_VOICE_SLOTS)[number];
 /** 32-bit FNV-1a over the run/actor seed, independent of locale and host. */
 function npcVoiceSeed(runId: string, actorId: string) {
   let hash = 0x811c9dc5;
@@ -1221,10 +1220,6 @@ export class NpcVoiceDirector {
 }
 
 let playerVoiceDirector: NpcVoiceDirector | undefined;
-/** The most recent director; main.ts keeps its instance for the player chat. */
-export function setPlayerVoiceDirector(director: NpcVoiceDirector | undefined) {
-  playerVoiceDirector = director;
-}
 /** Speak a player line through the live director (escape games only). */
 export function speakAsPlayer(game: Game, text: string, yaw: number) {
   return playerVoiceDirector?.speakAsPlayer(game, text, yaw) ?? false;

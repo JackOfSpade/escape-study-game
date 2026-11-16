@@ -15,9 +15,9 @@ export const CATASTROPHE_HISTORY_KEY = "dead-air-catastrophe-history-v1";
 /** How many catastrophes are kept and sent as `recent`. */
 export const CATASTROPHE_HISTORY_LIMIT = 8;
 /** A new answer whose signature matches one of this many is asked for again. */
-export const CATASTROPHE_REPEAT_WINDOW = 3;
+const CATASTROPHE_REPEAT_WINDOW = 3;
 
-export interface CatastropheSummary {
+interface CatastropheSummary {
   title: string;
   /** Behaviour kinds, sorted; a kind appears once per behaviour. */
   kinds: BehaviourKind[];

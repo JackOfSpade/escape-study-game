@@ -20,7 +20,7 @@ import { npcVoiceKey } from "./voice-key";
 import type { SavedRunDesign } from "./run-design-contract.mjs";
 
 /** Builds an area's own `Game` from its seed. Registered by `src/main.ts`. */
-export type AreaFactory = (seed: number) => Game;
+type AreaFactory = (seed: number) => Game;
 
 /** One AI request, resolved with the answer or rejected. */
 type AreaRequest = (operation: string, payload: unknown) => unknown;
@@ -37,13 +37,13 @@ export function setAreaFactory(fn: AreaFactory): void {
 }
 
 /** Designs one area's own venue-specific building. Registered by `src/main.ts`. */
-export type AreaDesigner = (
+type AreaDesigner = (
   stub: AreaStub,
   signal: AbortSignal,
 ) => Promise<SavedRunDesign>;
 
 /** Builds a fresh area game from an accepted design. Registered by `src/main.ts`. */
-export type DesignedAreaFactory = (seed: number, saved: SavedRunDesign) => Game;
+type DesignedAreaFactory = (seed: number, saved: SavedRunDesign) => Game;
 
 let areaDesigner: AreaDesigner | undefined;
 let designedAreaFactory: DesignedAreaFactory | undefined;
@@ -393,7 +393,7 @@ function parkSource(source: Game, escape: EscapeState, areaId: string): void {
 
 /** The plot a site is assumed to need: 44 x 34 tiles. */
 export const SITE_WIDTH = 44;
-export const SITE_HEIGHT = 34;
+const SITE_HEIGHT = 34;
 
 /** Every site stub: a place the player can walk to. */
 function siteStubs(g: Game): AreaStub[] {

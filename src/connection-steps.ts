@@ -1,6 +1,6 @@
 import type { BridgeStatus } from "./bridge-client";
 
-export interface ConnectionStep {
+interface ConnectionStep {
   text: string;
   command?: string;
 }

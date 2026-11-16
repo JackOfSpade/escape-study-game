@@ -3,10 +3,10 @@ import type { KnowledgeGapRecord } from "./knowledge-probe";
 import type { LearningEvidence } from "./learning-model";
 import type { Roadmap, StudyState, Track } from "./model";
 
-export type StudyCheckpointStatus =
+type StudyCheckpointStatus =
   "verified" | "gap" | "unassessed" | "partial" | "recheck";
 
-export interface StudyCheckpoint {
+interface StudyCheckpoint {
   id: string;
   /** The curriculum wording; no generated claim about the learner's ability. */
   scope: string;

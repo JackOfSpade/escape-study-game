@@ -13,7 +13,7 @@ export interface ListenerLook {
   yaw: number;
   pitch?: number;
 }
-export interface AudioPose {
+interface AudioPose {
   x: number;
   y: number;
   z: number;

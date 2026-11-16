@@ -26,10 +26,10 @@ import { canSee, sightRadius } from "./visibility";
 import { observableSceneDetails } from "./scene-observations";
 import { NPC_DIALOGUE_GENERATION_INSTRUCTION } from "../scripts/lib/npc-dialogue-policy.mjs";
 
-export const NPC_CHATTER_RANGE = 10;
+const NPC_CHATTER_RANGE = 10;
 export const NPC_CHATTER_CONTEXT_SECONDS = 120;
 export type NpcChatterDelivery = "calm" | "urgent" | "whisper" | "relieved";
-export type NpcChatterThreatBand =
+type NpcChatterThreatBand =
   "clear" | "watchful" | "nearby" | "immediate";
 type HealthBand = "healthy" | "hurt" | "critical";
 export interface NpcChatterRecentLine {
@@ -60,7 +60,7 @@ export interface NpcChatterConversation {
     distance: number;
   };
 }
-export interface NpcChatterConversationIntent {
+interface NpcChatterConversationIntent {
   intent: "invite" | "continue" | "close";
   replyTo?: string;
 }
@@ -70,7 +70,7 @@ export interface NpcChatterConversationIntent {
 export function npcSpeechFactId(line: NpcChatterRecentLine) {
   return `speech:${line.id ?? `${line.actorId}:${Math.round(line.at * 30)}`}`;
 }
-export interface NpcDialogueFact {
+interface NpcDialogueFact {
   id: string;
   kind:
     | "setting"

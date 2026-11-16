@@ -18,7 +18,7 @@ const CORPUS = fileURLToPath(
 );
 const LIMITS = { bytes: 2_000_000, cases: 64, examples: 256, rows: 256 };
 
-export interface RealismExample {
+interface RealismExample {
   id: string;
   decision: "speak" | "silence";
   text: string;
@@ -30,7 +30,7 @@ export interface RealismExample {
     replyTo?: string;
   };
 }
-export interface RealismCase {
+interface RealismCase {
   id: string;
   title: string;
   situation: string;
@@ -76,7 +76,7 @@ export interface RealismTask {
   rubric: string[];
   unknowns: string[];
 }
-export interface ResultProvenance {
+interface ResultProvenance {
   kind: "scripted" | "human" | "model";
   name: string;
   runId?: string;
@@ -518,7 +518,7 @@ export async function evaluateNpcDialogueRealism(
   };
 }
 
-export async function runNpcDialogueRealismCli(args: string[]) {
+async function runNpcDialogueRealismCli(args: string[]) {
   const options = new Map<string, string>();
   for (let i = 0; i < args.length; i++) {
     const name = args[i];

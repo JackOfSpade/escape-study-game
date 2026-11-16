@@ -48,7 +48,7 @@ import {
 import type { InteriorLightmap } from "./interior-lightmap";
 
 type Shape = "box" | "cylinder" | "cone" | "sphere";
-export interface PropPart {
+interface PropPart {
   shape: Shape;
   x: number;
   y: number;

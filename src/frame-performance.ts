@@ -1,4 +1,4 @@
-export interface FrameWork {
+interface FrameWork {
   simulationMs: number;
   renderMs: number;
   /** Whole frame callback work, including persist and UI time. */

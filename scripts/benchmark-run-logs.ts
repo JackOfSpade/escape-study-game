@@ -11,7 +11,7 @@ import { performance } from "node:perf_hooks";
 import { LOG_LIMITS, RunLogs } from "../src/run-logs";
 import type { Game } from "../src/model";
 
-export interface LegacyEntry {
+interface LegacyEntry {
   at: number;
   type: string;
   data: unknown;
@@ -132,7 +132,7 @@ export function syntheticGame(id: string, seed: number): LogGame {
 }
 
 /** Synthetic snapshot-sized payload (20 actors) with escaping and multibyte text. */
-export function syntheticSnapshot(rand: () => number, n: number) {
+function syntheticSnapshot(rand: () => number, n: number) {
   return {
     status: "playing",
     paused: false,

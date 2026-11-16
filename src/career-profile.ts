@@ -9,11 +9,11 @@ import { reconcileGates, restoreFullQueues } from "./learner";
  * objective targets/cells, ledger evidence and reviews are never changed.
  */
 export type CareerFocus = "product-feature-owner" | "full";
-export type CareerPriority = "core" | "reference" | "optional";
+type CareerPriority = "core" | "reference" | "optional";
 type Focusable = { careerFocus?: CareerFocus };
 
-export const ROLE_MAX_PE_DEPTH = 3;
-export const CAREER_FOCUS_LABELS: Record<CareerFocus, string> = {
+const ROLE_MAX_PE_DEPTH = 3;
+const CAREER_FOCUS_LABELS: Record<CareerFocus, string> = {
   "product-feature-owner": "Product feature owner (role profile)",
   full: "Full curriculum",
 };

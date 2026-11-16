@@ -1,7 +1,7 @@
 import { type Actor, type Game, type Point } from "./model";
 import { walkSegment } from "./navigation";
 
-export interface TrafficBody extends Point {
+interface TrafficBody extends Point {
   id: string;
   velocity: Point;
 }

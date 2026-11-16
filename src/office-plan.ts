@@ -25,12 +25,12 @@ import {
 
 /** Version 5 office floor plans: six chain sectors of varied shape between
  * the rear entry and the front stairs. See docs/FLOOR_PLAN_DESIGN.md. */
-export type PlanFamily = "stack" | "columns" | "serpentine";
+type PlanFamily = "stack" | "columns" | "serpentine";
 const int = between;
 
 /** Interior cell labels while planning: -2 outside the bounding box, -1 wall
  * (or outside the shell inside the box), 0..5 the sector order. */
-export interface PlanGrid {
+interface PlanGrid {
   lab: Int8Array;
   X0: number;
   X1: number;
@@ -38,7 +38,7 @@ export interface PlanGrid {
   bottom: number;
   inside: (x: number, y: number) => boolean;
 }
-export function planGrid(f: Floor): PlanGrid {
+function planGrid(f: Floor): PlanGrid {
   const b = f.boundary!;
   const rows = b.rows.slice(b.top, b.bottom);
   const X0 = Math.min(...rows.map((r) => r.left)),
@@ -56,7 +56,7 @@ export function planGrid(f: Floor): PlanGrid {
       y >= b.top && y < b.bottom && x >= b.rows[y].left && x < b.rows[y].right,
   };
 }
-export const labelAt = (p: PlanGrid, x: number, y: number) =>
+const labelAt = (p: PlanGrid, x: number, y: number) =>
   x < 0 || y < 0 || x >= W || y >= H ? -2 : p.lab[y * W + x];
 
 /** Lobby rectangles and the per-column wall rows around them. */
@@ -311,7 +311,7 @@ function mergeOrders(p: PlanGrid, a: number, b: number) {
   }
 }
 
-export interface PlanGate {
+interface PlanGate {
   x: number;
   y: number;
   w: number;
@@ -358,7 +358,7 @@ function gateCandidates(p: PlanGrid, a: number, b: number): PlanGate[] {
   return out;
 }
 /** The sector cell directly in front of a gate's middle cell. */
-export function gateFront(p: PlanGrid, gate: PlanGate, order: number): Point {
+function gateFront(p: PlanGrid, gate: PlanGate, order: number): Point {
   const [mx, my] = gate.cells[1];
   for (const s of [-1, 1]) {
     const x = gate.w === 1 ? mx + s : mx,
@@ -383,7 +383,7 @@ export interface Plan {
   ring: Uint8Array;
   door: Uint8Array;
 }
-export const isWide = (tiles: number[][], x: number, y: number) => {
+const isWide = (tiles: number[][], x: number, y: number) => {
   const open = (cx: number, cy: number) => tiles[cy]?.[cx] === 0;
   if (!open(x, y)) return false;
   for (const dx of [-1, 0])
@@ -437,7 +437,7 @@ function sectorWide(plan: Plan, order: number, extra: Point[] = []) {
   ];
   return targets.every((t) => seen[t.y * W + t.x]);
 }
-export const cellsOf = (r: Rect) => {
+const cellsOf = (r: Rect) => {
   const out: Point[] = [];
   for (let y = r.y1; y <= r.y2; y++)
     for (let x = r.x1; x <= r.x2; x++) out.push({ x, y });

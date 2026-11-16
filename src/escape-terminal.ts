@@ -17,7 +17,7 @@ import { logEvent } from "./escape-log";
  * No imports from question-thread: completeSegment is the caller, so this file
  * stays free of that cycle.
  */
-export type EscapeDecision = "continue" | "next-question" | "close";
+type EscapeDecision = "continue" | "next-question" | "close";
 
 /** The escape task whose station this is, while it can still be worked. */
 export function taskAtStation(

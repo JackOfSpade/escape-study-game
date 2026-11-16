@@ -13,12 +13,12 @@ import {
 /** Deck slabs and treads are 20 cm thick; flights rise in twenty treads. */
 export const DECK_THICKNESS = 0.2;
 export const DECK_WIDTH = STAIR_ROUTE_WIDTH + 0.12;
-export const FLIGHT_STEPS = 20;
+const FLIGHT_STEPS = 20;
 /** Glass guards stand at this lateral offset from the walking line. */
-export const GUARD_OFFSET = 0.81;
+const GUARD_OFFSET = 0.81;
 /** Top of the handrail above the deck surface at the guard. */
 export const GUARD_HEIGHT = 1.17;
-export const LANDING_SIZE = 1.9;
+const LANDING_SIZE = 1.9;
 export const COLUMN_SIZE = 0.2;
 
 /** An oriented walking slab: a level deck, a corner landing or a flight. */
@@ -45,7 +45,7 @@ export interface Slab {
 }
 
 /** One guard bay between two posts; `broken` bays have lost glass and rail. */
-export interface GuardBay {
+interface GuardBay {
   x1: number;
   y1: number;
   x2: number;
@@ -59,7 +59,7 @@ export interface GuardBay {
   level: number;
 }
 
-export interface Column extends Point {
+interface Column extends Point {
   top: number;
 }
 
@@ -371,7 +371,7 @@ function openingGuards(core: FloorCore, level: number, guards: GuardBay[]) {
 }
 
 /** Horizontal centre of a site's footprint: (min left + max right) / 2. */
-export function footprintCentreX(b?: BuildingFootprint) {
+function footprintCentreX(b?: BuildingFootprint) {
   let left = Infinity,
     right = -Infinity;
   for (const row of b?.rows ?? [])

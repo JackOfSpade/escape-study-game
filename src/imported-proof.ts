@@ -187,7 +187,7 @@ export function importedProofValid(
 }
 export const adoptedSourceText = (l?: LearnerLedger) =>
   l?.roadmapAdoptions?.at(-1)?.proposal.canonical;
-export const adoptedTrackProgress = (
+const adoptedTrackProgress = (
   l: LearnerLedger | undefined,
   track: Track,
 ) =>

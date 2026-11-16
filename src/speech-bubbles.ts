@@ -1,6 +1,6 @@
 import type { Game } from "./model";
 
-export interface NpcSpeechBubble {
+interface NpcSpeechBubble {
   id: string;
   actorId: string;
   text: string;

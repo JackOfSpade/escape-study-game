@@ -9,7 +9,7 @@ export function sightRadius(f: Floor) {
   return f.dark > 0.8 ? VISION.dark : f.dark > 0.3 ? VISION.dim : VISION.lit;
 }
 /** Streets have real long sight lines; indoor room visibility remains local. */
-export function playerSightRadius(f: Floor, origin: Point) {
+function playerSightRadius(f: Floor, origin: Point) {
   if (!f.city || cityWall(f, origin.x, origin.y) !== false)
     return sightRadius(f);
   return Math.max(64, ...f.city.approaches.map((route) => route.length + 24));

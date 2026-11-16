@@ -232,8 +232,3 @@ export function doorSideOf(o: Furniture, p: Point): -1 | 1 {
   if (vertical) return p.x <= frame.x ? 1 : -1;
   return p.y >= frame.y ? 1 : -1;
 }
-
-/** A locked door refuses its locked face; the other face may unlock it. */
-export function doorBlocksFrom(o: Furniture, p: Point) {
-  return !!o.lock && doorSideOf(o, p) === o.lock.side;
-}

@@ -15,7 +15,7 @@ import {
 const HORDE_SOURCE_LEVEL = 0.1;
 /** Sources beyond the shared mixer's audible range are never captured. */
 const HORDE_RANGE = 24;
-export interface SoundCue {
+interface SoundCue {
   frequency: number;
   duration: number;
   gain: number;

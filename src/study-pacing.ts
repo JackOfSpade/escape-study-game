@@ -4,7 +4,7 @@ import { FIELD_PACING, initializeFieldPacing } from "./field-pacing";
 
 /** Fresh playable runs give the learner a calm opening, bounded field durability
  * and slower world tempo. Movement and combat speeds stay responsive. */
-export interface PacingProfile {
+interface PacingProfile {
   zombieGraceSeconds: number;
   swarmInterval: number;
   swarmBatch: number;
@@ -26,7 +26,7 @@ export const STUDY_PACING: Readonly<PacingProfile> = Object.freeze({
 
 /** Historical timing. Evaluated lazily so module import cycles through
  * force-fields/engine never observe an uninitialised SWARM binding. */
-export function legacyPacing(): PacingProfile {
+function legacyPacing(): PacingProfile {
   return {
     zombieGraceSeconds: CONFIG.spawnGraceSeconds,
     swarmInterval: SWARM.interval,

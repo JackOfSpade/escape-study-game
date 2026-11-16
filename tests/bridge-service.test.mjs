@@ -52,7 +52,12 @@ async function fixture() {
     options,
     api,
     async close() {
-      await stopBridge(options);
+      // Under a loaded suite the one-second acknowledgement window can lapse.
+      // Stopping is idempotent, so teardown asks once more before failing.
+      await stopBridge(options).catch((error) => {
+        if (!/not acknowledged/.test(error.message)) throw error;
+        return stopBridge(options);
+      });
       rmSync(root, { recursive: true, force: true });
     },
   };

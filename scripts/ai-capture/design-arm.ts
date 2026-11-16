@@ -44,7 +44,7 @@ import { newDesignDraft, prepareDesignedRun } from "../../src/run-designer";
 import { finalizeDesignedRun, previewDesignedRun } from "../../src/world";
 
 /** The one row a CLI invocation writes before its retry or correction. */
-export interface UsageRow {
+interface UsageRow {
   v?: number;
   attempt?: number | null;
   at?: string;
@@ -59,7 +59,7 @@ export interface UsageRow {
   outcome?: string;
 }
 
-export interface DesignGateway {
+interface DesignGateway {
   run(
     operation: string,
     payload: unknown,
@@ -76,7 +76,7 @@ export type DesignGatewayFactory = (
 ) => DesignGateway;
 
 /** The judge reads `results.jsonl`, which the ladder also writes. */
-export interface DesignRow {
+interface DesignRow {
   v: 1;
   at: string;
   caseId: string;
@@ -94,12 +94,12 @@ export interface DesignRow {
   model: string[];
 }
 
-export const designCaseId = (seed: number, placeTag?: string) =>
+const designCaseId = (seed: number, placeTag?: string) =>
   placeTag ? `design-seed-${seed}-place-${placeTag}` : `design-seed-${seed}`;
 
 /** One exact place the pipeline must design, as the area designer asks for it.
  * `tag` is a lowercase slug so case ids and files stay stable and readable. */
-export interface DesignPlace {
+interface DesignPlace {
   tag: string;
   name: string;
   brief: string;
@@ -112,7 +112,7 @@ const placeText = (value: unknown) =>
   typeof value === "string" ? value.trim() : "";
 
 /** Validates a caller's place before any case id, case file or gateway uses it. */
-export function parsePlace(value: unknown): DesignPlace | undefined {
+function parsePlace(value: unknown): DesignPlace | undefined {
   if (value === undefined || value === null) return undefined;
   if (typeof value !== "object" || Array.isArray(value))
     throw Error("A place must be an object with {tag, name, brief}");
@@ -149,7 +149,7 @@ const failedOutcome = (error: unknown) =>
 
 /** Builds the judge-compatible row from one pipeline run. A run that threw has
  * no answer, but keeps whatever usage rows the gateway already recorded. */
-export function designRow({
+function designRow({
   at,
   seed,
   setting,
@@ -202,7 +202,7 @@ const roadmap: Roadmap = JSON.parse(
 
 export const CASES_FILE = "cases-design.json";
 
-export interface DesignCase {
+interface DesignCase {
   id: string;
   operation: "design-run";
   payload: {
@@ -214,7 +214,7 @@ export interface DesignCase {
 
 /** The judge needs a case per seed and place; ids merge so a resumed run never
  * loses one, and a place case records exactly what was asked for. */
-export function writeDesignCases(
+function writeDesignCases(
   out: string,
   seeds: number[],
   place?: DesignPlace,
@@ -249,7 +249,7 @@ export function writeDesignCases(
   });
 }
 
-export interface DesignArmInput {
+interface DesignArmInput {
   /** `model:effort`; every stage of the arm uses exactly this setting. */
   setting: string;
   seed: number;
@@ -358,7 +358,7 @@ export async function runDesignArm({
   return { skipped: false, row };
 }
 
-export function parseSeeds(value: unknown): number[] {
+function parseSeeds(value: unknown): number[] {
   const list = (Array.isArray(value) ? value : String(value ?? "").split(","))
     .map((entry) => String(entry).trim())
     .filter(Boolean)
@@ -371,7 +371,7 @@ export function parseSeeds(value: unknown): number[] {
   return [...new Set(list)];
 }
 
-export interface DesignSeedsInput extends Omit<
+interface DesignSeedsInput extends Omit<
   DesignArmInput,
   "setting" | "seed"
 > {

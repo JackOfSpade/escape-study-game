@@ -19,7 +19,7 @@ export interface DoorTraffic {
   target: Point;
   arrival: boolean;
 }
-export interface DoorMotion {
+interface DoorMotion {
   point: Point;
   forwardLimit: number;
   steer: boolean;

@@ -57,7 +57,7 @@ export type GenerateCase = {
   payload: Record<string, unknown>;
 };
 
-export type DownstreamCaseBook = {
+type DownstreamCaseBook = {
   tutor: StudyCase[];
   assess: StudyCase[];
   skipped: string[];
@@ -67,7 +67,7 @@ const topicOf = (id: string | undefined) =>
   id?.split(":")[1]?.split(".")[0] ?? "";
 
 /** The last answer of a valid generate row at exactly this arm and rep. */
-export function validAnswer(
+function validAnswer(
   rows: LadderRow[],
   caseId: string,
   setting: string,
@@ -109,7 +109,7 @@ export function problemFrom(answer: unknown): Problem {
  * them, except that the problem is the generated one. The scenario and seed
  * follow the generate case's index, so an arm's cases stay reproducible.
  */
-export function encounterForProblem(
+function encounterForProblem(
   r: Roadmap,
   index: number,
   problem: Problem,
@@ -204,7 +204,7 @@ async function captureAssess(
   return captured;
 }
 
-export type BuildDownstreamOptions = {
+type BuildDownstreamOptions = {
   rows: LadderRow[];
   generateCases: GenerateCase[];
   setting: string;
@@ -253,7 +253,7 @@ export async function buildDownstreamCases({
 }
 
 /** Write tutor.json and assess.json with the same permissions as study cases. */
-export async function writeDownstreamCases(
+async function writeDownstreamCases(
   out: string,
   options: BuildDownstreamOptions,
 ) {

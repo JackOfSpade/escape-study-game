@@ -4,25 +4,25 @@ export interface Counts {
   passed: number;
   total: number;
 }
-export interface TopicState extends Counts {
+interface TopicState extends Counts {
   status: string;
 }
 export interface MapSnapshot {
   tiers: Record<string, Counts>;
   topics: Record<string, TopicState>;
 }
-export interface TopicChange {
+interface TopicChange {
   key: string;
   from: TopicState;
   to: TopicState;
   completed: boolean;
 }
-export interface TierChange {
+interface TierChange {
   tier: string;
   from: Counts;
   to: Counts;
 }
-export interface ProgressDelta {
+interface ProgressDelta {
   gained: number;
   lost: number;
   topics: TopicChange[];

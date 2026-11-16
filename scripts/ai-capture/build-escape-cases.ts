@@ -50,12 +50,12 @@ export const OPERATIONS = [
 ] as const;
 export type Operation = (typeof OPERATIONS)[number];
 
-export interface EscapeCaptureCase {
+interface EscapeCaptureCase {
   id: string;
   operation: Operation;
   payload: Record<string, unknown>;
 }
-export type EscapeCaseBook = Record<Operation, EscapeCaptureCase[]>;
+type EscapeCaseBook = Record<Operation, EscapeCaptureCase[]>;
 
 /** A case id tags conversation turns so the ladder can apply the reply rule. */
 type TurnTag = "first" | "reply";
@@ -387,7 +387,7 @@ export async function buildEscapeCases({
 type CapturedEntry = { payload: Record<string, unknown>; tag?: TurnTag };
 
 /** Keep first lines and replies balanced when trimming an over-full turn set. */
-export function interleaveTurns(entries: CapturedEntry[]): CapturedEntry[] {
+function interleaveTurns(entries: CapturedEntry[]): CapturedEntry[] {
   const firsts = entries.filter((entry) => entry.tag === "first"),
     replies = entries.filter((entry) => entry.tag === "reply"),
     other = entries.filter((entry) => !entry.tag),
@@ -400,7 +400,7 @@ export function interleaveTurns(entries: CapturedEntry[]): CapturedEntry[] {
 }
 
 /** Write one JSON case array per operation (owner-only files and directory). */
-export async function writeEscapeCases(
+async function writeEscapeCases(
   out: string,
   perOp = 12,
 ): Promise<EscapeCaseBook> {

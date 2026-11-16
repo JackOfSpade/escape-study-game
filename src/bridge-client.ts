@@ -1,6 +1,6 @@
 import { isRecord } from "./records";
 /** Provider transport only; gameplay and learning remain in their owning modules. */
-export type DisconnectReason =
+type DisconnectReason =
   "relay-unreachable" | "gateway-off" | "cli-missing" | "signed-out";
 const REASONS: readonly unknown[] = [
   "relay-unreachable",
@@ -63,7 +63,7 @@ export async function checkBridge() {
   return bridgeStatus;
 }
 /** How long one request waits for the bridge to answer. */
-export const REQUEST_TIMEOUT_MS = 30 * 60_000;
+const REQUEST_TIMEOUT_MS = 30 * 60_000;
 /** Bridge errors may come from a proxy as plain text; never surface a JSON
  * parse failure in place of the real reason. */
 async function readJson(r: Response) {
@@ -102,7 +102,7 @@ async function readStream(r: Response, onText: (text: string) => void) {
     }
   }
 }
-export interface BridgeRequestOptions {
+interface BridgeRequestOptions {
   /** Cancel optional presentation work when its owner is no longer active. */
   signal?: AbortSignal;
   /** Wait budget; bounded to REQUEST_TIMEOUT_MS. */

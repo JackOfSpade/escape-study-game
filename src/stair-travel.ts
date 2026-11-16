@@ -31,13 +31,12 @@ import {
 import {
   insideFootprint,
   startElevated,
-  stepElevated,
   surfaceBelow,
   type ElevatedSurface,
 } from "./elevated-physics";
 
 /** On a carved well, walking this close to the marker completes the flight. */
-export const STAIRWELL_DEEP = STAIRWELL_RADIUS / 2;
+const STAIRWELL_DEEP = STAIRWELL_RADIUS / 2;
 
 export interface StairTravel {
   fromFloor: number;
@@ -559,13 +558,4 @@ export function settleElevated(g: Game, a: Actor, surface?: ElevatedSurface) {
     if (surface.kind === "plate" || g.floors[0].city) delete a.elevated;
     delete a.physics;
   }
-}
-
-/** Walk freely in two dimensions; only visible geometry blocks the body. */
-export function walkStairs(g: Game, a: Actor, input: Point, dt: number) {
-  if (a.stairTravel?.walked === undefined) return false;
-  ensureWalkingBody(g, a);
-  const result = stepElevated(g, a, input, dt);
-  settleElevated(g, a, result.surface);
-  return result;
 }

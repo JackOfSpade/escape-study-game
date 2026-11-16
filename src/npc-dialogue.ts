@@ -19,7 +19,7 @@ export interface NpcDialogueTransport {
     isActive: () => boolean,
   ): Promise<unknown>;
 }
-export interface NpcDialogueControls {
+interface NpcDialogueControls {
   signal: AbortSignal;
   isActive: () => boolean;
   onEvidence?: (request: NpcChatterRequest, ids: readonly string[]) => void;

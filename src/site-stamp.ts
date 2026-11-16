@@ -15,12 +15,11 @@ import {
   START_SITE,
   floorCols,
   floorRows,
-  siteAt,
   sitesOf,
   type Site,
 } from "./site";
 
-export interface StampOptions {
+interface StampOptions {
   id: string;
   name: string;
   origin: Point;
@@ -306,7 +305,7 @@ export const GATE_APRON = 2;
 
 /** The region one person may explore on a floor: its home site's footprint,
  * plus, while it stands outdoors, a short apron outside its own gate. */
-export interface HomeArea {
+interface HomeArea {
   site: Site;
   floor: number;
   /** Footprint bounds in world tiles, for bounded cell searches. */
@@ -348,21 +347,4 @@ export function homeArea(
     outside: !inFootprint(site, a),
     gate: gatePoint(g, site, a.floor),
   };
-}
-
-/** True when a point belongs to the area: inside the home footprint, or in the
- * apron outside its own gate, and never inside another site. */
-export function inHomeArea(
-  g: Pick<Game, "floors" | "sites">,
-  area: HomeArea,
-  p: Point,
-): boolean {
-  const owner = siteAt(g, area.floor, p);
-  if (owner) return owner.id === area.site.id;
-  return (
-    area.outside &&
-    !!area.gate &&
-    Math.abs(p.x - area.gate.x) <= GATE_APRON &&
-    Math.abs(p.y - area.gate.y) <= GATE_APRON
-  );
 }

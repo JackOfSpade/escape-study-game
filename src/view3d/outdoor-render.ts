@@ -18,7 +18,7 @@ import type { CityObstacle, CityPlan } from "../city-layout";
 import type { OutdoorBackdrop, OutdoorEnclosure } from "../outdoor-plan.mjs";
 import type { NeighborStyle } from "./neighbors";
 
-export type OutdoorLayer = "solid" | "glass" | "water";
+type OutdoorLayer = "solid" | "glass" | "water";
 export type OutdoorEmit = (
   geometry: BufferGeometry,
   color: string,

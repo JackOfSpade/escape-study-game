@@ -22,7 +22,7 @@ import { resolveGroundFeatures, resolveRoofFeatures } from "../venue";
 import { PartAnimator, roofFeatureParts } from "./roof-features";
 import { wallMaterialParams, wallTexture } from "./wall-textures";
 
-export interface PerimeterWindow {
+interface PerimeterWindow {
   x: number;
   z: number;
   /** Direction along the window opening. */

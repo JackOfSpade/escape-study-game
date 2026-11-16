@@ -52,7 +52,7 @@ export type DesignDraft =
 const DRAFT_KEY = "dead-air-run-design-draft-v1";
 const HISTORY_KEY = "dead-air-run-design-history-v1";
 const CONTENT_HISTORY_KEY = "dead-air-environment-history-v1";
-export const DESIGN_ATTEMPTS = 3;
+const DESIGN_ATTEMPTS = 3;
 
 export function parseDesignDraft(value: unknown): DesignDraft {
   if ((value as { version?: unknown } | null)?.version === 3)
@@ -104,7 +104,7 @@ export function parseDesignDraft(value: unknown): DesignDraft {
   };
 }
 
-export function recentEnvironment(): EnvironmentSummary[] {
+function recentEnvironment(): EnvironmentSummary[] {
   try {
     return parseEnvironmentSummaries(
       JSON.parse(localStorage.getItem(CONTENT_HISTORY_KEY) ?? "[]"),

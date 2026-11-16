@@ -1,6 +1,6 @@
 import { fnv1a } from "./hash";
 import { type Actor, type Encounter, type Game, event } from "./model";
-export type TechnicalFocus =
+type TechnicalFocus =
   "reasoning" | "implementation" | "testing" | "debugging";
 export interface NpcProfile {
   topics: Record<string, number>;

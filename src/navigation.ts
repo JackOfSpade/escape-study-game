@@ -985,7 +985,7 @@ export function survivorPath(f: Floor, start: Point, end: Point): NavStep[] {
   return survivorPaths(f, start, [end])[0];
 }
 /** Raw route graph for tests: points in build order and every edge. */
-export function routeGraphSnapshot(f: Floor) {
+function routeGraphSnapshot(f: Floor) {
   const g = graph(f);
   return {
     points: g.points.map((p) => ({ ...p })),

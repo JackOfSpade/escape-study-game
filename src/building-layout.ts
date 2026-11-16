@@ -109,7 +109,7 @@ export function buildingRoof(f: Floor) {
 
 /** Ids of stamped extra sites are `${siteId}:`-prefixed, so an id alone tells
  * the start site's own content from a stamped building's. */
-export function stampedId(id: string, sites?: readonly { id: string }[]) {
+function stampedId(id: string, sites?: readonly { id: string }[]) {
   const colon = id.indexOf(":");
   return colon > 0 && !!sites?.some((s) => s.id === id.slice(0, colon));
 }
