@@ -31,7 +31,7 @@ html.study-only body {
   height: var(--view-height);
   overflow: hidden;
   background: var(--bg);
-  padding: 56px 28px;
+  padding: 24px 28px;
 }
 .study-workspace-inner {
   display: flex;
@@ -71,7 +71,7 @@ html.study-only body {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 /* One thing at a time: the skill map with the way into the next question, or
    the open question on its own. Status lines stay visible in both. */
@@ -81,9 +81,6 @@ html.study-only body {
 #study-workspace[data-view="question"] #study-regenerate,
 #study-workspace[data-view="map"] #study-terminal-slot {
   display: none;
-}
-#study-workspace[data-view="question"] {
-  padding-top: 24px;
 }
 #study-workspace[data-view="question"] .study-workspace-toolbar {
   margin-bottom: 12px;
@@ -112,8 +109,24 @@ html.study-only body {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 24px;
-  margin-top: 24px;
+  padding: 16px 20px;
+  margin-top: 16px;
+}
+/* Under the map the session card is one line: heading left, actions right,
+   status lines wrapping beneath. The height it saves goes to the map. */
+#study-workspace[data-view="map"] .study-session {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 20px;
+}
+#study-workspace[data-view="map"] .study-actions {
+  margin-top: 0;
+}
+#study-workspace[data-view="map"] .study-session p {
+  flex: 1 0 100%;
+  margin: 0;
 }
 .study-session p {
   color: var(--muted);
@@ -175,10 +188,7 @@ header[aria-label="Game controls"] {
 }
 @media (max-width: 620px) {
   #study-workspace {
-    padding: 28px 16px;
-  }
-  .study-session {
-    padding: 20px;
+    padding: 16px;
   }
 }
 
@@ -196,16 +206,18 @@ header[aria-label="Game controls"] {
   display: flex;
   flex-direction: column;
   flex: 0 1 auto;
-  min-height: min-content;
+  /* Root card, a 120px strip of topics and the legend; below this the whole
+     map scrolls inside #study-progress instead. */
+  min-height: 330px;
 }
+/* The topic list's row gives up height first, down to 120px. */
 .study-map-tier {
-  display: flex;
-  flex-direction: column;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(120px, auto);
   flex: 0 1 auto;
   padding: 24px 20px 0;
-}
-.study-map-tier > :not(.study-map-scroll) {
-  flex: none;
 }
 .study-map-tier + .study-map-tier {
   border-top: 1px solid var(--line);
@@ -259,14 +271,9 @@ header[aria-label="Game controls"] {
 .study-map-scroll {
   /* Rendering restores scrollTop explicitly; browser anchoring must not undo it. */
   overflow-anchor: none;
-  /* Never shorter than before; on a tall window it takes the room that would
-     otherwise sit empty under the session card. */
-  max-height: max(
-    min(440px, calc(var(--view-height) * 0.52)),
-    calc(var(--view-height) - 590px)
-  );
-  flex: 0 1 auto;
-  min-height: 120px;
+  /* As tall as its topics, up to whatever the viewport has left once the
+     toolbar and the session card are placed; only then does it scroll. */
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-gutter: stable both-edges;
@@ -464,7 +471,7 @@ header[aria-label="Game controls"] {
 }
 @media (max-width: 780px) {
   #study-workspace {
-    padding: 28px 18px;
+    padding: 20px 18px;
   }
   .study-map-tier {
     padding: 20px 14px 0;

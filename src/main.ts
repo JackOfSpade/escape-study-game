@@ -2342,10 +2342,7 @@ function renderTerminal(force = false) {
       ? `Message ${STUDY_APP ? "your tutor" : "Terminal AI"}`
       : "Message",
   );
-  composer.placeholder =
-    STUDY_APP && dialogue
-      ? "Write your answer. Enter sends, Shift+Enter starts a new line."
-      : "";
+  composer.placeholder = "";
   editor.dataset.mode = e.problem?.runtime ? "code" : "text";
   presentProblem(game, e, roadmap);
   setText(
