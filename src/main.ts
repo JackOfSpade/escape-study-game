@@ -824,6 +824,14 @@ const studyWorkspaceView = createStudyWorkspaceView(
 );
 function renderStudyWorkspace() {
   studyWorkspaceView.render();
+  // Offered beside the skill map, for the question that is waiting there.
+  const waiting = workspaceQuestion(game);
+  $("#study-regenerate").hidden = !(
+    STUDY_APP &&
+    !studyStarting &&
+    waiting &&
+    canRegenerate(game, waiting)
+  );
 }
 mountBugReport({
   log: (type, data) => {
@@ -2260,7 +2268,6 @@ function renderTerminal(force = false) {
     return;
   const e = game.encounters[active];
   const locked = connectionLocked(e);
-  $("#regenerate-question").hidden = !(STUDY_APP && canRegenerate(game, e));
   $("#terminal-connect").hidden = !locked;
   $("#terminal-body").hidden = locked;
   if (locked) {
@@ -2837,9 +2844,9 @@ $("#work-log").ontoggle = () => {
   }
 };
 $("#leave").onclick = leaveTerminal;
-$("#regenerate-question").onclick = () => {
-  const e = active ? game.encounters[active] : undefined;
-  if (!e || !canRegenerate(game, e)) return;
+$("#study-regenerate").onclick = () => {
+  const e = workspaceQuestion(game);
+  if (!e || studyStarting || !canRegenerate(game, e)) return;
   if (
     e.tutor.some((m) => m.kind === "human") &&
     !confirm(
@@ -2850,8 +2857,14 @@ $("#regenerate-question").onclick = () => {
   const title = e.problem?.title;
   if (!regenerateQuestion(game, e, roadmap)) return;
   runLogs.record(game, "question-regenerated", { encounter: e.id, title });
-  renderTerminal(true);
-  void prepareQuestion(e).finally(() => void persist());
+  // The new question opens as it is written, as a started one does.
+  openStudyTerminal(e);
+  renderStudyWorkspace();
+  renderStudyStatus();
+  void prepareQuestion(e).finally(() => {
+    renderStudyWorkspace();
+    void persist();
+  });
   void persist();
 };
 $("#save-button").onclick = async () => {

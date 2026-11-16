@@ -603,16 +603,6 @@ body.spectating .inventory {
   border-bottom: 1px solid var(--line);
   gap: 10px;
 }
-.terminal-heading-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 10px;
-}
-/* The app-only rule would otherwise show a button the page has hidden. */
-#regenerate-question[hidden] {
-  display: none;
-}
 .terminal-heading h2 {
   font-size: 19px;
   margin-bottom: 0;
