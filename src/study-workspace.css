@@ -17,6 +17,7 @@ html.study-only body {
   --accent: #8bb8f2;
   --terminal: #8bb8f2;
   --study-inset: #141b25;
+  --editor: #141b25;
   --study-success: #8cd1aa;
 }
 #study-workspace {
@@ -217,7 +218,12 @@ header[aria-label="Game controls"] {
 .study-map-scroll {
   /* Rendering restores scrollTop explicitly; browser anchoring must not undo it. */
   overflow-anchor: none;
-  max-height: min(440px, calc(var(--view-height) * 0.52));
+  /* Never shorter than before; on a tall window it takes the room that would
+     otherwise sit empty under the session card. */
+  max-height: max(
+    min(440px, calc(var(--view-height) * 0.52)),
+    calc(var(--view-height) - 590px)
+  );
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-gutter: stable both-edges;
@@ -713,5 +719,127 @@ header[aria-label="Game controls"] {
   .study-reveal-layer,
   .study-reveal-particle {
     display: none;
+  }
+}
+
+/* The open question. The page scrolls as one document: the question is never
+   boxed into a short pane of its own, and the answer column follows the reader
+   down a long question. */
+#study-terminal-slot #terminal {
+  overflow-x: clip;
+  overflow-y: visible;
+}
+#study-terminal-slot #terminal-body {
+  overflow: visible;
+  padding: 24px;
+}
+#study-terminal-slot .terminal-heading {
+  padding: 20px 24px;
+}
+#study-terminal-slot .terminal-heading .eyebrow {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+}
+#study-terminal-slot #problem {
+  max-height: none;
+  overflow: visible;
+  margin-bottom: 0;
+  font-size: 15px;
+  line-height: 1.7;
+}
+#study-terminal-slot #problem p,
+#study-terminal-slot #problem ul,
+#study-terminal-slot #problem ol {
+  margin-bottom: 12px;
+}
+#study-terminal-slot #problem li + li {
+  margin-top: 6px;
+}
+#study-terminal-slot #problem pre,
+#study-terminal-slot .message-body pre {
+  margin: 10px 0 14px;
+  padding: 12px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+#study-terminal-slot #problem > :last-child,
+#study-terminal-slot .message-body > :last-child {
+  margin-bottom: 0;
+}
+/* The answer column is only as tall as its conversation, so the composer sits
+   directly under the heading until there is something to scroll. */
+#study-terminal-slot .conversation-panel {
+  top: 16px;
+  height: auto;
+  min-height: 0;
+  max-height: calc(var(--view-height) - 32px);
+}
+#study-terminal-slot .conversation-panel h3 {
+  margin-bottom: 12px;
+}
+#study-terminal-slot #messages {
+  flex: 0 1 auto;
+  min-height: 0;
+  padding: 0 4px 0 0;
+}
+#study-terminal-slot #messages:empty {
+  display: none;
+}
+#study-terminal-slot .message {
+  padding: 12px 14px;
+  border-radius: 8px;
+}
+#study-terminal-slot .message.human {
+  background: color-mix(in srgb, var(--accent) 9%, var(--study-inset));
+}
+#study-terminal-slot .message strong {
+  font-size: 11px;
+  letter-spacing: 0.4px;
+}
+#study-terminal-slot .message p,
+#study-terminal-slot .message-body {
+  font-size: 14px;
+  line-height: 1.6;
+}
+#study-terminal-slot #dialogue-status {
+  margin: 0 0 12px;
+}
+#study-terminal-slot #tutor-request-status p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+#study-terminal-slot #chat-form {
+  flex: none;
+  margin-top: 0;
+  padding: 0;
+  border: 0;
+}
+#study-terminal-slot #messages:not(:empty) ~ #chat-form {
+  margin-top: 12px;
+}
+#study-terminal-slot #chat-input {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--study-inset);
+  font-size: 14px;
+}
+@media (max-width: 760px) {
+  #study-terminal-slot #terminal-body {
+    padding: 16px;
+  }
+  #study-terminal-slot .terminal-heading {
+    padding: 16px;
+  }
+  /* Stacked: the divider runs across, and the page does the scrolling. */
+  #study-terminal-slot .conversation-panel {
+    position: static;
+    max-height: none;
+    padding: 20px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--line);
   }
 }

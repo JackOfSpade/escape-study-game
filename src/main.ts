@@ -757,6 +757,9 @@ $("#pause-menu").addEventListener("cancel", (event) => {
 const STUDY_APP = import.meta.env.VITE_ARCHIVED_GAME !== "1";
 /** What the question's conversation partner is called. */
 const TUTOR = STUDY_APP ? "Tutor" : "Terminal AI";
+/** Saved replies carry the game's speaker name; the workspace has no terminal. */
+const speakerLabel = (author: string) =>
+  STUDY_APP && author === "Terminal AI" ? TUTOR : author;
 document.documentElement.classList.toggle("study-app", STUDY_APP);
 function setStudyMode(enabled: boolean) {
   if (saveRecoveryError) return;
@@ -2339,6 +2342,10 @@ function renderTerminal(force = false) {
       ? `Message ${STUDY_APP ? "your tutor" : "Terminal AI"}`
       : "Message",
   );
+  composer.placeholder =
+    STUDY_APP && dialogue
+      ? "Write your answer. Enter sends, Shift+Enter starts a new line."
+      : "";
   editor.dataset.mode = e.problem?.runtime ? "code" : "text";
   presentProblem(game, e, roadmap);
   setText(
@@ -2654,7 +2661,9 @@ function renderTerminal(force = false) {
         (j) =>
           `<p>${
             j.state === "pending"
-              ? "Waiting for a reply. Survival continues."
+              ? STUDY_APP
+                ? "Waiting for a reply."
+                : "Waiting for a reply. Survival continues."
               : escape(j.error ?? "Saved question interrupted.")
           }${j.state === "interrupted" ? `<button class="quiet" data-question-retry="${escape(j.id)}" data-channel="${tab}">Retry saved ${tab === "tutor" ? "private" : "group"} question</button>` : ""}</p>`,
       )
@@ -2686,7 +2695,7 @@ function renderTerminal(force = false) {
         v.messages
           .map(
             (m) =>
-              `<div class="message ${m.kind} carried"><strong>${escape(game.survivors.find((a) => a.id === m.author)?.name ?? m.author)}</strong><div class="message-body">${markdownToHtml(m.text)}</div></div>`,
+              `<div class="message ${m.kind} carried"><strong>${escape(game.survivors.find((a) => a.id === m.author)?.name ?? speakerLabel(m.author))}</strong><div class="message-body">${markdownToHtml(m.text)}</div></div>`,
           )
           .join(""),
     )
@@ -2696,7 +2705,7 @@ function renderTerminal(force = false) {
     messages
       .map(
         (m) =>
-          `<div class="message ${m.kind}"><strong>${escape(game.survivors.find((a) => a.id === m.author)?.name ?? m.author)}</strong><div class="message-body">${markdownToHtml(m.text)}</div></div>`,
+          `<div class="message ${m.kind}"><strong>${escape(game.survivors.find((a) => a.id === m.author)?.name ?? speakerLabel(m.author))}</strong><div class="message-body">${markdownToHtml(m.text)}</div></div>`,
       )
       .join("") +
     (tab === "tutor"
