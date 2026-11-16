@@ -240,6 +240,59 @@ test("the study terminal takes the wide workspace while the map keeps its readin
   expect(layout.clipped).toBe(false);
   expect(layout.emptyMessages).toBe(0);
   expect(layout.slack).toBeLessThan(2);
+  // Nothing scrolls the document: a long question scrolls its own half and
+  // leaves the answer column where it is.
+  const panes = await page.evaluate(() => {
+    const doc = document.documentElement;
+    const answer = document.querySelector<HTMLElement>(
+      "#study-terminal-slot .answer-panel",
+    )!;
+    const composer = document.querySelector("#chat-form")!;
+    const filler = document.createElement("div");
+    filler.style.height = "4000px";
+    document.querySelector("#problem")!.append(filler);
+    const before = composer.getBoundingClientRect().top;
+    answer.scrollTop = 600;
+    window.scrollTo(0, 500);
+    const result = {
+      pageScrolls: doc.scrollHeight > doc.clientHeight,
+      pageOffset: window.scrollY,
+      questionOffset: answer.scrollTop,
+      composerMoved: composer.getBoundingClientRect().top - before,
+      terminalBottom: document
+        .querySelector("#study-terminal-slot #terminal")!
+        .getBoundingClientRect().bottom,
+      viewport: innerHeight,
+    };
+    filler.remove();
+    return result;
+  });
+  expect(panes.pageScrolls).toBe(false);
+  expect(panes.pageOffset).toBe(0);
+  expect(panes.questionOffset).toBe(600);
+  expect(panes.composerMoved).toBe(0);
+  expect(panes.terminalBottom).toBeLessThanOrEqual(panes.viewport);
+  // A long conversation scrolls its messages; the composer stays on screen.
+  const chat = await page.evaluate(() => {
+    const messages = document.querySelector<HTMLElement>("#messages")!;
+    const filler = document.createElement("div");
+    filler.style.height = "4000px";
+    messages.append(filler);
+    const doc = document.documentElement;
+    const result = {
+      pageScrolls: doc.scrollHeight > doc.clientHeight,
+      messagesScroll: messages.scrollHeight > messages.clientHeight,
+      composerBottom: document
+        .querySelector("#chat-form")!
+        .getBoundingClientRect().bottom,
+      viewport: innerHeight,
+    };
+    filler.remove();
+    return result;
+  });
+  expect(chat.pageScrolls).toBe(false);
+  expect(chat.messagesScroll).toBe(true);
+  expect(chat.composerBottom).toBeLessThanOrEqual(chat.viewport);
   // The map keeps a readable measure; the question terminal no longer inherits
   // it, so the conversation and its composer get the rest of the page.
   expect(mapPane!.width).toBeGreaterThan(map!.width + 200);
