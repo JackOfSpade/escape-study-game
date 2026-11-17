@@ -120,6 +120,8 @@ export interface Finding {
   objectiveId: string;
   facet: string;
   outcome: "independent" | "assisted" | "unknown" | "contradicted";
+  /** How much help an assisted answer relied on: a hint, or the step itself. */
+  assistance?: "hinted" | "given";
   depth?: number;
   execution?: "not-run" | "executed";
   evidence: number[];
@@ -185,7 +187,7 @@ export interface Artifact {
 }
 export interface Message {
   /** A tutor reply's own declaration: facets it supplied help for, and facets it offered help on. */
-  help?: { supplies: string[]; offers: string[] };
+  help?: import("../scripts/lib/help-gate.mjs").DeclaredHelp;
   sourceRefs?: number[];
   requestId?: string;
   id: string;

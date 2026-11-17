@@ -38,7 +38,7 @@ test("real bridge and gateway: chat follow-up, malformed correction, interrupted
     await checkBridge();
     const jobs: any[] = [];
     const followup = {
-      help: { supplies: [], offers: ["synthetic-facet"] },
+      help: { nudges: [], hints: [], gives: [], offers: ["synthetic-facet"] },
       text: "Which reading leaves, and which enters?",
       complete: false,
     };
@@ -67,8 +67,8 @@ test("real bridge and gateway: chat follow-up, malformed correction, interrupted
     assert.equal(relay.rejected, 1, "the malformed answer was refused");
     assert.equal(e.tutorRequests![0].state, "applied");
     assert.equal(e.submissions.length, 0);
-    // Typed messages confirm no help; the reply's own declaration is kept.
-    assert.deepEqual(one.payload.helpPolicy, { confirmed: [] });
+    // Nothing is unlocked before a warning; the reply's own declaration is kept.
+    assert.deepEqual(one.payload.helpPolicy, { unlocked: [] });
     assert.deepEqual(e.tutor.at(-1)!.help, followup.help);
     assert.deepEqual(offeredHelp(e), ["synthetic-facet"]);
 
@@ -84,6 +84,8 @@ test("real bridge and gateway: chat follow-up, malformed correction, interrupted
       roadmap,
     );
     const two = jobs[1];
+    // The earlier warning unlocks hints on that facet from here on.
+    assert.deepEqual(two.payload.helpPolicy, { unlocked: ["synthetic-facet"] });
     assert.equal(two.payload.messages.length, 3);
     assert.equal(two.payload.messages[1].text, followup.text);
     const context = JSON.stringify(two.payload);
@@ -95,7 +97,7 @@ test("real bridge and gateway: chat follow-up, malformed correction, interrupted
     e = g.encounters[e.id];
     await checkBridge();
     const solved = {
-      help: { supplies: [], offers: [] },
+      help: { nudges: [], hints: [], gives: [], offers: [] },
       text: "Solved: the accumulated explanation covers the rubric.",
       complete: true,
     };

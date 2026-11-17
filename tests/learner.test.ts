@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { assess, edit, ensureProblem, submit } from "../src/ai";
+import {
+  assess,
+  edit,
+  ensureProblem,
+  facetAssistance,
+  submit,
+} from "../src/ai";
 import {
   beginVisit,
   eligible,
@@ -249,6 +255,55 @@ test("prior help is scoped per facet; neutral re-asking cannot restore supplied 
         "test-fixture",
       ),
     /explicit facet/,
+  );
+});
+test("an assisted part keeps how much help it needed, and the next question is told", () => {
+  const { l, e, c, proposal } = fixture();
+  e.tutor = [
+    {
+      id: "help",
+      author: "tutor",
+      kind: "tutor",
+      text: "A fixture hint and a fixture given step.",
+      seq: 0,
+      worldTime: 0,
+      presented: 0,
+      provenance: "test",
+    },
+  ];
+  const assisted = proposal("degrees", ["purpose", "boundary"]);
+  assisted.helpAttributions = [
+    { messageId: "help", facets: ["*"], rationale: "Fixture help." },
+  ];
+  assisted.findings[0] = {
+    ...assisted.findings[0],
+    outcome: "assisted",
+    assistance: "hinted",
+  };
+  assisted.findings[1] = {
+    ...assisted.findings[1],
+    outcome: "assisted",
+    assistance: "given",
+  };
+  applyLearningAssessment(r, l, e, assisted, when, "test-fixture");
+  const cell = l.cells[c.objectiveIds[0]];
+  assert.equal(cell.facets["D1:purpose"].assistance, "hinted");
+  assert.equal(cell.facets["D1:boundary"].assistance, "given");
+  assert.deepEqual(
+    l.evidence.slice(-2).map((record) => record.assistance),
+    ["hinted", "given"],
+  );
+  // Neither degree verifies the checkpoint.
+  assert.notEqual(cell.states[0], "P");
+  assert.deepEqual(facetAssistance({ learner: l }, c), {
+    facetAssistance: { purpose: "hinted", boundary: "given" },
+  });
+  // A degree only describes assisted work.
+  const wrong = proposal("degree-on-independent", ["purpose"]);
+  wrong.findings[0].assistance = "hinted";
+  assert.throws(
+    () => applyLearningAssessment(r, l, e, wrong, when, "test-fixture"),
+    /malformed facet assessment/,
   );
 });
 test("later catch-up exposure cannot taint earlier independent reasoning", () => {

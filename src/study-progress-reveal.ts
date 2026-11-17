@@ -82,6 +82,8 @@ const plural = (n: number, one: string, many = `${one}s`) =>
 /** Outcome, its short label in a mixed list, and its phrase when it stands alone. */
 const OUTCOME_LABELS = [
   ["independent", "unaided", "answered unaided"],
+  ["hinted", "after a hint", "answered after a hint"],
+  ["given", "given the step", "given the step"],
   ["assisted", "with help", "answered with help"],
   ["contradicted", "incorrect", "incorrect"],
   ["unknown", "not shown", "not shown"],

@@ -790,6 +790,9 @@ function validateProposal(
         f.outcome,
       ) ||
       !f.rationale?.trim() ||
+      (f.assistance !== undefined &&
+        (f.outcome !== "assisted" ||
+          !["hinted", "given"].includes(f.assistance))) ||
       (f.execution !== undefined &&
         !["not-run", "executed"].includes(f.execution)) ||
       !Array.isArray(f.evidence) ||
@@ -1099,6 +1102,7 @@ export function applyLearningAssessment(
       depth,
       facet: finding.facet,
       outcome: finding.outcome,
+      ...(finding.assistance ? { assistance: finding.assistance } : {}),
       artifactSequences: [...finding.evidence],
       helpMessageIds: (a.helpAttributions ?? [])
         .filter(
@@ -1141,6 +1145,7 @@ export function applyLearningAssessment(
     )
       cell.facets[key] = {
         outcome: finding.outcome,
+        ...(finding.assistance ? { assistance: finding.assistance } : {}),
         evidenceIds: [...(old?.evidenceIds ?? []), record.id],
         updatedAt: at,
       };

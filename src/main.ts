@@ -882,14 +882,11 @@ $("#retry-submission").onclick = () => {
   if (s?.status !== "error") return;
   startTerminalRequest((e) => retrySubmission(game, e, roadmap, s.id));
 };
-// Help that costs credit is given only after this explicit choice.
+// Shortcuts for answering the tutor's one warning; typing works too.
 $("#help-accept").onclick = () => {
   const e = active ? game.encounters[active] : undefined;
-  const offers = e ? offeredHelp(e) : [];
-  if (!e || !offers.length) return;
-  startTerminalRequest(() =>
-    send(game, e, "Yes, give me the help.", roadmap, offers),
-  );
+  if (!e || !offeredHelp(e).length) return;
+  startTerminalRequest(() => send(game, e, "Yes, give me a hint.", roadmap));
 };
 $("#help-retry").onclick = () => $<HTMLTextAreaElement>("#chat-input").focus();
 $("#help-skip").onclick = () => {

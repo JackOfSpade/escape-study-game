@@ -113,6 +113,14 @@ test("an unchanged map reports what the assessment recorded", () => {
     "Assessment saved · 3 parts: 1 unaided, 1 with help, 1 not shown · no checkpoint verified this time",
   );
   assert.equal(
+    summaryText(delta, ["independent", "hinted", "given", "given"]),
+    "Assessment saved · 4 parts: 1 unaided, 1 after a hint, 2 given the step · no checkpoint verified this time",
+  );
+  assert.equal(
+    summaryText(delta, ["hinted", "hinted"]),
+    "Assessment saved · 2 parts answered after a hint · no checkpoint verified this time",
+  );
+  assert.equal(
     summaryText(delta, ["contradicted"]),
     "Assessment saved · 1 part incorrect · no checkpoint verified this time",
   );

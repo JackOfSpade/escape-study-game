@@ -1,59 +1,71 @@
 import { isRecord as object } from "./is-record.mjs";
 
 /**
- * Help that costs credit is opt-in, and the app enforces it. A tutor reply
- * declares which facets its text supplies help for and which it offers help
- * on. The learner confirms an offer with a button; that press travels as
- * `payload.helpPolicy.confirmed` on the next turn. A reply that supplies
- * unconfirmed help is rejected before the learner sees it.
+ * The hint ladder. A tutor reply declares, per facet, how far its text went:
+ * a free nudge, a concrete hint, or the step itself. Hints and given steps
+ * cost credit, so the app lets them through only for a facet an earlier
+ * tutor reply warned about (`help.offers`). The request carries those facets
+ * as `payload.helpPolicy.unlocked`. A reply that crosses the line without
+ * that warning is rejected before the learner sees it.
  */
 export const HELP_GATE_GUIDANCE =
-  "Help gate (whenever payload.helpPolicy is present): write help first in the JSON object, before text: help:{supplies:[facet ids],offers:[facet ids]}. supplies lists every probe facet for which this reply's text states an assessed fact, value, pointer to the relevant line or reasoning step that the learner has not already given. offers lists the facets for which this reply warns that help would be recorded as answered with help and asks the learner to choose. Use empty arrays when neither applies. While complete is false, supplies may hold only ids listed in payload.helpPolicy.confirmed; the app rejects any other reply before the learner sees it, so withhold that content and put the facet in offers instead. The learner confirms by pressing a button the app shows whenever offers is not empty, and that press arrives as payload.helpPolicy.confirmed on the next turn. A typed yes is not a confirmation: reply by asking them to press Get the help, with the facet in offers again. When confirmed lists a facet, supply that help now and list it in supplies.";
+  "Hint ladder (whenever payload.helpPolicy is present): write help first in the JSON object, before text: help:{nudges:[facet ids],hints:[facet ids],gives:[facet ids],offers:[facet ids]}, using probe facet ids and empty arrays where nothing applies. Each time the learner misses a facet, move one rung up for that facet, never more, and read the earlier messages' help to see which rung it has reached. Rung 1 (nudges): say which part is wrong or incomplete. Rung 2 (nudges): reword the question or narrow what to think about, without any assessed content. Rungs 1 and 2 are free: give them without warning. Rung 3 (hints): a concrete hint, such as a worked example on other values or where to look, that leaves the reasoning step to the learner; the part is then recorded as hinted. Rung 4 (gives): state the missing step. Rung 5 (gives): give the full answer and close that part. Rungs 4 and 5 are recorded as given. Before the first rung 3 on a facet, stop once: say in one sentence that the next hint will be recorded as answered with a hint instead of unaided, ask whether they want it, and list the facet in offers. The app accepts hints or gives only for facets in payload.helpPolicy.unlocked, which holds every facet an earlier reply of yours offered, and rejects any other reply before the learner sees it. When the learner's reply to that offer means yes, in any words, continue up the ladder from rung 3 without asking again; when it is a new attempt, judge the attempt; when they want to move on, close with outcome gap. A learner who asks outright for the answer still gets the one warning first, then may be given it directly. After rung 4 or 5 do not quiz the learner on that step again.";
 
+const FIELDS = ["nudges", "hints", "gives", "offers"];
 const ids = (value) =>
   Array.isArray(value) &&
   value.length <= 64 &&
   value.every((id) => typeof id === "string" && id && id.length <= 200);
 
-/** `help` absent, or {supplies:[facet ids],offers:[facet ids]}. */
+/** `help` absent, or {nudges,hints,gives,offers}, each a list of facet ids. */
 export const validHelp = (help) =>
   help === undefined ||
-  (object(help) && ids(help.supplies) && ids(help.offers));
+  (object(help) && FIELDS.every((field) => ids(help[field])));
 
-/** The facets this turn's request lets the tutor supply help for, or undefined when the request predates the gate. */
-export function confirmedHelp(payload) {
-  const policy = object(payload) ? payload.helpPolicy : undefined;
-  if (!object(policy)) return undefined;
-  return ids(policy.confirmed) ? policy.confirmed : [];
+/** Every facet an earlier tutor message warned about: hints on these may follow. */
+export function unlockedHelp(messages) {
+  const unlocked = new Set();
+  for (const m of Array.isArray(messages) ? messages : [])
+    if (object(m) && m.kind === "tutor" && object(m.help) && ids(m.help.offers))
+      for (const id of m.help.offers) unlocked.add(id);
+  return [...unlocked];
 }
 
+/** The facets this request lets the tutor hint on, or undefined when the request predates the ladder. */
+function unlockedBy(payload) {
+  const policy = object(payload) ? payload.helpPolicy : undefined;
+  if (!object(policy)) return undefined;
+  return ids(policy.unlocked) ? policy.unlocked : [];
+}
+
+/** The facets a declaration spends credit on. */
+const costly = (help) => [...new Set([...help.hints, ...help.gives])];
+
 /**
- * Why a reply breaks the help gate, or undefined when it passes. `required`
+ * Why a reply breaks the ladder, or undefined when it passes. `required`
  * also insists that the declaration is present (the relay does; the app
- * accepts an undeclared reply from an older relay as supplying nothing).
+ * accepts an undeclared reply from an older relay as a free one).
  */
 export function helpGateProblem(payload, answer, required = false) {
-  const confirmed = confirmedHelp(payload);
-  if (!confirmed) return undefined;
+  const unlocked = unlockedBy(payload);
+  if (!unlocked) return undefined;
   if (!validHelp(answer.help) || (required && answer.help === undefined))
-    return "Terminal dialogue requires help:{supplies:[facet ids],offers:[facet ids]}, written before text";
+    return "Terminal dialogue requires help:{nudges:[facet ids],hints:[facet ids],gives:[facet ids],offers:[facet ids]}, written before text";
   if (answer.help === undefined || answer.complete === true) return undefined;
-  const unconfirmed = answer.help.supplies.filter(
-    (id) => !confirmed.includes(id),
-  );
-  if (unconfirmed.length)
-    return `This reply supplies help the learner has not confirmed (${unconfirmed.join(", ")}). Rewrite text so it withholds that content, set help.supplies to [] and list those facets in help.offers with a one-sentence warning and the choice of getting the help, trying again or moving on.`;
+  const early = costly(answer.help).filter((id) => !unlocked.includes(id));
+  if (early.length)
+    return `This reply gives a hint or a step the learner was not warned about (${early.join(", ")}). Rewrite text so it stays on a free rung for those facets, remove them from hints and gives, and list them in offers with a one-sentence warning that the next hint will be recorded as answered with a hint.`;
   return undefined;
 }
 
 /**
  * Holds a streamed reply back until its help declaration has been read and
- * passes, so rejected help never appears word by word. Returns undefined when
- * the request has no gate; otherwise a function of the raw reply so far.
+ * passes, so a rejected hint never appears word by word. Returns undefined
+ * when the request has no ladder; otherwise a function of the raw reply so far.
  */
 export function helpStreamGate(payload) {
-  const confirmed = confirmedHelp(payload);
-  if (!confirmed) return undefined;
+  const unlocked = unlockedBy(payload);
+  if (!unlocked) return undefined;
   let verdict;
   return (raw) => {
     if (verdict !== undefined) return verdict;
@@ -62,7 +74,7 @@ export function helpStreamGate(payload) {
     try {
       const help = JSON.parse(found[1]);
       verdict =
-        validHelp(help) && help.supplies.every((id) => confirmed.includes(id));
+        validHelp(help) && costly(help).every((id) => unlocked.includes(id));
     } catch {
       verdict = false;
     }
