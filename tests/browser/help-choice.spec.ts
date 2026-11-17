@@ -1,7 +1,15 @@
 import { expect, test } from "@playwright/test";
 import { mockClaudeStudy, openStudyQuestion } from "./study-harness";
 
-test("help that costs credit waits for the learner's explicit choice", async ({
+const help = (over: Record<string, string[]> = {}) => ({
+  nudges: [],
+  hints: [],
+  gives: [],
+  offers: [],
+  ...over,
+});
+
+test("hints ramp up freely, then wait for one warning before costing credit", async ({
   page,
 }) => {
   const relay = await mockClaudeStudy(page);
@@ -9,58 +17,67 @@ test("help that costs credit waits for the learner's explicit choice", async ({
   page.on("pageerror", (error) => errors.push(error.message));
   await openStudyQuestion(page);
   const choice = page.locator("#help-choice");
+  const say = async (text: string) => {
+    await page.locator("#chat-input").fill(text);
+    await page.locator("#chat-input").press("Enter");
+  };
   await expect(choice).toBeHidden();
 
-  // A typed message confirms nothing; the tutor can only offer.
+  // A free nudge needs no warning and shows no buttons.
   relay.reply(() => ({
-    help: { supplies: [], offers: ["scope"] },
-    text: "Answering that counts as help on this part. Do you want it?",
+    help: help({ nudges: ["scope"] }),
+    text: "FREE NUDGE: that part is incomplete.",
     complete: false,
   }));
-  await page.locator("#chat-input").fill("Does the loop run once?");
-  await page.locator("#chat-input").press("Enter");
+  await say("A first attempt");
   await expect.poll(() => relay.tutorCalls().length).toBe(1);
-  expect(relay.tutorCalls()[0].payload.helpPolicy).toEqual({ confirmed: [] });
-  await expect(choice).toBeVisible();
+  expect(relay.tutorCalls()[0].payload.helpPolicy).toEqual({ unlocked: [] });
+  await expect(page.locator("#messages")).toContainText("FREE NUDGE");
+  await expect(choice).toBeHidden();
 
-  // Trying again only returns to the message box.
-  await page.locator("#help-retry").click();
-  await expect(page.locator("#chat-input")).toBeFocused();
-  expect(relay.tutorCalls()).toHaveLength(1);
-
-  // A reply that supplies unconfirmed help is withheld, never shown.
+  // A hint before the warning is withheld, never shown.
   relay.reply(() => ({
-    help: { supplies: ["scope"], offers: [] },
-    text: "LEAKED ANSWER",
+    help: help({ hints: ["scope"] }),
+    text: "EARLY HINT",
     complete: false,
   }));
-  await page.locator("#chat-input").fill("Just a guess then");
-  await page.locator("#chat-input").press("Enter");
+  await say("A second attempt");
   await expect.poll(() => relay.tutorCalls().length).toBe(2);
   await expect(page.locator("button[data-question-retry]")).toBeVisible();
-  await expect(page.locator("#messages")).not.toContainText("LEAKED ANSWER");
-  await expect(choice).toBeHidden();
+  await expect(page.locator("#messages")).not.toContainText("EARLY HINT");
 
-  // The retry offers again; the button is the confirmation the tutor needs.
+  // The retry gives the one warning, which shows the shortcuts.
   relay.reply(() => ({
-    help: { supplies: [], offers: ["scope"] },
-    text: "That would count as help. Do you want it?",
+    help: help({ offers: ["scope"] }),
+    text: "The next hint will be recorded as a hint. Do you want it?",
     complete: false,
   }));
   await page.locator("button[data-question-retry]").click();
   await expect.poll(() => relay.tutorCalls().length).toBe(3);
   await expect(choice).toBeVisible();
+  await page.locator("#help-retry").click();
+  await expect(page.locator("#chat-input")).toBeFocused();
+
+  // A typed yes is enough: the facet is unlocked for the hint and beyond.
   relay.reply(() => ({
-    help: { supplies: ["scope"], offers: [] },
-    text: "CONFIRMED HELP",
+    help: help({ hints: ["scope"] }),
+    text: "CONCRETE HINT",
     complete: false,
   }));
-  await page.locator("#help-accept").click();
+  await say("yes please");
   await expect.poll(() => relay.tutorCalls().length).toBe(4);
   expect(relay.tutorCalls()[3].payload.helpPolicy).toEqual({
-    confirmed: ["scope"],
+    unlocked: ["scope"],
   });
-  await expect(page.locator("#messages")).toContainText("CONFIRMED HELP");
+  await expect(page.locator("#messages")).toContainText("CONCRETE HINT");
   await expect(choice).toBeHidden();
+  relay.reply(() => ({
+    help: help({ gives: ["scope"] }),
+    text: "GIVEN STEP",
+    complete: false,
+  }));
+  await say("still stuck");
+  await expect.poll(() => relay.tutorCalls().length).toBe(5);
+  await expect(page.locator("#messages")).toContainText("GIVEN STEP");
   expect(errors).toEqual([]);
 });

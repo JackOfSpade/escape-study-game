@@ -191,12 +191,8 @@ test("tutor instructions use focused questioning without breadth inflation", () 
     }) as string,
   };
   assert.ok(job.instructions.includes(QUESTION_ADAPTATION_GUIDANCE));
-  assert.match(job.instructions, /Ask about one missing point at most twice/);
-  assert.match(job.instructions, /Help that costs credit is opt-in/);
-  assert.match(
-    job.instructions,
-    /Supply it only after the learner confirms, and then supply only what was asked/,
-  );
+  assert.match(job.instructions, /one rung per miss on the same point/);
+  assert.match(job.instructions, /never give one before that warning/);
   assert.match(
     job.instructions,
     /Never ask again for something the learner has already answered correctly/,

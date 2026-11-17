@@ -9,6 +9,8 @@ export interface ScopeDefinition {
 }
 export interface FacetProof {
   outcome: "independent" | "assisted" | "unknown" | "contradicted";
+  /** For an assisted facet: answered after a hint, or given the step. */
+  assistance?: "hinted" | "given";
   evidenceIds: string[];
   updatedAt: string;
 }
@@ -97,6 +99,7 @@ export interface LearningEvidence {
   depth: number;
   facet: string;
   outcome: string;
+  assistance?: "hinted" | "given";
   artifactSequences: number[];
   helpMessageIds: string[];
   at: string;

@@ -257,7 +257,12 @@ export function createStudyWorkspaceView(
       reveal?.cancel();
       reveal = playProgressReveal(progress, snapshot, {
         reducedMotion: reducedMotion(),
-        outcomes: assessment.findings.map((finding) => finding.outcome),
+        // An assisted part is reported by how much help it needed.
+        outcomes: assessment.findings.map((finding) =>
+          finding.outcome === "assisted"
+            ? (finding.assistance ?? "assisted")
+            : finding.outcome,
+        ),
         // Deferred so the button is already re-enabled by this render. Any
         // key skips the reveal, so never pull focus out of a visible text
         // field the learner is typing in (the question stays open to discuss).

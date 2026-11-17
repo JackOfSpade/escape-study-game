@@ -1,5 +1,5 @@
 import { fnv1a } from "./hash";
-import { helpGateProblem } from "../scripts/lib/help-gate.mjs";
+import { helpGateProblem, unlockedHelp } from "../scripts/lib/help-gate.mjs";
 import { QUESTION_DESIGN_GUIDANCE } from "../scripts/lib/study-question-policy.mjs";
 import { completionVerdict } from "./completion-verdict";
 import { careerScopeGuidance, studyFocus } from "./career-profile";
@@ -144,6 +144,26 @@ const QUESTION_RUNTIME_SUPPORT = {
   react:
     "Optional D2+ TypeScript runtime: {language:typescript,environment:react,steps:[{kind:click|fill|press|expect-text|expect-count,selector:CSS,...}]}. Single TSX module default-exporting App; only installed React imports, no network, workers or external packages. At most eight bounded interaction/check steps. Runtime errors/DOM checks/preview are observations, never automatic correctness or ENV credit; TSX transpilation is not static TypeScript type checking. Docker runtime must be installed locally.",
 };
+/** Facets of this contract last answered with help, and how much help. */
+export function facetAssistance(
+  study: Pick<StudyRecord["study"], "learner">,
+  contract: Contract,
+) {
+  const degrees: Record<string, "hinted" | "given"> = {};
+  for (const id of contract.objectiveIds) {
+    const progress =
+      study.learner?.cells[id] ?? study.learner?.finalProgress?.[id];
+    const prefix = `D${contract.depth}:`;
+    for (const [key, proof] of Object.entries(progress?.facets ?? {}))
+      if (
+        key.startsWith(prefix) &&
+        proof.outcome === "assisted" &&
+        proof.assistance
+      )
+        degrees[key.slice(prefix.length)] = proof.assistance;
+  }
+  return Object.keys(degrees).length ? { facetAssistance: degrees } : {};
+}
 /** The request for one generated question. */
 function generationPayload(
   g: StudyRecord,
@@ -162,6 +182,7 @@ function generationPayload(
     runtimeSupport: QUESTION_RUNTIME_SUPPORT,
     existingScopeDefinitions: study.learner?.scopes,
     probeRecords: probeRecordsForTrack(g, contract.track, contract),
+    ...facetAssistance(study, contract),
     progressContext: trackProgressContext(study.learner!, r, contract.track),
     curriculum: r.tracks[contract.track].curriculum,
   };
@@ -581,8 +602,8 @@ export function retryTutorRequest(
         throw Error("Invalid tutor reply");
       if (dialogue && answer.text.length > 8000)
         throw Error("Terminal reply exceeds 8000 characters");
-      // The relay already rejects this; a reply that supplies help the
-      // learner has not confirmed is never shown or recorded.
+      // The relay already rejects this; a reply that hints before the
+      // learner was warned is never shown or recorded.
       const helpProblem = dialogue
         ? helpGateProblem(payload, answer as Record<string, unknown>)
         : undefined;
@@ -630,7 +651,9 @@ export function retryTutorRequest(
       const help = (answer as { help?: Message["help"] }).help;
       if (dialogue && help)
         delivered.help = {
-          supplies: [...help.supplies],
+          nudges: [...help.nudges],
+          hints: [...help.hints],
+          gives: [...help.gives],
           offers: [...help.offers],
         };
       job.responseMessageId = delivered.id;
@@ -702,7 +725,7 @@ export function retryTutorRequest(
   return operation;
 }
 /**
- * The facets the tutor's latest reply offered help on, while that offer is
+ * The facets the tutor's latest reply warned about before hinting, while that offer is
  * still the open decision: the question is unfinished and nothing has been
  * said or requested since.
  */
@@ -717,8 +740,6 @@ export async function send(
   e: Encounter,
   text: string,
   r: Roadmap,
-  /** Facets whose help the learner confirmed with the button for this turn. */
-  helpConfirmed: string[] = [],
 ) {
   const problem = e.problem;
   if (!text.trim() || !problem) return;
@@ -752,7 +773,8 @@ export async function send(
           responseFormat: TERMINAL_DIALOGUE_FORMAT,
           instruction: TERMINAL_DIALOGUE_INSTRUCTION,
           probe: encounterProbeContract(e, problem),
-          helpPolicy: { confirmed: helpConfirmed },
+          // Hints may follow only on facets the tutor already warned about.
+          helpPolicy: { unlocked: unlockedHelp(e.tutor) },
           ...(g.study.profile === "live" && r
             ? {
                 topicAssessmentContext: topicAssessmentContext(
