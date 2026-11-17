@@ -31,12 +31,7 @@ const authoring = (effort = "medium") => ({
 export const TASK_PROFILES = Object.freeze({
   generate: {
     ...authoring(),
-    stableKeys: [
-      "curriculum",
-      "generationPolicy",
-      "segmentGuidance",
-      "runtimeSupport",
-    ],
+    stableKeys: ["curriculum", "generationPolicy", "runtimeSupport"],
   },
   tutor: {
     ...live(120_000, "sonnet", "low"),

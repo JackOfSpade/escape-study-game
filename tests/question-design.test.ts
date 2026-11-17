@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 // @ts-expect-error Direct .mjs contract test.
-import { taskInstructions } from "../scripts/lib/ai-contracts.mjs";
+import { taskInstructions, validateAnswer } from "../scripts/lib/ai-contracts.mjs"; // prettier-ignore
 import { checkBridge, ensureProblem } from "../src/ai";
 import { eligible, initialStudy } from "../src/curriculum";
 import {
@@ -155,6 +155,30 @@ test("generate instructions require minimal concrete problems with unchanged con
   );
   assert.match(job.instructions, /prompt must stand on its own/);
   assert.doesNotMatch(job.instructions, /establishes the most at once/);
+});
+
+test("every generated question fits one sitting and is never split into parts", () => {
+  const contract = { id: "synthetic-sitting", depth: 2 };
+  const job = { operation: "generate", payload: { contract } };
+  const answer = (estimatedSolveSeconds: number) => ({
+    title: "Late deliveries report",
+    prompt: "Explain the bug.",
+    starter: "",
+    rubric: ["Names the race."],
+    contract,
+    scopeDefinitions: [{ id: "s" }],
+    estimatedSolveSeconds,
+  });
+  assert.doesNotThrow(() => validateAnswer(job, answer(900)));
+  assert.throws(() => validateAnswer(job, answer(901)), /30 to 900/);
+  const instructions = taskInstructions("generate", { contract }) as string;
+  assert.match(instructions, /one sitting of at most 15 minutes/);
+  for (const op of ["generate", "tutor", "assess"])
+    assert.doesNotMatch(
+      taskInstructions(op, { contract }) as string,
+      /segment/i,
+      `${op} still mentions segments`,
+    );
 });
 
 test("tutor instructions use focused questioning without breadth inflation", () => {

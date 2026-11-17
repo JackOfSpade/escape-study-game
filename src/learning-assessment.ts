@@ -3,7 +3,6 @@ import { bridgeRequest, status } from "./bridge-client";
 import { evidencePacket, syncLearningView } from "./curriculum";
 import { applyLearningAssessment, encounterKey } from "./learner";
 import type { Assessment, Encounter, StudyRecord, Roadmap } from "./model";
-import { assessmentDeferred, assessmentSegment } from "./question-thread";
 
 const connected = (g: StudyRecord) =>
   g.study.profile === "live" && status().mode !== "development";
@@ -32,8 +31,6 @@ export async function assess(
     0,
   );
   if (e.problem?.contract.practice) return;
-  // A segmented question is assessed once it is finished, visit by visit.
-  if (assessmentDeferred(g, e)) return;
   const study = g.study,
     id = `assessment-${encounterKey(e)}-${cutoff}`,
     prior = study.assessments.find((a) => a.id === id);
@@ -99,10 +96,7 @@ export async function assess(
           : "study-mode")(connected(g) ? status().mode : e.problem.provenance),
       payloadJson: JSON.stringify({
         requestId: id,
-        packet: ((segment) => ({
-          ...evidencePacket(e, r, cutoff, learner, acceptedCutoff),
-          ...(segment ? { segment } : {}),
-        }))(assessmentSegment(g, e)),
+        packet: evidencePacket(e, r, cutoff, learner, acceptedCutoff),
       }),
     };
     const saved = a.request,

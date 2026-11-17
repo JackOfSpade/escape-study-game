@@ -14,11 +14,6 @@ import { encounterGaps, probeSummary } from "./knowledge-probe";
 import { encounterKey } from "./learner";
 import { markdownToHtml } from "./markdown";
 import type { Encounter, StudyRecord, Roadmap } from "./model";
-import {
-  carriedVisits,
-  isInactiveVisit,
-  segmentCount,
-} from "./question-thread";
 
 /** What the question's conversation partner is called. */
 const TUTOR = "Tutor";
@@ -52,17 +47,6 @@ export function provenanceText(game: StudyRecord, e: Encounter): string {
   if (e.problem?.contract.practice)
     text +=
       " · Variety practice on another topic of this tier: knowledge is probed and recorded, but this is not the scheduled visit";
-  if (e.thread && e.problem) {
-    const count = segmentCount(e.problem);
-    const goal = e.problem.segments?.[e.thread.segment]?.goal;
-    text += isInactiveVisit(game, e)
-      ? " · This question continues in the conversation you opened most recently; this one is read-only history."
-      : count > 1
-        ? ` · Part ${e.thread.segment + 1} of ${count}${goal ? `: ${goal.replace(/[.!?]+$/, "")}` : ""}. Finishing this part moves the question on to its next part.`
-        : carriedVisits(game, e).length
-          ? " · Continued question: your earlier conversation and progress are kept."
-          : "";
-  }
   if (
     game.study.learner?.attempts.some(
       (a) =>
@@ -128,31 +112,17 @@ export function createTerminalPanels(host: TerminalPanelHost) {
       };
   }
 
-  /** The conversation: earlier visits, this visit, then a reply still arriving. */
+  /** The conversation, then a reply still arriving. */
   function messages(e: Encounter) {
-    const game = host.game();
-    const bubble = (
-      kind: string,
-      name: string,
-      text: string,
-      carried = false,
-    ) =>
-      `<div class="message ${escape(kind)}${carried ? " carried" : ""}"><strong>${name}</strong><div class="message-body">${markdownToHtml(text)}</div></div>`;
-    const said = (m: Encounter["tutor"][number], carried = false) =>
+    const bubble = (kind: string, name: string, text: string) =>
+      `<div class="message ${escape(kind)}"><strong>${name}</strong><div class="message-body">${markdownToHtml(text)}</div></div>`;
+    const said = (m: Encounter["tutor"][number]) =>
       bubble(
         m.kind,
         escape(m.author === "human" ? "You" : speakerLabel(m.author)),
         m.text,
-        carried,
       );
     const html =
-      carriedVisits(game, e)
-        .map(
-          (v) =>
-            `<div class="message system carried"><strong>Earlier visit · part ${v.segment + 1}${v.completed ? " · completed" : ""}</strong></div>` +
-            v.messages.map((m) => said(m, true)).join(""),
-        )
-        .join("") +
       e.tutor.map((m) => said(m)).join("") +
       (e.tutorRequests ?? [])
         .map((j) => (j.state === "pending" ? streamingReply(j) : undefined))

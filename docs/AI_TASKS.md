@@ -6,8 +6,8 @@ The operation names, their instructions and the validators that check each answe
 
 | Operation            | Purpose                                                                                                                                                                                |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `generate`           | A question, built from the eligible contract and the exact track curriculum. A question estimated over 15 minutes may carry a `segments` plan ([question design](QUESTION_DESIGN.md)). |
-| `tutor`              | One reply in the question's conversation, as the probe reply `{text, complete, outcome?, knowledge?, segmentSummary?}`. The reply streams, and `text` is written first.                |
+| `generate`           | A question, built from the eligible contract and the exact track curriculum. Each question is sized for one sitting of at most 15 minutes ([question design](QUESTION_DESIGN.md)).    |
+| `tutor`              | One reply in the question's conversation, as the probe reply `{text, complete, outcome?, knowledge?}`. The reply streams, and `text` is written first.                                |
 | `complete`           | Whether a captured submission solves the question, from the attributed history.                                                                                                        |
 | `assess`             | Formal learning assessment of one frozen question and its evidence.                                                                                                                    |
 | `review-environment` | Review of a practical environment observation ([practical observations](ENVIRONMENT_OBSERVATIONS.md)).                                                                                 |

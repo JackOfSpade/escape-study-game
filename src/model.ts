@@ -115,9 +115,6 @@ export interface StudyState {
   session?: string;
   assessments: Assessment[];
   archives: Encounter[];
-  /** The unfinished segmented question, kept until its last segment is
-   * completed. Only saves from the retired game start one. */
-  thread?: import("./question-thread").QuestionThread;
 }
 export interface Finding {
   objectiveId: string;
@@ -228,8 +225,6 @@ export interface Problem {
   validation?: { kind: "trace"; answer: number };
   contract: Contract;
   scopeDefinitions?: ScopeDefinition[];
-  /** Ordered parts of a long question, one per conversation. */
-  segments?: import("./question-thread").QuestionSegment[];
 }
 export interface TutorRequest {
   id: string;
@@ -265,8 +260,6 @@ export interface Encounter {
   studyTurnRecorded?: boolean;
   directStudy?: DirectStudySession;
   chatDraft?: string;
-  /** The segmented question this question works and which of its segments. */
-  thread?: { id: string; segment: number };
   tutorRequests?: TutorRequest[];
   /** Knowledge probe: facets, per-turn findings and answer signals. */
   probe?: import("./knowledge-probe").KnowledgeProbe;

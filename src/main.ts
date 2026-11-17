@@ -522,9 +522,6 @@ mountBugReport({
             state: e.state,
             error: e.error,
             generation: e.generation,
-            part: e.thread
-              ? `${e.thread.segment + 1} of thread ${e.thread.id}`
-              : undefined,
             prompt: e.problem?.prompt,
             messages: e.tutor.map(({ kind, author, text }) => ({
               kind,

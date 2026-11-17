@@ -1,15 +1,5 @@
 import { fnv1a } from "./hash";
 import { QUESTION_DESIGN_GUIDANCE } from "../scripts/lib/study-question-policy.mjs";
-import {
-  SEGMENT_GENERATION_GUIDANCE,
-  validateQuestionSegments,
-} from "../scripts/lib/question-segments.mjs";
-import {
-  completeSegment,
-  isActiveVisit,
-  segmentPayload,
-  threadEncounters,
-} from "./question-thread";
 import { completionVerdict } from "./completion-verdict";
 import { careerScopeGuidance, studyFocus } from "./career-profile";
 import {
@@ -94,13 +84,6 @@ function validateProblem(
   g: StudyRecord,
   c = eligible(r, g.study),
 ) {
-  try {
-    validateQuestionSegments(p);
-  } catch (error) {
-    throw Error(
-      `Invalid generated question plan for ${e.id}: ${String(error)}`,
-    );
-  }
   if (
     !p ||
     typeof p.prompt !== "string" ||
@@ -118,7 +101,13 @@ function validateProblem(
     p.contract.depth !== c.depth ||
     JSON.stringify(p.contract.objectiveIds) !==
       JSON.stringify(c.objectiveIds) ||
-    p.contract.track !== c.track
+    p.contract.track !== c.track ||
+    (p.estimatedSolveSeconds !== undefined &&
+      !(
+        typeof p.estimatedSolveSeconds === "number" &&
+        p.estimatedSolveSeconds >= 30 &&
+        p.estimatedSolveSeconds <= 900
+      ))
   )
     throw Error(`Invalid or out-of-scope generated problem for ${e.id}`);
   if (
@@ -149,7 +138,6 @@ const generationCurrent = (g: StudyRecord, e: Encounter, id: string) =>
 const QUESTION_GENERATION_POLICY =
   "Diagnose before teaching. Write a standalone question: the prompt alone must supply the essential scenario, interface, implementation, data, timing and business-rule facts needed to answer without using the chat. For classification, list the concrete items to classify and their relevant behavior, lifetime and source without supplying their classifications. For tracing, debugging or critique, supply the relevant code, event sequence or evidence. Distinguish fixed facts from intentional design choices; if the learner may choose an example or an approach, say so explicitly rather than expecting them to infer an unspecified implementation. Ask a bounded task that matches the supplied scenario; never paste a capability statement into an unrelated generic story. Every requirement in the rubric must be visible in the question; do not grade unstated assumptions or add unrelated decisions, personal history or edge cases. Before returning the question, check that it can be answered from the prompt alone and repair missing context without revealing the solution. For D1, keep the learner workspace starter empty; put essential scenario or code-reading material in the prompt without supplying the key explanation, endpoint update, worked result or a leading solution hint. Do not interpret an objective's implementation verb as a D1 implementation requirement. Preserve legitimate prior context and assistance attribution without presenting supplied steps as fresh independent understanding. Use probeRecords: build the question around open gaps inside the eligible scope with the facet they blocked as the apex; only a gap marked reuseInScopeDefinitions may add its exact facet id to scopeDefinitions, and existing stable scope definitions are copied exactly; do not spend the question on established facets unless the scope requires them; re-ask what a closed gap blocked. The prompt is read by the learner: never mention the scheduled scope, objective IDs, tiers, depth, scheduling or that this is a formal visit; ask the question in plain language. Keep it minimal: write the smallest self-contained diagnostic that exercises the objective, with one main problem and at most one or two directly connected follow-ups. Include only the essential facts, not pasted project context or a full-project audit. For code review, include the actual code under review, including any required helper and its authorization semantics; a prose proposal supports design review only. Prefer short snippets, traces or evidence, and never turn an objective's scope verbs into a D1 implementation task. The visible task and rubric must match, without leaking the solution. An honestly integrative objective may stay integrative on a small feature. A narrow example never establishes unrelated facets or mastery. " +
   QUESTION_DESIGN_GUIDANCE;
-const QUESTION_SEGMENT_GUIDANCE = SEGMENT_GENERATION_GUIDANCE;
 const QUESTION_RUNTIME_SUPPORT = {
   scripts: ["python", "typescript"],
   react:
@@ -170,7 +158,6 @@ function generationPayload(
     contract,
     careerScopeGuidance: careerScopeGuidance(contract, studyFocus(study)),
     generationPolicy: QUESTION_GENERATION_POLICY,
-    segmentGuidance: QUESTION_SEGMENT_GUIDANCE,
     runtimeSupport: QUESTION_RUNTIME_SUPPORT,
     existingScopeDefinitions: study.learner?.scopes,
     probeRecords: probeRecordsForTrack(g, contract.track, contract),
@@ -335,9 +322,7 @@ export function regenerateQuestion(g: StudyRecord, e: Encounter, r: Roadmap) {
     study.knowledgeEstablished = study.knowledgeEstablished.filter(
       (x) => !mine(x),
     );
-  if (e.thread && study.thread?.id === e.thread.id) delete study.thread;
   delete e.problem;
-  delete e.thread;
   delete e.probe;
   delete e.tutorRequests;
   delete e.chatDraft;
@@ -607,8 +592,6 @@ export function retryTutorRequest(
           )
         : undefined;
       checkSnapshot();
-      // Only the conversation opened last may finish the continued question's part.
-      if (dialogue && e.thread && !isActiveVisit(g, e)) answer.complete = false;
       if (dialogue && answer.complete === true && !r)
         throw Error(
           "Reconnect this saved conversation with its curriculum before accepting the answer",
@@ -685,15 +668,6 @@ export function retryTutorRequest(
         };
         e.submissions.push(submission);
         applyCompletion(g, e, r!, submission, verdict);
-        // Same synchronous step as the completion: one snapshot holds both or neither.
-        if (e.thread && (e.state as string) === "consumed") {
-          const finished = completeSegment(g, e, {
-            summary: answer.segmentSummary,
-          });
-          if (finished)
-            for (const visit of threadEncounters(g, finished))
-              void assess(g, visit, r!);
-        }
         if (topicUpdates.length)
           recordTopicAssessments(g, e, topicUpdates, {
             requestId: job.id,
@@ -752,7 +726,6 @@ export async function send(
           responseFormat: TERMINAL_DIALOGUE_FORMAT,
           instruction: TERMINAL_DIALOGUE_INSTRUCTION,
           probe: encounterProbeContract(e, problem),
-          ...(e.thread ? { segment: segmentPayload(g, e) } : {}),
           ...(g.study.profile === "live" && r
             ? {
                 topicAssessmentContext: topicAssessmentContext(
