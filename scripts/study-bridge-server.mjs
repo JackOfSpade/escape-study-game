@@ -124,8 +124,16 @@ export function createStudyBridgeServer({ claude, control, reports } = {}) {
       // unhandled rejection, end the whole relay.
       if (res.destroyed) return;
       if (res.headersSent) return void res.destroy();
-      res.writeHead(err instanceof HttpInputError ? err.status : 502);
-      res.end(JSON.stringify({ error: String(err) }));
+      if (err instanceof HttpInputError) {
+        res.writeHead(err.status);
+        res.end(JSON.stringify({ error: err.message }));
+        return;
+      }
+      // Unexpected failures stay in the relay's own log; the browser gets a
+      // fixed message rather than internal error text.
+      console.error("Study bridge request failed:", err);
+      res.writeHead(502);
+      res.end(JSON.stringify({ error: "Study bridge request failed" }));
     }
   });
 }

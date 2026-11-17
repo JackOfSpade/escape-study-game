@@ -109,7 +109,7 @@ test("topic names are escaped and the diagram contains no deeper checkpoint expa
     },
   ];
   const html = studyMapHtml(g, r, issued);
-  assert.doesNotMatch(html, /<script>|<img|<b>/);
+  assert.doesNotMatch(html, /<script|<img|<b>/i);
   assert.match(html, /&lt;img src=x onerror=&quot;unsafe&quot;&gt;/);
   assert.doesNotMatch(
     html,
