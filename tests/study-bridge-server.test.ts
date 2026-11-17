@@ -180,23 +180,10 @@ test("relay rejects a saved request captured under another provider before it re
       headers: { "Content-Type": "application/json", Origin: origin },
       body: JSON.stringify(body),
     });
-  const operations = [
-    "materialize-work",
-    "materialize-outcome",
-    "review-environment",
-    "group",
-    "complete",
-    "tutor",
-  ];
+  const operations = ["review-environment", "complete", "tutor"];
   const payload = (operation: string, provider?: string) => ({
     requestId: `synthetic-${operation}`,
     ...(provider ? { provider } : {}),
-    mode:
-      operation === "group"
-        ? "catch-up"
-        : operation === "complete"
-          ? "retrospective-npc-outcome"
-          : undefined,
   });
   try {
     for (const operation of operations)
@@ -231,6 +218,41 @@ test("relay rejects a saved request captured under another provider before it re
     }
     assert.equal(claude.calls.length, operations.length * 2);
   } finally {
+    await close(relay);
+  }
+});
+test("a route that fails after starting its reply drops that connection and leaves the relay serving", async () => {
+  const rejections: unknown[] = [];
+  const onRejection = (reason: unknown) => rejections.push(reason);
+  process.on("unhandledRejection", onRejection);
+  const relay = createStudyBridgeServer({
+    claude: fakeGateway(),
+    reports: {
+      async route(
+        req: { url?: string },
+        res: { writeHead(status: number): void; write(text: string): void },
+      ) {
+        if (req.url !== "/api/bug-report") return false;
+        res.writeHead(200);
+        res.write("{");
+        throw Error("Synthetic failure after the status line");
+      },
+    },
+  });
+  const base = await listen(relay);
+  try {
+    await assert.rejects(
+      fetch(base + "api/bug-report", { method: "POST" }).then((r) => r.text()),
+    );
+    // A second status line would have thrown out of the request handler.
+    await delay(20);
+    assert.deepEqual(rejections, []);
+    assert.equal(
+      (await (await fetch(base + "api/status")).json()).mode,
+      "claude-cli",
+    );
+  } finally {
+    process.off("unhandledRejection", onRejection);
     await close(relay);
   }
 });

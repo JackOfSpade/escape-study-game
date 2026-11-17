@@ -1,13 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
-import { enterNativeGame, mockClaudeStudy } from "./study-harness";
+import { mockClaudeStudy } from "./study-harness";
 
 async function openStudyQuestion(page: Page) {
   await mockClaudeStudy(page);
-  await enterNativeGame(page);
+  await page.goto("/");
   await page.evaluate(() => {
     (window as any).__deadAir.game.study.profile = "live";
   });
-  await page.locator("#study-only-toggle").click();
   await expect(page.locator("#study-workspace")).toBeVisible();
   await page.locator("#study-next").click();
   await expect(page.locator("#study-terminal-slot #terminal")).toBeVisible();
@@ -142,11 +141,10 @@ test("finishing a question returns to the map and plays the reveal once", async 
       body: JSON.stringify({ visitOutcome: "unresolved", findings: [] }),
     });
   });
-  await enterNativeGame(page);
+  await page.goto("/");
   await page.evaluate(() => {
     (window as any).__deadAir.game.study.profile = "live";
   });
-  await page.locator("#study-only-toggle").click();
   await page.locator("#study-next").click();
   await expect(page.locator("#study-terminal-slot #problem")).not.toBeEmpty();
   await expect(page.locator("#study-workspace")).toHaveAttribute(

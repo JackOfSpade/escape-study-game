@@ -4,9 +4,10 @@ import type {
   RoadmapReconciliationPayload,
 } from "./roadmap-adoption-types";
 import { inspectMergedDocument } from "./roadmap-structure";
+import { CELL_SEPARATOR } from "./table-row";
 const journals = (text: string) =>
   text.match(/<!-- BRANCH_RECORDS [^\n]* -->/g) ?? [];
-const idOf = (row: string) => row.split("|")[1]?.trim();
+const idOf = (row: string) => row.split(CELL_SEPARATOR)[1]?.trim();
 const formal = (key: string) =>
   /^(PY|PE)_PROGRESS\/0\.5(?:\.1)? /.test(key) &&
   /\/S\d{4}-(?:A|EV)\d{2,}$/.test(key);
@@ -88,12 +89,12 @@ export function normalizeBranchRecords(
     requested.add(key);
     const a = local.rows
         .get(key)!
-        .split("|")
+        .split(CELL_SEPARATOR)
         .slice(1, -1)
         .map((s) => s.trim()),
       b = incoming.rows
         .get(key)!
-        .split("|")
+        .split(CELL_SEPARATOR)
         .slice(1, -1)
         .map((s) => s.trim());
     if (
@@ -111,7 +112,7 @@ export function normalizeBranchRecords(
         if (
           formal(k) &&
           k.startsWith(claim.track + "_PROGRESS/0.5 ") &&
-          row.split("|")[2]?.trim() === claim.id
+          row.split(CELL_SEPARATOR)[2]?.trim() === claim.id
         )
           retained.add(k);
   }

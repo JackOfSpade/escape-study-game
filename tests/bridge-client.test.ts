@@ -151,3 +151,99 @@ test("a streaming reply reports its text so far, then returns the answer", async
     globalThis.fetch = original;
   }
 });
+
+test("a streamed reply tolerates blank lines and a missing final newline, rejects garbage and closes its stream", async () => {
+  const original = globalThis.fetch;
+  const online = () =>
+    Response.json({
+      mode: "claude-cli",
+      label: "Fake",
+      detail: "Fixture",
+      capabilities: [],
+    });
+  const ndjson = { headers: { "Content-Type": "application/x-ndjson" } };
+  let body = "";
+  let cancelled = 0;
+  globalThis.fetch = (async (input: unknown) => {
+    if (String(input) === "/api/status") return online();
+    const bytes = new TextEncoder().encode(body);
+    return new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(bytes);
+          // Left open on purpose: only the reader can end this exchange.
+        },
+        cancel() {
+          cancelled++;
+        },
+      }),
+      ndjson,
+    );
+  }) as typeof fetch;
+  try {
+    await checkBridge();
+    body = '\n{"text":"Wh"}\n\n{"answer":{"text":"Why?"}}\n{"text":"late"}\n';
+    const seen: string[] = [];
+    const answer = await bridgeRequest(
+      "tutor",
+      {},
+      { onText: (text) => seen.push(text) },
+    );
+    assert.equal((answer as any).text, "Why?");
+    assert.deepEqual(seen, ["Wh"]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(cancelled, 1, "the answered stream is released");
+    body = '{"text":"Wh"}\nnot json\n';
+    await assert.rejects(
+      bridgeRequest("tutor", {}, { onText: () => {} }),
+      /Malformed bridge response/,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(cancelled, 2, "a failed stream is released too");
+    globalThis.fetch = (async () =>
+      new Response(
+        '{"text":"Wh"}\n{"answer":{"text":"Done"}}',
+        ndjson,
+      )) as typeof fetch;
+    assert.equal(
+      ((await bridgeRequest("tutor", {}, { onText: () => {} })) as any).text,
+      "Done",
+    );
+    // Progress is display only: a listener that throws cannot cost the answer.
+    globalThis.fetch = (async () =>
+      new Response(
+        '{"text":"Wh"}\n{"answer":{"text":"Kept"}}\n',
+        ndjson,
+      )) as typeof fetch;
+    assert.equal(
+      (
+        (await bridgeRequest(
+          "tutor",
+          {},
+          {
+            onText: () => {
+              throw Error("repaint failed");
+            },
+          },
+        )) as any
+      ).text,
+      "Kept",
+    );
+    globalThis.fetch = (async () =>
+      new Response('{"text":"Wh"}\n', ndjson)) as typeof fetch;
+    await assert.rejects(
+      bridgeRequest("tutor", {}, { onText: () => {} }),
+      /ended before its answer/,
+    );
+  } finally {
+    globalThis.fetch = (async () =>
+      Response.json({
+        mode: "development",
+        label: "Development fallback",
+        detail: "Fixture ended",
+        capabilities: [],
+      })) as typeof fetch;
+    await checkBridge();
+    globalThis.fetch = original;
+  }
+});

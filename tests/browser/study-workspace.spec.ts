@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { enterNativeGame, mockClaudeStudy } from "./study-harness";
+import { mockClaudeStudy } from "./study-harness";
 
 test("tier skill map shows connected topic nodes vertically and marks the current topic in a split pane", async ({
   page,
@@ -7,7 +7,6 @@ test("tier skill map shows connected topic nodes vertically and marks the curren
   await mockClaudeStudy(page);
   await page.setViewportSize({ width: 700, height: 900 });
   await page.goto("/");
-  await page.locator("#study-only-toggle").click();
   const map = page.locator(".study-skill-map");
   const root = map.locator(".study-map-root");
   const columns = map.locator(".study-map-columns");
@@ -198,12 +197,11 @@ test("the study terminal takes the wide workspace while the map keeps its readin
   page,
 }) => {
   await mockClaudeStudy(page);
-  await enterNativeGame(page);
+  await page.goto("/");
   await page.setViewportSize({ width: 2000, height: 1100 });
   await page.evaluate(() => {
     (window as any).__deadAir.game.study.profile = "live";
   });
-  await page.locator("#study-only-toggle").click();
   // The map gives way to the open question, so it is measured first.
   const map = await page.locator(".study-skill-map").boundingBox();
   await page.locator("#study-next").click();

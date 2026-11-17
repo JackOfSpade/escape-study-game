@@ -1,7 +1,0 @@
-{
-  "seedSamples": 1000,
-  "ordinaryFloors": 4000,
-  "invalidFootprints": 0,
-  "constructionErrors": 0,
-  "scope": "Seeded uint32 generator smoke; wall connectivity is separately covered by the 64-seed core property test."
-}

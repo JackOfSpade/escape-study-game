@@ -2,10 +2,9 @@ import { PROVIDERS } from "./model";
 import { bridgeRequest, status } from "./bridge-client";
 import { evidencePacket, syncLearningView } from "./curriculum";
 import { applyLearningAssessment, encounterKey } from "./learner";
-import type { Assessment, Encounter, Game, Roadmap } from "./model";
-import { assessmentDeferred, assessmentSegment } from "./question-thread";
+import type { Assessment, Encounter, StudyRecord, Roadmap } from "./model";
 
-const connected = (g: Game) =>
+const connected = (g: StudyRecord) =>
   g.study.profile === "live" && status().mode !== "development";
 const latestHumanSequence = (e: Encounter) =>
   e.history.reduce(
@@ -19,7 +18,7 @@ const latestHumanSequence = (e: Encounter) =>
 
 /** An assessment reviews one immutable cutoff, even across reloads and retries. */
 export async function assess(
-  g: Game,
+  g: StudyRecord,
   e: Encounter,
   r: Roadmap,
   cutoff = e.submissions.find((s) => s.id === e.accepted)?.seq ??
@@ -32,8 +31,6 @@ export async function assess(
     0,
   );
   if (e.problem?.contract.practice) return;
-  // A segmented question is assessed once it is finished, visit by visit.
-  if (assessmentDeferred(g, e)) return;
   const study = g.study,
     id = `assessment-${encounterKey(e)}-${cutoff}`,
     prior = study.assessments.find((a) => a.id === id);
@@ -74,13 +71,13 @@ export async function assess(
   ) {
     a.status = "review-required";
     a.provenance =
-      "Attempt resolved in the imported roadmap. Local work is retained; world completion adds no duplicate academic assessment or visit.";
+      "Attempt resolved in the imported roadmap. Local work is retained; completing it adds no duplicate academic assessment or visit.";
     return;
   }
   if (!e.problem) {
     a.status = "review-required";
     a.provenance =
-      "Physical contribution retained; no persisted human learning task was issued. No academic credit.";
+      "No persisted human learning task was issued. No academic credit.";
     return;
   }
   if (!PROVIDERS.includes(e.problem.provenance) || study.profile !== "live") {
@@ -99,10 +96,7 @@ export async function assess(
           : "study-mode")(connected(g) ? status().mode : e.problem.provenance),
       payloadJson: JSON.stringify({
         requestId: id,
-        packet: ((segment) => ({
-          ...evidencePacket(e, r, cutoff, learner, acceptedCutoff),
-          ...(segment ? { segment } : {}),
-        }))(assessmentSegment(g, e)),
+        packet: evidencePacket(e, r, cutoff, learner, acceptedCutoff),
       }),
     };
     const saved = a.request,

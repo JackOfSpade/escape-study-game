@@ -28,7 +28,7 @@ try {
     throw error;
 }
 // Identical verification must not trigger Vite's public-file reload and interrupt
-// a running game or study request whenever a build/test preflight runs.
+// a running study request whenever a build/test preflight runs.
 if (previous !== serialized) writeFileSync(output, serialized);
 console.log(
   `Verified revision 9; PY ${result.tracks.PY.objectives.length}, PE ${result.tracks.PE.objectives.length}; source and 3 protected digests intact.`,

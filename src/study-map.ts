@@ -1,6 +1,6 @@
 import { eligible } from "./curriculum";
 import { escapeHtml as esc } from "./html";
-import type { Contract, Game, Roadmap } from "./model";
+import type { Contract, StudyRecord, Roadmap } from "./model";
 import { studyTrackProgress } from "./study-progress";
 
 type TopicProgress = ReturnType<typeof studyTrackProgress>["topics"][number];
@@ -32,7 +32,7 @@ const statusLabels = {
 };
 
 /** A topic-only diagram. Connectors show curriculum grouping, never prerequisites. */
-export function studyMapHtml(g: Game, r: Roadmap, issued?: Contract) {
+export function studyMapHtml(g: StudyRecord, r: Roadmap, issued?: Contract) {
   let current = issued;
   if (!current) {
     try {

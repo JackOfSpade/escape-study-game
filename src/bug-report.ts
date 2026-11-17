@@ -3,7 +3,9 @@
  * computer's service logs and writes one Markdown file. "Copy to clipboard"
  * copies that file's path and the learner's own words, never the report body. */
 
-export interface BugReportQuestion {
+import { isRecord } from "./records";
+
+interface BugReportQuestion {
   title: string;
   /** The scheduling and provenance line the workspace no longer displays. */
   provenance: string;
@@ -16,7 +18,7 @@ export interface BugReportQuestion {
   requests: { state: string; error?: string }[];
   draft?: string;
 }
-export interface BugReportSnapshot {
+interface BugReportSnapshot {
   url: string;
   build?: string;
   userAgent: string;
@@ -33,7 +35,7 @@ export interface BugReportSnapshot {
 }
 
 /** Characters of browser diagnostics kept; the newest entries win. */
-export const CLIENT_REPORT_LIMIT = 600_000;
+const CLIENT_REPORT_LIMIT = 600_000;
 const DRAFT_KEY = "bug-report-draft";
 
 const fence = (text: string, language = "text") =>
@@ -57,15 +59,12 @@ function diagnostics(logs: string, budget: number) {
   const sections: string[] = [];
   // Newest run first: it is the one a report is almost always about.
   for (const run of [...runs].reverse()) {
-    const {
-      entries = [],
-      audit,
-      ...head
-    } = run as {
-      entries?: unknown[];
-      audit?: { events?: unknown[] } & Record<string, unknown>;
-    } & Record<string, unknown>;
-    const { events = [], ...summary } = audit ?? {};
+    // Stored diagnostics may be damaged; a report must still be produced.
+    if (!isRecord(run)) continue;
+    const { entries: rawEntries, audit, ...head } = run;
+    const { events: rawEvents, ...summary } = isRecord(audit) ? audit : {};
+    const entries = Array.isArray(rawEntries) ? rawEntries : [];
+    const events = Array.isArray(rawEvents) ? rawEvents : [];
     const lines = (items: unknown[]) =>
       items.map((item) => JSON.stringify(item));
     let detail = lines(entries);
@@ -99,7 +98,7 @@ function diagnostics(logs: string, budget: number) {
     );
     if (budget <= 0) break;
   }
-  return sections.join("\n\n");
+  return sections.join("\n\n") || "_No runs recorded._";
 }
 
 /** The browser's part of a report, as Markdown. Pure: tests call it directly. */
@@ -284,10 +283,13 @@ export function mountBugReport({ collect, log }: Wiring) {
         say("The report was downloaded.", "ok");
         outcome = "downloaded";
       }
-      text.value = "";
-      try {
-        sessionStorage.removeItem(DRAFT_KEY);
-      } catch {}
+      // Words typed while the report was being sent belong to the next one.
+      if (text.value.trim() === description) {
+        text.value = "";
+        try {
+          sessionStorage.removeItem(DRAFT_KEY);
+        } catch {}
+      }
     } catch (error) {
       // The bridge is the usual thing being reported as broken, so the
       // browser's own half must still reach the learner without it.

@@ -13,7 +13,7 @@ import {
 import type { Assessment, Encounter, Roadmap } from "../src/model";
 import { prepareRoadmapExport, sha256 } from "../src/roadmap-export";
 import { reviewRoadmap } from "../src/roadmap-review";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 const at = "2026-10-15T16:00:00.000Z";
 // Isolated synthetic adapter fixtures: no game save or real human progress is
@@ -386,7 +386,7 @@ test("roadmap export: preview-only scope generation cannot create a revision; pe
   assess(e);
   const first = await prepareRoadmapExport(r, l, undefined, at);
   const c = eligibleLearning(r, l, at),
-    preview = createGame(99, r).encounters["f0-room0"];
+    preview = createGame(99, r).encounters["question-0"];
   preview.problem = {
     title: "preview",
     prompt: "preview",
@@ -428,4 +428,23 @@ test("roadmap export: preview-only scope generation cannot create a revision; pe
     /pending-scope \| Explain the relevant source distinction \| unknown/,
   );
   assert.equal(l.evidence.length, 2);
+});
+
+test("roadmap export: replacement patterns in facet text stay literal instead of expanding into the document", async () => {
+  const { l, issue, assess } = fixture();
+  const e = issue();
+  const description =
+    "Explain shell $$, the quoting forms $' and $`, and the regex token $&";
+  const definition = e.problem!.scopeDefinitions![0];
+  definition.facets[0].description = description;
+  l.scopes[definition.id].facets[0].description = description;
+  assess(e, ["purpose"], false);
+  const saved = await prepareRoadmapExport(r, l, undefined, at);
+  assert.ok(saved.content.includes(description));
+  for (const name of ["SHARED_PROGRESS", "PY_PROGRESS", "PE_PROGRESS"])
+    assert.equal(saved.content.split(`<!-- BEGIN ${name} -->`).length, 2);
+  // Nothing but the projected rows grew: the document was not spliced into itself.
+  assert.ok(saved.content.length < r.raw.length * 1.2);
+  const again = await prepareRoadmapExport(r, l, saved, at);
+  assert.equal(again.hash, saved.hash);
 });

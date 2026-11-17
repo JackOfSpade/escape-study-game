@@ -1,5 +1,4 @@
 import { expect, test, type Page } from "@playwright/test";
-import { enterNativeGame } from "./study-harness";
 
 /** Fake Claude CLI gateway: no model, connector or real save is involved. */
 async function mockClaude(page: Page) {
@@ -19,7 +18,7 @@ async function mockClaude(page: Page) {
         mode: "claude-cli",
         label: "Claude CLI",
         detail: "Synthetic gateway",
-        capabilities: ["generate", "tutor", "complete", "assess", "group"],
+        capabilities: ["generate", "tutor", "complete", "assess"],
       });
     if (url.pathname !== "/api/bridge")
       return json({ error: `No route for ${url.pathname}` }, 404);
@@ -57,32 +56,17 @@ async function mockClaude(page: Page) {
   });
   return { calls, held };
 }
-const openTerminal = (page: Page) =>
-  page.evaluate(async () => {
-    const d = (window as any).__deadAir,
-      g = d.game;
-    g.study.profile = "live";
-    // A live run starts with no pre-made practice questions.
-    for (const each of Object.values<any>(g.encounters)) delete each.problem;
-    const st = g.floors[0].stations[0],
-      e = g.encounters[st.encounter];
-    e.mode = "solo";
-    e.owner = "human";
-    Object.assign(g.survivors[0], { floor: 0, x: st.x, y: st.y });
-    await d.interact();
-    return e.id as string;
-  });
-const gameTime = (page: Page) =>
-  page.evaluate(() => (window as any).__deadAir.game.time as number);
+const openQuestion = async (page: Page) => {
+  await page.goto("/");
+  await page.locator("#study-next").click();
+};
 
-test("Claude CLI serves a question and conversation inside the game, pausing only during a reply", async ({
+test("Claude CLI serves a question and conversation inside the study workspace", async ({
   page,
 }) => {
   const claude = await mockClaude(page);
-  await enterNativeGame(page);
-  await openTerminal(page);
+  await openQuestion(page);
   await expect(page.locator("#terminal")).toBeVisible();
-  await expect(page.locator("body")).toHaveClass(/terminal-open/);
   await expect(page.locator("#problem-title")).toHaveText("Embedded question");
   // The fenced block renders as code, with no literal fence and no page growth.
   await expect(page.locator("#problem pre code")).toHaveCount(1);
@@ -117,28 +101,19 @@ test("Claude CLI serves a question and conversation inside the game, pausing onl
   await page.locator("#chat-input").fill("It decides what the index can seek.");
   await page.locator("#chat-input").press("Enter");
   await expect.poll(() => claude.held.release !== undefined).toBe(true);
-  const frozen = await gameTime(page);
-  await page.waitForTimeout(400);
-  expect(await gameTime(page)).toBe(frozen);
-
   claude.held.release!();
   await expect(page.locator("#messages")).toContainText(
     "What would the planner do then?",
   );
   await expect(page.locator("#messages pre code")).toHaveText("SELECT 1;");
   await expect(page.locator("#messages")).not.toContainText("```");
-  await expect.poll(() => gameTime(page)).toBeGreaterThan(frozen);
 });
 
-test("the study view shows the embedded terminal and returns it to the game layout", async ({
+test("the study view shows the question panel and keeps it open", async ({
   page,
 }) => {
   const claude = await mockClaude(page);
-  await enterNativeGame(page);
-  await page.evaluate(() => {
-    (window as any).__deadAir.game.study.profile = "live";
-  });
-  await page.locator("#study-only-toggle").click();
+  await page.goto("/");
   await expect(page.locator("#study-workspace")).toBeVisible();
   await expect(page.locator("#terminal")).toBeHidden();
 
@@ -148,13 +123,10 @@ test("the study view shows the embedded terminal and returns it to the game layo
   await expect(terminal.locator("#problem")).toContainText(
     "Why does the leading index column matter?",
   );
-  // The background preparation may also have run; the study question is its own.
-  expect(
-    claude.calls.filter(
-      (c) => c.operation === "generate" && c.payload.encounterId !== "prepared",
-    ),
-  ).toHaveLength(1);
-  // No horizontal scroll while the terminal is in the study view.
+  expect(claude.calls.filter((c) => c.operation === "generate")).toHaveLength(
+    1,
+  );
+  // No horizontal scroll while the question is open.
   expect(
     await page.evaluate(
       () =>
@@ -162,8 +134,6 @@ test("the study view shows the embedded terminal and returns it to the game layo
         document.documentElement.clientWidth,
     ),
   ).toBe(true);
-
-  // The station reach check must not close a terminal that has no station.
   await page.waitForTimeout(400);
   await expect(terminal).toBeVisible();
 
@@ -175,32 +145,8 @@ test("the study view shows the embedded terminal and returns it to the game layo
     "What would the planner do then?",
   );
 
-  // Study mode offers no way to walk away from the open question.
-  await expect(page.locator("#leave")).toBeHidden();
-  // If the terminal is closed anyway, the unfinished question is resumable
-  // instead of stranding the learner behind a disabled button.
-  await page.evaluate(() =>
-    document.querySelector<HTMLButtonElement>("#leave")!.click(),
-  );
-  await expect(page.locator("#terminal")).toBeHidden();
-  await expect(page.locator("#study-workspace")).toBeVisible();
+  // The workspace offers no way to walk away from the open question.
   const next = page.locator("#study-next");
-  await expect(next).toHaveText("Resume question");
-  await expect(next).toBeEnabled();
-  await next.click();
-  await expect(terminal).toBeVisible();
-  await expect(terminal.locator("#problem")).toContainText(
-    "Why does the leading index column matter?",
-  );
-  await expect(page.locator("#messages")).toContainText(
-    "What would the planner do then?",
-  );
   await expect(next).toHaveText("Question in progress");
   await expect(next).toBeDisabled();
-
-  await page.locator("#study-only-exit").click();
-  await expect(page.locator("#study-workspace")).toBeHidden();
-  await expect(page.locator(".game-layout #terminal")).toHaveCount(1);
-  await expect(page.locator("#study-terminal-slot #terminal")).toHaveCount(0);
-  await expect(page.locator("#terminal")).toBeHidden();
 });

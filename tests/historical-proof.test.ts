@@ -16,7 +16,7 @@ import {
 import type { Assessment, Roadmap } from "../src/model";
 import { decode, encode } from "../src/persistence";
 import { prepareRoadmapExport } from "../src/roadmap-export";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 const at = "2026-10-16T16:00:00.000Z";
@@ -37,7 +37,7 @@ function fixture(id = "PY:T07.1", mode: "test" | "live" = "test") {
   let serial = 0;
   const issue = () => {
     const c = eligibleLearning(r, l, at),
-      e = structuredClone(g.encounters["f0-room0"]);
+      e = structuredClone(g.encounters["question-0"]);
     e.id = `historical-${++serial}`;
     assert.deepEqual(c.objectiveIds, [id]);
     e.problem = {

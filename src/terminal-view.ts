@@ -1,6 +1,4 @@
 import type { Encounter } from "./model";
-export const terminalChannel = (e: Pick<Encounter, "mode">) =>
-  e.mode === "shared" ? "group" : "tutor";
 export function submissionView(e: Encounter) {
   const s = e.submissions.at(-1);
   if (s?.status === "pending")
@@ -22,7 +20,7 @@ export function submissionView(e: Encounter) {
           ? "Accepted"
           : "Completed previously",
       tone: "accepted",
-      help: "This puzzle is solved. Gameplay rewards and individual learning assessment are separate.",
+      help: "This question is solved. Individual learning assessment is separate.",
     };
   if (s?.status === "needs-work")
     return {
@@ -35,9 +33,9 @@ export function submissionView(e: Encounter) {
     };
   if (e.state === "consumed")
     return {
-      label: "Completed by survivors",
+      label: "Completed",
       tone: "accepted",
-      help: "This one-time puzzle is read-only.",
+      help: "This question is closed and read-only.",
     };
   return {
     label: "Not submitted",

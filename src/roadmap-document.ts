@@ -3,6 +3,7 @@ import { finalRequirements } from "./final-requirements";
 import type { Objective, Roadmap, Track } from "./model";
 import { readIdentifierCounters } from "./roadmap-identifiers";
 import { inspectMergedDocument } from "./roadmap-structure";
+import { CELL_SEPARATOR } from "./table-row";
 const validDay = (value: string) =>
   /^\d{4}-\d{2}-\d{2}$/.test(value) &&
   Number.isFinite(Date.parse(value)) &&
@@ -19,7 +20,7 @@ function field(raw: string, label: string) {
   if (rows.length !== 1)
     throw Error(`Missing or ambiguous saved field ${label}`);
   const c = rows[0]
-    .split("|")
+    .split(CELL_SEPARATOR)
     .slice(1, -1)
     .map((c) => c.trim());
   if (c.length !== 2) throw Error(`Malformed saved field ${label}`);
@@ -27,7 +28,7 @@ function field(raw: string, label: string) {
 }
 const cells = (line: string) =>
   line
-    .split("|")
+    .split(CELL_SEPARATOR)
     .slice(1, -1)
     .map((c) => c.trim());
 /** Parse an entire saved document without adopting its claims or starting study.
@@ -117,9 +118,9 @@ export async function parseRoadmapDocument(
         const def = curriculumLines.find((l) => l.startsWith(`| ${id} |`));
         const extension = curriculumLines.find((l) => l.includes(`**${id}**`));
         const scope =
-          def?.split("|")[2].trim() ??
+          def?.split(CELL_SEPARATOR)[2].trim() ??
           extension
-            ?.split("|")[3]
+            ?.split(CELL_SEPARATOR)[3]
             ?.split(`**${id}**`)[1]
             ?.split(/\*\*[TX]\d{2}\.\d+\*\*/)[0]
             ?.trim();
@@ -269,6 +270,8 @@ export async function parseRoadmapDocument(
     tracks,
     sharedProgress: "\n" + parsed.blocks.SHARED_PROGRESS,
   };
+  // Parsed once per track: the retention table below consults it per row.
+  const finals = {} as Record<Track, ReturnType<typeof finalRequirements>>;
   for (const t of ["PY", "PE"] as Track[]) {
     const s = tracks[t],
       other = tracks[t === "PY" ? "PE" : "PY"];
@@ -292,7 +295,7 @@ export async function parseRoadmapDocument(
       !c[1]?.startsWith(`Tier ${s.tier} / ${s.phase}`)
     )
       throw Error(`Shared ${t} dashboard contradicts track state`);
-    const defs = finalRequirements(result, t),
+    const defs = (finals[t] = finalRequirements(result, t)),
       allowed = [
         ...s.rotation,
         ...defs
@@ -388,7 +391,7 @@ export async function parseRoadmapDocument(
       const id = key ? `${key[1]}:${key[2]}` : "",
         depth = Number(key?.[3] ?? key?.[4]),
         o = tracks[t].objectives.find((o) => o.id === id),
-        final = finalRequirements(result, t).find(
+        final = finals[t].find(
           (d) => d.id === id && d.kind !== "environment" && d.selected,
         );
       if (
@@ -427,7 +430,7 @@ export async function parseRoadmapDocument(
     }
     const allowed = [
       ...tracks[t].rotation,
-      ...finalRequirements(result, t)
+      ...finals[t]
         .filter((d) => d.kind === "integration" && d.selected)
         .map((d) => d.name),
     ];
@@ -458,7 +461,9 @@ export async function parseRoadmapDocument(
       };
     });
   }
-  const issued = new Set<string>();
+  // Evidence cites a task from its own track's register: a PE row naming a
+  // PY task (or the reverse) would attach evidence to the wrong track.
+  const issued: Record<Track, Set<string>> = { PY: new Set(), PE: new Set() };
   for (const t of ["PY", "PE"] as Track[])
     for (const row of part(tracks[t].progress, "0.5.1 Attempt status register")
       .split("\n")
@@ -485,7 +490,7 @@ export async function parseRoadmapDocument(
         throw Error(
           "Invalid source attempt disposition; completion is not a mastery score",
         );
-      issued.add(c[0]);
+      issued[t].add(c[0]);
     }
   for (const t of ["PY", "PE"] as Track[])
     for (const row of part(
@@ -494,9 +499,11 @@ export async function parseRoadmapDocument(
     )
       .split("\n")
       .filter((s) => /^\| S\d/.test(s)))
-      if (!issued.has(cells(row)[1]))
+      if (!issued[t].has(cells(row)[1]))
         throw Error(
-          "Source evidence does not reference an issued assessment task",
+          issued[t === "PY" ? "PE" : "PY"].has(cells(row)[1])
+            ? `${t} evidence cites an assessment task issued on the other track: ${cells(row)[1]}`
+            : "Source evidence does not reference an issued assessment task",
         );
   const identifiers = readIdentifierCounters(raw);
   if (identifiers.issue) issues.push(identifiers.issue);

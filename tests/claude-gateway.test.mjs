@@ -148,18 +148,12 @@ test("terminal dialogue validation enforces topicAssessments on completion", () 
 test("each task runs its chosen model and effort, latest aliases only", () => {
   assert.deepEqual(
     Object.fromEntries(
-      [
-        "tutor",
-        "complete",
-        "assess",
-        "generate",
-        "reconcile-roadmap",
-        "npc-chatter",
-        "design-run",
-      ].map((op) => {
-        const p = taskProfile(op, {});
-        return [op, `${p.model}/${p.effort}`];
-      }),
+      ["tutor", "complete", "assess", "generate", "reconcile-roadmap"].map(
+        (op) => {
+          const p = taskProfile(op, {});
+          return [op, `${p.model}/${p.effort}`];
+        },
+      ),
     ),
     {
       tutor: "sonnet/low",
@@ -167,14 +161,9 @@ test("each task runs its chosen model and effort, latest aliases only", () => {
       assess: "haiku/high",
       generate: "opus/medium",
       "reconcile-roadmap": "opus/high",
-      "npc-chatter": "haiku/high",
-      "design-run": "sonnet/medium",
     },
   );
-  assert.deepEqual(
-    taskProfile("design-run", { phase: "content-batch" }),
-    taskProfile("design-run", {}),
-  );
+  assert.throws(() => taskProfile("design-run"), /Unknown AI task/);
 });
 
 test("calls are locked down and cannot bill an API key", () => {
@@ -234,19 +223,6 @@ test("a repeated request id joins the same call and never pays twice", async () 
   assert.equal(calls.length, 1);
 });
 
-test("run design stages share one conversation", async () => {
-  const calls = [];
-  const g = gateway(['{"ok":1}', '{"ok":2}'], calls);
-  await g.run("design-run", { requestId: "a", generationId: "design-g" });
-  await g.run("design-run", { requestId: "b", generationId: "design-g" });
-  assert.ok(calls[0].args.includes("--session-id"));
-  assert.ok(calls[1].args.includes("--resume"));
-  assert.equal(
-    calls[0].args[calls[0].args.indexOf("--session-id") + 1],
-    calls[1].args[calls[1].args.indexOf("--resume") + 1],
-  );
-});
-
 test("failures say what to do: usage limit, sign-in, wrong model", async () => {
   const fail = (result) => ({
     result: { type: "result", subtype: "error", is_error: true, result },
@@ -283,31 +259,6 @@ test("cancelling stops the running process", async () => {
   const running = g.run("complete", {}, { signal: cancel.signal });
   setImmediate(() => cancel.abort());
   await assert.rejects(running, { code: "CLAUDE_CANCELLED" });
-});
-
-test("the limit on running calls lets a player's request pass queued chatter", async () => {
-  const order = [];
-  const replies = ["hang", '{"chatter":1}', '{"player":1}'];
-  const base = fakeSpawn(replies);
-  let first;
-  const g = createClaudeGateway({
-    env,
-    cwd: dir,
-    maxRunning: 1,
-    validate: () => {},
-    spawn: (...args) => {
-      const child = base(...args);
-      first ??= child;
-      return child;
-    },
-  });
-  const blocker = g.run("complete", {}, {}).catch(() => {});
-  const chatter = g.run("npc-chatter", {}).then(() => order.push("chatter"));
-  const player = g.run("tutor", {}).then(() => order.push("player"));
-  await new Promise((r) => setImmediate(r));
-  first.kill();
-  await Promise.all([blocker, chatter, player]);
-  assert.equal(order[0], "player");
 });
 
 test("a request cancelled while queued never starts a process", async () => {
@@ -357,38 +308,47 @@ test("a joined call survives one caller leaving and stops when all have", async 
   assert.equal(calls.length, 1);
 });
 
-test("a design conversation recovers after a restart or a lost session", async () => {
-  const fail = (result) => ({
-    result: { type: "result", subtype: "error", is_error: true, result },
-  });
-  const restarted = [];
-  const afterRestart = gateway(
-    [fail("Session ID x is already in use."), '{"ok":1}'],
-    restarted,
-  );
-  assert.deepEqual(
-    await afterRestart.run("design-run", { generationId: "design-a" }),
-    { ok: 1 },
-  );
-  assert.ok(restarted[0].args.includes("--session-id"));
-  assert.ok(restarted[1].args.includes("--resume"));
-  const lost = [];
-  const afterLoss = gateway(
-    ['{"ok":1}', fail("No conversation found"), '{"ok":2}'],
-    lost,
-  );
-  await afterLoss.run("design-run", {
-    requestId: "a",
-    generationId: "design-b",
-  });
-  assert.deepEqual(
-    await afterLoss.run("design-run", {
-      requestId: "b",
-      generationId: "design-b",
-    }),
-    { ok: 2 },
-  );
-  assert.ok(lost[2].args.includes("--session-id"));
+test("a retry of a request whose every caller left starts afresh instead of inheriting the cancellation", async () => {
+  // The stopped process takes a moment to exit, as a real one does.
+  const children = [];
+  const spawn = (binary, args) => {
+    const child = new EventEmitter();
+    child.stdout = new PassThrough();
+    child.stderr = new PassThrough();
+    child.stdin = new PassThrough();
+    child.kill = () => {
+      if (child.killed) return;
+      child.killed = true;
+      setTimeout(() => child.emit("close", null), 20);
+    };
+    if (children.push(child) > 1)
+      setImmediate(() => {
+        const model = args[args.indexOf("--model") + 1];
+        child.stdout.write(
+          `${JSON.stringify({ type: "system", subtype: "init", model: `claude-${model}-5-5` })}\n`,
+        );
+        child.stdout.write(
+          `${JSON.stringify({ type: "result", subtype: "success", is_error: false, result: '{"ok":2}' })}\n`,
+        );
+        child.stdout.end();
+        child.emit("close", 0);
+      });
+    return child;
+  };
+  const g = createClaudeGateway({ env, cwd: dir, validate: () => {}, spawn });
+  const payload = { requestId: "reloaded" };
+  const left = new AbortController();
+  const first = g.run("complete", payload, { signal: left.signal });
+  await new Promise((r) => setImmediate(r));
+  left.abort();
+  // The page reloads and asks again before the first process has exited.
+  const retry = g.run("complete", payload);
+  await assert.rejects(first, { code: "CLAUDE_CANCELLED" });
+  assert.deepEqual(await retry, { ok: 2 });
+  assert.equal(children.length, 2);
+  // The stopped call's cleanup left the finished answer reachable by its id.
+  assert.deepEqual(await g.run("complete", payload), { ok: 2 });
+  assert.equal(children.length, 2);
 });
 
 test("the reply's text can be read as it is written", () => {
@@ -449,129 +409,6 @@ test("streamed text arrives before the answer, and a correction clears it", asyn
   assert.deepEqual(seen, ["Hel", "Hello", "", "Hel", "Hello"]);
 });
 
-test("quality design stages require schema-validated structured output", async () => {
-  const calls = [];
-  const g = gateway(
-    [
-      {
-        result: {
-          type: "result",
-          subtype: "success",
-          is_error: false,
-          result: "",
-          structured_output: {
-            requestId: "s1",
-            selectedId: "a",
-            rationale: "r",
-          },
-        },
-      },
-      '{"ok":1}',
-      '{"ok":2}',
-    ],
-    calls,
-  );
-  const reply = await g.run("design-run", {
-    version: 3,
-    phase: "selection",
-    requestId: "s1",
-    generationId: "design-schema",
-  });
-  assert.deepEqual(reply, { requestId: "s1", selectedId: "a", rationale: "r" });
-  const schema = JSON.parse(
-    calls[0].args[calls[0].args.indexOf("--json-schema") + 1],
-  );
-  assert.equal(schema.properties.requestId.type, "string");
-  assert.deepEqual(schema.required, ["requestId", "selectedId", "rationale"]);
-  // Retained legacy design requests and live tasks keep free-form replies.
-  await g.run("design-run", { version: 1, requestId: "old" });
-  await g.run("complete", {});
-  assert.equal(calls[1].args.includes("--json-schema"), false);
-  assert.equal(calls[2].args.includes("--json-schema"), false);
-});
-
-test("escape-catastrophe uses its reply schema and is never streamed", async () => {
-  const calls = [];
-  const structured = { requestId: "cat-g1", spec: { id: "c" } };
-  const g = gateway(
-    [
-      {
-        result: {
-          type: "result",
-          subtype: "success",
-          is_error: false,
-          result: "",
-          structured_output: structured,
-        },
-      },
-    ],
-    calls,
-  );
-  const seen = [];
-  const reply = await g.run(
-    "escape-catastrophe",
-    { requestId: "cat-g1", areaIds: ["dorm", "pad"], recent: [] },
-    { onText: (t) => seen.push(t) },
-  );
-  assert.deepEqual(reply, structured);
-  const args = calls[0].args;
-  assert.equal(args.includes("--include-partial-messages"), false);
-  const schema = JSON.parse(args[args.indexOf("--json-schema") + 1]);
-  assert.deepEqual(schema.properties.requestId, { const: "cat-g1" });
-  assert.deepEqual(schema.properties.spec.properties.origin.properties.areaId, {
-    enum: ["dorm", "pad"],
-  });
-  assert.deepEqual(seen, []);
-  const { system } = buildPrompt("escape-catastrophe", { requestId: "x" });
-  assert.match(system, /StructuredOutput tool/);
-  assert.match(system, /payload\.recent/);
-  assert.match(system, /different threat mechanism, not a renamed/);
-});
-
-test("a reply the CLI cannot fit to the schema gets one correction turn", async () => {
-  const calls = [];
-  const g = gateway(
-    [
-      {
-        result: {
-          type: "result",
-          subtype: "error_max_structured_output_retries",
-          is_error: true,
-          errors: ["concepts: must have 3 items"],
-        },
-      },
-      {
-        result: {
-          type: "result",
-          subtype: "success",
-          is_error: false,
-          result: "",
-          structured_output: {
-            requestId: "c1",
-            selectedId: "b",
-            rationale: "r",
-          },
-        },
-      },
-    ],
-    calls,
-  );
-  const payload = { version: 3, phase: "selection", requestId: "c1" };
-  assert.deepEqual(await g.run("design-run", payload), {
-    requestId: "c1",
-    selectedId: "b",
-    rationale: "r",
-  });
-  assert.equal(calls.length, 2);
-  assert.match(calls[1].input, /previous answer was rejected/);
-  assert.match(calls[1].input, /must have 3 items/);
-  // Schema-backed stages ask for the StructuredOutput tool, not free text.
-  const { system } = buildPrompt("design-run", payload);
-  assert.match(system, /StructuredOutput tool/);
-  assert.doesNotMatch(system, /no markdown fence/);
-  assert.match(buildPrompt("complete", {}).system, /no markdown fence/);
-});
-
 const usageRows = () => {
   const rows = [];
   return { rows, log: (row) => rows.push(row) };
@@ -607,10 +444,7 @@ test("a successful call logs exactly one measured row", async () => {
   assert.equal(row.v, 1);
   assert.equal(row.at, new Date(row.at).toISOString());
   assert.equal(row.operation, "complete");
-  assert.equal(row.phase, null);
-  assert.equal(row.conversationTurn, null);
   assert.equal(row.attempt, 0);
-  assert.equal(row.sessionResume, null);
   assert.equal(row.alias, "sonnet");
   assert.equal(row.effort, "high");
   assert.equal(row.model, "claude-sonnet-5-5");
@@ -634,10 +468,7 @@ test("a rejected reply then a valid correction logs both attempts", async () => 
       if (answer.bad) throw Error("wrong shape");
     },
   });
-  assert.deepEqual(
-    await g.run("complete", { conversation: { turn: 1 }, phase: "content" }),
-    { ok: 1 },
-  );
+  assert.deepEqual(await g.run("complete", {}), { ok: 1 });
   assert.deepEqual(
     rows.map((row) => [row.attempt, row.outcome]),
     [
@@ -645,177 +476,6 @@ test("a rejected reply then a valid correction logs both attempts", async () => 
       [1, "accepted"],
     ],
   );
-  assert.deepEqual(
-    rows.map((row) => [row.conversationTurn, row.phase]),
-    [
-      [1, "content"],
-      [1, "content"],
-    ],
-  );
-});
-
-test("a session retry whose reply is rejected still logs that reply", async () => {
-  const { rows, log } = usageRows();
-  const inUse = {
-    result: {
-      type: "result",
-      subtype: "error",
-      is_error: true,
-      result: "Session ID x is already in use.",
-    },
-  };
-  const g = gateway([inUse, '{"bad":1}', '{"ok":1}'], [], {
-    usageLog: log,
-    validate: (_job, answer) => {
-      if (answer.bad) throw Error("wrong shape");
-    },
-  });
-  assert.deepEqual(await g.run("design-run", { generationId: "design-r" }), {
-    ok: 1,
-  });
-  assert.deepEqual(
-    rows.map((row) => [row.attempt, row.sessionResume, row.outcome]),
-    [
-      [0, false, "session-in-use"],
-      [0, true, "rejected"],
-      [1, true, "accepted"],
-    ],
-  );
-});
-
-test("a still-invalid design content batch returns for the designer's repair", async () => {
-  for (const phase of ["content-batch", "content-revision"]) {
-    const { rows, log } = usageRows();
-    const g = gateway(['{"bad":1}', '{"bad":2}'], [], {
-      usageLog: log,
-      validate: (_job, answer) => {
-        if (answer.bad) throw Error("entry exceeds its readable budget");
-      },
-    });
-    assert.deepEqual(
-      await g.run("design-run", { generationId: `design-${phase}`, phase }),
-      { bad: 2 },
-    );
-    assert.deepEqual(
-      rows.map((row) => [row.phase, row.attempt, row.outcome]),
-      [
-        [phase, 0, "rejected"],
-        [phase, 1, "rejected"],
-      ],
-    );
-  }
-});
-
-test("a still-invalid answer outside the designer's phases still ends the call", async () => {
-  // Structure gets three corrections, so a still-invalid structure answer costs
-  // four attempts; every other operation and phase still stops after two.
-  for (const [operation, payload, attempts] of [
-    ["design-run", { generationId: "design-structure", phase: "structure" }, 4],
-    ["complete", {}, 2],
-  ]) {
-    const { rows, log } = usageRows();
-    const g = gateway(
-      ['{"bad":1}', '{"bad":2}', '{"bad":3}', '{"bad":4}'],
-      [],
-      {
-        usageLog: log,
-        validate: (_job, answer) => {
-          if (answer.bad) throw Error("wrong shape");
-        },
-      },
-    );
-    await assert.rejects(g.run(operation, payload), {
-      code: "CLAUDE_INVALID_ANSWER",
-    });
-    assert.equal(rows.length, attempts);
-    assert.deepEqual(
-      rows.map((row) => [row.attempt, row.outcome]),
-      Array.from({ length: attempts }, (_, attempt) => [attempt, "rejected"]),
-    );
-  }
-});
-
-test("the structure phase gets three corrections before a valid answer", async () => {
-  const calls = [];
-  const { rows, log } = usageRows();
-  const g = gateway(
-    ['{"bad":1}', '{"bad":2}', '{"bad":3}', '{"ok":1}'],
-    calls,
-    {
-      usageLog: log,
-      validate: (_job, answer) => {
-        if (answer.bad)
-          throw Error(
-            "Run design: floors[2].scene exceeds 16 furniture items: it has 18 (room 0: 5, room 1: 4, room 2: 5, room 3: 4); remove at least 2 and keep every room at 1 or more",
-          );
-      },
-    },
-  );
-  assert.deepEqual(
-    await g.run("design-run", {
-      generationId: "design-four-attempts",
-      phase: "structure",
-    }),
-    { ok: 1 },
-  );
-  assert.equal(calls.length, 4);
-  assert.ok(
-    calls[3].input.includes("remove at least 2"),
-    "the fourth call carries the validator's richer message",
-  );
-  assert.deepEqual(
-    rows.map((row) => [row.phase, row.attempt, row.outcome]),
-    [
-      ["structure", 0, "rejected"],
-      ["structure", 1, "rejected"],
-      ["structure", 2, "rejected"],
-      ["structure", 3, "accepted"],
-    ],
-  );
-});
-
-test("four rejected structure replies end the call after four attempts", async () => {
-  const calls = [];
-  const g = gateway(
-    ['{"bad":1}', '{"bad":2}', '{"bad":3}', '{"bad":4}'],
-    calls,
-    {
-      validate: () => {
-        throw Error("wrong shape");
-      },
-    },
-  );
-  await assert.rejects(
-    g.run("design-run", {
-      generationId: "design-four-rejections",
-      phase: "structure",
-    }),
-    { code: "CLAUDE_INVALID_ANSWER" },
-  );
-  assert.equal(calls.length, 4);
-});
-
-test("operations and phases outside structure still get one correction", async () => {
-  for (const [operation, payload] of [
-    ["complete", {}],
-    ["design-run", { generationId: "design-concepts", phase: "concepts" }],
-    ["design-run", { generationId: "design-no-phase" }],
-  ]) {
-    const calls = [];
-    const g = gateway(['{"bad":1}', '{"bad":2}', '{"bad":3}'], calls, {
-      validate: () => {
-        throw Error("wrong shape");
-      },
-    });
-    await assert.rejects(g.run(operation, payload), {
-      code: "CLAUDE_INVALID_ANSWER",
-    });
-    assert.equal(
-      calls.length,
-      2,
-      `${operation} ${payload.phase ?? "no phase"}`,
-    );
-  }
 });
 
 test("a failed call logs its failure outcome and null measurements", async () => {
@@ -872,7 +532,6 @@ test("usage rows carry no prompt, reply or request id content", async () => {
     "attempt",
     "cacheReadTokens",
     "cacheWriteTokens",
-    "conversationTurn",
     "costUsd",
     "durationMs",
     "effort",
@@ -883,8 +542,6 @@ test("usage rows carry no prompt, reply or request id content", async () => {
     "operation",
     "outcome",
     "outputTokens",
-    "phase",
-    "sessionResume",
     "v",
   ]);
 });
@@ -1002,59 +659,6 @@ test("a profile override changes the model and effort the CLI runs with", async 
   assert.equal(rows[0].model, "claude-opus-5-5");
 });
 
-test("a session namespace gives each arm its own design conversation", async () => {
-  const sessionId = (calls) =>
-    calls[0].args[calls[0].args.indexOf("--session-id") + 1];
-  const plain = [];
-  const alpha = [];
-  const beta = [];
-  await gateway(['{"ok":1}'], plain).run("design-run", {
-    generationId: "design-n",
-  });
-  await gateway(['{"ok":1}'], alpha, { sessionNamespace: "arm-a" }).run(
-    "design-run",
-    { generationId: "design-n" },
-  );
-  await gateway(['{"ok":1}'], beta, { sessionNamespace: "arm-b" }).run(
-    "design-run",
-    { generationId: "design-n" },
-  );
-  assert.ok(plain[0].args.includes("--session-id"));
-  assert.notEqual(sessionId(alpha), sessionId(beta));
-  assert.notEqual(sessionId(alpha), sessionId(plain));
-  assert.notEqual(sessionId(beta), sessionId(plain));
-  // One namespace and design still share one conversation across stages.
-  const again = [];
-  const resumed = gateway(
-    [
-      {
-        model: "claude-sonnet-5-5",
-        result: resultEvent({ result: '{"ok":1}' }),
-      },
-      {
-        model: "claude-sonnet-5-5",
-        result: resultEvent({ result: '{"ok":2}' }),
-      },
-    ],
-    again,
-    { sessionNamespace: "arm-a" },
-  );
-  await resumed.run("design-run", {
-    requestId: "s1",
-    generationId: "design-n",
-  });
-  assert.ok(again[0].args.includes("--session-id"));
-  await resumed.run("design-run", {
-    requestId: "s2",
-    generationId: "design-n",
-  });
-  assert.ok(again[1].args.includes("--resume"));
-  assert.equal(
-    again[1].args[again[1].args.indexOf("--resume") + 1],
-    sessionId(alpha),
-  );
-});
-
 test("replay samples capture one private JSON per finished call", async () => {
   const store = mkdtempSync(join(tmpdir(), "claude-replay-"));
   const g = gateway([fullReply()], [], { replaySamples: store });
@@ -1081,32 +685,6 @@ test("replay samples capture one private JSON per finished call", async () => {
   assert.equal(sample.costUsd, 0.0123);
   assert.equal(typeof sample.durationMs, "number");
   assert.equal(sample.attempts, 1);
-});
-
-test("replay capture keeps 24 live samples but a whole design conversation", async () => {
-  const store = mkdtempSync(join(tmpdir(), "claude-replay-"));
-  const live = gateway(
-    Array.from({ length: 30 }, () => fullReply()),
-    [],
-    { replaySamples: store },
-  );
-  for (let index = 0; index < 30; index++)
-    assert.deepEqual(await live.run("complete", {}), { ok: 1 });
-  assert.equal(sampleNames(store).length, 24);
-  const design = gateway(
-    Array.from({ length: 30 }, () => ({
-      model: "claude-sonnet-5-5",
-      result: resultEvent({ result: '{"ok":1}' }),
-    })),
-    [],
-    { replaySamples: store },
-  );
-  for (let index = 0; index < 30; index++)
-    await design.run("design-run", {
-      requestId: `design-${index}`,
-      generationId: "design-keep",
-    });
-  assert.equal(sampleNames(store, "design-run").length, 30);
 });
 
 test("replay capture records a rejected answer as invalid", async () => {
@@ -1156,52 +734,4 @@ test("a broken replay store never fails a call", async () => {
   }
   assert.equal(warnings.length, 1);
   assert.match(warnings[0], /replay sample failed/i);
-});
-
-test("a resumed conversation logs each call's own cost, not the CLI's running total", async () => {
-  const { rows, log } = usageRows();
-  const g = gateway(
-    [
-      { result: resultEvent({ total_cost_usd: 0.5 }) },
-      { result: resultEvent({ total_cost_usd: 0.8 }) },
-    ],
-    [],
-    { usageLog: log },
-  );
-  await g.run("design-run", { requestId: "a", generationId: "design-cost" });
-  await g.run("design-run", { requestId: "b", generationId: "design-cost" });
-  assert.deepEqual(
-    rows.map((row) => [row.sessionResume, row.costUsd]),
-    [
-      [false, 0.5],
-      [true, 0.30000000000000004],
-    ],
-  );
-});
-
-test("a resumed call whose earlier total is unknown records an unknown cost", async () => {
-  const { rows, log } = usageRows();
-  const fail = {
-    result: {
-      type: "result",
-      subtype: "error",
-      is_error: true,
-      result: "Session ID x is already in use.",
-    },
-  };
-  const g = gateway(
-    [fail, { result: resultEvent({ total_cost_usd: 2 }) }],
-    [],
-    {
-      usageLog: log,
-    },
-  );
-  await g.run("design-run", { generationId: "design-restarted" });
-  assert.deepEqual(
-    rows.map((row) => [row.sessionResume, row.costUsd]),
-    [
-      [false, null],
-      [true, null],
-    ],
-  );
 });

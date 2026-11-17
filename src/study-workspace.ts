@@ -1,28 +1,27 @@
 import { studyMapHtml } from "./study-map";
 import { eligible, syncLearningView } from "./curriculum";
 import { encounterKey, interruptLearningAttempt } from "./learner";
-import type { Encounter, Game, Roadmap } from "./model";
+import type { Encounter, StudyRecord, Roadmap } from "./model";
 
-export const STUDY_VIEW_KEY = "learning-workspace-view-v1";
+/** Fields the retired game required on every saved question. Nothing reads
+ * them; they are written so a save made here still loads in the old build. */
+const RETIRED_ENCOUNTER_FIELDS = {
+  floor: 0,
+  reward: "loot",
+  group: [],
+  chatCursor: 0,
+  recentSpeakers: [],
+  npcProgress: 0,
+  loot: [],
+};
 
-export function enterStudyWorkspace(g: Game) {
+export function enterStudyWorkspace(g: StudyRecord) {
   if (!g.studyWorkspace?.enabled)
-    g.studyWorkspace = {
-      ...g.studyWorkspace,
-      enabled: true,
-      wasPaused: !!g.paused,
-    };
-  g.paused = true;
-}
-
-export function exitStudyWorkspace(g: Game) {
-  if (!g.studyWorkspace?.enabled) return;
-  g.paused = g.studyWorkspace.wasPaused;
-  g.studyWorkspace.enabled = false;
+    g.studyWorkspace = { ...g.studyWorkspace, enabled: true };
 }
 
 /** Prefer the actual unfinished task over creating another visit or chat. */
-export function workspaceQuestion(g: Game): Encounter | undefined {
+export function workspaceQuestion(g: StudyRecord): Encounter | undefined {
   const current = Object.values(g.encounters);
   const selected = workspaceSelectedQuestion(g);
   const available = (e: Encounter) =>
@@ -62,8 +61,11 @@ export function workspaceQuestion(g: Game): Encounter | undefined {
   );
 }
 
-/** No station, RNG consumption, actor movement or scope changes are needed. */
-export function nextWorkspaceQuestion(g: Game, roadmap: Roadmap): Encounter {
+/** The next question for the learner; no scope changes are needed. */
+export function nextWorkspaceQuestion(
+  g: StudyRecord,
+  roadmap: Roadmap,
+): Encounter {
   if (!g.studyWorkspace?.enabled)
     throw Error("Open the study workspace first.");
   const assessment = workspaceAssessment(g);
@@ -105,41 +107,35 @@ export function nextWorkspaceQuestion(g: Game, roadmap: Roadmap): Encounter {
     id,
     runId: g.id,
     studyOnly: true,
-    floor: 0,
     mode: "solo",
-    reward: "loot",
     state: "available",
     owner: "human",
     workspace: "",
     revision: 0,
     history: [],
-    group: [],
     tutor: [],
     submissions: [],
     contributors: [],
-    chatCursor: 0,
     chatOpen: false,
-    recentSpeakers: [],
-    npcProgress: 0,
-    loot: [],
     scroll: 0,
     selection: [0, 0],
+    ...RETIRED_ENCOUNTER_FIELDS,
   };
   g.encounters[id] = e;
   g.studyWorkspace.encounter = encounterKey(e);
   return e;
 }
 
-export function workspaceAssessment(g: Game) {
+export function workspaceAssessment(g: StudyRecord) {
   if (g.study.profile !== "live") return undefined;
   const e = workspaceSelectedQuestion(g);
   return e ? assessmentForQuestion(g, e) : undefined;
 }
 
-function assessmentForQuestion(g: Game, e: Encounter) {
+function assessmentForQuestion(g: StudyRecord, e: Encounter) {
   const prefix = `assessment-${encounterKey(e)}-`;
   // Legacy assessment IDs are safe only when their unscoped encounter ID is
-  // unambiguous. Physical station IDs are reused by later building runs.
+  // unambiguous. Older saves reused question IDs across their runs.
   const unambiguous = [
     ...Object.values(g.encounters),
     ...g.study.archives,
@@ -158,14 +154,17 @@ function assessmentForQuestion(g: Game, e: Encounter) {
   return undefined;
 }
 
-export function workspaceSelectedQuestion(g: Game) {
+export function workspaceSelectedQuestion(g: StudyRecord) {
   return [...Object.values(g.encounters), ...g.study.archives].find(
     (e) => encounterKey(e) === g.studyWorkspace?.encounter,
   );
 }
 
-/** Counts come from the same ledger as the game; observations are separate. */
-export function workspaceProgressHtml(g: Game, roadmap: Roadmap): string {
+/** Counts come from the learner ledger; observations are separate. */
+export function workspaceProgressHtml(
+  g: StudyRecord,
+  roadmap: Roadmap,
+): string {
   const issued = workspaceQuestion(g)?.problem?.contract;
   return studyMapHtml(g, roadmap, issued);
 }

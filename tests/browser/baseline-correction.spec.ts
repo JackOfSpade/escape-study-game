@@ -1,9 +1,8 @@
-import { startDesignedRun } from "./helpers/designed-run";
-import { openGameMenu } from "./helpers/game-menu";
+import { openAgentMenu, openApp } from "./helpers/agent-menu";
 // Actual UI, controlled source judgment; no real learner data is corrected.
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
-import { createGame } from "../../src/world";
+import { createGame } from "../helpers/record";
 import { baselineFixture, roadmap as r } from "../helpers/baseline-correction";
 
 test("original checkpoint correction exposes complete historical review before adoption and survives reload", async ({
@@ -41,17 +40,15 @@ test("original checkpoint correction exposes complete historical review before a
     });
   });
   await page.goto("/");
-  await startDesignedRun(page);
+  await openApp(page);
   await page.evaluate(() => {
     const g = (window as any).__deadAir.game;
     g.study.profile = "live";
-    g.nextSpawn = Number.MAX_SAFE_INTEGER;
-    g.zombies = [];
   });
   const before = await page.evaluate(() =>
     JSON.stringify((window as any).__deadAir.game.study.learner),
   );
-  await openGameMenu(page);
+  await openAgentMenu(page);
   await page.locator("#curriculum-button").click();
   await page.getByText("Review an updated roadmap", { exact: true }).click();
   await page.locator("#roadmap-review-file").setInputFiles({

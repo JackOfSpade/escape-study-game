@@ -1,9 +1,8 @@
-import { openGameMenu } from "./helpers/game-menu";
+import { openAgentMenu, openApp, seedQuestions } from "./helpers/agent-menu";
 // Synthetic native provider only. Real browser edits, saved work and world transactions.
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { reviewRoadmap } from "../../src/roadmap-review";
-import { enterLegacyBuilding } from "./helpers/legacy-world";
 
 // The editor was removed from normal gameplay. These scoped API fixtures keep
 // reconciliation's captured-work transaction covered through the actual browser
@@ -11,7 +10,7 @@ import { enterLegacyBuilding } from "./helpers/legacy-world";
 async function capturedWork(
   page: import("@playwright/test").Page,
   text: string,
-  id = "f0-room0",
+  id = "question-0",
 ) {
   await page.evaluate(
     async ({ text, id }) => {
@@ -30,7 +29,7 @@ async function capturedWork(
 }
 const workspace = (page: import("@playwright/test").Page) =>
   page.evaluate(
-    () => (window as any).__deadAir.game.encounters["f0-room0"].workspace,
+    () => (window as any).__deadAir.game.encounters["question-0"].workspace,
   );
 
 for (const scenario of ["unchanged", "stale", "new-work"])
@@ -198,14 +197,11 @@ for (const scenario of ["unchanged", "stale", "new-work"])
         json: { error: "Unused fixture operation" },
       });
     });
-    await enterLegacyBuilding(page);
+    await openApp(page);
+    await seedQuestions(page);
     await page.evaluate(() => {
-      const g = (window as any).__deadAir.game,
-        s = g.floors[0].stations.find((s: any) => s.encounter === "f0-room0");
+      const g = (window as any).__deadAir.game;
       g.study.profile = "live";
-      g.zombies = [];
-      g.nextSpawn = Number.MAX_SAFE_INTEGER;
-      Object.assign(g.survivors[0], { x: s.x, y: s.y });
     });
     await capturedWork(page, "PRIVATE_ACTIVE_BROWSER_DRAFT");
     await expect(page.locator("#terminal")).toBeHidden();
@@ -213,7 +209,7 @@ for (const scenario of ["unchanged", "stale", "new-work"])
       const d = (window as any).__deadAir,
         g = d.game,
         r = d.roadmap,
-        e = g.encounters["f0-room0"],
+        e = g.encounters["question-0"],
         root = "/src/";
       const { prepareRoadmapExport } = await import(root + "roadmap-export.ts"),
         { applyLearningAssessment, closeLearningSession } = await import(
@@ -251,7 +247,7 @@ for (const scenario of ["unchanged", "stale", "new-work"])
         attemptId: l.attempts[0].id,
       };
     });
-    await openGameMenu(page);
+    await openAgentMenu(page);
     await page.locator("#curriculum-button").click();
     await page.getByText("Review an updated roadmap", { exact: true }).click();
     await page.locator("#roadmap-review-file").setInputFiles({
@@ -268,12 +264,12 @@ for (const scenario of ["unchanged", "stale", "new-work"])
     await expect.poll(() => !!release).toBe(true);
     if (stale) {
       await page.locator("#close-inspector").click();
-      await page.locator("#resume-game").click();
+      await page.locator("#menu-close").click();
       await capturedWork(
         page,
         "PRIVATE_ACTIVE_BROWSER_DRAFT plus newer actual typing",
       );
-      await openGameMenu(page);
+      await openAgentMenu(page);
       await page.locator("#curriculum-button").click();
       release();
       await expect(page.locator("#roadmap-adoption-controls")).toContainText(
@@ -291,7 +287,7 @@ for (const scenario of ["unchanged", "stale", "new-work"])
         ),
       ).toBe("in-progress");
       await page.locator("#close-inspector").click();
-      await page.locator("#resume-game").click();
+      await page.locator("#menu-close").click();
       expect(await workspace(page)).toBe(
         "PRIVATE_ACTIVE_BROWSER_DRAFT plus newer actual typing",
       );
@@ -303,7 +299,7 @@ for (const scenario of ["unchanged", "stale", "new-work"])
       page.getByRole("button", { name: "Adopt reviewed roadmap", exact: true }),
     ).toBeVisible();
     await expect(page.locator("#roadmap-adoption-controls")).toContainText(
-      "keeps its original puzzle and draft for gameplay",
+      "keeps its original question and draft, without another academic assessment",
     );
     const download = page.waitForEvent("download");
     await page
@@ -314,7 +310,7 @@ for (const scenario of ["unchanged", "stale", "new-work"])
       "adopted and saved",
     );
     await page.locator("#close-inspector").click();
-    await page.locator("#resume-game").click();
+    await page.locator("#menu-close").click();
     expect(await workspace(page)).toBe("PRIVATE_ACTIVE_BROWSER_DRAFT");
     expect(
       await page.evaluate(
@@ -324,7 +320,7 @@ for (const scenario of ["unchanged", "stale", "new-work"])
     await expect(page.locator("#terminal")).toBeHidden();
     expect(
       await page.evaluate(() =>
-        (window as any).__deadAir.game.encounters["f0-room0"].history.some(
+        (window as any).__deadAir.game.encounters["question-0"].history.some(
           (h: any) => h.kind === "source-view",
         ),
       ),
@@ -332,13 +328,13 @@ for (const scenario of ["unchanged", "stale", "new-work"])
     expect(
       await page.evaluate(() =>
         JSON.stringify(
-          (window as any).__deadAir.game.encounters["f0-room0"].problem,
+          (window as any).__deadAir.game.encounters["question-0"].problem,
         ),
       ),
     ).toBe(source.problem);
     expect(
       await page.evaluate(
-        () => (window as any).__deadAir.game.encounters["f0-room0"].state,
+        () => (window as any).__deadAir.game.encounters["question-0"].state,
       ),
     ).toBe("in-progress");
     const retainedDraft =
@@ -353,12 +349,12 @@ for (const scenario of ["unchanged", "stale", "new-work"])
       const d = (window as any).__deadAir,
         root = "/src/";
       const { submit } = await import(root + "ai.ts");
-      await submit(d.game, d.game.encounters["f0-room0"], d.roadmap);
+      await submit(d.game, d.game.encounters["question-0"], d.roadmap);
     });
     await expect
       .poll(() =>
         page.evaluate(
-          () => (window as any).__deadAir.game.encounters["f0-room0"].state,
+          () => (window as any).__deadAir.game.encounters["question-0"].state,
         ),
       )
       .toBe("consumed");
@@ -384,11 +380,13 @@ for (const scenario of ["unchanged", "stale", "new-work"])
         ];
       }),
     ).toEqual([0, 0, 0, 1]);
-    await openGameMenu(page);
+    await openAgentMenu(page);
     await page.getByRole("button", { name: "Save run", exact: true }).click();
     // The click resolves before the async save; reloading earlier loses it.
-    await expect(page.locator("#notice")).toContainText("Run saved locally");
-    await page.locator("#resume-game").click();
+    await expect(page.locator("#pause-save-status")).toContainText(
+      "Run saved locally",
+    );
+    await page.locator("#menu-close").click();
     await page.reload();
     await page.waitForFunction(() => !!(window as any).__deadAir);
     expect(
@@ -396,9 +394,9 @@ for (const scenario of ["unchanged", "stale", "new-work"])
         const g = (window as any).__deadAir.game;
         return {
           status: g.study.learner.attempts[0].status,
-          draft: g.encounters["f0-room0"].workspace,
-          question: JSON.stringify(g.encounters["f0-room0"].problem),
-          state: g.encounters["f0-room0"].state,
+          draft: g.encounters["question-0"].workspace,
+          question: JSON.stringify(g.encounters["question-0"].problem),
+          state: g.encounters["question-0"].state,
         };
       }),
     ).toEqual({
@@ -407,18 +405,18 @@ for (const scenario of ["unchanged", "stale", "new-work"])
       question: source.problem,
       state: "consumed",
     });
-    await page.evaluate(() => {
-      const g = (window as any).__deadAir.game,
-        s = g.floors[0].stations.find((s: any) => s.encounter === "f0-room3");
-      Object.assign(g.survivors[0], { x: s.x, y: s.y, station: undefined });
-    });
-    await capturedWork(page, "Fresh next eligible question draft", "f0-room3");
+    await capturedWork(
+      page,
+      "Fresh next eligible question draft",
+      "question-3",
+    );
     expect(
       await page.evaluate(
         () =>
-          (window as any).__deadAir.game.encounters["f0-room3"].problem.prompt,
+          (window as any).__deadAir.game.encounters["question-3"].problem
+            .prompt,
       ),
-    ).toContain("Synthetic task for f0-room3");
+    ).toContain("Synthetic task for question-3");
     await expect(page.locator("#terminal")).toBeHidden();
     expect(
       await page.evaluate(() => {

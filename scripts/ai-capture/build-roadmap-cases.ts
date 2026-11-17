@@ -36,10 +36,11 @@ import type { Roadmap } from "../../src/model";
 import { reconcileRoadmap } from "../../src/roadmap-adoption";
 import type { RoadmapReconciliation } from "../../src/roadmap-adoption-types";
 import { prepareRoadmapExport } from "../../src/roadmap-export";
-import { createGame } from "../../src/world";
+import { createGame } from "../../tests/helpers/record";
+import { CELL_SEPARATOR } from "../../src/table-row";
 
 export const RECONCILE_OPERATION = "reconcile-roadmap" as const;
-export const DEFAULT_COUNT = 6;
+const DEFAULT_COUNT = 6;
 
 export type RoadmapPayload = { local: string; candidate: string } & Record<
   string,
@@ -55,7 +56,7 @@ export type RoadmapCase = {
 };
 
 /** The reply fields that carry imported study progress into an adopted file. */
-export type RoadmapExpectation = Pick<
+type RoadmapExpectation = Pick<
   RoadmapReconciliation,
   "definitions" | "mappings" | "completeScopes"
 >;
@@ -194,14 +195,14 @@ const ADDED_T07 = [
   "| S0006-EV20 | S0006-A16 | 2026-09-19 | T07.2 | D1 late-save reread of update ordering at the reconnection point | DIAGNOSTIC | NONE | 2 | Named the updates that must happen before the rewiring step in the clarified replacement interpretation. Ordering completeness and end-of-chain handling remain unassessed. Described only |",
 ];
 
-export type RoadmapRecipe = {
+type RoadmapRecipe = {
   id: string;
   conflict: string;
   /** Candidate document text derived from the checked-in local roadmap. */
   edit(raw: string): string;
 };
 
-export const RECIPES: RoadmapRecipe[] = [
+const RECIPES: RoadmapRecipe[] = [
   {
     id: "add-learning-records",
     conflict:
@@ -284,7 +285,7 @@ const ADMIN_DECISION = "DEC0028";
 const NEXT_DECISION = "DEC0029";
 
 /** One learner-requested administrative change, recorded as revision 10. */
-export type AdoptRecipe = RoadmapRecipe & {
+type AdoptRecipe = RoadmapRecipe & {
   /** Cells 2-5 of the new shared decision row (id, date/session and status fixed). */
   decision: { type: string; scope: string; reason: string; expiry: string };
   /** One clause naming the change in each track's revision-history row. */
@@ -312,7 +313,7 @@ const decisionRow = (recipe: AdoptRecipe) =>
  * adds, reorders or re-scores a record; the change is learner-reported, never
  * evidence and never a mastery claim.
  */
-export function recordAdministrativeRevision(raw: string, recipe: AdoptRecipe) {
+function recordAdministrativeRevision(raw: string, recipe: AdoptRecipe) {
   const parent = createHash("sha256").update(raw).digest("hex");
   const history = (track: "PY" | "PE") =>
     `| Merged r10 | ${ADMIN_DATE} | ${recipe.recorded} Shared ${ADMIN_DECISION} records the learner's request; ${track} curriculum and learning evidence are unchanged, so this administrative save closes no study. | None; no ${track} learning evidence or checkpoint state changed. |`;
@@ -382,7 +383,7 @@ export function recordAdministrativeRevision(raw: string, recipe: AdoptRecipe) {
  * candidate is a sibling revision whose only changes are administrative rows:
  * no recorded observation, objective, gate or rule block moves, and the change
  * is fully recorded as revision 10 (DEC0028, advanced counters, a
- * revision-history row and updated save anchors), so the game accepts adoption
+ * revision-history row and updated save anchors), so the app accepts adoption
  * once each changed row is resolved as "incoming".
  */
 export const ADOPT_RECIPES: AdoptRecipe[] = [
@@ -479,10 +480,10 @@ async function capturePayload(
 
 /**
  * Start a reconciliation with an intercepted requester and hand back both the
- * captured payload and the game that owns it, so a caller can resume the same
+ * captured payload and the record that owns it, so a caller can resume the same
  * saved request offline. No provider is contacted.
  */
-export async function openReconciliation(
+async function openReconciliation(
   roadmap: Roadmap,
   candidate: string,
 ): Promise<{ g: ReturnType<typeof createGame>; payload: RoadmapPayload }> {
@@ -674,19 +675,16 @@ if (entry === fileURLToPath(import.meta.url)) {
   );
 }
 
-/** A fresh live game, mirroring the study fixture the reference test proves. */
+/** A fresh live record, mirroring the study fixture the reference test proves. */
 function liveStudy(roadmap: Roadmap) {
   const g = createGame(7, roadmap);
   g.study.profile = "live";
-  g.status = "playing";
-  g.zombies = [];
-  g.nextSpawn = Number.MAX_SAFE_INTEGER;
   if (!g.study.learner) throw Error("a live study profile has no learner");
   return { g, l: g.study.learner };
 }
 
 /**
- * Run real study through the game's own learner functions and export the
+ * Run real study through the learner functions and export the
  * resulting descendant revision. One round records an independent observation
  * on a single facet without completing the checkpoint scope; the full three
  * rounds complete it and pass the checkpoint.
@@ -770,7 +768,7 @@ async function studiedProgressFile(roadmap: Roadmap, rounds: number) {
         .find((line) => line.startsWith(`| ${ev.id} |`));
       if (!row) throw Error(`exported file has no evidence row for ${ev.id}`);
       const cells = row
-        .split("|")
+        .split(CELL_SEPARATOR)
         .slice(1, -1)
         .map((v) => v.trim());
       return {

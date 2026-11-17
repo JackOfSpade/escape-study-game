@@ -5,6 +5,7 @@ import type { CellState, LearnerLedger } from "./learning-model";
 import { scopeKey } from "./learning-model";
 import type { Roadmap, Track } from "./model";
 import { baselineCheckpointValid } from "./observation-validity";
+import { CELL_SEPARATOR } from "./table-row";
 
 export interface FinalRequirement {
   id: string;
@@ -31,7 +32,7 @@ function rows(text: string, pattern: RegExp) {
     .filter((line) => pattern.test(line))
     .map((line) =>
       line
-        .split("|")
+        .split(CELL_SEPARATOR)
         .slice(1, -1)
         .map((cell) => cell.trim()),
     );
@@ -296,7 +297,8 @@ export function curriculumReadiness(
     /^\| G\d+ \|/,
   )
     .filter((c) => {
-      if (c[6].startsWith("CLOSED")) return false;
+      // A truncated row has no status cell: it stays unresolved.
+      if (c[6]?.startsWith("CLOSED")) return false;
       const m = /^([TX]\d{2}\.\d+) \/ D([1-4])$/.exec(c[1]);
       if (!m) return true; // Unknown material scope cannot be silently certified.
       const id = `${track}:${m[1]}`,

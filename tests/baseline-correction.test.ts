@@ -13,7 +13,7 @@ import {
 } from "../src/roadmap-adoption";
 import { prepareRoadmapExport } from "../src/roadmap-export";
 import { inspectMergedDocument } from "../src/roadmap-structure";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 import { baselineFixture, roadmap as r } from "./helpers/baseline-correction";
 for (const id of ["PY:T05.2", "PE:T01.2", "PY:T06.1"])
   test(`source-authorized baseline correction reviews complete original history and retains partial knowledge: ${id}`, async () => {
@@ -197,7 +197,7 @@ test("withdrawn original pass is repaired by real scheduling and fresh proof, wi
   let visits = 0;
   for (let n = 0; n < 180; n++) {
     const c = eligibleLearning(r, l, at);
-    const e = structuredClone(copy.encounters["f0-room0"]);
+    const e = structuredClone(copy.encounters["question-0"]);
     e.id = `synthetic-baseline-repair-${n}`;
     const definition = l.scopes[`${c.objectiveIds[0]}/D${c.depth}`];
     e.problem = {
@@ -341,7 +341,7 @@ test("baseline withdrawal cannot erase a later actually assessed material contra
     at = "2026-10-17T16:00:00Z",
     id = "PY:T05.2";
   const c = eligibleLearning(r, l, at),
-    e = g.encounters["f0-room0"];
+    e = g.encounters["question-0"];
   assert.deepEqual(c.objectiveIds, [id]);
   assert.equal(c.review, true);
   const o = r.tracks.PY.objectives.find((o) => o.id === id)!;

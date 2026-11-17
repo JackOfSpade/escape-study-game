@@ -52,7 +52,12 @@ async function fixture() {
     options,
     api,
     async close() {
-      await stopBridge(options);
+      // Under a loaded suite the one-second acknowledgement window can lapse.
+      // Stopping is idempotent, so teardown asks once more before failing.
+      await stopBridge(options).catch((error) => {
+        if (!/not acknowledged/.test(error.message)) throw error;
+        return stopBridge(options);
+      });
       rmSync(root, { recursive: true, force: true });
     },
   };
@@ -295,7 +300,7 @@ test("an unrelated listener is neither adopted nor stopped", async () => {
   }
 });
 
-test("the actual dev-launcher shutdown stops its game child and leaves the bridge reusable", async () => {
+test("the actual dev-launcher shutdown stops its app child and leaves the bridge reusable", async () => {
   const f = await fixture();
   const client = join(f.root, "client.mjs");
   writeFileSync(
@@ -329,7 +334,7 @@ test("the actual dev-launcher shutdown stops its game child and leaves the bridg
       });
       current.once("exit", (code) => {
         clearTimeout(timer);
-        reject(Error(`Game launcher exited early (${code})`));
+        reject(Error(`App launcher exited early (${code})`));
       });
     });
   }

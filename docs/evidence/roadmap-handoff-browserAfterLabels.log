@@ -1,9 +1,0 @@
-
-Running 2 tests using 1 worker
-
-(node:43399) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-(Use `node --trace-warnings ...` to show where the warning was created)
-  ✓  1 tests/browser/chatgpt-handoff.spec.ts:11:1 › ChatGPT handoff UI: exact generation survives reload, tutoring stays private, world completion precedes separate assisted assessment (7.8s)
-  ✓  2 tests/browser/roadmap-handoff.spec.ts:12:1 › ChatGPT roadmap review survives reload with exact files and provider, then requires explicit adoption (2.6s)
-
-  2 passed (10.9s)

@@ -113,19 +113,6 @@ test("each case and setting gets a fresh gateway and one measured row", async ()
     gatewayFactory: factory,
   });
   assert.equal(arms.length, 4);
-  assert.deepEqual(
-    arms.map((arm) => arm.options.sessionNamespace),
-    [
-      "run-1:haiku:low:0",
-      "run-1:sonnet:high:0",
-      "run-1:haiku:low:0",
-      "run-1:sonnet:high:0",
-    ],
-  );
-  assert.equal(
-    new Set(arms.map((arm) => arm.options.sessionNamespace)).size,
-    2,
-  );
   const override = arms[0].options.profileFor("complete", {});
   assert.equal(override.model, "haiku");
   assert.equal(override.effort, "low");
@@ -188,36 +175,6 @@ test("a second run resumes by skipping every finished row", async () => {
   assert.equal(second.rows.length, 0);
   assert.equal(calls, 0);
   assert.equal(readLadderRows(out).length, 4);
-});
-
-test("a design conversation replays its payloads in order, one namespace", async () => {
-  const { factory, arms } = scriptedFactory();
-  const out = join(store(), "run");
-  const sequence = [
-    { generationId: "g1", requestId: "r1" },
-    { generationId: "g1", requestId: "r2" },
-  ];
-  const result = await runLadder({
-    cases: [{ id: "design", operation: "design-run", sequence }],
-    settings: ["haiku:low"],
-    out,
-    ephemeral: true,
-    runId: "run-d",
-    gatewayFactory: factory,
-  });
-  assert.equal(arms.length, 1);
-  assert.deepEqual(
-    arms[0].runs.map((run) => run.payload.requestId),
-    ["r1", "r2"],
-  );
-  assert.equal(arms[0].options.sessionNamespace, "run-d:haiku:low:0");
-  const row = readLadderRows(out)[0];
-  assert.equal(result.rows.length, 1);
-  assert.equal(row.caseId, "design");
-  assert.equal(row.operation, "design-run");
-  assert.equal(row.outcome, "valid");
-  assert.equal(row.answers.length, 2);
-  assert.equal(row.attempts, 2);
 });
 
 test("a usage limit stops the whole run after writing its row", async () => {
@@ -339,47 +296,26 @@ test("the summary reports exact reliability, cost and speed figures", () => {
   ]);
 });
 
-test("a replay-sample directory becomes cases and one design sequence", () => {
+test("a replay-sample directory becomes one case per sample", () => {
   const directory = store();
   const complete = join(directory, "complete");
-  const design = join(directory, "design-run");
   mkdirSync(complete, { recursive: true });
-  mkdirSync(design, { recursive: true });
-  const sample = (operation, payload) =>
+  writeFileSync(
+    join(complete, "2025-01-01T00-00-00.000Z-aaaa1111.json"),
     JSON.stringify({
       v: 1,
       at: "2025-01-01T00:00:00.000Z",
-      operation,
-      payload,
-    });
-  writeFileSync(
-    join(complete, "2025-01-01T00-00-00.000Z-aaaa1111.json"),
-    sample("complete", { note: "one" }),
+      operation: "complete",
+      payload: { note: "one" },
+    }),
   );
-  writeFileSync(
-    join(design, "2025-01-01T00-00-01.000Z-bbbb2222.json"),
-    sample("design-run", { generationId: "g1", requestId: "first" }),
-  );
-  writeFileSync(
-    join(design, "2025-01-01T00-00-02.000Z-cccc3333.json"),
-    sample("design-run", { generationId: "g1", requestId: "second" }),
-  );
-  const found = readCases(directory);
-  assert.equal(found.length, 2);
-  assert.deepEqual(found[0], {
-    id: "2025-01-01T00-00-00.000Z-aaaa1111",
-    operation: "complete",
-    payload: { note: "one" },
-  });
-  assert.deepEqual(found[1], {
-    id: "design-run:g1",
-    operation: "design-run",
-    sequence: [
-      { generationId: "g1", requestId: "first" },
-      { generationId: "g1", requestId: "second" },
-    ],
-  });
-  assert.equal(readdirSync(directory).sort().join(","), "complete,design-run");
+  assert.deepEqual(readCases(directory), [
+    {
+      id: "2025-01-01T00-00-00.000Z-aaaa1111",
+      operation: "complete",
+      payload: { note: "one" },
+    },
+  ]);
 });
 
 test("arms run in parallel only up to the requested limit", async () => {

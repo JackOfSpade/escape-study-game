@@ -1,9 +1,0 @@
-{
-  "parent": "docs/evidence/lag-performance.json",
-  "npcExit": 1,
-  "vaultExit": 1,
-  "vaultStatus": "failed",
-  "vaultError": "Error: Tick 1: vault action could not reach its target.",
-  "npcFailed": 2,
-  "scope": "Run new synthetic behavioral regressions against immutable preceding source, without modifying original files or learner state."
-}

@@ -1,6 +1,6 @@
 import { isRecord } from "./records";
-/** Provider transport only; gameplay and learning remain in their owning modules. */
-export type DisconnectReason =
+/** Provider transport only; learning stays in its owning modules. */
+type DisconnectReason =
   "relay-unreachable" | "gateway-off" | "cli-missing" | "signed-out";
 const REASONS: readonly unknown[] = [
   "relay-unreachable",
@@ -9,7 +9,7 @@ const REASONS: readonly unknown[] = [
   "signed-out",
 ];
 export interface BridgeStatus {
-  /** "development" means Claude is not connected, so terminals are locked. */
+  /** "development" means Claude is not connected, so questions are locked. */
   mode: "development" | "claude-cli";
   label: string;
   reason?: DisconnectReason;
@@ -63,7 +63,7 @@ export async function checkBridge() {
   return bridgeStatus;
 }
 /** How long one request waits for the bridge to answer. */
-export const REQUEST_TIMEOUT_MS = 30 * 60_000;
+const REQUEST_TIMEOUT_MS = 30 * 60_000;
 /** Bridge errors may come from a proxy as plain text; never surface a JSON
  * parse failure in place of the real reason. */
 async function readJson(r: Response) {
@@ -83,26 +83,55 @@ async function readJson(r: Response) {
   if (!isRecord(data)) throw Error("Malformed bridge response");
   return data;
 }
+/** One stream line: the final answer, or undefined after a progress line. */
+function streamEvent(line: string, onText: (text: string) => void) {
+  // Blank keep-alive lines carry nothing.
+  if (!line.trim()) return undefined;
+  let event: unknown;
+  try {
+    event = JSON.parse(line);
+  } catch {
+    throw Error("Malformed bridge response");
+  }
+  if (!isRecord(event)) throw Error("Malformed bridge response");
+  if (typeof event.error === "string") throw Error(event.error);
+  if (isRecord(event.answer)) return event.answer;
+  if (typeof event.text === "string")
+    try {
+      onText(event.text);
+    } catch {
+      // Progress is display only: a failed repaint must not cost the answer.
+    }
+  return undefined;
+}
 /** Each line is the text so far, then one final answer or error. */
 async function readStream(r: Response, onText: (text: string) => void) {
-  const reader = r.body!.pipeThrough(new TextDecoderStream()).getReader();
+  if (!r.body) throw Error("Malformed bridge response");
+  const reader = r.body.pipeThrough(new TextDecoderStream()).getReader();
   let buffer = "";
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) throw Error("The reply ended before its answer arrived");
-    buffer += value;
-    let at;
-    while ((at = buffer.indexOf("\n")) >= 0) {
-      const event: unknown = JSON.parse(buffer.slice(0, at));
-      buffer = buffer.slice(at + 1);
-      if (!isRecord(event)) throw Error("Malformed bridge response");
-      if (typeof event.error === "string") throw Error(event.error);
-      if (isRecord(event.answer)) return event.answer;
-      if (typeof event.text === "string") onText(event.text);
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) {
+        // A final line may arrive without its newline.
+        const answer = streamEvent(buffer, onText);
+        if (answer) return answer;
+        throw Error("The reply ended before its answer arrived");
+      }
+      buffer += value;
+      let at;
+      while ((at = buffer.indexOf("\n")) >= 0) {
+        const answer = streamEvent(buffer.slice(0, at), onText);
+        buffer = buffer.slice(at + 1);
+        if (answer) return answer;
+      }
     }
+  } finally {
+    // The answer or an error ends the exchange: never leave the stream open.
+    void reader.cancel().catch(() => {});
   }
 }
-export interface BridgeRequestOptions {
+interface BridgeRequestOptions {
   /** Cancel optional presentation work when its owner is no longer active. */
   signal?: AbortSignal;
   /** Wait budget; bounded to REQUEST_TIMEOUT_MS. */

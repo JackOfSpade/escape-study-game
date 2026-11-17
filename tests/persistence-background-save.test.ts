@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 import { setImmediate as settle } from "node:timers/promises";
 import test from "node:test";
 import type { Roadmap } from "../src/model";
-import { decode, encode, save } from "../src/persistence";
-import { createGame } from "../src/world";
+import { decode, save } from "../src/persistence";
+import { createGame } from "./helpers/record";
 
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 test("a background checkpoint skips the local mirror, reaches IndexedDB and falls back if that fails", async () => {
@@ -53,13 +53,7 @@ test("a background checkpoint skips the local mirror, reaches IndexedDB and fall
   await settle();
   assert.equal(setItemCalls, 0, "an autosave must not block on localStorage");
   assert.equal(writes.length, 1);
-  assert.equal(decode(JSON.parse(puts[0]).data).seed, g.seed);
-  // The expensive design re-check is skipped only for autosaves, and the
-  // loader still rejects a checkpoint that would have failed it.
-  const tampered = createGame(730, r);
-  tampered.floors[0].design = {} as never;
-  assert.throws(() => encode(tampered));
-  assert.throws(() => decode(encode(tampered, { revalidate: false })));
+  assert.equal(decode(JSON.parse(puts[0]).data).id, g.id);
   writes[0].oncomplete?.call(writes[0], new Event("complete"));
   await durable;
   assert.equal(setItemCalls, 0);

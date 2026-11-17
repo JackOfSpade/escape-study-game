@@ -12,7 +12,7 @@ import {
   TERMINAL_DIALOGUE_INSTRUCTION,
 } from "../src/knowledge-probe";
 import type { Problem, Roadmap } from "../src/model";
-import { createPlayableGame } from "../src/world";
+import { createPlayableGame } from "./helpers/record";
 import { QUESTION_ADAPTATION_GUIDANCE } from "../scripts/lib/study-question-policy.mjs";
 
 const roadmap: Roadmap = JSON.parse(
@@ -51,7 +51,7 @@ test("a clarification-only terminal turn receives the clarity policy and preserv
   try {
     await checkBridge();
     const g = createPlayableGame(20261020, roadmap);
-    const e = g.encounters[g.floors[0].stations[0].encounter];
+    const e = g.encounters["question-0"];
     e.mode = "solo";
     e.owner = "human";
     e.state = "in-progress";
@@ -95,13 +95,11 @@ test("a clarification-only terminal turn receives the clarity policy and preserv
     const beforeGaps = structuredClone(g.study.knowledgeGaps);
     const beforeLearner = structuredClone(g.study.learner);
     const beforeProblem = structuredClone(e.problem);
-    const keys = g.survivors[0].keys ?? 0;
     connected = true;
     await checkBridge();
     await send(
       g,
       e,
-      "tutor",
       "Are there any popups in this implementation, or should I classify only the three listed items?",
       roadmap,
     );
@@ -151,7 +149,6 @@ test("a clarification-only terminal turn receives the clarity policy and preserv
     assert.equal(e.tutorRequests!.at(-1)!.state, "applied");
     assert.equal(e.tutor.at(-1)!.kind, "tutor");
     assert.equal(e.state, "in-progress");
-    assert.equal(g.survivors[0].keys ?? 0, keys);
     assert.equal(e.submissions.length, 0);
   } finally {
     connected = false;

@@ -16,7 +16,7 @@ import { scopeKey } from "../src/learning-model";
 import type { Assessment, Encounter, Roadmap } from "../src/model";
 import { decode, encode } from "../src/persistence";
 import { prepareRoadmapExport } from "../src/roadmap-export";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 import { tier4RoadmapFixture } from "./fixtures/tier4-roadmap";
 
 const original: Roadmap = JSON.parse(
@@ -38,7 +38,7 @@ function fixture(mode: "test" | "live" = "test") {
     const c = eligibleLearning(r, l, when),
       id = c.objectiveIds[0];
     const e: Encounter = {
-      ...structuredClone(g.encounters["f0-room0"]),
+      ...structuredClone(g.encounters["question-0"]),
       id: `tier4-${++serial}`,
     };
     e.problem = {

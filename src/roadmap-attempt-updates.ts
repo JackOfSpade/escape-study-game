@@ -3,10 +3,11 @@ import type {
   RoadmapReconciliationPayload,
 } from "./roadmap-adoption-types";
 import { inspectMergedDocument } from "./roadmap-structure";
+import { CELL_SEPARATOR } from "./table-row";
 
 const cells = (row: string) =>
   row
-    .split("|")
+    .split(CELL_SEPARATOR)
     .slice(1, -1)
     .map((s) => s.trim());
 const journals = (text: string) =>

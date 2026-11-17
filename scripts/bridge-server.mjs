@@ -1,16 +1,14 @@
 import { safeEqual } from "./lib/safe-equal.mjs";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import { dirname, join, resolve } from "node:path";
 import { createClaudeGateway } from "./claude-gateway.mjs";
 import { createStudyBridgeServer } from "./study-bridge-server.mjs";
-import { createNpcSpeechService } from "./npc-speech-service.mjs";
-import { createKokoroRenderer } from "./npc-kokoro-renderer.mjs";
 import { privateDirectory, writePrivate } from "./lib/private-fs.mjs";
 import { createBugReports } from "./bug-report-route.mjs";
 import { stampConsole } from "./lib/stamp-console.mjs";
 
-/** This process owns AI calls, speech and code execution. Game launchers may
- * disconnect without ending it. */
+/** This process owns AI calls and code execution. Launchers may disconnect
+ * without ending it. */
 export async function startBridgeService(boot, options = {}) {
   if (
     boot.version !== 1 ||
@@ -30,12 +28,6 @@ export async function startBridgeService(boot, options = {}) {
     instance: boot.instance,
   };
   let closing = false;
-  // macOS gets the local neural narrator with `say` as its instant fallback;
-  // other platforms keep the previous behavior.
-  const speech =
-    process.platform === "darwin"
-      ? createNpcSpeechService({ render: createKokoroRenderer() })
-      : createNpcSpeechService();
   const usageLog = join(boot.directory, "claude-usage.jsonl");
   const claude =
     options.claude ??
@@ -49,7 +41,6 @@ export async function startBridgeService(boot, options = {}) {
   // Reports sit beside the service folders (.local/bug-reports in a checkout).
   const local = dirname(boot.directory);
   const server = createStudyBridgeServer({
-    speech,
     claude,
     reports: createBugReports({
       directory: join(local, "bug-reports"),
@@ -98,7 +89,6 @@ export async function startBridgeService(boot, options = {}) {
   async function close() {
     if (closing) return;
     closing = true;
-    await speech.close();
     server.closeAllConnections();
     server.close(() => process.exit(0));
   }
@@ -129,7 +119,7 @@ export function bootstrapBridge(options = {}) {
     try {
       const service = await startBridgeService(boot, options);
       process.send?.({ kind: "ready", status: service.status });
-      // Deliberately no disconnect shutdown: game/dev launchers are clients.
+      // Deliberately no disconnect shutdown: dev launchers are clients.
     } catch (error) {
       console.error(error.message);
       process.exit(1);

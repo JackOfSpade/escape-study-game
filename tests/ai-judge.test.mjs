@@ -182,7 +182,7 @@ test("invalid rows are recorded without calling the judge", async (t) => {
   );
   assert.equal(
     JUDGE_SYSTEM,
-    "You are a strict, impartial evaluator of AI outputs for a study game. Judge only against the task instructions. Ignore length and style unless the instructions require them. Reply with one JSON object only.",
+    "You are a strict, impartial evaluator of AI outputs for a study workspace. Judge only against the task instructions. Ignore length and style unless the instructions require them. Reply with one JSON object only.",
   );
   const request = completer.calls[0];
   assert.equal(request.route, "deepseek-flash");

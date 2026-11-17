@@ -10,7 +10,7 @@ import {
 } from "../src/roadmap-adoption";
 import { prepareRoadmapExport, sha256 } from "../src/roadmap-export";
 import { inspectMergedDocument } from "../src/roadmap-structure";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 import {
   baselineFixture,
   setCheckpointStatus,

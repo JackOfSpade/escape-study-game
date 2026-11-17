@@ -15,8 +15,7 @@ import { curriculumReadiness } from "../src/final-requirements";
 import { eligibleLearning, reconcileGates } from "../src/learner";
 import { parseProbeReply, probeContract } from "../src/knowledge-probe";
 import type { Roadmap } from "../src/model";
-import { spawnCandidates, spawnContract } from "../src/topic-spawn";
-import { createGame, createPlayableGame } from "../src/world";
+import { createGame } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 const at = "2026-10-22T16:00:00Z";
 
@@ -65,52 +64,18 @@ test("the exact 51 objective role core changes future PE targets while Python an
   assert.equal(JSON.stringify(r), before);
 });
 
-test("future development and live spawns use only core objectives; issued tasks survive profile switching", () => {
+test("future development and live questions use only core objectives", () => {
   for (const profile of ["development", "live"] as const) {
     const s = initialStudy(r, profile);
     activateCareerFocus(r, s);
-    const pyBefore = spawnCandidates(r, initialStudy(r, profile), "PY");
-    assert.deepEqual(spawnCandidates(r, s, "PY"), pyBefore);
-    const candidates = spawnCandidates(r, s, "PE");
-    assert.ok(candidates.length > 5);
-    for (const name of candidates)
-      assert.ok(
-        r.tracks.PE.objectives.some(
-          (o) =>
-            o.id.startsWith(`PE:${name}.`) && careerPriority(o.id) === "core",
-        ),
-      );
     s.cycleOffset = 1;
     s.learner!.cycleOffset = 1;
     const formal = eligible(r, s, "2026-10-22");
     assert.equal(formal.track, "PE");
-    for (let i = 0; i < 30; i++) {
-      s.topicSpawn = {
-        disabled: [],
-        recent: candidates
-          .map((topic, j) => ({
-            track: "PE" as const,
-            topic,
-            encounter: `synthetic-${j}`,
-            at: j,
-            profile,
-          }))
-          .slice(i % 10),
-      };
-      const c = spawnContract(r, s, formal);
-      assert.ok(
-        c.objectiveIds.every((id) => careerPriority(id) === "core"),
-        c.objectiveIds.join(),
-      );
-    }
-    const world = createPlayableGame(23, r, s);
-    for (const e of Object.values(world.encounters))
-      if (e.problem?.contract.track === "PE")
-        assert.ok(
-          e.problem.contract.objectiveIds.every(
-            (id) => careerPriority(id) === "core",
-          ),
-        );
+    assert.ok(
+      formal.objectiveIds.every((id) => careerPriority(id) === "core"),
+      formal.objectiveIds.join(),
+    );
   }
   const s = initialStudy(r, "live");
   const g = createGame(12, r, s);
@@ -196,7 +161,6 @@ test("focused PE finishes at depth3, preserves PY4 and full readiness, and full 
   });
   activateCareerFocus(r, s, "full");
   assert.notEqual(l.tracks.PE.phase, "COMPLETE");
-  assert.ok(spawnCandidates(r, s, "PE").includes("T02"));
   l.cycleOffset = 1;
   const restored = eligibleLearning(r, l, at);
   assert.equal(restored.objectiveIds[0], "PE:T04.1");

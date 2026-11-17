@@ -3,15 +3,6 @@ import { defineConfig } from "@playwright/test";
 // No persistent study bridge, existing server, real learner state or provider.
 export default defineConfig({
   testDir: "./tests/browser",
-  testMatch: [
-    "game-test-lab.spec.ts",
-    "keyboard-access.spec.ts",
-    "pause-controls.spec.ts",
-    "run-designer.spec.ts",
-    "run-design-dressing.spec.ts",
-    "authored-scene.spec.ts",
-    "environment-surfaces.spec.ts",
-  ],
   workers: 1,
   retries: 0,
   timeout: 30000,
@@ -26,11 +17,8 @@ export default defineConfig({
     command: "npm run client -- --port 5279 --strictPort",
     // Never reach the player's real study relay: a live run would ask real
     // Claude to prepare questions. Specs that need Claude mock /api themselves.
-    // The archived escape game is reachable only in a build made with this
-    // flag; these specs are what still exercise it.
     env: {
       STUDY_BRIDGE_URL: "http://127.0.0.1:9",
-      VITE_ARCHIVED_GAME: "1",
     },
     url: "http://127.0.0.1:5279",
     reuseExistingServer: false,

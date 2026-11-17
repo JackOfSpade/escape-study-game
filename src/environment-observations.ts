@@ -2,7 +2,7 @@ import { browserSpecText } from "../scripts/browser-runner/spec.mjs";
 import type { ExecutionReceipt, WorkspaceExecution } from "./execution";
 import { finalRequirements } from "./final-requirements";
 import { encounterKey } from "./learner";
-import type { Artifact, Game, Roadmap } from "./model";
+import type { Artifact, StudyRecord, Roadmap } from "./model";
 import { sha256 } from "./digest";
 import { workspaceAt } from "./workspace-history";
 export interface EnvironmentObservation {
@@ -39,13 +39,13 @@ export interface EnvironmentObservation {
     authorshipAndAssistance: "unassessed; full attributed work and tutor history remain in the game backup";
   };
 }
-export interface EnvironmentObservationInput {
+interface EnvironmentObservationInput {
   envId: string;
   statement: string;
   executionKey?: string;
   suppliedOutput?: { name: string; text: string };
 }
-export function environmentExecutions(g: Game) {
+export function environmentExecutions(g: StudyRecord) {
   return [...Object.values(g.encounters), ...g.study.archives].flatMap((e) =>
     (e.executions ?? [])
       .filter(
@@ -94,7 +94,7 @@ export function environmentExecutions(g: Game) {
 /** Capture raw evidence for later review. This cannot assign ENV status, academic
  * EV IDs, visits, gates or mastery. A report is never promoted to observation. */
 export async function recordEnvironmentObservation(
-  g: Game,
+  g: StudyRecord,
   r: Roadmap,
   input: EnvironmentObservationInput,
 ) {

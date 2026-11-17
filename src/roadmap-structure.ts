@@ -1,4 +1,5 @@
 import type { RoadmapAdoptionReceipt } from "./roadmap-adoption-types";
+import { CELL_SEPARATOR } from "./table-row";
 const names = [
   "SHARED_PROGRESS",
   "MERGE_RULES",
@@ -80,7 +81,7 @@ export function inspectMergedDocument(raw: string) {
         inTable = true;
       }
       const cells = line
-        .split("|")
+        .split(CELL_SEPARATOR)
         .slice(1, -1)
         .map((c) => c.trim());
       if (!cells.length || cells.every((c) => /^:?-+:?$/.test(c))) continue;

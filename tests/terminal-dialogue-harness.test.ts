@@ -3,16 +3,15 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { preparePracticeRooms } from "./helpers/practice-questions";
 import { checkBridge, retryTutorRequest, send } from "../src/ai";
-import { TestRunner } from "../src/gametest/runner";
-import { emptyScenario } from "../src/gametest/schema";
 import type { Roadmap } from "../src/model";
 import { decode, encode, recover } from "../src/persistence";
+import { createGame } from "./helpers/record";
 import { localHandoff } from "./helpers/local-handoff";
 const roadmap: Roadmap = JSON.parse(
   readFileSync("public/curriculum.json", "utf8"),
 );
 
-test("real bridge and gateway: chat follow-up, malformed correction, interrupted reply, reload retry and once-only key reward", async () => {
+test("real bridge and gateway: chat follow-up, malformed correction, interrupted reply, reload retry and once-only completion", async () => {
   const original = globalThis.fetch;
   const relay = await localHandoff();
   try {
@@ -24,36 +23,11 @@ test("real bridge and gateway: chat follow-up, malformed correction, interrupted
         capabilities: [],
       });
     await checkBridge();
-    const lab = new TestRunner(
-      {
-        ...emptyScenario(),
-        id: "terminal-dialogue-harness",
-        template: "building",
-        layout: "forward",
-        rules: "force-fields",
-        simulation: "game",
-        maxTicks: 1,
-        checks: [
-          {
-            name: "Synthetic survivor remains alive",
-            mode: "always",
-            query: { type: "property", id: "human", field: "alive" },
-            op: "eq",
-            expected: true,
-          },
-        ],
-      },
-      roadmap,
-    );
-    let g = lab.game,
-      e = g.encounters[g.floors[0].stations[0].encounter];
-    assert.equal(
-      e.runId,
-      g.id,
-      "GameTest encounter sessions must use the scenario run ID",
-    );
+    let g = createGame(1, roadmap),
+      e = g.encounters["question-0"];
+    assert.equal(e.runId, g.id, "encounter sessions must use the record ID");
     preparePracticeRooms(g, roadmap);
-    e = g.encounters[g.floors[0].stations[0].encounter];
+    e = g.encounters["question-0"];
     e.owner = "human";
     const ledger = JSON.stringify(g.study.learner);
     globalThis.fetch = (url, options) =>
@@ -77,7 +51,6 @@ test("real bridge and gateway: chat follow-up, malformed correction, interrupted
     await send(
       g,
       e,
-      "tutor",
       "Synthetic prediction: the first window is largest",
       roadmap,
     );
@@ -93,7 +66,6 @@ test("real bridge and gateway: chat follow-up, malformed correction, interrupted
     assert.equal(relay.rejected, 1, "the malformed answer was refused");
     assert.equal(e.tutorRequests![0].state, "applied");
     assert.equal(e.submissions.length, 0);
-    assert.equal(g.survivors[0].keys, 0);
 
     // A failed gateway call must not leak a reward and keeps the exact request.
     relay.answerWith((job) => {
@@ -103,7 +75,6 @@ test("real bridge and gateway: chat follow-up, malformed correction, interrupted
     await send(
       g,
       e,
-      "tutor",
       "Synthetic explanation: subtract outgoing and add incoming; check final full window",
       roadmap,
     );
@@ -113,7 +84,6 @@ test("real bridge and gateway: chat follow-up, malformed correction, interrupted
     const context = JSON.stringify(two.payload);
     assert.notEqual(e.tutorRequests!.at(-1)!.state, "applied");
     assert.equal(e.state === "consumed", false);
-    assert.equal(g.survivors[0].keys, 0);
 
     // The held request is reused byte-for-byte after an in-memory save/reload.
     g = recover(decode(encode(g)));
@@ -131,8 +101,6 @@ test("real bridge and gateway: chat follow-up, malformed correction, interrupted
     const retry = jobs[2];
     assert.equal(JSON.stringify(retry.payload), context);
     assert.equal(e.state, "consumed");
-    assert.equal(g.survivors[0].keys, 1);
-    assert.ok(g.survivors[0].access.includes(e.floor));
     assert.equal(e.submissions.length, 1);
     assert.match(e.submissions[0].content, /Synthetic prediction/);
     assert.match(e.submissions[0].content, /Synthetic explanation/);
@@ -140,10 +108,9 @@ test("real bridge and gateway: chat follow-up, malformed correction, interrupted
     assert.equal(
       JSON.stringify(g.study.learner),
       ledger,
-      "development gameplay must not award mastery",
+      "a development question must not award mastery",
     );
     await retryTutorRequest(g, e, e.tutorRequests!.at(-1)!.id, roadmap);
-    assert.equal(g.survivors[0].keys, 1);
     assert.equal(e.submissions.length, 1);
     assert.equal(jobs.length, 3, "an applied reply is never requested again");
   } finally {

@@ -14,8 +14,11 @@ import type {
   EnvironmentReviewPayload,
 } from "../src/environment-status";
 import { curriculumReadiness } from "../src/final-requirements";
+import {
+  importedEnvironmentEvidence,
+  importedEnvironmentStatus,
+} from "../src/imported-proof";
 import type { Roadmap } from "../src/model";
-import { event } from "../src/model";
 import { decode, encode, recover } from "../src/persistence";
 import {
   adoptReconciledRoadmap,
@@ -23,7 +26,7 @@ import {
 } from "../src/roadmap-adoption";
 import { prepareRoadmapExport, sha256 } from "../src/roadmap-export";
 import { reviewRoadmap } from "../src/roadmap-review";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 
 async function waitUntil(
   ready: () => boolean,
@@ -401,7 +404,7 @@ test("ENV-only export preserves protected bytes, academic sections and scheduler
 test("mixed academic-attempt exports also include ENV receipts without conflating evidence types", async () => {
   const { g, o, l } = await fixture();
   await reviewEnvironment(g, r, o.id, async (p) => judgment(p));
-  const e = g.encounters["f0-room0"];
+  const e = g.encounters["question-0"];
   e.problem = {
     title: "Fixture question",
     prompt: "Fixture",
@@ -439,9 +442,9 @@ test("a packet captured under development remains raw evidence that a later live
 });
 test("runner-backed practical review uses the captured human source and cutoff assistance, including after archive", async () => {
   const g = createGame(7, r),
-    e = g.encounters["f0-room0"];
+    e = g.encounters["question-0"];
   g.study.profile = "live";
-  const help = event(g, "tutor", "Private guided fixture", 0, "tutor", e.id);
+  const help = { seq: ++g.seq };
   e.tutor.push({
     id: "private-before",
     author: "tutor",
@@ -484,7 +487,7 @@ test("runner-backed practical review uses the captured human source and cutoff a
       receipt,
     },
   ];
-  const ran = event(g, "execution", "Fixture execution", 0, "runner", e.id);
+  const ran = { seq: ++g.seq };
   e.history.push({
     seq: ran.seq,
     author: "runner",
@@ -790,4 +793,77 @@ test("the Claude gateway ENV review rejects invalid claims, applies only separat
     globalThis.fetch = original;
     await relay.close();
   }
+});
+
+test("a later adopted roadmap supersedes an earlier imported ENV status, downward as well as upward", async () => {
+  const external = await fixture();
+  await reviewEnvironment(external.g, r, external.o.id, async (p) =>
+    judgment(p),
+  );
+  const source = await prepareRoadmapExport(r, external.l);
+  const g = createGame(7, r);
+  g.study.profile = "live";
+  const priorRef = external.l.environmentEvidence![0].id;
+  await reconcileRoadmap(g, r, source.content, async (p) => ({
+    requestId: p.requestId,
+    localHash: p.localHash,
+    candidateHash: p.candidateHash,
+    canonical: source.content,
+    definitions: [],
+    mappings: [],
+    completeScopes: [],
+    decisions: [],
+    environment: [
+      {
+        envId: external.o.envId,
+        status: "P",
+        evidenceIds: [priorRef],
+        rationale: "Synthetic correspondence to the exact prior review",
+      },
+    ],
+    rationale: "Synthetic import only; no actual certification",
+  }));
+  const job = g.study.roadmapReconciliations![0];
+  assert.equal(job.state, "ready", job.error);
+  await adoptReconciledRoadmap(g, r, job.id);
+  const l = g.study.learner!;
+  const d = curriculumReadiness(r, l, "PE").requirements.find(
+    (x) => x.id === external.o.envId,
+  )!;
+  const scope = d.scope;
+  assert.equal(importedEnvironmentStatus(r, l, d.id, scope), "P");
+  // A later adopted document whose ENV06 row was reviewed down to G.
+  const first = l.roadmapAdoptions!.at(-1)!;
+  const relabel = (status: "G" | "U") => {
+    const later = structuredClone(first);
+    const row = later.proposal.canonical
+      .split("\n")
+      .find((line) => line.startsWith("| ENV06 |"))!;
+    const c = row.split("|");
+    c[4] = ` ${status} `;
+    later.proposal.canonical = later.proposal.canonical.replace(
+      row,
+      c.join("|"),
+    );
+    later.proposal.environment = [
+      {
+        envId: d.id,
+        status,
+        evidenceIds: status === "U" ? [] : [priorRef],
+        rationale: "Synthetic later review of the same practical work",
+      },
+    ];
+    return later;
+  };
+  l.roadmapAdoptions!.push(relabel("G"));
+  assert.equal(importedEnvironmentStatus(r, l, d.id, scope), "G");
+  assert.deepEqual(importedEnvironmentEvidence(r, l, d.id, scope).refs, [
+    priorRef,
+  ]);
+  l.roadmapAdoptions!.push(relabel("U"));
+  assert.equal(importedEnvironmentStatus(r, l, d.id, scope), "U");
+  assert.deepEqual(importedEnvironmentEvidence(r, l, d.id, scope), {
+    refs: [],
+    notes: [],
+  });
 });

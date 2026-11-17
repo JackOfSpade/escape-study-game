@@ -1,7 +1,7 @@
 // Controlled source-audit fixture. Never a real judgment about the learner.
 import { readFileSync } from "node:fs";
 import { historicalScope } from "../../src/historical-scope";
-import type { Game, Roadmap } from "../../src/model";
+import type { StudyRecord, Roadmap } from "../../src/model";
 import { baselineCheckpointRefs } from "../../src/observation-validity";
 import type {
   RoadmapReconciliation,
@@ -80,7 +80,7 @@ export function setCheckpointStatus(raw: string, id: string, state: string) {
   return raw.replace(sharedRow, `| ${shared.join(" | ")} |`);
 }
 export async function baselineFixture(
-  g: Game,
+  g: StudyRecord,
   id = "PY:T05.2",
   state?: "P" | "U" | "G" | "R",
 ) {

@@ -5,7 +5,7 @@ import { activateCareerFocus } from "../src/career-profile";
 import { initialStudy } from "../src/curriculum";
 import type { Contract, Roadmap } from "../src/model";
 import { studyMapHtml } from "../src/study-map";
-import { createPlayableGame } from "../src/world";
+import { createPlayableGame } from "./helpers/record";
 
 const roadmap: Roadmap = JSON.parse(
   readFileSync("public/curriculum.json", "utf8"),
@@ -109,7 +109,7 @@ test("topic names are escaped and the diagram contains no deeper checkpoint expa
     },
   ];
   const html = studyMapHtml(g, r, issued);
-  assert.doesNotMatch(html, /<script>|<img|<b>/);
+  assert.doesNotMatch(html, /<script|<img|<b>/i);
   assert.match(html, /&lt;img src=x onerror=&quot;unsafe&quot;&gt;/);
   assert.doesNotMatch(
     html,

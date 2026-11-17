@@ -8,6 +8,7 @@ import {
 } from "./learning-model";
 import type { Roadmap } from "./model";
 import { observationInvalidated } from "./observation-validity";
+import { CELL_SEPARATOR } from "./table-row";
 
 export function historicalRecords(
   r: Roadmap,
@@ -17,7 +18,7 @@ export function historicalRecords(
   const track = objectiveId.startsWith("PY:") ? "PY" : "PE";
   return historicalScope(r, track, objectiveId, depth).evidenceRows.map(
     (row) => {
-      const c = row.split("|").map((s) => s.trim());
+      const c = row.split(CELL_SEPARATOR).map((s) => s.trim());
       return {
         id: c[1],
         date: c[3],
@@ -155,7 +156,7 @@ export function historicalReviewAuthorized(
   }
 }
 
-export function historicalMappingKey(m: HistoricalFacetMapping) {
+function historicalMappingKey(m: HistoricalFacetMapping) {
   return JSON.stringify([
     m.scopeId,
     m.facet,

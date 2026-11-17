@@ -24,7 +24,7 @@ import {
   readIdentifierCounters,
 } from "../src/roadmap-identifiers";
 import { inspectMergedDocument } from "../src/roadmap-structure";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 const final = finalRequirements(r, "PY").find((d) => d.id === "PY:T01")!;
 const excerpt =
@@ -266,7 +266,7 @@ test("source-backed terminal correction withdraws a closed imported pass, retain
     ),
     false,
   );
-  const e = copy.encounters["f0-room0"];
+  const e = copy.encounters["question-0"];
   e.problem = {
     title: "Later synthetic study",
     prompt: "Continue eligible scope",
@@ -467,7 +467,7 @@ test("an imported final semantic-facet projection retains its own gap ID across 
   assert.equal(job.state, "ready", job.error);
   await adoptReconciledRoadmap(g, r, job.id);
   const l = g.study.learner!,
-    e = g.encounters["f0-room0"];
+    e = g.encounters["question-0"];
   e.problem = {
     title: "Later synthetic issue",
     prompt: "Continue eligible scope",

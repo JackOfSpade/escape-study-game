@@ -47,6 +47,7 @@ import {
   scopeKey,
   studyRatioPosition,
 } from "./learning-model";
+import { CELL_SEPARATOR } from "./table-row";
 export interface RoadmapExport {
   fingerprint: string;
   content: string;
@@ -80,9 +81,11 @@ function gapLineMap(source: string, track?: string) {
 }
 function replaceBlock(raw: string, name: string, value: string) {
   const old = block(raw, name);
+  // A replacer function keeps "$&", "$'" and "$$" in learner or curriculum text
+  // literal; a replacement string would expand them into the document.
   return raw.replace(
     `<!-- BEGIN ${name} -->${old}<!-- END ${name} -->`,
-    `<!-- BEGIN ${name} -->${value}<!-- END ${name} -->`,
+    () => `<!-- BEGIN ${name} -->${value}<!-- END ${name} -->`,
   );
 }
 const section = (raw: string, heading: string) => {
@@ -115,7 +118,7 @@ const row = (cells: unknown[]) => `| ${cells.map(cell).join(" | ")} |`;
 const split = (line: string) =>
   line
     .slice(1, -1)
-    .split("|")
+    .split(CELL_SEPARATOR)
     .map((c) => c.trim());
 function table(raw: string, edit: (cells: string[]) => string[] | undefined) {
   return raw
@@ -130,7 +133,7 @@ function table(raw: string, edit: (cells: string[]) => string[] | undefined) {
 function fields(raw: string, changes: Record<string, string>) {
   const found = new Set<string>();
   const result = table(raw, (c) => {
-    if (!(c[0] in changes)) return;
+    if (!Object.hasOwn(changes, c[0])) return;
     found.add(c[0]);
     return [c[0], changes[c[0]]];
   });

@@ -1,16 +1,18 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { checkBridge, ensureProblem, regenerateQuestion } from "../src/ai";
+import {
+  checkBridge,
+  completeQuestion,
+  ensureProblem,
+  regenerateQuestion,
+} from "../src/ai";
 import {
   beginVisit,
   countStudyTurn,
   eligible,
   initialStudy,
 } from "../src/curriculum";
-import { complete, step } from "../src/engine";
-import { TestRunner } from "../src/gametest/runner";
-import { emptyScenario } from "../src/gametest/schema";
 import {
   applyLearningAssessment,
   encounterKey,
@@ -18,11 +20,10 @@ import {
 } from "../src/learner";
 import type { Assessment, Encounter, Roadmap } from "../src/model";
 import { decode, encode, recover } from "../src/persistence";
-import { createPlayableGame } from "../src/world";
+import { createPlayableGame } from "./helpers/record";
 import { devProblem, preparePracticeRooms } from "./helpers/practice-questions";
 import {
   enterStudyWorkspace,
-  exitStudyWorkspace,
   nextWorkspaceQuestion,
   workspaceQuestion,
   workspaceAssessment,
@@ -32,96 +33,46 @@ import {
 
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 
-test("study workspace freezes the real GameTest world and restores the prior pause state", () => {
-  const scenario = emptyScenario();
-  scenario.simulation = "game";
-  scenario.maxTicks = 30;
-  scenario.entities = [
-    { id: "human", kind: "player", x: 10, y: 10 },
-    { id: "enemy", kind: "zombie", x: 15, y: 10 },
-  ];
-  scenario.checks = [
-    {
-      name: "World stays frozen",
-      mode: "always",
-      query: { type: "worldTime" },
-      op: "eq",
-      expected: 0,
-    },
-  ];
-  const runner = new TestRunner(scenario, r);
-  const g = runner.game;
-  const before = structuredClone({
-    survivors: g.survivors,
-    zombies: g.zombies,
-    rng: g.rng,
+test("entering the study workspace marks it enabled once and keeps what the save held", () => {
+  const g = createPlayableGame(121, r);
+  g.studyWorkspace = { enabled: false, encounter: "question-0" };
+  enterStudyWorkspace(g);
+  assert.deepEqual(g.studyWorkspace, {
+    enabled: true,
+    encounter: "question-0",
   });
   enterStudyWorkspace(g);
-  g.paused = false; // Even an unrelated pause toggle cannot resume this view.
-  assert.equal(runner.run().status, "passed");
-  assert.deepEqual(
-    { survivors: g.survivors, zombies: g.zombies, rng: g.rng },
-    before,
-  );
   const saved = recover(decode(encode(g)));
-  enterStudyWorkspace(saved);
-  assert.equal(saved.studyWorkspace?.wasPaused, false);
-  exitStudyWorkspace(saved);
-  step(saved, 1 / 30);
-  assert.ok(saved.time > 0);
-  saved.paused = true;
-  enterStudyWorkspace(saved);
-  enterStudyWorkspace(saved);
-  exitStudyWorkspace(saved);
-  assert.equal(saved.paused, true);
+  assert.deepEqual(saved.studyWorkspace, g.studyWorkspace);
 });
 
-test("standalone questions use the formal scheduler without touching stations, world RNG or pacing", async () => {
+test("standalone questions use the formal scheduler and complete once", async () => {
   const g = createPlayableGame(122, r);
   preparePracticeRooms(g, r);
-  const before = structuredClone({
-    floors: g.floors,
-    rng: g.rng,
-    pacing: g.fieldPacing,
-    spawn: g.study.topicSpawn,
-  });
   const contract = eligible(r, g.study);
   enterStudyWorkspace(g);
   const e = nextWorkspaceQuestion(g, r);
   assert.equal(nextWorkspaceQuestion(g, r), e);
   assert.equal(e.studyOnly, true);
-  // No local stand-in: an unconnected world gets no question, only an error.
+  // No local stand-in: an unconnected record gets no question, only an error.
   await ensureProblem(g, e, r);
   assert.equal(e.problem, undefined);
   assert.ok(e.error);
-  e.problem = devProblem({ ...g, rng: g.seed ^ g.study.version }, r, contract);
+  e.problem = devProblem({ ...g, rng: g.seq ^ g.study.version }, r, contract);
   e.workspace = e.problem.starter;
   delete e.error;
   assert.deepEqual(e.problem?.contract, contract);
-  assert.deepEqual(
-    {
-      floors: g.floors,
-      rng: g.rng,
-      pacing: g.fieldPacing,
-      spawn: g.study.topicSpawn,
-    },
-    before,
-  );
-  const keys = g.survivors[0].keys;
-  const access = [...g.survivors[0].access];
   const ledger = structuredClone(g.study.learner);
   assert.equal(
-    complete(g, e.id, "synthetic-completion", ["human"], "Synthetic outcome"),
+    completeQuestion(g, e, "synthetic-completion", "Synthetic outcome"),
     true,
   );
-  assert.equal(complete(g, e.id, "duplicate", ["human"], "Duplicate"), false);
-  assert.equal(g.survivors[0].keys, keys);
-  assert.deepEqual(g.survivors[0].access, access);
+  assert.equal(completeQuestion(g, e, "duplicate", "Duplicate"), false);
   assert.deepEqual(g.study.learner, ledger);
-  assert.match(g.events.at(-1)!.text, /Study question completed/);
+  assert.match(e.history.at(-1)!.text, /Study question completed/);
 });
 
-test("workspace reuses an issued game question and ignores NPC-only preparation", () => {
+test("workspace reuses an issued question and ignores work owned by someone else", () => {
   const g = createPlayableGame(123, r);
   preparePracticeRooms(g, r);
   const npc = Object.values(g.encounters)[0];
@@ -138,8 +89,8 @@ test("workspace reuses an issued game question and ignores NPC-only preparation"
   assert.equal(nextWorkspaceQuestion(g, r), issued);
   assert.equal(workspaceSelectedQuestion(g), issued);
   assert.equal(Object.keys(g.encounters).length, count);
-  // Retained unfinished work from a closed run is history, not a question the
-  // current workspace may reopen or silently reinterpret as a pending visit.
+  // Retained unfinished work from an earlier record is history, not a question
+  // the workspace may reopen or silently reinterpret as a pending visit.
   issued.state = "consumed";
   const archived = structuredClone(issued);
   archived.runId = "older-run";
@@ -163,7 +114,7 @@ test("workspace keeps the selected human question when other displayed tasks pre
   assert.equal(nextWorkspaceQuestion(g, r), selected);
 });
 
-test("consumed generation and displayed NPC-owned work cannot block a new study question", () => {
+test("consumed generation and displayed work owned by someone else cannot block a new study question", () => {
   const g = createPlayableGame(128, r);
   preparePracticeRooms(g, r);
   enterStudyWorkspace(g);
@@ -179,7 +130,7 @@ test("consumed generation and displayed NPC-owned work cannot block a new study 
   assert.notEqual(next, npc);
 });
 
-test("live study-only generation receives the exact formal contract and preserves physical pacing", async () => {
+test("live study-only generation receives the exact formal contract", async () => {
   const original = globalThis.fetch;
   const sent: any[] = [];
   globalThis.fetch = async (url, init) => {
@@ -217,7 +168,6 @@ test("live study-only generation receives the exact formal contract and preserve
     const g = createPlayableGame(126, r, initialStudy(r, "live"));
     enterStudyWorkspace(g);
     const formal = eligible(r, g.study);
-    const pacing = structuredClone(g.fieldPacing);
     const e = nextWorkspaceQuestion(g, r);
     await ensureProblem(g, e, r);
     assert.equal(sent.length, 1);
@@ -226,7 +176,6 @@ test("live study-only generation receives the exact formal contract and preserve
     assert.deepEqual(sent[0].contract, JSON.parse(JSON.stringify(formal)));
     assert.deepEqual(e.problem?.contract, formal);
     assert.equal(e.problem?.provenance, "claude-cli");
-    assert.deepEqual(g.fieldPacing, pacing);
   } finally {
     globalThis.fetch = original;
     await checkBridge();
@@ -263,7 +212,7 @@ test("next live question waits for its source-bound progress review, while unrel
   assert.notEqual(nextWorkspaceQuestion(g, r), e);
 });
 
-test("workspace reviews stay bound to their run when station IDs are reused", () => {
+test("workspace reviews stay bound to their record when question IDs are reused", () => {
   const g = createPlayableGame(129, r, initialStudy(r, "live"));
   enterStudyWorkspace(g);
   const current = nextWorkspaceQuestion(g, r);
@@ -416,7 +365,7 @@ test("regenerating a workspace question keeps its topic and leaves progress unto
   enterStudyWorkspace(g);
   const e = nextWorkspaceQuestion(g, r);
   assert.equal(regenerateQuestion(g, e, r), false); // Nothing to replace yet.
-  e.problem = devProblem({ ...g, rng: g.seed ^ g.study.version }, r, contract);
+  e.problem = devProblem({ ...g, rng: g.seq ^ g.study.version }, r, contract);
   e.state = "in-progress";
   e.workspace = "draft";
   e.revision = 3;

@@ -12,7 +12,7 @@ export async function startDev({
 } = {}) {
   const bridge = await ensureBridge(bridgeOptions);
   console.log(
-    `Study bridge ${bridge.reused ? "reconnected" : "started"}: http://127.0.0.1:${bridgeOptions.port ?? 4318} (persists across game-server restarts)`,
+    `Study bridge ${bridge.reused ? "reconnected" : "started"}: http://127.0.0.1:${bridgeOptions.port ?? 4318} (persists across dev-server restarts)`,
   );
   const vite = spawn(process.execPath, [clientEntry, ...clientArgs], {
     stdio: "inherit",
@@ -31,7 +31,7 @@ export async function startDev({
   });
   vite.once("exit", (code) => {
     console.log(
-      "Game server stopped. Study bridge remains running; npm run bridge:stop ends it.",
+      "Dev server stopped. Study bridge remains running; npm run bridge:stop ends it.",
     );
     process.exit(code ?? 0);
   });

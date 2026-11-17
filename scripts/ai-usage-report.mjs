@@ -16,12 +16,6 @@ function percentile(values, p) {
   const rank = Math.ceil((p / 100) * sorted.length) - 1;
   return sorted[Math.min(Math.max(rank, 0), sorted.length - 1)];
 }
-const turnOf = (row) =>
-  row.conversationTurn === 1
-    ? "first"
-    : row.conversationTurn > 1
-      ? "reply"
-      : "";
 
 /** Reads the JSONL logs, skipping and counting lines that are not rows. */
 export function readUsageRows(paths) {
@@ -58,17 +52,11 @@ export function summarizeUsage(rows) {
     const attempt =
       Number.isInteger(row.attempt) && row.attempt > 0 ? row.attempt : 0;
     const alias = row.alias ?? null;
-    const phase = row.phase ?? null;
     const model = row.model ?? null;
-    const turn = turnOf(row);
-    const key = [row.operation, phase, turn, alias, row.effort, model].join(
-      "\u0000",
-    );
+    const key = [row.operation, alias, row.effort, model].join("\u0000");
     if (!groups.has(key))
       groups.set(key, {
         operation: row.operation ?? null,
-        phase,
-        turn,
         alias,
         effort: row.effort ?? null,
         model,
@@ -100,8 +88,6 @@ export function summarizeUsage(rows) {
       .filter(isNumber);
     summary.push({
       operation: group.operation,
-      phase: group.phase,
-      turn: group.turn,
       alias: group.alias,
       effort: group.effort,
       model: group.model,
@@ -122,8 +108,6 @@ export function summarizeUsage(rows) {
   summary.sort(
     (a, b) =>
       String(a.operation).localeCompare(String(b.operation)) ||
-      String(a.phase ?? "").localeCompare(String(b.phase ?? "")) ||
-      String(a.turn).localeCompare(String(b.turn)) ||
       String(a.alias ?? "").localeCompare(String(b.alias ?? "")) ||
       String(a.effort ?? "").localeCompare(String(b.effort ?? "")) ||
       String(a.model ?? "").localeCompare(String(b.model ?? "")),
@@ -139,8 +123,6 @@ const formatNumber = (value, digits = 0) =>
       : String(Math.round(value));
 const HEADER = [
   "operation",
-  "phase",
-  "turn",
   "alias:effort",
   "model",
   "calls",
@@ -156,7 +138,7 @@ const HEADER = [
   "p95first",
 ];
 
-/** An aligned table: one line per operation, phase, turn, alias:effort, model. */
+/** An aligned table: one line per operation, alias:effort, model. */
 export function formatUsageReport({
   summary,
   calls,
@@ -165,8 +147,6 @@ export function formatUsageReport({
 }) {
   const cells = summary.map((group) => [
     group.operation ?? "-",
-    group.phase ?? "-",
-    group.turn || "-",
     `${group.alias ?? "-"}:${group.effort ?? "-"}`,
     group.model ?? "-",
     String(group.calls),
@@ -193,7 +173,7 @@ export function formatUsageReport({
   const render = (row) =>
     row
       .map((cell, column) =>
-        column < 5
+        column < 3
           ? cell.padEnd(widths[column])
           : cell.padStart(widths[column]),
       )

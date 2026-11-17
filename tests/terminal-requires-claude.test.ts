@@ -7,18 +7,17 @@ import { connectionSteps } from "../src/connection-steps";
 import { initialStudy } from "../src/curriculum";
 import { moveToLiveStudy } from "../src/live-study";
 import type { Roadmap } from "../src/model";
-import { npcThinkingRate } from "../src/npc-cognition";
-import { createPlayableGame } from "../src/world";
+import { createPlayableGame } from "./helpers/record";
 import { devProblem, preparePracticeRooms } from "./helpers/practice-questions";
 
 const roadmap: Roadmap = JSON.parse(
   readFileSync("public/curriculum.json", "utf8"),
 );
 const statusReply = (body: unknown) => async () => Response.json(body);
-const roomEncounters = (g: ReturnType<typeof createPlayableGame>) =>
-  Object.values(g.encounters).filter((e) => e.questionRoom);
+const questions = (g: ReturnType<typeof createPlayableGame>) =>
+  Object.values(g.encounters);
 
-test("game source has no local questions to fall back on", () => {
+test("app source has no local questions to fall back on", () => {
   for (const file of readdirSync("src"))
     if (file.endsWith(".ts"))
       assert.doesNotMatch(
@@ -28,13 +27,13 @@ test("game source has no local questions to fall back on", () => {
       );
 });
 
-test("a new live run gives no room a question until Claude writes one", () => {
+test("a new live record holds no question until Claude writes one", () => {
   const g = createPlayableGame(42, roadmap, initialStudy(roadmap, "live"));
-  assert.ok(roomEncounters(g).length > 0);
-  for (const e of roomEncounters(g)) assert.equal(e.problem, undefined);
+  assert.ok(questions(g).length > 0);
+  for (const e of questions(g)) assert.equal(e.problem, undefined);
 });
 
-test("without Claude, opening a terminal asks nothing and invents no question", async (t) => {
+test("without Claude, opening a question asks nothing and invents no question", async (t) => {
   const original = globalThis.fetch;
   t.after(() => {
     globalThis.fetch = original;
@@ -53,27 +52,19 @@ test("without Claude, opening a terminal asks nothing and invents no question", 
     throw Error("no request expected");
   }) as typeof fetch;
   const g = createPlayableGame(42, roadmap, initialStudy(roadmap, "live"));
-  const e = roomEncounters(g)[0];
+  const e = questions(g)[0];
   await ensureProblem(g, e, roadmap);
   assert.equal(e.problem, undefined);
   assert.ok(e.error);
   assert.equal(requests, 0);
 });
 
-test("NPCs keep working in a room nobody has opened", () => {
-  const g = createPlayableGame(42, roadmap, initialStudy(roadmap, "live"));
-  const e = roomEncounters(g)[0];
-  const npc = g.survivors[1];
-  assert.equal(e.problem, undefined);
-  assert.ok(npcThinkingRate(npc, e) > 0);
-});
-
-test("a saved practice run moves to live and keeps its learning", () => {
+test("a saved practice record moves to live and keeps its learning", () => {
   const g = createPlayableGame(42, roadmap);
   preparePracticeRooms(g, roadmap);
   const learner = g.study.learner;
   const assessments = g.study.assessments;
-  const [open, solved] = roomEncounters(g);
+  const [open, solved] = questions(g);
   open.owner = "human";
   open.workspace = "practice answer";
   open.revision = 3;
@@ -97,23 +88,20 @@ test("a saved practice run moves to live and keeps its learning", () => {
   assert.equal(moveToLiveStudy(g, roadmap), false);
 });
 
-test("moving to live keeps knowledge records and never spreads an old practice question", async (t) => {
+test("moving to live keeps knowledge records and never keeps an old practice question", async (t) => {
   const g = createPlayableGame(42, roadmap);
   preparePracticeRooms(g, roadmap);
   g.study.version = 9;
   g.study.knowledgeGaps = [{ id: "gap" } as never];
   g.study.knowledgeEstablished = [{ id: "known" } as never];
-  const room = roomEncounters(g)[0].questionRoom;
-  const peers = roomEncounters(g).filter((e) => e.questionRoom === room);
-  assert.ok(peers.length > 1);
-  const [solved, open] = peers;
+  const [solved, open] = questions(g);
   solved.state = "consumed";
-  open.npcProgress = 0.9;
+  open.workspace = "practice answer";
   moveToLiveStudy(g, roadmap);
   assert.equal(g.study.version, 9);
   assert.equal(g.study.knowledgeGaps?.length, 1);
   assert.equal(g.study.knowledgeEstablished?.length, 1);
-  assert.equal(open.npcProgress, 0);
+  assert.equal(open.workspace, "");
 
   const original = globalThis.fetch;
   t.after(() => {
@@ -133,7 +121,7 @@ test("moving to live keeps knowledge records and never spreads an old practice q
 
 test("moving to live leaves questions Claude already wrote alone", () => {
   const g = createPlayableGame(42, roadmap);
-  const e = roomEncounters(g)[0];
+  const e = questions(g)[0];
   e.problem = { ...devProblem(g, roadmap), provenance: "claude-cli" };
   e.state = "in-progress";
   moveToLiveStudy(g, roadmap);

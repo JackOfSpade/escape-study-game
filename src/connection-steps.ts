@@ -1,6 +1,6 @@
 import type { BridgeStatus } from "./bridge-client";
 
-export interface ConnectionStep {
+interface ConnectionStep {
   text: string;
   command?: string;
 }
@@ -16,10 +16,10 @@ const INSTALL: ConnectionStep = {
   command: "curl -fsSL https://claude.ai/install.sh | bash",
 };
 const START_RELAY: ConnectionStep = {
-  text: "Go to the game's project folder and start the study relay.",
+  text: "Go to the app's project folder and start the study relay.",
   command: "npm run bridge:start",
 };
-/** What the player must do to enable a terminal, for the actual cause. */
+/** What the learner must do to enable a question, for the actual cause. */
 export function connectionSteps(status: BridgeStatus): {
   problem: string;
   steps: ConnectionStep[];
@@ -37,8 +37,7 @@ export function connectionSteps(status: BridgeStatus): {
       };
     default:
       return {
-        problem:
-          "The game cannot reach its study relay, which talks to Claude.",
+        problem: "The app cannot reach its study relay, which talks to Claude.",
         steps: [OPEN_TERMINAL, START_RELAY],
       };
   }

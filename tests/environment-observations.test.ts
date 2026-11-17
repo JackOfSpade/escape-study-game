@@ -8,14 +8,13 @@ import {
 } from "../src/environment-observations";
 import { curriculumReadiness } from "../src/final-requirements";
 import type { Roadmap } from "../src/model";
-import { event } from "../src/model";
 import { decode, encode, recover } from "../src/persistence";
 import { prepareRoadmapExport, sha256 } from "../src/roadmap-export";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 async function fixture() {
   const g = createGame(7, r),
-    e = g.encounters["f0-room0"];
+    e = g.encounters["question-0"];
   edit(g, e, "assert 2 + 2 == 4", 0);
   const receipt = {
     id: "synthetic-container-receipt",
@@ -40,7 +39,7 @@ async function fixture() {
       receipt,
     },
   ];
-  const ev = event(g, "execution", "Fixture only", 0, "runner", e.id);
+  const ev = { seq: ++g.seq };
   e.history.push({
     seq: ev.seq,
     author: "runner",
@@ -108,12 +107,12 @@ test("identical capture coalesces concurrently and after reload, even when unrel
     recordEnvironmentObservation(g, r, input),
   ]);
   assert.equal(a.id, b.id);
-  const ev = event(g, "npc-activity", "Unrelated later work", 0, "npc-0", e.id);
+  const ev = { seq: ++g.seq };
   e.history.push({
     seq: ev.seq,
-    author: "npc-0",
+    author: "someone-else",
     kind: "activity",
-    text: ev.text,
+    text: "Unrelated later work",
     revision: e.revision,
     at: g.time,
   });

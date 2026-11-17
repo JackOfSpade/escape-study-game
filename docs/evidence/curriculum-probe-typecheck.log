@@ -1,6 +1,0 @@
-
-> zombie-study-escape@0.1.0 typecheck
-> tsc --noEmit
-
-tests/curriculum-probe.test.ts(5,1): error TS2578: Unused '@ts-expect-error' directive.
-tests/curriculum-probe.test.ts(9,8): error TS7016: Could not find a declaration file for module '../scripts/smoke-chatgpt-curriculum.mjs'. '/Users/jack/Desktop/My Apps/zombie-escape-study-game/scripts/smoke-chatgpt-curriculum.mjs' implicitly has an 'any' type.

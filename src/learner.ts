@@ -33,6 +33,7 @@ import {
   type Assessment,
   type Contract,
   type Encounter,
+  type Message,
   type Roadmap,
   type Track,
 } from "./model";
@@ -50,6 +51,7 @@ import {
 import { externalResolutionRow } from "./roadmap-active-work";
 import { allocationCounters, formatIdentifier } from "./roadmap-identifiers";
 import { sourceSessionStatus } from "./roadmap-structure";
+import { CELL_SEPARATOR } from "./table-row";
 export const encounterKey = (e: Encounter) => `${e.runId ?? "legacy"}/${e.id}`;
 const localDateFormat = new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/Toronto",
@@ -84,6 +86,8 @@ export function initialLearner(
     );
   const cells: LearnerLedger["cells"] = {},
     reviews: LearnerLedger["reviews"] = {};
+  // Split the source once, and only when an objective carries a due review.
+  let sourceLines: string[] | undefined;
   for (const track of ["PY", "PE"] as const)
     for (const o of r.tracks[track].objectives) {
       cells[o.id] = {
@@ -95,9 +99,11 @@ export function initialLearner(
       if (o.reviewDue) {
         const ev = /S\d{4}-EV\d+/.exec(o.refs)?.[0],
           session = ev?.split("-")[0];
-        const row = r.raw
-          .split("\n")
-          .find((l) => session && l.startsWith(`| ${session} |`));
+        const row = session
+          ? (sourceLines ??= r.raw.split("\n")).find((l) =>
+              l.startsWith(`| ${session} |`),
+            )
+          : undefined;
         reviews[reviewKey(o.id, 1)] = {
           objectiveId: o.id,
           depth: 1,
@@ -118,7 +124,7 @@ export function initialLearner(
   const sessions = [...history.matchAll(/^\| (S\d{4}) \| (.+)$/gm)].map(
     (m) => ({
       id: m[1],
-      status: sourceSessionStatus(m[2].split("|")[0]),
+      status: sourceSessionStatus(m[2].split(CELL_SEPARATOR)[0]),
     }),
   );
   const state = (t: Track) => ({
@@ -542,58 +548,6 @@ export function eligibleLearning(
     "Both tracks are at unresolved gates; do not generate filler or harder work.",
   );
 }
-/**
- * A practice contract for a variety terminal on `topic` at the track's current
- * tier. It mirrors the formal contract's facet bookkeeping but is marked
- * practice: no attempt, visit or ledger evidence is ever created for it.
- */
-export function practiceContract(
-  r: Roadmap,
-  l: LearnerLedger,
-  track: Track,
-  topicId: string,
-): Contract | undefined {
-  const s = l.tracks[track];
-  if (s.tier === 4) return undefined;
-  const o = r.tracks[track].objectives.find(
-    (o) =>
-      topic(o.id) === topicId &&
-      effectiveTarget(o, focusOf(l)) >= s.tier &&
-      l.cells[o.id]?.states[s.tier - 1] !== "P",
-  );
-  if (!o) return undefined;
-  const depth = s.tier,
-    definition = l.scopes[scopeKey(o.id, depth)],
-    progress = l.cells[o.id];
-  const preservedFacets =
-    definition?.facets
-      .filter(
-        (f) => progress?.facets[`D${depth}:${f.id}`]?.outcome === "independent",
-      )
-      .map((f) => f.id) ?? [];
-  return {
-    kind: "checkpoint",
-    id: `practice-live-${l.version}-${scopeKey(o.id, depth)}`,
-    track,
-    objectiveIds: [o.id],
-    scopes: [o.scope],
-    depth,
-    phase: s.phase,
-    review: false,
-    ledgerVersion: l.version,
-    priorEvidence: [
-      o.refs,
-      ...Object.values(progress?.facets ?? {}).flatMap((p) => p.evidenceIds),
-    ],
-    preservedFacets,
-    missingFacets: definition?.facets
-      .filter((f) => !preservedFacets.includes(f.id))
-      .map((f) => f.id),
-    historicalScope: historicalScope(r, track, o.id, depth),
-    practice: true,
-    scheduleNote: `Variety practice on ${topicId}; not the scheduled visit and never ledger evidence.`,
-  };
-}
 function attemptRoot(l: LearnerLedger, a: LearningAttempt) {
   return learningAttemptRoot(l, a);
 }
@@ -718,7 +672,7 @@ export function isDelayedReview(v: ReviewRecord, at: string, session: string) {
   return false;
 }
 export function assistanceSources(e: Encounter) {
-  const sources: Encounter["group"] = [...e.group, ...e.tutor];
+  const sources: Message[] = [...(e.group ?? []), ...e.tutor];
   for (const h of e.history.filter(
     (h) =>
       [
@@ -818,6 +772,7 @@ function validateProposal(
     a.evidenceCutoffSequence ??
     e.history.reduce((latest, h) => Math.max(latest, h.seq), 0);
   const scopes = e.problem!.scopeDefinitions ?? [];
+  const sources = assistanceSources(e);
   for (const f of a.findings) {
     const d = f.depth ?? c.depth,
       def = l.scopes[scopeKey(f.objectiveId, d)];
@@ -896,7 +851,7 @@ function validateProposal(
           "An unchanged or unattributed supplied artifact is not independently authored code",
         );
       const latest = evidence.reduce((latest, h) => Math.max(latest, h.seq), 0);
-      for (const m of assistanceSources(e).filter(
+      for (const m of sources.filter(
         (m) =>
           m.kind !== "human" &&
           m.kind !== "system" &&
@@ -957,7 +912,7 @@ function validateProposal(
       );
   }
   for (const help of a.helpAttributions ?? [])
-    if (!assistanceSources(e).some((m) => m.id === help.messageId))
+    if (!sources.some((m) => m.id === help.messageId))
       throw Error("Unknown assistance reference");
 }
 
@@ -1228,22 +1183,13 @@ export function applyLearningAssessment(
       );
     if (complete) {
       setProgressStatus(cell, def.depth, "P");
+      const proofRefs = def.facets.flatMap((f) =>
+        cell.facets[`D${def.depth}:${f.id}`].evidenceIds.filter((ref) =>
+          independentProofValid(r, work, def.objectiveId, def.depth, f.id, ref),
+        ),
+      );
       cell.proofs[String(def.depth)] = [
-        ...new Set([
-          ...(cell.proofs[String(def.depth)] ?? []),
-          ...def.facets.flatMap((f) =>
-            cell.facets[`D${def.depth}:${f.id}`].evidenceIds.filter((ref) =>
-              independentProofValid(
-                r,
-                work,
-                def.objectiveId,
-                def.depth,
-                f.id,
-                ref,
-              ),
-            ),
-          ),
-        ]),
+        ...new Set([...(cell.proofs[String(def.depth)] ?? []), ...proofRefs]),
       ];
       const reviewId = reviewKey(def.objectiveId, def.depth),
         review = work.reviews[reviewId];
@@ -1267,11 +1213,6 @@ export function applyLearningAssessment(
                 ),
             )
           : [];
-      const proofRefs = def.facets.flatMap((f) =>
-        cell.facets[`D${def.depth}:${f.id}`].evidenceIds.filter((ref) =>
-          independentProofValid(r, work, def.objectiveId, def.depth, f.id, ref),
-        ),
-      );
       const actualTimes = work.evidence
         .filter((ev) => proofRefs.includes(ev.id) && ev.observedAt)
         .map((ev) => ev.observedAt!)

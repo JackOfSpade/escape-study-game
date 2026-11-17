@@ -1,6 +1,7 @@
 import type { LearnerLedger, LearningAttempt } from "./learning-model";
 import type { Roadmap } from "./model";
 import { inspectMergedDocument } from "./roadmap-structure";
+import { CELL_SEPARATOR } from "./table-row";
 
 export interface IdentifierCounters {
   nextSession: number;
@@ -12,7 +13,7 @@ export interface IdentifierCounters {
 const heading = "S0.7 Shared identifier counters";
 const positive = (value: unknown) =>
   typeof value === "number" && Number.isSafeInteger(value) && value > 0;
-export function validateIdentifierCounters(c: IdentifierCounters) {
+function validateIdentifierCounters(c: IdentifierCounters) {
   if (
     !c ||
     !positive(c.nextSession) ||
@@ -72,7 +73,7 @@ const next = (n: number) => {
 };
 /** Only actual progress-row identities count as allocated. Curriculum examples,
  * quoted history and the next-counter declaration are not issued tasks. */
-export function recordedIdentifierCounters(raw: string): IdentifierCounters {
+function recordedIdentifierCounters(raw: string): IdentifierCounters {
   const c: IdentifierCounters = {
     nextSession: 1,
     nextGap: 1,
@@ -83,7 +84,7 @@ export function recordedIdentifierCounters(raw: string): IdentifierCounters {
   const doc = inspectMergedDocument(raw),
     seen = new Set<string>();
   for (const [key, line] of doc.rows) {
-    const id = line.split("|")[1]?.trim();
+    const id = line.split(CELL_SEPARATOR)[1]?.trim();
     const formal = /^(S\d{4})-(A|EV)(\d{2,})$/.exec(id);
     if (
       /\/0\.5(?:\.1)? /.test(key) &&
@@ -122,7 +123,7 @@ function counterClaim(shared: string): IdentifierCounters | undefined {
       .find((s) =>
         s.startsWith("| Reserved next identifiers (shared counters) |"),
       )
-      ?.split("|")[2]
+      ?.split(CELL_SEPARATOR)[2]
       ?.trim() ?? "";
   const game =
     /^(S\d{4}): next shared attempt (S\d{4})-A(\d+), evidence (S\d{4})-EV(\d+); next gap G(\d+); next shared decision DEC(\d+); next genuinely new session S(\d+)$/.exec(
@@ -164,7 +165,7 @@ export function readIdentifierCounters(raw: string, strict = true) {
       .find((s) =>
         s.startsWith("| Reserved next identifiers (shared counters) |"),
       )
-      ?.split("|")[2] ?? "";
+      ?.split(CELL_SEPARATOR)[2] ?? "";
   const prefix = field.split(/\bNext |\bnext shared attempt/)[0];
   for (const match of prefix.matchAll(
     /(S\d{4})-(A|EV)(\d+)(?:[–-](?:\1-)?(?:A|EV)?(\d+))?/g,
@@ -204,7 +205,7 @@ export function readIdentifierCounters(raw: string, strict = true) {
       throw Error("Unrecognized content in shared identifier counter metadata");
     for (const row of section.split("\n").filter((s) => s.startsWith("|"))) {
       const cells = row
-        .split("|")
+        .split(CELL_SEPARATOR)
         .slice(1, -1)
         .map((s) => s.trim());
       if (cells[0] === "Counter" || cells.every((s) => /^-+$/.test(s)))
@@ -369,7 +370,9 @@ export function projectIdentifierCounters(
   } else updated = updated.trimEnd() + "\n\n" + text;
   return raw.replace(
     `<!-- BEGIN SHARED_PROGRESS -->\n${old}<!-- END SHARED_PROGRESS -->`,
-    `<!-- BEGIN SHARED_PROGRESS -->\n${updated}<!-- END SHARED_PROGRESS -->`,
+    // A function, so "$" sequences in saved progress text stay literal.
+    () =>
+      `<!-- BEGIN SHARED_PROGRESS -->\n${updated}<!-- END SHARED_PROGRESS -->`,
   );
 }
 export function attemptDisposition(

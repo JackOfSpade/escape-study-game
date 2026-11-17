@@ -1,6 +1,7 @@
 import type { LearnerLedger } from "./learning-model";
 import type { Roadmap } from "./model";
 import { inspectMergedDocument } from "./roadmap-structure";
+import { CELL_SEPARATOR } from "./table-row";
 const cache = new WeakMap<
   LearnerLedger,
   { text: string; invalid: Set<string>; attempts: Map<string, string> }
@@ -20,7 +21,7 @@ export function observationInvalidated(
       attempts = new Map<string, string>();
     for (const [key, row] of inspectMergedDocument(text).rows) {
       const c = row
-          .split("|")
+          .split(CELL_SEPARATOR)
           .slice(1, -1)
           .map((s) => s.trim()),
         track = key.split("_")[0];

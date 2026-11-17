@@ -159,32 +159,18 @@ html.study-only body {
   border-color: var(--line);
   font-size: 13px;
 }
-#study-workspace .native-study {
-  position: static;
-  width: auto;
-  max-width: none;
-  background: var(--study-inset);
+#study-load-notice {
+  margin-top: 12px;
+  padding: 12px 14px;
   border: 1px solid var(--line);
-  color: var(--ink);
-  box-shadow: none;
-  margin-top: 20px;
-  padding: 20px;
   border-radius: 7px;
+  background: var(--study-inset);
 }
-#study-workspace .native-study p {
-  color: var(--muted);
-}
-#study-workspace .native-study textarea {
-  background: var(--panel);
-  color: var(--ink);
-  width: 100%;
+#study-load-notice p {
+  margin: 0 0 10px;
 }
 #study-save-status.saved {
   color: var(--study-success);
-}
-header[aria-label="Game controls"] {
-  display: flex;
-  gap: 8px;
 }
 @media (max-width: 620px) {
   #study-workspace {

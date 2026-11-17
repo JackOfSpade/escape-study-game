@@ -24,7 +24,7 @@ import {
   readIdentifierCounters,
 } from "../src/roadmap-identifiers";
 import { inspectMergedDocument } from "../src/roadmap-structure";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 const at = "2026-10-16T16:00:00Z";
 
@@ -32,7 +32,7 @@ test("reviewed lower-pass correction suspends a real issued higher task and pres
   const g = createGame(77, r);
   g.study.profile = "live";
   const l = g.study.learner!;
-  const base = g.encounters["f0-room0"];
+  const base = g.encounters["question-0"];
   function encounter(c: Contract, n: number, world = g): Encounter {
     const e = structuredClone(base);
     e.id = `synthetic-scheduled-${n}`;

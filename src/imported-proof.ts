@@ -11,6 +11,7 @@ import type {
   RoadmapAdoptionReceipt,
 } from "./roadmap-adoption-types";
 import { receiptRows } from "./roadmap-structure";
+import { CELL_SEPARATOR } from "./table-row";
 /** Manual merged roadmaps may bind final evidence in the authoritative final
  * register instead of repeating a synthetic D4 label in the observation title.
  * An explicit conflicting depth is never overridden by that cross-reference. */
@@ -35,7 +36,7 @@ function finalRegisterDepth(
       key.startsWith(`${track}_PROGRESS/${heading}/`) && key.endsWith(`/${id}`),
   )?.[1];
   const c = row
-    ?.split("|")
+    ?.split(CELL_SEPARATOR)
     .slice(1, -1)
     .map((c) => c.trim());
   if (
@@ -77,7 +78,7 @@ export function importedMappingValid(
     );
     if (!found) throw Error("Imported proof has no exact source evidence row");
     const c = found[1]
-        .split("|")
+        .split(CELL_SEPARATOR)
         .slice(1, -1)
         .map((c) => c.trim()),
       excerpt = m.sourceExcerpts?.[ref];
@@ -106,7 +107,7 @@ export function importedMappingValid(
           key.startsWith(`${track}_PROGRESS/0.5.1 Attempt status register/`) &&
           key.endsWith(`/${c[1]}`),
       )?.[1]
-      .split("|")
+      .split(CELL_SEPARATOR)
       .slice(1, -1)
       .map((c) => c.trim());
     if (!attempt || /^INVALIDATED\b/.test(attempt[3]))
@@ -118,9 +119,7 @@ export function importedMappingValid(
       c[5].startsWith("GAME_AI_ASSESSED_") &&
       (!game || /\/ ([^:]+):/.exec(c[4])?.[1] !== m.facet)
     )
-      throw Error(
-        "Imported game evidence outcome or named facet does not match",
-      );
+      throw Error("Imported evidence outcome or named facet does not match");
     const numeric = /^[0-3](?:$|\s)/.test(c[7]) ? Number(c[7][0]) : undefined;
     if (
       !game &&
@@ -187,10 +186,7 @@ export function importedProofValid(
 }
 export const adoptedSourceText = (l?: LearnerLedger) =>
   l?.roadmapAdoptions?.at(-1)?.proposal.canonical;
-export const adoptedTrackProgress = (
-  l: LearnerLedger | undefined,
-  track: Track,
-) =>
+const adoptedTrackProgress = (l: LearnerLedger | undefined, track: Track) =>
   adoptedSourceText(l)
     ?.split(`<!-- BEGIN ${track}_PROGRESS -->`)[1]
     ?.split(`<!-- END ${track}_PROGRESS -->`)[0];
@@ -199,13 +195,22 @@ export const trackProgressContext = (
   r: Roadmap,
   track: Track,
 ) => adoptedTrackProgress(l, track) ?? r.tracks[track].progress;
-export function importedEnvironmentStatus(
+/**
+ * The practical environment status restored by adopted roadmaps. Every
+ * adoption's mapping is checked against its own source row, and the latest
+ * adoption that maps this item supersedes earlier ones: a later reviewed
+ * document can lower an imported status as well as raise it. Locally reviewed
+ * work is combined separately (`environmentStatus`), and adoption itself
+ * refuses to erase a qualifying pass.
+ */
+function importedEnvironment(
   r: Roadmap,
   l: LearnerLedger,
   id: string,
   scope: string,
 ) {
-  let status: "U" | "G" | "P" = "U";
+  let latest:
+    { status: "U" | "G" | "P"; refs: string[]; note: string } | undefined;
   for (const receipt of l.roadmapAdoptions ?? [])
     for (const m of receipt.proposal.environment ?? []) {
       if (m.envId !== id) continue;
@@ -216,7 +221,7 @@ export function importedEnvironmentStatus(
           ) && key.endsWith(`/${id.split(":")[1]}`),
       );
       const c = found?.[1]
-        .split("|")
+        .split(CELL_SEPARATOR)
         .slice(1, -1)
         .map((c) => c.trim());
       if (
@@ -234,36 +239,27 @@ export function importedEnvironmentStatus(
             c[5] === "—"))
       )
         throw Error("Unsupported imported practical environment status");
-      if (m.status === "P" || (m.status === "G" && status !== "P"))
-        status = m.status;
+      latest = { status: m.status, refs: m.evidenceIds, note: c[5] };
     }
-  return status;
+  return latest;
 }
-/** Only references from source rows already checked by the adoption validator. */
+export function importedEnvironmentStatus(
+  r: Roadmap,
+  l: LearnerLedger,
+  id: string,
+  scope: string,
+) {
+  return importedEnvironment(r, l, id, scope)?.status ?? "U";
+}
+/** Only references from the source row that set the imported status. */
 export function importedEnvironmentEvidence(
   r: Roadmap,
   l: LearnerLedger,
   id: string,
   scope: string,
 ) {
-  importedEnvironmentStatus(r, l, id, scope);
-  const refs: string[] = [],
-    notes: string[] = [];
-  for (const receipt of l.roadmapAdoptions ?? [])
-    for (const mapping of receipt.proposal.environment ?? []) {
-      if (mapping.envId !== id || mapping.status === "U") continue;
-      const row = [...receiptRows(receipt)].find(
-        ([key]) =>
-          key.startsWith(
-            "PE_PROGRESS/0.8.1 Environment-backed verification/",
-          ) && key.endsWith(`/${id.split(":")[1]}`),
-      )![1];
-      const c = row
-        .split("|")
-        .slice(1, -1)
-        .map((c) => c.trim());
-      refs.push(...mapping.evidenceIds);
-      notes.push(c[5]);
-    }
-  return { refs: [...new Set(refs)], notes: [...new Set(notes)] };
+  const latest = importedEnvironment(r, l, id, scope);
+  return latest && latest.status !== "U"
+    ? { refs: [...new Set(latest.refs)], notes: [latest.note] }
+    : { refs: [], notes: [] };
 }

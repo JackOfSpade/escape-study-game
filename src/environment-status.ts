@@ -42,7 +42,7 @@ export interface EnvironmentEvidence {
   requestHash: string;
   judgmentHash: string;
 }
-export function environmentOutput(p: EnvironmentReviewPayload, kind: string) {
+function environmentOutput(p: EnvironmentReviewPayload, kind: string) {
   if (kind === "supplied-output") return p.observation.suppliedOutput?.text;
   if (kind === "runner-receipt")
     return p.observation.execution

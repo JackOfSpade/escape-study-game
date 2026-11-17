@@ -12,7 +12,7 @@ import type { Roadmap } from "../src/model";
 import { parseRoadmapDocument } from "../src/roadmap-document";
 import { prepareRoadmapExport, sha256 } from "../src/roadmap-export";
 import { reviewRoadmap } from "../src/roadmap-review";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 const at = "2026-10-16T16:00:00.000Z";
 function next(raw: string) {
@@ -27,7 +27,7 @@ function next(raw: string) {
 function fixture() {
   const l = initialLearner(r),
     g = createGame(7, r),
-    e = g.encounters["f0-room0"],
+    e = g.encounters["question-0"],
     contract = eligibleLearning(r, l, at);
   e.problem = {
     title: "Synthetic metadata fixture",
@@ -390,4 +390,38 @@ test("legacy game supplements without exact retention and suspended metadata rem
   const report = await reviewRoadmap(r, r.raw, raw);
   assert.equal(report.issues.filter((i) => i.severity === "invalid").length, 0);
   assert.ok(report.issues.some((i) => /legacy game progress/.test(i.detail)));
+});
+test("evidence must cite an assessment task issued on its own track", async () => {
+  const row = "| S0004-EV03 | S0004-A02 |";
+  assert.ok(r.raw.includes(row), "the source has this PE evidence row");
+  // S0001-A01 is a PY task; a PE evidence row may not attach to it.
+  const crossed = next(r.raw.replace(row, "| S0004-EV03 | S0001-A01 |"));
+  await assert.rejects(
+    parseRoadmapDocument(crossed, r),
+    /PE evidence cites an assessment task issued on the other track: S0001-A01/,
+  );
+  const unissued = next(r.raw.replace(row, "| S0004-EV03 | S0004-A99 |"));
+  await assert.rejects(
+    parseRoadmapDocument(unissued, r),
+    /does not reference an issued assessment task/,
+  );
+});
+test("an observation with an escaped pipe keeps its row intact", async () => {
+  const row = "| S0004-EV03 | S0004-A02 |";
+  const line = r.raw.split("\n").find((l) => l.startsWith(row))!;
+  const observed = line.replace(
+    "| D1 problem-versus-solution separation",
+    "| D1 problem \\| solution separation",
+  );
+  assert.notEqual(observed, line);
+  const attempt = r.raw.split("\n").find((l) => l.startsWith("| S0004-A02 |"))!;
+  const scoped = attempt.replace(
+    "problem framing",
+    "problem framing \\| assumptions",
+  );
+  const candidate = next(
+    r.raw.replace(line, observed).replace(attempt, scoped),
+  );
+  const parsed = await parseRoadmapDocument(candidate, r);
+  assert.ok(parsed.tracks.PE.progress.includes(observed));
 });

@@ -1,9 +1,0 @@
-
-Running 2 tests using 1 worker
-
-(node:23141) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-(Use `node --trace-warnings ...` to show where the warning was created)
-  ✓  1 tests/browser/play.spec.ts:1129:1 › container workspace: real code execution preserves a captured revision while editing, leaving, survival and reload continue (4.1s)
-  ✓  2 tests/browser/play.spec.ts:2283:3 › container workspace NPC: NPC edits and submits only after departure, return exposes the accepted snapshot without human credit (1.8s)
-
-  2 passed (6.3s)

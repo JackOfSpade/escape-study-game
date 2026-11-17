@@ -5,7 +5,7 @@ import { preparePracticeRooms } from "./helpers/practice-questions";
 import { checkBridge, retryTutorRequest, send } from "../src/ai";
 import { probeFacets, probeState } from "../src/knowledge-probe";
 import type { Roadmap } from "../src/model";
-import { createPlayableGame } from "../src/world";
+import { createPlayableGame } from "./helpers/record";
 import { decode, encode, recover } from "../src/persistence";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 async function fixture(
@@ -37,7 +37,7 @@ async function fixture(
     await checkBridge();
     const g = createPlayableGame(717, r);
     preparePracticeRooms(g, r);
-    const e = g.encounters[g.floors[0].stations[0].encounter];
+    const e = g.encounters["question-0"];
     e.mode = "solo";
     e.owner = "human";
     connected = true;
@@ -51,19 +51,17 @@ async function fixture(
     globalThis.fetch = original;
   }
 }
-test("one private tutor conversation accumulates answers and awards one key only on explicit completion", async () =>
+test("one private tutor conversation accumulates answers and completes once, only on explicit completion", async () =>
   fixture(async (g, e, calls, reply) => {
-    const keys = g.survivors[0].keys ?? 0;
-    await send(g, e, "tutor", "My initial prediction", r);
+    await send(g, e, "My initial prediction", r);
     assert.equal(e.submissions.length, 0);
-    assert.equal(g.survivors[0].keys ?? 0, keys);
     reply(async () =>
       Response.json({
         text: "Solved: your explanation covers the rubric.",
         complete: true,
       }),
     );
-    await send(g, e, "tutor", "My explanation and boundary", r);
+    await send(g, e, "My explanation and boundary", r);
     assert.equal(calls.length, 2);
     assert.ok(calls.every((c) => c.operation === "tutor"));
     for (const c of calls) {
@@ -84,16 +82,13 @@ test("one private tutor conversation accumulates answers and awards one key only
     assert.equal(calls[1].payload.messages.length, 3);
     assert.equal(calls[1].payload.messages[1].kind, "tutor");
     assert.equal(e.state, "consumed");
-    assert.equal(g.survivors[0].keys, keys + 1);
-    assert.ok(g.survivors[0].access.includes(e.floor));
     assert.equal(e.submissions.length, 1);
     assert.equal(e.submissions[0].status, "complete");
     assert.match(e.submissions[0].content, /initial prediction/);
     assert.doesNotMatch(e.submissions[0].content, /What changes/);
     const id = e.tutorRequests.at(-1).id;
     await retryTutorRequest(g, e, id, r);
-    await send(g, e, "tutor", "Explain that again", r);
-    assert.equal(g.survivors[0].keys, keys + 1);
+    await send(g, e, "Explain that again", r);
     assert.equal(e.submissions.length, 1);
     assert.equal(
       g.study.visits.filter((v: any) => v.encounter === e.id).length <= 1,
@@ -105,7 +100,7 @@ test("interrupted chat retries its exact captured context after reload and never
     reply(async () =>
       Response.json({ error: "Synthetic outage" }, { status: 503 }),
     );
-    await send(g, e, "tutor", "Captured answer", r);
+    await send(g, e, "Captured answer", r);
     assert.equal(e.tutorRequests[0].state, "interrupted");
     const loaded = recover(decode(encode(g))),
       resumed = loaded.encounters[e.id];
@@ -119,7 +114,6 @@ test("interrupted chat retries its exact captured context after reload and never
       return Response.json({ text: "Solved", complete: true });
     });
     await retryTutorRequest(loaded, resumed, resumed.tutorRequests![0].id, r);
-    assert.equal(loaded.survivors[0].keys ?? 0, 0);
     assert.equal(resumed.submissions.length, 0);
     assert.match(resumed.tutorRequests![0].error!, /changed during review/);
   }));
@@ -132,15 +126,15 @@ test("pending turns coalesce, newer turns supersede interrupted checks, and a di
           finish = resolve;
         }),
     );
-    const waiting = send(g, e, "tutor", "First answer", r);
-    await send(g, e, "tutor", "Premature second answer", r);
+    const waiting = send(g, e, "First answer", r);
+    await send(g, e, "Premature second answer", r);
     assert.equal(e.tutor.filter((m: any) => m.kind === "human").length, 1);
     assert.equal(calls.length, 1);
     finish(Response.json({ error: "outage" }, { status: 503 }));
     await waiting;
     const old = e.tutorRequests[0];
     reply(async () => Response.json({ text: "Keep going", complete: false }));
-    await send(g, e, "tutor", "Revised answer", r);
+    await send(g, e, "Revised answer", r);
     assert.equal(old.state, "superseded");
     await retryTutorRequest(g, e, old.id, r);
     assert.equal(calls.length, 2);
@@ -157,24 +151,21 @@ test("pending turns coalesce, newer turns supersede interrupted checks, and a di
       globalThis.fetch = current;
       return Response.json({ text: "Solved", complete: true });
     });
-    await send(g, e, "tutor", "Final answer", r);
+    await send(g, e, "Final answer", r);
     assert.equal(e.state !== "consumed", true);
-    assert.equal(g.survivors[0].keys ?? 0, 0);
   }));
 
 for (const changed of ["profile", "study"] as const)
   test(`a pending tutor answer cannot reward a replaced ${changed}`, async () =>
     fixture(async (g, e, _calls, reply) => {
-      const keys = g.survivors[0].keys ?? 0;
       reply(async () => {
         if (changed === "profile") g.study.profile = "live";
         else g.study = structuredClone(g.study);
         return Response.json({ text: "Synthetic completion", complete: true });
       });
-      await send(g, e, "tutor", "Synthetic saved answer", r);
+      await send(g, e, "Synthetic saved answer", r);
       assert.equal(e.tutorRequests[0].state, "interrupted");
       assert.equal(e.tutor.filter((m: any) => m.kind === "tutor").length, 0);
-      assert.equal(g.survivors[0].keys ?? 0, keys);
       assert.equal(e.submissions.length, 0);
     }));
 
@@ -183,7 +174,7 @@ test("dialogue clients reject missing completion decisions and changed captured 
     reply(async () =>
       Response.json({ text: "This reply forgot its completion decision" }),
     );
-    await send(g, e, "tutor", "A supported answer", r);
+    await send(g, e, "A supported answer", r);
     assert.equal(e.tutorRequests[0].state, "interrupted");
     assert.equal(e.tutor.filter((m: any) => m.kind === "tutor").length, 0);
     assert.equal(e.submissions.length, 0);
@@ -199,12 +190,10 @@ test("dialogue clients reject missing completion decisions and changed captured 
       "outdated snapshots must be rejected before sending",
     );
     assert.equal(e.workspace, "Newer retained work");
-    assert.equal(g.survivors[0].keys ?? 0, 0);
   }));
 
-test("a declared gap lets Terminal AI concede the key, records the gap with the learner's words, and carries it to the next question and run", async () =>
+test("a declared gap lets the tutor concede the question, records the gap with the learner's words, and carries it to the next question and run", async () =>
   fixture(async (g, e, calls, reply) => {
-    const keys = g.survivors[0].keys ?? 0;
     const facets = probeFacets(e.problem);
     reply(async () =>
       Response.json({
@@ -216,14 +205,13 @@ test("a declared gap lets Terminal AI concede the key, records the gap with the 
         },
       }),
     );
-    await send(g, e, "tutor", "5, from the last two readings", r);
+    await send(g, e, "5, from the last two readings", r);
     assert.equal(e.probe.turns.length, 1);
     assert.equal(probeState(e).established, 1);
-    assert.equal(g.survivors[0].keys ?? 0, keys);
     assert.equal(g.study.knowledgeGaps, undefined);
     reply(async () =>
       Response.json({
-        text: "Recorded: you do not know the boundary. Here is your key.",
+        text: "Recorded: you do not know the boundary. Moving on.",
         complete: true,
         outcome: "gap",
         knowledge: {
@@ -235,10 +223,8 @@ test("a declared gap lets Terminal AI concede the key, records the gap with the 
         },
       }),
     );
-    await send(g, e, "tutor", "Honestly I don't know what the boundary is", r);
+    await send(g, e, "Honestly I don't know what the boundary is", r);
     assert.equal(e.state, "consumed");
-    assert.equal(g.survivors[0].keys, keys + 1);
-    assert.ok(g.survivors[0].access.includes(e.floor));
     assert.equal(e.submissions.length, 1);
     assert.equal(e.submissions[0].status, "complete");
     assert.match(
@@ -266,8 +252,7 @@ test("a declared gap lets Terminal AI concede the key, records the gap with the 
         outcome: "gap",
       }),
     );
-    await send(g, e, "tutor", "Tell me again", r);
-    assert.equal(g.survivors[0].keys, keys + 1);
+    await send(g, e, "Tell me again", r);
     assert.equal(g.study.knowledgeGaps.length, facets.length - 1);
     // The next question on the same track carries the recorded gap as context.
     const other = Object.values(g.encounters).find(
@@ -276,7 +261,7 @@ test("a declared gap lets Terminal AI concede the key, records the gap with the 
     other.owner = "human";
     reply(async () => Response.json({ text: "Go on", complete: false }));
     const before = calls.length;
-    await send(g, other, "tutor", "Starting the next room", r);
+    await send(g, other, "Starting the next room", r);
     const next = calls[before].payload;
     if (next.problem.contract.track === e.problem.contract.track) {
       assert.match(next.progressContext, /Learner-declared knowledge gaps/);
@@ -311,11 +296,10 @@ test("a reply with a malformed knowledge report is interrupted and awards nothin
         outcome: "mostly",
       }),
     );
-    await send(g, e, "tutor", "An answer", r);
+    await send(g, e, "An answer", r);
     assert.equal(e.tutorRequests[0].state, "interrupted");
     assert.match(e.tutorRequests[0].error, /outcome must be/);
     assert.equal(e.state !== "consumed", true);
-    assert.equal(g.survivors[0].keys ?? 0, 0);
     assert.equal(e.probe, undefined);
     reply(async () =>
       Response.json({
@@ -327,7 +311,6 @@ test("a reply with a malformed knowledge report is interrupted and awards nothin
     await retryTutorRequest(g, e, e.tutorRequests[0].id, r);
     assert.equal(e.tutorRequests[0].state, "interrupted");
     assert.match(e.tutorRequests[0].error, /knowledge report/);
-    assert.equal(g.survivors[0].keys ?? 0, 0);
     reply(async () =>
       Response.json({
         text: "Solved: all facets shown.",
@@ -344,7 +327,6 @@ test("a reply with a malformed knowledge report is interrupted and awards nothin
     await retryTutorRequest(g, e, e.tutorRequests[0].id, r);
     assert.equal(e.tutorRequests[0].state, "applied");
     assert.equal(e.state, "consumed");
-    assert.equal(g.survivors[0].keys, 1);
     assert.equal(g.study.knowledgeGaps, undefined);
     assert.deepEqual(
       e.probe.turns[0].findings.map((f: any) => f.id),
@@ -353,7 +335,7 @@ test("a reply with a malformed knowledge report is interrupted and awards nothin
     assert.doesNotMatch(e.submissions[0].feedback, /conceded/);
   }));
 
-test("an apex gap descends through tutor-declared parts: the known part is established, the missing part is the recorded gap, and the key is granted", async () =>
+test("an apex gap descends through tutor-declared parts: the known part is established, the missing part is the recorded gap, and the question completes", async () =>
   fixture(async (g, e, calls, reply) => {
     const apex = probeFacets(e.problem)[0];
     reply(async () =>
@@ -380,13 +362,13 @@ test("an apex gap descends through tutor-declared parts: the known part is estab
         },
       }),
     );
-    await send(g, e, "tutor", "I don't know that one", r);
+    await send(g, e, "I don't know that one", r);
     assert.equal(e.probe.facets.length, probeFacets(e.problem).length + 2);
     assert.equal(e.state !== "consumed", true);
     assert.equal(g.study.knowledgeGaps, undefined);
     reply(async () =>
       Response.json({
-        text: "Generating functions: known. Counting by cases is the gap; recorded, and here is your key.",
+        text: "Generating functions: known. Counting by cases is the gap; recorded, and we move on.",
         complete: true,
         outcome: "gap",
         knowledge: {
@@ -401,12 +383,10 @@ test("an apex gap descends through tutor-declared parts: the known part is estab
     await send(
       g,
       e,
-      "tutor",
       "A generating function encodes a sequence as power-series coefficients; counting by cases I never learned",
       r,
     );
     assert.equal(e.state, "consumed");
-    assert.equal(g.survivors[0].keys, 1);
     assert.deepEqual(
       g.study.knowledgeGaps.map((x: any) => [x.facet.id, x.partOf?.id]),
       [["enumerative-combinatorics", apex.id]],
@@ -423,7 +403,7 @@ test("an apex gap descends through tutor-declared parts: the known part is estab
     assert.match(calls[0].payload.instruction, /partOf/);
   }));
 
-test("a gap concession with a reply at the transport bound still grants the key and leaves no pending submission", async () =>
+test("a gap concession with a reply at the transport bound still completes and leaves no pending submission", async () =>
   fixture(async (g, e, calls, reply) => {
     const facets = probeFacets(e.problem);
     const text = "Recorded as a gap. " + "x".repeat(7_900);
@@ -438,10 +418,9 @@ test("a gap concession with a reply at the transport bound still grants the key 
         },
       }),
     );
-    await send(g, e, "tutor", "I do not know any of this", r);
+    await send(g, e, "I do not know any of this", r);
     assert.equal(e.tutorRequests[0].state, "applied", e.tutorRequests[0].error);
     assert.equal(e.state, "consumed");
-    assert.equal(g.survivors[0].keys, 1);
     assert.equal(e.submissions.length, 1);
     assert.equal(e.submissions[0].status, "complete");
     assert.ok(e.submissions.every((s: any) => s.status !== "pending"));
@@ -480,7 +459,7 @@ test("a part declared on one turn is sent back with its stored id on the next tu
         },
       }),
     );
-    await send(g, e, "tutor", "I don't know the apex", r);
+    await send(g, e, "I don't know the apex", r);
     reply(async () =>
       Response.json({
         text: "Good: you know generating functions.",
@@ -490,7 +469,7 @@ test("a part declared on one turn is sent back with its stored id on the next tu
         },
       }),
     );
-    await send(g, e, "tutor", "It encodes a sequence as coefficients", r);
+    await send(g, e, "It encodes a sequence as coefficients", r);
     assert.deepEqual(calls[1].payload.probe.facets.at(-1), {
       id: "generating-functions",
       description: "Generating functions",
@@ -501,4 +480,21 @@ test("a part declared on one turn is sent back with its stored id on the next tu
       g.study.knowledgeEstablished.map((k: any) => k.facet.id),
       ["generating-functions"],
     );
+  }));
+
+test("a message whose question context cannot be captured is reported instead of rejecting unhandled", async () =>
+  fixture(async (g, e, calls) => {
+    // The roadmap no longer holds the question's track.
+    const stale: Roadmap = structuredClone(r);
+    delete (stale.tracks as Record<string, unknown>)[e.problem.contract.track];
+    await send(g, e, "My answer", stale);
+    assert.equal(calls.length, 0);
+    assert.equal(e.tutor.at(-1).text, "My answer", "the message is kept");
+    assert.match(e.error, /could not be prepared/);
+    assert.ok(!e.tutorRequests?.length, "no request is left pending");
+    // The same conversation carries on once the context can be read again.
+    await send(g, e, "My answer again", r);
+    assert.equal(calls.length, 1);
+    assert.equal(e.error, undefined);
+    assert.equal(e.tutor.at(-1).text, "What changes?");
   }));

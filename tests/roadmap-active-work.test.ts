@@ -20,13 +20,13 @@ import {
 import type { RoadmapReconciliationPayload } from "../src/roadmap-adoption-types";
 import { prepareRoadmapExport } from "../src/roadmap-export";
 import { reviewRoadmap } from "../src/roadmap-review";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 const at = "2026-10-16T16:00:00Z";
 async function fixture(otherUnfinished = false, leaveSourceOpen = false) {
   const g = createGame(7, r),
     l = g.study.learner!,
-    e = g.encounters["f0-room0"];
+    e = g.encounters["question-0"];
   g.study.profile = "live";
   const c = eligibleLearning(r, l, at);
   e.problem = {
@@ -128,8 +128,7 @@ async function fixture(otherUnfinished = false, leaveSourceOpen = false) {
 for (const transport of ["study-mode", "chatgpt-handoff"] as const)
   test(`explicit external resolution through ${transport} preserves the exact playable puzzle and draft, closes only the settled session and imports no duplicate game visit`, async () => {
     const f = await fixture(),
-      before = JSON.stringify(f.e),
-      world = JSON.stringify(f.g.floors);
+      before = JSON.stringify(f.e);
     await reconcileRoadmap(
       f.g,
       r,
@@ -163,7 +162,6 @@ for (const transport of ["study-mode", "chatgpt-handoff"] as const)
     assert.equal(l.evidence.length, 0);
     assert.equal(f.g.study.visits.length, 0);
     assert.equal(JSON.stringify(f.e), before);
-    assert.equal(JSON.stringify(f.g.floors), world);
     assert.equal(f.e.state, "available");
     assert.equal(beginLearningAttempt(r, l, f.e, at).id, f.attempt.id);
     assert.equal(l.attempts.length, 1);
@@ -182,7 +180,7 @@ for (const transport of ["study-mode", "chatgpt-handoff"] as const)
       restored = saved.study.learner!,
       next = eligibleLearning(r, restored, at);
     assert.notEqual(next.track, f.c.track);
-    const e = saved.encounters["f0-room1"];
+    const e = saved.encounters["question-1"];
     e.problem = {
       title: "Synthetic next eligible question",
       prompt: "New question",

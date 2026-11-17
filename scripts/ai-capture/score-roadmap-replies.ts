@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Score captured `reconcile-roadmap` replies with the game's own validators.
+ * Score captured `reconcile-roadmap` replies with the app's own validators.
  *
  * A model's saved reply is not trusted: the edit list it wrote is replayed
- * through `reconcileRoadmap` on a fresh game built from the same case, exactly
+ * through `reconcileRoadmap` on a fresh record built from the same case, exactly
  * as the client would retry it. The job therefore validates the proposed file
  * the way production does, and the score says whether the proposal would have
  * been adopted (`adoptable`), refused by a validator (`rejected`), or whether
@@ -18,7 +18,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Roadmap } from "../../src/model";
 import { reconcileRoadmap } from "../../src/roadmap-adoption";
-import { createGame } from "../../src/world";
+import { createGame } from "../../tests/helpers/record";
 import {
   loadRoadmap,
   RECONCILE_OPERATION,
@@ -28,9 +28,9 @@ import {
 /** Must match `KEEP_LOCAL` in scripts/lib/roadmap-edits.mjs. */
 const KEEP_LOCAL = "keep-local";
 
-export type ReplyClassification = "adoptable" | "rejected" | "keep-local";
+type ReplyClassification = "adoptable" | "rejected" | "keep-local";
 
-export type ScoredRoadmapReply = {
+type ScoredRoadmapReply = {
   caseId: string;
   setting: string;
   rep: number | null;
@@ -39,7 +39,7 @@ export type ScoredRoadmapReply = {
   error?: string;
 };
 
-export type SettingScore = {
+type SettingScore = {
   setting: string;
   adoptable: number;
   rejected: number;
@@ -48,7 +48,7 @@ export type SettingScore = {
   adoptableRate: number;
 };
 
-export type RoadmapScore = {
+type RoadmapScore = {
   rows: ScoredRoadmapReply[];
   settings: SettingScore[];
 };
@@ -65,11 +65,11 @@ function lastAnswer(row: Record<string, unknown>) {
 }
 
 /**
- * Replay one reply through the real validator on a fresh game. The answer's
+ * Replay one reply through the real validator on a fresh record. The answer's
  * binding hashes are replaced with the fresh payload's values, so the reply is
  * graded on its content rather than on a stale snapshot.
  */
-export async function classifyRoadmapReply({
+async function classifyRoadmapReply({
   item,
   answer,
   roadmap,
@@ -79,7 +79,7 @@ export async function classifyRoadmapReply({
   roadmap: Roadmap;
 }): Promise<{ classification: ReplyClassification; error?: string }> {
   if (answer.outcome === KEEP_LOCAL) return { classification: "keep-local" };
-  // A fresh copy and a fresh game keep one replay out of the next; the saved
+  // A fresh copy and a fresh record keep one replay out of the next; the saved
   // reply is graded on its content, never on a stale snapshot.
   const isolated = JSON.parse(JSON.stringify(roadmap)) as Roadmap;
   const g = createGame(7, isolated);
@@ -184,7 +184,7 @@ export async function scoreRoadmapReplies({
 const percent = (value: number) =>
   Number.isFinite(value) ? `${Math.round(value * 100)}%` : "-";
 
-export function formatRoadmapScore(score: RoadmapScore): string {
+function formatRoadmapScore(score: RoadmapScore): string {
   const headers = [
     "setting",
     "adoptable",
@@ -222,7 +222,7 @@ export function formatRoadmapScore(score: RoadmapScore): string {
 }
 
 /** Read a JSONL ladder results file, skipping blank or unreadable lines. */
-export function readResultRows(file: string): Record<string, unknown>[] {
+function readResultRows(file: string): Record<string, unknown>[] {
   return readFileSync(resolve(file), "utf8")
     .split("\n")
     .filter((line) => line.trim())

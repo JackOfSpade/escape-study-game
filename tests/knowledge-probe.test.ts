@@ -29,7 +29,7 @@ import {
 } from "../src/knowledge-probe";
 import type { Roadmap } from "../src/model";
 import { decode, encode, recover } from "../src/persistence";
-import { createPlayableGame } from "../src/world";
+import { createPlayableGame } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 
 const rubricProblem = {
@@ -466,7 +466,7 @@ test("the probe contract assumes knowledge, asks the apex question first, and co
     assert.match(text, /Do not walk the rubric item by item/);
     assert.match(text, /mark Y and Z implied by X/);
     assert.match(text, /Read how the answer is given/);
-    assert.match(text, /do not lecture and do not withhold the reward/);
+    assert.match(text, /do not lecture and do not refuse to let them move on/);
     assert.match(text, /at most one level below an original question facet/);
     assert.match(text, /leave all unasked siblings unknown/);
     assert.match(text, /return to the apex and ask it again/);
@@ -606,7 +606,7 @@ test("reply parsing keeps the key decision authoritative, drops unknown facet id
 test("cumulative state re-judges per facet and conceding records only unestablished facets as gaps, once, carried into the next run", async () => {
   const g = createPlayableGame(4242, r);
   preparePracticeRooms(g, r);
-  const e = g.encounters[g.floors[0].stations[0].encounter];
+  const e = g.encounters["question-0"];
   await ensureProblem(g, e, r);
   e.problem!.scopeDefinitions = scopedProblem.scopeDefinitions as never;
   const facets = probeFacets(e.problem!);
@@ -844,7 +844,7 @@ test("cumulative state re-judges per facet and conceding records only unestablis
 test("conceding without naming facets leaves unasked facets unknown", async () => {
   const g = createPlayableGame(77, r);
   preparePracticeRooms(g, r);
-  const e = g.encounters[g.floors[0].stations[0].encounter];
+  const e = g.encounters["question-0"];
   await ensureProblem(g, e, r);
   const facets = probeFacets(e.problem!);
   assert.ok(facets.length >= 2);
@@ -890,7 +890,7 @@ test("conceding without naming facets leaves unasked facets unknown", async () =
   // A plain solved completion records nothing.
   const g2 = createPlayableGame(78, r);
   preparePracticeRooms(g2, r);
-  const e2 = g2.encounters[g2.floors[0].stations[0].encounter];
+  const e2 = g2.encounters["question-0"];
   await ensureProblem(g2, e2, r);
   assert.deepEqual(
     recordProbeTurn(
@@ -1258,7 +1258,7 @@ test("the tutor can declare prerequisite parts the question never listed, bounde
 test("declared parts join the encounter's universe and are carried in records and context with their parent", async () => {
   const g = createPlayableGame(515, r);
   preparePracticeRooms(g, r);
-  const e = g.encounters[g.floors[0].stations[0].encounter];
+  const e = g.encounters["question-0"];
   await ensureProblem(g, e, r);
   e.problem!.scopeDefinitions = [
     {
@@ -1513,7 +1513,6 @@ test("live question generation sends the track's probe records and a policy that
     await checkBridge();
     // Created live so no development practice problem is pre-assigned.
     const g = createPlayableGame(33, r, initialStudy(r, "live"));
-    g.status = "playing";
     const track = eligible(r, g.study).track;
     g.study.knowledgeGaps = [
       {
@@ -1533,7 +1532,7 @@ test("live question generation sends the track's probe records and a policy that
         at: "2026-10-18T00:00:00.000Z",
       },
     ];
-    const e = g.encounters[g.floors[0].stations[0].encounter];
+    const e = g.encounters["question-0"];
     await ensureProblem(g, e, r);
     assert.equal(e.problem?.provenance, "claude-cli");
     assert.equal(generatePayload.probeRecords.note, PROBE_RECORDS_NOTE);
@@ -1733,7 +1732,7 @@ test("a declared part is matched in the model's own spelling on later turns, for
 test("the next turn's probe contract carries declared parts with their stored ids", async () => {
   const g = createPlayableGame(616, r);
   preparePracticeRooms(g, r);
-  const e = g.encounters[g.floors[0].stations[0].encounter];
+  const e = g.encounters["question-0"];
   await ensureProblem(g, e, r);
   const own = probeFacets(e.problem!);
   assert.deepEqual(encounterProbeContract(e, e.problem!).facets, own);

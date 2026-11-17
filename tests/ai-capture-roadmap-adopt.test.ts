@@ -14,7 +14,7 @@ import {
   reconcileRoadmap,
 } from "../src/roadmap-adoption";
 import { inspectMergedDocument } from "../src/roadmap-structure";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 import {
   ADOPT_FILE,
   ADOPT_RECIPES,
@@ -340,9 +340,6 @@ function liveGame() {
   const roadmap = loadRoadmap(),
     g = createGame(7, roadmap);
   g.study.profile = "live";
-  g.status = "playing";
-  g.zombies = [];
-  g.nextSpawn = Number.MAX_SAFE_INTEGER;
   return { roadmap, g };
 }
 

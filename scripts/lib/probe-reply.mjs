@@ -2,7 +2,7 @@ import { isRecord as object } from "./is-record.mjs";
 
 /**
  * Knowledge-probe reply fields shared by the Claude gateway, the live terminal
- * relay app and the synthetic demo app. The game validates the same shape
+ * relay app and the synthetic demo app. The app validates the same shape
  * again in src/knowledge-probe.ts (parseProbeReply); this module only keeps
  * the transport-side checks and JSON Schema in one place.
  */
@@ -18,7 +18,7 @@ export const probeReplyProperties = () => ({
     type: "string",
     enum: OUTCOMES,
     description:
-      "Only with complete:true. solved: the learner's own answers solve it. gap: the learner declared they do not know what remains and no lower-level facet is left to probe; the game records the gap and still grants its once-only key.",
+      "Only with complete:true. solved: the learner's own answers solve it. gap: the learner declared they do not know what remains and no lower-level facet is left to probe; the app records the gap and still completes the question.",
   },
   knowledge: {
     type: "object",
@@ -101,7 +101,7 @@ export function validProbeKnowledge(args) {
 export const validProbeReply = (args) =>
   validProbeOutcome(args) && validProbeKnowledge(args);
 
-/** The reply the game receives: text and complete, plus the optional probe fields when given. */
+/** The reply the app receives: text and complete, plus the optional probe fields when given. */
 export const probeReplyFields = (args) => ({
   text: args.text,
   complete: args.complete,

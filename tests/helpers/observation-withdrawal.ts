@@ -16,7 +16,7 @@ import {
   readIdentifierCounters,
 } from "../../src/roadmap-identifiers";
 import { inspectMergedDocument } from "../../src/roadmap-structure";
-import { createGame } from "../../src/world";
+import { createGame } from "./record";
 export const r: Roadmap = JSON.parse(
   readFileSync("public/curriculum.json", "utf8"),
 );

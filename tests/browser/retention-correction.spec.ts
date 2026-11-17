@@ -1,4 +1,4 @@
-import { openGameMenu } from "./helpers/game-menu";
+import { openAgentMenu } from "./helpers/agent-menu";
 // Controlled source review only; no live model or real learner grades.
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
@@ -13,10 +13,6 @@ for (const removed of [0, 1])
     page,
   }) => {
     const { g, events } = retentionFixture();
-    g.status = "playing";
-    g.zombies = [];
-    g.nextSpawn = Number.MAX_SAFE_INTEGER;
-    for (const actor of g.survivors.slice(1)) actor.escaped = true;
     const expected =
       removed === 1
         ? events[0].after
@@ -67,7 +63,7 @@ for (const removed of [0, 1])
       await save(current);
     }, encode(g));
     await page.reload();
-    await openGameMenu(page);
+    await openAgentMenu(page);
     await page.locator("#curriculum-button").click();
     await page.getByText("Review an updated roadmap", { exact: true }).click();
     await page.locator("#roadmap-review-file").setInputFiles({

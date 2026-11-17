@@ -1,5 +1,5 @@
 {
-  "name": "zombie-study-escape",
+  "name": "interview-study-workspace",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,32 +11,13 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts tests/*.test.mjs",
     "test:browser": "playwright test",
-    "ai:capture": "playwright test -c playwright.capture.config.ts",
     "import:curriculum": "node --import tsx scripts/import-curriculum.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "predev": "npm run import:curriculum",
     "pretest": "npm run import:curriculum",
     "format:check": "prettier --check src scripts tests",
-    "benchmark:defense": "tsx scripts/benchmark-defense.ts",
     "test:runner": "node --import tsx --test --test-concurrency=1 tests/runner/*.test.mjs",
     "test:browser:runner": "RUN_CONTAINER_BROWSER=1 playwright test --grep \"container workspace\"",
-    "benchmark:roof": "tsx scripts/replay-roof.ts",
-    "benchmark:npc": "SIM_SECONDS=1800 tsx scripts/simulate.ts",
-    "prebenchmark:npc": "npm run import:curriculum",
-    "prebenchmark:defense": "npm run import:curriculum",
-    "prebenchmark:roof": "npm run import:curriculum",
-    "benchmark:exploration": "tsx scripts/replay-exploration.ts",
-    "prebenchmark:exploration": "npm run import:curriculum",
-    "benchmark:retreat": "tsx scripts/replay-retreat.ts",
-    "prebenchmark:retreat": "npm run import:curriculum",
-    "benchmark:cooperation": "tsx scripts/replay-cooperation.ts",
-    "prebenchmark:cooperation": "npm run import:curriculum",
-    "benchmark:npc-work": "tsx scripts/benchmark-npc-work.ts",
-    "prebenchmark:npc-work": "npm run import:curriculum",
-    "test:game": "tsx scripts/game-test.ts",
-    "test:agents": "tsx scripts/game-test.ts --json - --artifacts .artifacts/game-tests",
-    "test:dialogue": "tsx --test tests/npc-chatter.test.ts tests/npc-voice.test.ts tests/npc-dialogue-realism.test.ts tests/npc-voice-bridge.test.mjs",
-    "eval:dialogue": "tsx scripts/evaluate-npc-dialogue.ts",
     "bridge:start": "node scripts/bridge-service.mjs start",
     "ai:usage": "node scripts/ai-usage-report.mjs",
     "ai:ladder": "node scripts/ai-ladder.mjs",
@@ -47,18 +28,9 @@
   "devDependencies": {
     "@playwright/test": "^1.56.0",
     "@types/node": "^24.0.0",
-    "@types/three": "0.186.0",
     "prettier": "^3.9.10",
     "tsx": "^4.20.0",
     "typescript": "^5.9.0",
     "vite": "^7.1.0"
-  },
-  "dependencies": {
-    "kokoro-js": "1.2.1",
-    "planck": "1.5.1",
-    "three": "0.186.1"
-  },
-  "overrides": {
-    "sharp": "0.35.5"
   }
 }

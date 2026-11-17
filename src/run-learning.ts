@@ -1,15 +1,11 @@
-import { encounterKey, interruptLearningAttempt } from "./learner";
-import type { Encounter, Game, TutorRequest } from "./model";
+import type { Encounter, TutorRequest } from "./model";
 import { isRecord } from "./records";
 
 /** Static roadmap texts re-derivable from the curriculum; never re-read once settled. */
-export const RELEASED_REQUEST_FIELDS = [
-  "curriculum",
-  "progressContext",
-] as const;
+const RELEASED_REQUEST_FIELDS = ["curriculum", "progressContext"] as const;
 
 /** Drop static context from a stored request; keeps every auditable field. */
-export function releaseRequestContext(job: { payloadJson: string }): boolean {
+function releaseRequestContext(job: { payloadJson: string }): boolean {
   let payload: unknown;
   try {
     payload = JSON.parse(job.payloadJson);
@@ -134,38 +130,4 @@ export function recoverDirectStudy(e: Encounter): void {
     s.error =
       "Application restarted while this question was open in the retired chat; the saved question is kept but cannot be resumed.";
   }
-}
-
-/** Preserve actual human context, including an issued but unanswered question. */
-export function retainRunLearning(g: Game, archive = false) {
-  if (archive)
-    for (const e of [...Object.values(g.encounters), ...g.study.archives])
-      closeDirectStudy(e);
-  const retained = Object.values(g.encounters).filter(
-    (e) =>
-      e.problemPresentedSequence !== undefined ||
-      directOf(e) !== undefined ||
-      // Legacy/imported drafts can precede the event ledger. Preserve their
-      // actual bytes as context; retention alone never makes them evidence.
-      !!e.chatDraft?.length ||
-      e.workspace !== (e.problem?.starter ?? "") ||
-      [...e.group, ...e.tutor].some((m) => m.kind === "human") ||
-      e.submissions.some((s) => s.author === "human") ||
-      e.history.some((h) => h.author === "human") ||
-      e.contributors.includes("human") ||
-      (e.executions?.length ?? 0) > 0 ||
-      g.study.learner?.attempts.some((a) => a.encounter === encounterKey(e)),
-  );
-  for (const e of retained) {
-    if (archive) {
-      const archived = g.study.archives.filter(
-        (a) => encounterKey(a) === encounterKey(e),
-      );
-      if (!archived.length) g.study.archives.push(e);
-      for (const a of archived) releaseSettledRequests(a, true);
-      releaseSettledRequests(e, true);
-    }
-    if (g.study.learner) interruptLearningAttempt(g.study.learner, e);
-  }
-  return retained;
 }

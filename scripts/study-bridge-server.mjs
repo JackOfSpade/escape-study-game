@@ -2,14 +2,10 @@ import { HttpInputError, readJsonBody } from "./http-json.mjs";
 import { createServer } from "node:http";
 import { executionRoute } from "./execution-route.mjs";
 import { AI_OPERATIONS } from "./lib/ai-contracts.mjs";
+import { isRecord } from "./lib/is-record.mjs";
 
 /** Construct the actual loopback relay without launching Vite, for isolated transport verification. */
-export function createStudyBridgeServer({
-  speech,
-  claude,
-  control,
-  reports,
-} = {}) {
+export function createStudyBridgeServer({ claude, control, reports } = {}) {
   return createServer(async (req, res) => {
     res.setHeader("Content-Type", "application/json");
     res.setHeader("Cache-Control", "no-store");
@@ -26,7 +22,6 @@ export function createStudyBridgeServer({
     }
     try {
       if (control?.route(req, res)) return;
-      if (speech && (await speech.route(req, res))) return;
       if (reports && (await reports.route(req, res))) return;
       if (req.url === "/api/execute") {
         await executionRoute(req, res);
@@ -70,12 +65,7 @@ export function createStudyBridgeServer({
         claude?.enabled()
       ) {
         const parsed = await readJsonBody(req);
-        if (
-          !parsed ||
-          typeof parsed !== "object" ||
-          Array.isArray(parsed) ||
-          !AI_OPERATIONS.includes(parsed.operation)
-        )
+        if (!isRecord(parsed) || !AI_OPERATIONS.includes(parsed.operation))
           throw new HttpInputError(400, "Unknown operation");
         // A saved request belongs to the provider that captured it.
         if (
@@ -129,8 +119,21 @@ export function createStudyBridgeServer({
       res.writeHead(404);
       res.end(JSON.stringify({ error: "Not found" }));
     } catch (err) {
-      res.writeHead(err instanceof HttpInputError ? err.status : 502);
-      res.end(JSON.stringify({ error: String(err) }));
+      // A route that failed after starting its reply cannot send a second
+      // status line; writeHead would throw from this handler and, as an
+      // unhandled rejection, end the whole relay.
+      if (res.destroyed) return;
+      if (res.headersSent) return void res.destroy();
+      if (err instanceof HttpInputError) {
+        res.writeHead(err.status);
+        res.end(JSON.stringify({ error: err.message }));
+        return;
+      }
+      // Unexpected failures stay in the relay's own log; the browser gets a
+      // fixed message rather than internal error text.
+      console.error("Study bridge request failed:", err);
+      res.writeHead(502);
+      res.end(JSON.stringify({ error: "Study bridge request failed" }));
     }
   });
 }

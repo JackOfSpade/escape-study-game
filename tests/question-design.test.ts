@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 // @ts-expect-error Direct .mjs contract test.
-import { taskInstructions } from "../scripts/lib/ai-contracts.mjs";
+import { taskInstructions, validateAnswer } from "../scripts/lib/ai-contracts.mjs"; // prettier-ignore
 import { checkBridge, ensureProblem } from "../src/ai";
 import { eligible, initialStudy } from "../src/curriculum";
 import {
@@ -10,7 +10,7 @@ import {
   TERMINAL_DIALOGUE_INSTRUCTION,
 } from "../src/knowledge-probe";
 import type { Roadmap } from "../src/model";
-import { createPlayableGame } from "../src/world";
+import { createPlayableGame } from "./helpers/record";
 import {
   QUESTION_DESIGN_GUIDANCE,
   QUESTION_ADAPTATION_GUIDANCE,
@@ -70,8 +70,7 @@ test("live generation payload carries the minimal concrete problem policy and ke
   try {
     await checkBridge();
     const g = createPlayableGame(41, r, initialStudy(r, "live"));
-    g.status = "playing";
-    const e = g.encounters[g.floors[0].stations[0].encounter];
+    const e = g.encounters["question-0"];
     await ensureProblem(g, e, r);
     assert.equal(sent.length, 1);
     assert.equal(e.problem?.provenance, "claude-cli");
@@ -107,8 +106,7 @@ test("a saved generation retries with its exact captured payload and request ide
   try {
     await checkBridge();
     const g = createPlayableGame(42, r, initialStudy(r, "live"));
-    g.status = "playing";
-    const e = g.encounters[g.floors[0].stations[0].encounter];
+    const e = g.encounters["question-0"];
     const captured = {
       requestId: "gen-synthetic-saved",
       encounterId: e.id,
@@ -159,6 +157,30 @@ test("generate instructions require minimal concrete problems with unchanged con
   assert.doesNotMatch(job.instructions, /establishes the most at once/);
 });
 
+test("every generated question fits one sitting and is never split into parts", () => {
+  const contract = { id: "synthetic-sitting", depth: 2 };
+  const job = { operation: "generate", payload: { contract } };
+  const answer = (estimatedSolveSeconds: number) => ({
+    title: "Late deliveries report",
+    prompt: "Explain the bug.",
+    starter: "",
+    rubric: ["Names the race."],
+    contract,
+    scopeDefinitions: [{ id: "s" }],
+    estimatedSolveSeconds,
+  });
+  assert.doesNotThrow(() => validateAnswer(job, answer(900)));
+  assert.throws(() => validateAnswer(job, answer(901)), /30 to 900/);
+  const instructions = taskInstructions("generate", { contract }) as string;
+  assert.match(instructions, /one sitting of at most 15 minutes/);
+  for (const op of ["generate", "tutor", "assess"])
+    assert.doesNotMatch(
+      taskInstructions(op, { contract }) as string,
+      /segment/i,
+      `${op} still mentions segments`,
+    );
+});
+
 test("tutor instructions use focused questioning without breadth inflation", () => {
   const job = {
     instructions: taskInstructions("tutor", {
@@ -206,15 +228,6 @@ test("probe stance keeps bounded reasoning, one-level clarification and explicit
     PROBE_STANCE,
     /Requesting clarification alone is not evidence of partial knowledge, guessing or a gap/,
   );
-});
-
-test("the terminal helper line asks focused questions without most-at-once pressure", () => {
-  const source = readFileSync("src/main.ts", "utf8");
-  assert.match(
-    source,
-    /Terminal AI assumes you already know this and asks one focused question at a time/,
-  );
-  assert.doesNotMatch(source, /establishes the most at once/);
 });
 
 test("study prompts carry no game framing and ask for interview-realistic questions", () => {

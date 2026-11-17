@@ -1,4 +1,3 @@
-import { startDesignedRun } from "./helpers/designed-run";
 import { expect, type Page } from "@playwright/test";
 
 /** Every API request stays inside this synthetic browser context. There is no
@@ -137,88 +136,26 @@ export async function mockClaudeStudy(
   };
 }
 
-export async function enterNativeGame(page: Page) {
+/** Open the app and ask for the next question through the workspace's own
+ * button. With the synthetic relay the question arrives at once; the returned
+ * id is the encounter the learner now has open. */
+export async function openStudyQuestion(page: Page) {
   await page.goto("/");
-  await startDesignedRun(page);
-  await page.evaluate(() => {
-    const g = (window as any).__deadAir.game;
-    g.zombies = [];
-    g.nextSpawn = Number.MAX_SAFE_INTEGER;
-    g.surge.anchor = Number.MAX_SAFE_INTEGER;
-    g.survivors = g.survivors.slice(0, 1);
-  });
-}
-
-/** Existing saved work is a migration fixture, not a second answer UI. */
-export async function seedLegacyDraft(page: Page, text: string) {
-  return page.evaluate((draft) => {
-    const g = (window as any).__deadAir.game;
-    const e = g.encounters[g.floors[0].stations[0].encounter];
-    e.workspace = draft;
-    e.revision++;
-    e.history.push({
-      seq: ++g.seq,
-      author: "human",
-      kind: "edit",
-      text: draft,
-      at: g.time,
-      revision: e.revision,
-    });
-    return e.id as string;
-  }, text);
-}
-
-/** Open the real E interaction at an actual generated physical station. */
-export async function openNativeQuestion(
-  page: Page,
-  profile: "live" | "development" = "live",
-) {
-  const id = await page.evaluate(async (profile) => {
-    const d = (window as any).__deadAir,
-      g = d.game,
-      root = "/src/";
-    const { ensureProblem } = await import(/* @vite-ignore */ root + "ai.ts");
-    if (profile === "live") {
-      // A live run starts with no pre-made practice questions.
-      g.study.profile = "live";
-      for (const each of Object.values<any>(g.encounters)) delete each.problem;
-    } else {
-      // The game has no local questions; the development world is a test fixture.
-      const fixtures = "/tests/helpers/practice-questions.ts";
-      const { preparePracticeRooms } = await import(
-        /* @vite-ignore */ fixtures
-      );
-      preparePracticeRooms(g, d.roadmap);
-    }
-    const st = g.floors[0].stations[0],
-      e = g.encounters[st.encounter];
-    e.mode = "solo";
-    e.owner = "human";
-    Object.assign(g.survivors[0], { floor: 0, x: st.x, y: st.y });
-    await ensureProblem(g, e, d.roadmap);
-    await d.interact();
-    return e.id as string;
-  }, profile);
+  await page.waitForFunction(() => !!(window as any).__deadAir);
+  await page.locator("#study-next").click();
   await expect(page.locator("#terminal")).toBeVisible();
-  await expect(page.locator("body")).toHaveClass(/terminal-open/);
-  return id;
+  await expect(page.locator("#problem-title")).not.toHaveText("Connecting…");
+  return page.evaluate(
+    () => (window as any).__deadAir.game.lastStudyEncounter as string,
+  );
 }
 
-export const nativeState = (page: Page, id: string) =>
+/** The saved facts about one question that specs assert on. */
+export const studyState = (page: Page, id: string) =>
   page.evaluate((encounter) => {
     const g = (window as any).__deadAir.game,
-      e = g.encounters[encounter],
-      h = g.survivors[0];
+      e = g.encounters[encounter];
     return {
-      status: g.status,
-      time: g.time,
-      endedAt: g.endedAt,
-      paused: !!g.paused,
-      keys: h.keys ?? 0,
-      alive: h.alive,
-      x: h.x,
-      y: h.y,
-      station: h.station,
       state: e.state,
       workspace: e.workspace,
       problem: e.problem ? JSON.stringify(e.problem) : undefined,
@@ -229,35 +166,8 @@ export const nativeState = (page: Page, id: string) =>
     };
   }, id);
 
-export async function killHumanInStep(page: Page) {
-  await page.evaluate(async () => {
-    const g = (window as any).__deadAir.game,
-      h = g.survivors[0],
-      root = "/src/";
-    const { step } = await import(/* @vite-ignore */ root + "engine.ts");
-    h.hp = 1;
-    g.zombies.push({
-      id: "synthetic-combat-killer",
-      floor: h.floor,
-      x: h.x + 0.55,
-      y: h.y,
-      hp: 60,
-      path: [],
-      repath: 0,
-      cooldown: 0,
-      memory: 0,
-      stagger: 0,
-      origin: "outside",
-    });
-    step(g, 0.1);
-  });
-  await expect
-    .poll(() => page.evaluate(() => (window as any).__deadAir.game.status))
-    .toBe("dead");
-}
-
 /** Flush the UI's already-requested persistence before testing page reload. */
-export async function flushNativeSave(page: Page) {
+export async function flushStudySave(page: Page) {
   await page.evaluate(async () => {
     const root = "/src/";
     const { flushSaves } = await import(

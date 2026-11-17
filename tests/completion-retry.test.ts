@@ -5,13 +5,13 @@ import { checkBridge, edit, retrySubmission, submit } from "../src/ai";
 import { eligible } from "../src/curriculum";
 import type { Roadmap } from "../src/model";
 import { decode, encode, recover } from "../src/persistence";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 const roadmap: Roadmap = JSON.parse(
   readFileSync("public/curriculum.json", "utf8"),
 );
 function fixture() {
   const g = createGame(71, roadmap),
-    e = g.encounters["f0-room0"];
+    e = g.encounters["question-0"];
   g.study.profile = "live";
   e.problem = {
     title: "Controlled retry",
@@ -126,27 +126,10 @@ test("saved completion refuses a changed provider or captured revision before se
   }
 });
 
-test("D02/D03/D09 a late useful fix qualifies immediately despite extensive help, unfinished teammate handling and a pending individual assessment", async () => {
-  const { g, e } = fixture(),
-    h = g.survivors[0],
-    builder = g.survivors[1],
-    observer = g.survivors[2];
+test("D02/D03/D09 a late useful fix is accepted immediately despite extensive help and a pending individual assessment", async () => {
+  const { g, e } = fixture();
   g.study.learner!.mode = "test";
-  g.status = "playing";
   g.time = 600;
-  // Controlled ongoing work state; this case does not measure physical preparation.
-  builder.activity = "defending";
-  builder.handling = g.floors[0].furniture.find((o) => o.kind === "shelf")!.id;
-  e.humanEngaged = true;
-  e.history.push({
-    seq: ++g.seq,
-    author: builder.id,
-    kind: "defense",
-    text: "Controlled prior useful defense",
-    at: 599,
-    revision: 0,
-  });
-  e.contributors = [builder.id];
   for (let i = 0; i < 12; i++)
     e.tutor.push({
       id: `help-${i}`,
@@ -159,8 +142,7 @@ test("D02/D03/D09 a late useful fix qualifies immediately despite extensive help
     });
   edit(g, e, "return count + 1", e.revision, roadmap);
   const fixedAt = g.time,
-    learning = JSON.stringify(g.study.learner!.evidence),
-    inventory = structuredClone(h.inventory);
+    learning = JSON.stringify(g.study.learner!.evidence);
   let release!: (r: Response) => void,
     assessStarted = false;
   const restore = await connection(async (_url, init) => {
@@ -169,7 +151,7 @@ test("D02/D03/D09 a late useful fix qualifies immediately despite extensive help
       return Response.json({
         complete: true,
         feedback: "Synthetic useful fix accepted; not a real semantic grade",
-        qualified: [h.id, observer.id],
+        qualified: ["human"],
       });
     assert.equal(request.operation, "assess");
     assessStarted = true;
@@ -179,19 +161,6 @@ test("D02/D03/D09 a late useful fix qualifies immediately despite extensive help
     await submit(g, e, roadmap);
     assert.equal(g.time, fixedAt, "no elapsed participation quota");
     assert.equal(e.state, "consumed");
-    assert.ok(h.access.includes(0));
-    assert.ok(builder.access.includes(0));
-    assert.deepEqual(
-      observer.access,
-      [],
-      "mere presence cannot qualify even when the provider nominates it",
-    );
-    assert.equal(
-      builder.handling,
-      g.floors[0].furniture.find((o) => o.kind === "shelf")!.id,
-      "unfinished teammate work is not a world-completion prerequisite",
-    );
-    assert.deepEqual(h.inventory, inventory);
     assert.ok(assessStarted);
     assert.equal(g.study.assessments.at(-1)!.status, "pending");
     assert.equal(JSON.stringify(g.study.learner!.evidence), learning);
@@ -211,7 +180,7 @@ test("D02/D03/D09 a late useful fix qualifies immediately despite extensive help
     )
       await new Promise((resolve) => setTimeout(resolve, 0));
     assert.equal(g.study.assessments.at(-1)!.status, "review-required");
-    assert.ok(h.access.includes(0));
+    assert.equal(e.state, "consumed");
   } finally {
     if (release)
       release(Response.json({ error: "Fixture ended" }, { status: 503 }));

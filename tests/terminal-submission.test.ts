@@ -10,12 +10,12 @@ import {
   submit,
 } from "../src/ai";
 import { completionVerdict } from "../src/completion-verdict";
-import { submissionView, terminalChannel } from "../src/terminal-view";
+import { submissionView } from "../src/terminal-view";
 import type { Roadmap } from "../src/model";
-import { createGame } from "../src/world";
+import { createGame } from "./helpers/record";
 import { devProblem } from "./helpers/practice-questions";
-import { recordSpawn, spawnContract } from "../src/topic-spawn";
-import type { Encounter, Game } from "../src/model";
+import { eligible } from "../src/curriculum";
+import type { Encounter, StudyRecord } from "../src/model";
 
 const roadmap: Roadmap = JSON.parse(
   readFileSync("public/curriculum.json", "utf8"),
@@ -38,7 +38,7 @@ async function transport(
           mode: connected ? "claude-cli" : "development",
           label: "Synthetic transport",
           detail: "No external AI",
-          capabilities: connected ? ["complete", "tutor", "group"] : [],
+          capabilities: connected ? ["complete", "tutor"] : [],
         })
       : reply(JSON.parse(String(init?.body)));
   const set = async (value: boolean, handler?: typeof reply) => {
@@ -55,16 +55,15 @@ async function transport(
   }
 }
 /** Old development path: the encounter's private synthetic question, assigned explicitly. */
-function issueDev(g: Game, e: Encounter, roadmap: Roadmap) {
-  const contract = spawnContract(roadmap, g.study);
+function issueDev(g: StudyRecord, e: Encounter, roadmap: Roadmap) {
+  const contract = eligible(roadmap, g.study);
   e.problem = devProblem(g, roadmap, contract);
   e.workspace = e.problem.starter;
   e.state = "in-progress";
-  recordSpawn(g.study, contract, e.id, g.time);
 }
 async function fixture() {
   const g = createGame(701, roadmap);
-  const e = g.encounters["f0-room0"];
+  const e = g.encounters["question-0"];
   issueDev(g, e, roadmap);
   await ensureProblem(g, e, roadmap);
   assert.equal(e.problem!.provenance, "development");
@@ -86,7 +85,6 @@ test("offline answers never pass heuristics; captured content retries independen
     assert.equal(s.status, "error");
     assert.equal(submissionView(e).label, "Unable to check");
     assert.notEqual(e.state, "consumed");
-    assert.deepEqual(g.survivors[0].access, []);
     const captured = s.content;
     edit(g, e, "Later unsent draft", e.revision, roadmap);
     await set(true, async (request) => {
@@ -106,7 +104,7 @@ test("offline answers never pass heuristics; captured content retries independen
     assert.equal(e.workspace, "Later unsent draft");
     assert.equal(JSON.stringify(g.study.learner!.evidence), learning);
   }));
-test("only structured AI acceptance consumes development practice, without granting academic credit", async () =>
+test("only structured AI acceptance consumes a development question, without granting academic credit", async () =>
   transport(async (set) => {
     const { g, e } = await fixture();
     const evidence = JSON.stringify(g.study.learner!.evidence);
@@ -159,55 +157,27 @@ for (const change of ["malformed", "disconnected", "changed question"] as const)
       await pending;
       assert.equal(e.submissions[0].status, "error");
       assert.notEqual(e.state, "consumed");
-      assert.deepEqual(g.survivors[0].access, []);
     }));
-test("tutor and group receive current draft JSON; private tutoring stays out of group and chat cannot submit", async () =>
+test("the tutor receives current draft JSON and chat cannot submit", async () =>
   transport(async (set) => {
     const { g, e } = await fixture();
     edit(g, e, "Current unsubmitted draft", e.revision, roadmap);
     e.mode = "solo";
-    const npc = g.survivors[1];
-    Object.assign(npc, {
-      intent: e.id,
-      thought: 10,
-      floor: e.floor,
-      activity: "working",
-    });
-    g.zombies = [];
     const calls: any[] = [];
     await set(true, async (request) => {
       calls.push(request);
       const p = request.payload;
+      assert.equal(request.operation, "tutor");
       assert.equal(p.workspace, "Current unsubmitted draft");
       assert.equal(p.draftRevision, e.revision);
-      if (request.operation === "tutor")
-        return Response.json({
-          text: "PRIVATE_TUTOR_SENTINEL",
-          complete: false,
-        });
-      assert.equal(request.operation, "group");
-      assert.ok(!JSON.stringify(p).includes("PRIVATE_TUTOR_SENTINEL"));
       return Response.json({
-        requestId: p.requestId,
-        sourceRevision: p.sourceRevision,
-        messages: [
-          {
-            author: p.speakers[0].id,
-            kind: "question",
-            text: "Which assumption should we test?",
-            refs: [],
-          },
-        ],
+        text: "PRIVATE_TUTOR_SENTINEL",
+        complete: false,
       });
     });
-    assert.equal(terminalChannel(e), "tutor");
-    await send(g, e, "tutor", "Help with current draft", roadmap);
+    await send(g, e, "Help with current draft", roadmap);
     assert.equal(e.tutor.at(-1)!.text, "PRIVATE_TUTOR_SENTINEL");
-    e.mode = "shared";
-    assert.equal(terminalChannel(e), "group");
-    await send(g, e, "group", "Help with the assumption", roadmap);
-    assert.equal(calls.length, 2);
-    assert.equal(e.group.at(-1)!.text, "Which assumption should we test?");
+    assert.equal(calls.length, 1);
     assert.equal(e.submissions.length, 0);
     assert.notEqual(e.state, "consumed");
   }));
