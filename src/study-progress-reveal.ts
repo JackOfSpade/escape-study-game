@@ -79,7 +79,33 @@ export function progressDelta(
 const plural = (n: number, one: string, many = `${one}s`) =>
   `${n} ${n === 1 ? one : many}`;
 
-export function summaryText(delta: ProgressDelta): string {
+/** Outcome, its short label in a mixed list, and its phrase when it stands alone. */
+const OUTCOME_LABELS = [
+  ["independent", "unaided", "answered unaided"],
+  ["assisted", "with help", "answered with help"],
+  ["contradicted", "incorrect", "incorrect"],
+  ["unknown", "not shown", "not shown"],
+] as const;
+
+/** "4 parts answered with help", or "3 parts: 1 unaided, 2 with help". */
+function outcomeText(outcomes: string[]): string {
+  const counts = OUTCOME_LABELS.map(([outcome, short, alone]) => ({
+    n: outcomes.filter((o) => o === outcome).length,
+    short,
+    alone,
+  })).filter(({ n }) => n > 0);
+  if (!counts.length) return "";
+  if (counts.length === 1)
+    return `${plural(counts[0].n, "part")} ${counts[0].alone}`;
+  const total = counts.reduce((sum, { n }) => sum + n, 0);
+  return `${plural(total, "part")}: ${counts.map(({ n, short }) => `${n} ${short}`).join(", ")}`;
+}
+
+/**
+ * `outcomes` are the assessment's per-part results. They explain a map that
+ * did not move: the record still gained what each part showed.
+ */
+export function summaryText(delta: ProgressDelta, outcomes?: string[]): string {
   const parts: string[] = [];
   if (delta.gained > 0)
     parts.push(
@@ -95,6 +121,9 @@ export function summaryText(delta: ProgressDelta): string {
   if (parts.length) return parts.join(" · ");
   if (delta.topics.length)
     return `Assessment saved · ${plural(delta.topics.length, "topic")} marked to practise`;
+  const recorded = outcomeText(outcomes ?? []);
+  if (recorded)
+    return `Assessment saved · ${recorded} · no checkpoint verified this time`;
   return "Assessment saved · no change this time";
 }
 
@@ -134,7 +163,7 @@ const setNumber = (strong: HTMLElement, value: number) => {
 export function playProgressReveal(
   progressEl: HTMLElement,
   before: MapSnapshot,
-  opts: { reducedMotion: boolean; onDone?: () => void },
+  opts: { reducedMotion: boolean; outcomes?: string[]; onDone?: () => void },
 ): { cancel(): void } {
   const delta = progressDelta(before, readMapSnapshot(progressEl));
   window.scrollTo({
@@ -148,7 +177,7 @@ export function playProgressReveal(
   banner.className = "study-reveal-banner";
   banner.setAttribute("role", "status");
   banner.setAttribute("aria-live", "polite");
-  banner.textContent = summaryText(delta);
+  banner.textContent = summaryText(delta, opts.outcomes);
   host.insertBefore(banner, host.firstChild);
   const bannerTimer = window.setTimeout(() => banner.remove(), 4500);
   const removeBanner = () => {

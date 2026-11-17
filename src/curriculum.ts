@@ -1,3 +1,4 @@
+import { ASSESSMENT_HELP_GUIDANCE } from "../scripts/lib/study-question-policy.mjs";
 import { adoptedSourceText } from "./imported-proof";
 import { effectiveTarget, roleFocused, studyFocus } from "./career-profile";
 import {
@@ -310,6 +311,7 @@ export function evidencePacket(
       (m) => m.presented !== undefined && m.presented <= cutoff,
     ),
     scopePolicy:
-      "Every earlier visible nonhuman assistance source requires a helpAttributions entry with its exact messageId and a rationale, even when unrelated or rejected. Use facets:[] when it supplied no used key step; never omit the source or count rejected assistant embellishment as human authorship. Full checkpoint passes require independent complete-scope evidence. Assistant work and supplied solutions never prove personal mastery. No execution claimed without actual runner output. scopeReviews.completeCoverage reviews whether the registered facet criteria fully cover the curriculum objective at the stated depth; it does NOT describe whether the current learner response is independent, correct or complete. Report those outcomes in findings. An assisted/unknown/incorrect response does not by itself make valid criteria incomplete. Withdrawing an already verified definition requires definitionIssue:{sourceHash,sourceQuote,missingCriterion}, with this exact sourceHash, an exact 20–2000-character quote from assessmentCriteria and a concrete missing criterion. Do not invent a definition issue to express a learner gap.",
+      "Every earlier visible nonhuman assistance source requires a helpAttributions entry with its exact messageId and a rationale, even when unrelated or rejected. Use facets:[] when it supplied no used key step; never omit the source or count rejected assistant embellishment as human authorship. Full checkpoint passes require independent complete-scope evidence. Assistant work and supplied solutions never prove personal mastery. No execution claimed without actual runner output. scopeReviews.completeCoverage reviews whether the registered facet criteria fully cover the curriculum objective at the stated depth; it does NOT describe whether the current learner response is independent, correct or complete. Report those outcomes in findings. An assisted/unknown/incorrect response does not by itself make valid criteria incomplete. Withdrawing an already verified definition requires definitionIssue:{sourceHash,sourceQuote,missingCriterion}, with this exact sourceHash, an exact 20–2000-character quote from assessmentCriteria and a concrete missing criterion. Do not invent a definition issue to express a learner gap. " +
+      ASSESSMENT_HELP_GUIDANCE,
   };
 }

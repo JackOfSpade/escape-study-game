@@ -100,3 +100,24 @@ test("an unchanged map says nothing changed", () => {
   assert.deepEqual(delta, { gained: 0, lost: 0, topics: [], tiers: [] });
   assert.equal(summaryText(delta), "Assessment saved · no change this time");
 });
+
+test("an unchanged map reports what the assessment recorded", () => {
+  const same = snapshot({ "PY:a/D1": [1, 2, "partial"] });
+  const delta = progressDelta(same, structuredClone(same));
+  assert.equal(
+    summaryText(delta, ["assisted", "assisted", "assisted", "assisted"]),
+    "Assessment saved · 4 parts answered with help · no checkpoint verified this time",
+  );
+  assert.equal(
+    summaryText(delta, ["independent", "assisted", "unknown"]),
+    "Assessment saved · 3 parts: 1 unaided, 1 with help, 1 not shown · no checkpoint verified this time",
+  );
+  assert.equal(
+    summaryText(delta, ["contradicted"]),
+    "Assessment saved · 1 part incorrect · no checkpoint verified this time",
+  );
+  assert.equal(
+    summaryText(delta, []),
+    "Assessment saved · no change this time",
+  );
+});

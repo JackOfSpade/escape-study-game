@@ -1,4 +1,5 @@
 import { fnv1a } from "./hash";
+import { helpGateProblem } from "../scripts/lib/help-gate.mjs";
 import { QUESTION_DESIGN_GUIDANCE } from "../scripts/lib/study-question-policy.mjs";
 import { completionVerdict } from "./completion-verdict";
 import { careerScopeGuidance, studyFocus } from "./career-profile";
@@ -580,6 +581,12 @@ export function retryTutorRequest(
         throw Error("Invalid tutor reply");
       if (dialogue && answer.text.length > 8000)
         throw Error("Terminal reply exceeds 8000 characters");
+      // The relay already rejects this; a reply that supplies help the
+      // learner has not confirmed is never shown or recorded.
+      const helpProblem = dialogue
+        ? helpGateProblem(payload, answer as Record<string, unknown>)
+        : undefined;
+      if (helpProblem) throw Error(`Tutor reply withheld. ${helpProblem}`);
       const probe = dialogue
         ? parseProbeReply(
             answer as Record<string, unknown>,
@@ -620,6 +627,12 @@ export function retryTutorRequest(
         job.questionSequence,
       );
       delivered.requestId = job.id;
+      const help = (answer as { help?: Message["help"] }).help;
+      if (dialogue && help)
+        delivered.help = {
+          supplies: [...help.supplies],
+          offers: [...help.offers],
+        };
       job.responseMessageId = delivered.id;
       const gaps = probe
         ? recordProbeTurn(g, e, probe, {
@@ -688,11 +701,24 @@ export function retryTutorRequest(
   void operation.finally(() => tutorInFlight.delete(job));
   return operation;
 }
+/**
+ * The facets the tutor's latest reply offered help on, while that offer is
+ * still the open decision: the question is unfinished and nothing has been
+ * said or requested since.
+ */
+export function offeredHelp(e: Encounter): string[] {
+  if (e.mode !== "solo" || e.state === "consumed") return [];
+  if (e.tutorRequests?.some((j) => j.state === "pending")) return [];
+  const last = e.tutor.at(-1);
+  return last?.kind === "tutor" ? (last.help?.offers ?? []) : [];
+}
 export async function send(
   g: StudyRecord,
   e: Encounter,
   text: string,
   r: Roadmap,
+  /** Facets whose help the learner confirmed with the button for this turn. */
+  helpConfirmed: string[] = [],
 ) {
   const problem = e.problem;
   if (!text.trim() || !problem) return;
@@ -726,6 +752,7 @@ export async function send(
           responseFormat: TERMINAL_DIALOGUE_FORMAT,
           instruction: TERMINAL_DIALOGUE_INSTRUCTION,
           probe: encounterProbeContract(e, problem),
+          helpPolicy: { confirmed: helpConfirmed },
           ...(g.study.profile === "live" && r
             ? {
                 topicAssessmentContext: topicAssessmentContext(
