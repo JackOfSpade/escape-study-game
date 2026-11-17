@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { preparePracticeRooms } from "./helpers/practice-questions";
-import { checkBridge, retryTutorRequest, send } from "../src/ai";
+import { checkBridge, offeredHelp, retryTutorRequest, send } from "../src/ai";
 import type { Roadmap } from "../src/model";
 import { decode, encode, recover } from "../src/persistence";
 import { createGame } from "./helpers/record";
@@ -38,6 +38,7 @@ test("real bridge and gateway: chat follow-up, malformed correction, interrupted
     await checkBridge();
     const jobs: any[] = [];
     const followup = {
+      help: { supplies: [], offers: ["synthetic-facet"] },
       text: "Which reading leaves, and which enters?",
       complete: false,
     };
@@ -66,6 +67,10 @@ test("real bridge and gateway: chat follow-up, malformed correction, interrupted
     assert.equal(relay.rejected, 1, "the malformed answer was refused");
     assert.equal(e.tutorRequests![0].state, "applied");
     assert.equal(e.submissions.length, 0);
+    // Typed messages confirm no help; the reply's own declaration is kept.
+    assert.deepEqual(one.payload.helpPolicy, { confirmed: [] });
+    assert.deepEqual(e.tutor.at(-1)!.help, followup.help);
+    assert.deepEqual(offeredHelp(e), ["synthetic-facet"]);
 
     // A failed gateway call must not leak a reward and keeps the exact request.
     relay.answerWith((job) => {
@@ -90,6 +95,7 @@ test("real bridge and gateway: chat follow-up, malformed correction, interrupted
     e = g.encounters[e.id];
     await checkBridge();
     const solved = {
+      help: { supplies: [], offers: [] },
       text: "Solved: the accumulated explanation covers the rubric.",
       complete: true,
     };

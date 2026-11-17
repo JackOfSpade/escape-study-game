@@ -120,6 +120,20 @@
               <p id="conversation-context" class="muted"></p>
               <div id="messages" aria-live="polite"></div>
               <div id="tutor-request-status" hidden></div>
+              <div id="help-choice" role="group" aria-label="Help" hidden>
+                <p class="muted">
+                  Getting help here means this part is recorded as answered with
+                  help instead of unaided.
+                </p>
+                <div class="submit-row">
+                  <button id="help-accept" type="button">Get the help</button
+                  ><button id="help-retry" type="button" class="quiet">
+                    Try again</button
+                  ><button id="help-skip" type="button" class="quiet">
+                    Move on
+                  </button>
+                </div>
+              </div>
               <form id="chat-form">
                 <textarea
                   rows="3"

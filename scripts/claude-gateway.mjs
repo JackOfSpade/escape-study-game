@@ -13,6 +13,7 @@ import {
 import { homedir, tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { taskInstructions, validateAnswer } from "./lib/ai-contracts.mjs";
+import { helpStreamGate } from "./lib/help-gate.mjs";
 import { privateDirectory, writePrivate } from "./lib/private-fs.mjs";
 
 /** Every AI task's model and effort: the measured quality knee from the
@@ -434,7 +435,7 @@ export function createClaudeGateway({
       waiting.push(resolve);
     });
   };
-  const runOnce = ({ profile, system, user, signal, onText }) =>
+  const runOnce = ({ profile, system, user, signal, onText, gate }) =>
     new Promise((resolve, reject) => {
       const binary = resolveClaudeBinary(env);
       const child = spawn(
@@ -450,6 +451,7 @@ export function createClaudeGateway({
       const started = now();
       const at = new Date(started).toISOString();
       let buffer = "",
+        raw = "",
         shown = "",
         stderr = "",
         result,
@@ -506,8 +508,10 @@ export function createClaudeGateway({
           if (event.type === "result") result = event;
           const delta = event.event?.delta;
           if (readText && delta?.type === "text_delta") {
+            raw += delta.text;
             const text = readText(delta.text);
-            if (text !== shown) {
+            // A gated reply stays hidden until its help declaration passes.
+            if (text !== shown && (!gate || gate(raw))) {
               firstTextAt ??= now();
               onText((shown = text));
             }
@@ -599,6 +603,7 @@ export function createClaudeGateway({
             user: prompt,
             signal,
             onText,
+            gate: operation === "tutor" ? helpStreamGate(payload) : undefined,
           });
           text = done.text;
           measured = done.meta;

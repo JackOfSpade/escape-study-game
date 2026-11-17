@@ -184,6 +184,8 @@ export interface Artifact {
   presented?: number;
 }
 export interface Message {
+  /** A tutor reply's own declaration: facets it supplied help for, and facets it offered help on. */
+  help?: { supplies: string[]; offers: string[] };
   sourceRefs?: number[];
   requestId?: string;
   id: string;

@@ -4,6 +4,7 @@ import {
   ensureProblem,
   generatingEncounter,
   generationProgress,
+  offeredHelp,
   presentMessages,
   presentProblem,
   releaseRetiredChatRequests,
@@ -709,6 +710,7 @@ function renderTerminal(force = false) {
   presentMessages(game, e);
   terminalPanels.requestStatus(e);
   terminalPanels.messages(e);
+  $("#help-choice").hidden = !offeredHelp(e).length;
 }
 /** The question, its title and what the conversation beside it is for. */
 function renderHeading(e: Encounter) {
@@ -879,6 +881,21 @@ $("#retry-submission").onclick = () => {
   const s = active ? game.encounters[active]?.submissions.at(-1) : undefined;
   if (s?.status !== "error") return;
   startTerminalRequest((e) => retrySubmission(game, e, roadmap, s.id));
+};
+// Help that costs credit is given only after this explicit choice.
+$("#help-accept").onclick = () => {
+  const e = active ? game.encounters[active] : undefined;
+  const offers = e ? offeredHelp(e) : [];
+  if (!e || !offers.length) return;
+  startTerminalRequest(() =>
+    send(game, e, "Yes, give me the help.", roadmap, offers),
+  );
+};
+$("#help-retry").onclick = () => $<HTMLTextAreaElement>("#chat-input").focus();
+$("#help-skip").onclick = () => {
+  const e = active ? game.encounters[active] : undefined;
+  if (!e || !offeredHelp(e).length) return;
+  startTerminalRequest(() => send(game, e, "I want to move on.", roadmap));
 };
 $("#chat-input").addEventListener("input", () => {
   if (!active) return;

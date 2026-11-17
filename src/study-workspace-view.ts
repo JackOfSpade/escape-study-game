@@ -257,6 +257,7 @@ export function createStudyWorkspaceView(
       reveal?.cancel();
       reveal = playProgressReveal(progress, snapshot, {
         reducedMotion: reducedMotion(),
+        outcomes: assessment.findings.map((finding) => finding.outcome),
         // Deferred so the button is already re-enabled by this render. Any
         // key skips the reveal, so never pull focus out of a visible text
         // field the learner is typing in (the question stays open to discuss).

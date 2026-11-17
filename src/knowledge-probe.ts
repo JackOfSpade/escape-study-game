@@ -1,3 +1,4 @@
+import { HELP_GATE_GUIDANCE } from "../scripts/lib/help-gate.mjs";
 import { QUESTION_ADAPTATION_GUIDANCE } from "../scripts/lib/study-question-policy.mjs";
 import { scopeKey } from "./learning-model";
 import type { Contract, Encounter, StudyRecord, Problem } from "./model";
@@ -115,6 +116,10 @@ export const PROBE_STANCE =
   QUESTION_ADAPTATION_GUIDANCE;
 
 export const TERMINAL_DIALOGUE_FORMAT = {
+  help: {
+    supplies: ["probe facet ids this reply's text supplies help for"],
+    offers: ["probe facet ids this reply offers help on and awaits a choice"],
+  },
   text: "string",
   complete: "boolean",
   outcome: "solved|gap (only with complete:true; omit while continuing)",
@@ -138,9 +143,10 @@ export const TERMINAL_DIALOGUE_FORMAT = {
 } as const;
 
 export const TERMINAL_DIALOGUE_INSTRUCTION =
-  "Continue this private question conversation. Judge the learner's accumulated answers against every part of the question and rubric. Return {text,complete,outcome?,knowledge?}. " +
+  "Continue this private question conversation. Judge the learner's accumulated answers against every part of the question and rubric. Return {help,text,complete,outcome?,knowledge?}. " +
   PROBE_STANCE +
-  ' Ask a focused follow-up with complete:false while a facet is still open. Set complete:true with outcome:"solved" when the learner\'s messages and saved work supply a correct, sufficiently supported solution; set complete:true with outcome:"gap" when the learner has declared they do not know what remains or wants to move on; do not require a prerequisite tree, and name those facets as gaps in knowledge.facets. In knowledge.facets use ids from probe.facets, or declare a prerequisite part the question did not list as a new id with partOf (a known facet id) and description, with status demonstrated, implied (with impliedBy) or gap; add knowledge.signal only when the learner supplies an answer to assess. Your own explanations are assistance, not learner evidence. Do not demand a separate submission or repeat already demonstrated reasoning. Do not claim execution without matching receipts. Answer acceptance is separate from independent mastery.';
+  ' Ask a focused follow-up with complete:false while a facet is still open. Set complete:true with outcome:"solved" when the learner\'s messages and saved work supply a correct, sufficiently supported solution; set complete:true with outcome:"gap" when the learner has declared they do not know what remains or wants to move on; do not require a prerequisite tree, and name those facets as gaps in knowledge.facets. In knowledge.facets use ids from probe.facets, or declare a prerequisite part the question did not list as a new id with partOf (a known facet id) and description, with status demonstrated, implied (with impliedBy) or gap; add knowledge.signal only when the learner supplies an answer to assess. Your own explanations are assistance, not learner evidence. Do not demand a separate submission or repeat already demonstrated reasoning. Do not claim execution without matching receipts. Answer acceptance is separate from independent mastery. ' +
+  HELP_GATE_GUIDANCE;
 
 const facetId = (value: string) =>
   value

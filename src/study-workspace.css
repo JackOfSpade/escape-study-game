@@ -876,6 +876,14 @@ html.study-only body {
   color: var(--muted);
   font-size: 12px;
 }
+#study-terminal-slot #help-choice {
+  flex: none;
+  margin: 8px 0;
+}
+#study-terminal-slot #help-choice p {
+  margin: 0 0 6px;
+  font-size: 12px;
+}
 #study-terminal-slot #chat-form {
   flex: none;
   margin-top: 0;

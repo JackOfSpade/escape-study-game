@@ -14,6 +14,7 @@ import { createPlayableGame } from "./helpers/record";
 import {
   QUESTION_DESIGN_GUIDANCE,
   QUESTION_ADAPTATION_GUIDANCE,
+  ASSESSMENT_HELP_GUIDANCE,
 } from "../scripts/lib/study-question-policy.mjs";
 
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
@@ -190,6 +191,26 @@ test("tutor instructions use focused questioning without breadth inflation", () 
     }) as string,
   };
   assert.ok(job.instructions.includes(QUESTION_ADAPTATION_GUIDANCE));
+  assert.match(job.instructions, /Ask about one missing point at most twice/);
+  assert.match(job.instructions, /Help that costs credit is opt-in/);
+  assert.match(
+    job.instructions,
+    /Supply it only after the learner confirms, and then supply only what was asked/,
+  );
+  assert.match(
+    job.instructions,
+    /Never ask again for something the learner has already answered correctly/,
+  );
+  assert.match(
+    job.instructions,
+    /do not ask them to restate, complete or re-derive it/,
+  );
+  const assess = taskInstructions("assess", {}) as string;
+  assert.ok(assess.includes(ASSESSMENT_HELP_GUIDANCE));
+  assert.match(
+    ASSESSMENT_HELP_GUIDANCE,
+    /only repeats or rewords a part of the issued question/,
+  );
   assert.match(
     job.instructions,
     /one focused question whose reasoning genuinely entails its prerequisites/,
