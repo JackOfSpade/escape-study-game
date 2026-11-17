@@ -3,6 +3,7 @@ import { finalRequirements } from "./final-requirements";
 import type { Objective, Roadmap, Track } from "./model";
 import { readIdentifierCounters } from "./roadmap-identifiers";
 import { inspectMergedDocument } from "./roadmap-structure";
+import { CELL_SEPARATOR } from "./table-row";
 const validDay = (value: string) =>
   /^\d{4}-\d{2}-\d{2}$/.test(value) &&
   Number.isFinite(Date.parse(value)) &&
@@ -19,7 +20,7 @@ function field(raw: string, label: string) {
   if (rows.length !== 1)
     throw Error(`Missing or ambiguous saved field ${label}`);
   const c = rows[0]
-    .split("|")
+    .split(CELL_SEPARATOR)
     .slice(1, -1)
     .map((c) => c.trim());
   if (c.length !== 2) throw Error(`Malformed saved field ${label}`);
@@ -27,7 +28,7 @@ function field(raw: string, label: string) {
 }
 const cells = (line: string) =>
   line
-    .split("|")
+    .split(CELL_SEPARATOR)
     .slice(1, -1)
     .map((c) => c.trim());
 /** Parse an entire saved document without adopting its claims or starting study.
@@ -117,9 +118,9 @@ export async function parseRoadmapDocument(
         const def = curriculumLines.find((l) => l.startsWith(`| ${id} |`));
         const extension = curriculumLines.find((l) => l.includes(`**${id}**`));
         const scope =
-          def?.split("|")[2].trim() ??
+          def?.split(CELL_SEPARATOR)[2].trim() ??
           extension
-            ?.split("|")[3]
+            ?.split(CELL_SEPARATOR)[3]
             ?.split(`**${id}**`)[1]
             ?.split(/\*\*[TX]\d{2}\.\d+\*\*/)[0]
             ?.trim();
@@ -460,7 +461,9 @@ export async function parseRoadmapDocument(
       };
     });
   }
-  const issued = new Set<string>();
+  // Evidence cites a task from its own track's register: a PE row naming a
+  // PY task (or the reverse) would attach evidence to the wrong track.
+  const issued: Record<Track, Set<string>> = { PY: new Set(), PE: new Set() };
   for (const t of ["PY", "PE"] as Track[])
     for (const row of part(tracks[t].progress, "0.5.1 Attempt status register")
       .split("\n")
@@ -487,7 +490,7 @@ export async function parseRoadmapDocument(
         throw Error(
           "Invalid source attempt disposition; completion is not a mastery score",
         );
-      issued.add(c[0]);
+      issued[t].add(c[0]);
     }
   for (const t of ["PY", "PE"] as Track[])
     for (const row of part(
@@ -496,9 +499,11 @@ export async function parseRoadmapDocument(
     )
       .split("\n")
       .filter((s) => /^\| S\d/.test(s)))
-      if (!issued.has(cells(row)[1]))
+      if (!issued[t].has(cells(row)[1]))
         throw Error(
-          "Source evidence does not reference an issued assessment task",
+          issued[t === "PY" ? "PE" : "PY"].has(cells(row)[1])
+            ? `${t} evidence cites an assessment task issued on the other track: ${cells(row)[1]}`
+            : "Source evidence does not reference an issued assessment task",
         );
   const identifiers = readIdentifierCounters(raw);
   if (identifiers.issue) issues.push(identifiers.issue);

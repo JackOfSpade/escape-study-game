@@ -66,6 +66,7 @@ import {
   KEEP_LOCAL,
   expandRoadmapReconciliation,
 } from "../scripts/lib/roadmap-edits.mjs";
+import { CELL_SEPARATOR } from "./table-row";
 const running = new WeakMap<
   object,
   {
@@ -440,7 +441,7 @@ export async function compileRoadmapAdoption(
       adoptionId: job.id,
       canonicalHash: receipt.canonicalHash,
       sourceRow: row,
-      disposition: row.split("|")[4].trim(),
+      disposition: row.split(CELL_SEPARATOR)[4].trim(),
       humanCutoff: update.resolveCurrent.humanCutoff!,
       assessedHumanSequences: update.resolveCurrent.assessedHumanSequences!,
       at: now,
@@ -464,7 +465,7 @@ export async function compileRoadmapAdoption(
           key.includes("/0.5 Assessment evidence register/") &&
           key.endsWith(`/${ref}`),
       )?.[1]
-      .split("|")
+      .split(CELL_SEPARATOR)
       .slice(1, -1)
       .map((c) => c.trim());
   const order = (id: string) => {
@@ -836,7 +837,7 @@ export async function compileRoadmapAdoption(
     .split("### S0.4")[1]
     .split("### S0.5")[0];
   for (const match of sessionRows.matchAll(/^\| (S\d{4}) \| (.+)$/gm)) {
-    const disposition = match[2].split("|")[0];
+    const disposition = match[2].split(CELL_SEPARATOR)[0];
     const status = sourceSessionStatus(disposition);
     const existing = work.sessions.find((s) => s.id === match[1]);
     if (
@@ -873,13 +874,13 @@ export async function compileRoadmapAdoption(
   for (const [key, row] of local.rows) {
     if (!key.includes("/0.6 Facet gaps, unknowns, and dependencies/")) continue;
     const c = row
-      .split("|")
+      .split(CELL_SEPARATOR)
       .slice(1, -1)
       .map((c) => c.trim());
     if (c[2] !== "SEMANTIC_FACET_SCOPE") continue;
     const retained = merged.rows
       .get(key)
-      ?.split("|")
+      ?.split(CELL_SEPARATOR)
       .slice(1, -1)
       .map((c) => c.trim());
     if (!retained || retained[1] !== c[1] || retained[2] !== c[2])
@@ -890,7 +891,7 @@ export async function compileRoadmapAdoption(
   for (const [key, row] of merged.rows) {
     if (!key.includes("/0.6 Facet gaps, unknowns, and dependencies/")) continue;
     const c = row
-      .split("|")
+      .split(CELL_SEPARATOR)
       .slice(1, -1)
       .map((c) => c.trim());
     // Historical CONCEPT/UNKNOWN_SCOPE gaps remain separate immutable IDs;

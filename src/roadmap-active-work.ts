@@ -7,6 +7,7 @@ import type {
   RoadmapReconciliationJob,
 } from "./roadmap-adoption-types";
 import { receiptRows } from "./roadmap-structure";
+import { CELL_SEPARATOR } from "./table-row";
 const key = (e: Encounter) => `${e.runId ?? "legacy"}/${e.id}`;
 const encounter = (g: StudyRecord, id: string) =>
   [...Object.values(g.encounters), ...g.study.archives].find(
@@ -142,7 +143,7 @@ export function externalResolutionRow(l: LearnerLedger, a: LearningAttempt) {
     receipt.canonicalHash !== v.canonicalHash ||
     row !== v.sourceRow ||
     row
-      .split("|")
+      .split(CELL_SEPARATOR)
       .slice(1, -1)
       .map((s) => s.trim())[3] !== v.disposition
   )

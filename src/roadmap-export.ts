@@ -47,6 +47,7 @@ import {
   scopeKey,
   studyRatioPosition,
 } from "./learning-model";
+import { CELL_SEPARATOR } from "./table-row";
 export interface RoadmapExport {
   fingerprint: string;
   content: string;
@@ -117,7 +118,7 @@ const row = (cells: unknown[]) => `| ${cells.map(cell).join(" | ")} |`;
 const split = (line: string) =>
   line
     .slice(1, -1)
-    .split("|")
+    .split(CELL_SEPARATOR)
     .map((c) => c.trim());
 function table(raw: string, edit: (cells: string[]) => string[] | undefined) {
   return raw

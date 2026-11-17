@@ -37,6 +37,7 @@ import { reconcileRoadmap } from "../../src/roadmap-adoption";
 import type { RoadmapReconciliation } from "../../src/roadmap-adoption-types";
 import { prepareRoadmapExport } from "../../src/roadmap-export";
 import { createGame } from "../../tests/helpers/record";
+import { CELL_SEPARATOR } from "../../src/table-row";
 
 export const RECONCILE_OPERATION = "reconcile-roadmap" as const;
 const DEFAULT_COUNT = 6;
@@ -767,7 +768,7 @@ async function studiedProgressFile(roadmap: Roadmap, rounds: number) {
         .find((line) => line.startsWith(`| ${ev.id} |`));
       if (!row) throw Error(`exported file has no evidence row for ${ev.id}`);
       const cells = row
-        .split("|")
+        .split(CELL_SEPARATOR)
         .slice(1, -1)
         .map((v) => v.trim());
       return {

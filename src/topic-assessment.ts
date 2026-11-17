@@ -15,6 +15,7 @@ import type {
 } from "./model";
 import { inspectMergedDocument } from "./roadmap-structure";
 import { studyTrackProgress } from "./study-progress";
+import { CELL_SEPARATOR } from "./table-row";
 
 /** AI-written knowledge commentary. This is never a curriculum proof. */
 export interface TopicAssessmentRecord {
@@ -321,7 +322,7 @@ export function topicAssessmentContext(
       if (!/^\| (?:S\d{4}-(?:EV\d+|A\d+)|G\d+) \|/.test(row) || seen.has(row))
         return [];
       seen.add(row);
-      const columns = row.split("|").map((column) => column.trim());
+      const columns = row.split(CELL_SEPARATOR).map((column) => column.trim());
       const gap = /^G\d+$/.test(columns[1]);
       const attempt = /^S\d{4}-A\d+$/.test(columns[1]);
       const scope = columns[gap ? 2 : attempt ? 3 : 4];

@@ -8,6 +8,7 @@ import {
   observationInvalidated,
 } from "./observation-validity";
 import type { RoadmapReconciliation } from "./roadmap-adoption-types";
+import { CELL_SEPARATOR } from "./table-row";
 
 /** A terminal audit alone cannot retract a trusted original checkpoint.
  * Require explicit whole-scope review of its complete attributed history. */
@@ -58,7 +59,7 @@ export function reviewBaselineCorrections(
           );
         const rows = history.evidenceRows.map((row) =>
           row
-            .split("|")
+            .split(CELL_SEPARATOR)
             .slice(1, -1)
             .map((c) => c.trim()),
         );

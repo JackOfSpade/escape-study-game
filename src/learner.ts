@@ -51,6 +51,7 @@ import {
 import { externalResolutionRow } from "./roadmap-active-work";
 import { allocationCounters, formatIdentifier } from "./roadmap-identifiers";
 import { sourceSessionStatus } from "./roadmap-structure";
+import { CELL_SEPARATOR } from "./table-row";
 export const encounterKey = (e: Encounter) => `${e.runId ?? "legacy"}/${e.id}`;
 const localDateFormat = new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/Toronto",
@@ -123,7 +124,7 @@ export function initialLearner(
   const sessions = [...history.matchAll(/^\| (S\d{4}) \| (.+)$/gm)].map(
     (m) => ({
       id: m[1],
-      status: sourceSessionStatus(m[2].split("|")[0]),
+      status: sourceSessionStatus(m[2].split(CELL_SEPARATOR)[0]),
     }),
   );
   const state = (t: Track) => ({

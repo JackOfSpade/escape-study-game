@@ -5,6 +5,7 @@ import type { CellState, LearnerLedger } from "./learning-model";
 import { scopeKey } from "./learning-model";
 import type { Roadmap, Track } from "./model";
 import { baselineCheckpointValid } from "./observation-validity";
+import { CELL_SEPARATOR } from "./table-row";
 
 export interface FinalRequirement {
   id: string;
@@ -31,7 +32,7 @@ function rows(text: string, pattern: RegExp) {
     .filter((line) => pattern.test(line))
     .map((line) =>
       line
-        .split("|")
+        .split(CELL_SEPARATOR)
         .slice(1, -1)
         .map((cell) => cell.trim()),
     );
