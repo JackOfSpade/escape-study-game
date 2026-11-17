@@ -2,8 +2,9 @@
 
 This repository is an interview-preparation study workspace: a local browser app (`src/`, entry `src/main.ts`)
 backed by a loopback bridge that runs AI tasks through the Claude CLI (`scripts/`). There is no game in it. An
-earlier escape game was removed in November 2026; it survives only in git history. Do not resurrect or reference
-it, and treat any leftover game wording you find as a bug to remove.
+earlier escape game and a shelved ChatGPT integration were removed in November 2026; they survive only in git
+history. Do not resurrect or reference them, and treat any leftover game wording you find as a bug to remove. The
+provider value `chatgpt-handoff` stays because saved records carry it.
 
 ## What to protect
 
@@ -15,7 +16,6 @@ it, and treat any leftover game wording you find as a bug to remove.
   `SOURCE_INTEGRITY.json`, `START_HERE.md`, `ACCEPTANCE_TESTS.md`, `GAME_DESIGN_HANDOFF.md`) are integrity-pinned.
   Do not edit them.
 - Exported formats (roadmap document export, career export, bug reports) and the bridge's wire formats.
-- `shelf/` is a separate archive (the shelved ChatGPT integration). Leave it alone unless asked.
 - The owner's running app on port 5173 and bridge on 4318. Never start, stop or signal them, and never copy real
   saves into fixtures.
 
