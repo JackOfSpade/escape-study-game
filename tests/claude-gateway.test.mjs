@@ -233,6 +233,26 @@ test("a field name written with stray spaces is still that field", async () => {
   assert.equal(calls.length, 1);
 });
 
+test("a tutor follow-up that omits complete continues the conversation", async () => {
+  const help = '"help":{"nudges":["f"],"hints":[],"gives":[],"offers":[]}';
+  const payload = { mode: "terminal-dialogue", helpPolicy: { unlocked: [] } };
+  const calls = [];
+  const g = gateway([`{${help},"text":"Look again at part 2."}`], calls, {
+    validate: validateAnswer,
+  });
+  assert.equal((await g.run("tutor", payload)).complete, false);
+  assert.equal(calls.length, 1);
+  // A verdict without complete is still rejected: nothing is assumed solved.
+  const claimed = `{${help},"text":"Done.","outcome":"solved"}`;
+  await assert.rejects(
+    gateway([claimed, claimed], [], { validate: validateAnswer }).run(
+      "tutor",
+      payload,
+    ),
+    { code: "CLAUDE_INVALID_ANSWER" },
+  );
+});
+
 test("a rejected reply's logged skeleton keeps structure and drops long text", () => {
   assert.equal(
     replySkeleton(
