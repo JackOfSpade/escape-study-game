@@ -264,6 +264,28 @@ export function firstJsonObject(text) {
   }
   return undefined;
 }
+/**
+ * A reply's field names with stray surrounding whitespace removed, at every
+ * depth. A model sometimes writes a key as `" complete"`; without this the
+ * validator reports the field missing and the whole turn is lost. A trimmed
+ * name never replaces a field the reply already holds under the exact name.
+ */
+export function trimmedKeys(value) {
+  if (Array.isArray(value)) return value.map(trimmedKeys);
+  if (!value || typeof value !== "object") return value;
+  const out = {};
+  for (const [key, inner] of Object.entries(value)) {
+    const name = key.trim();
+    if (name !== key && Object.hasOwn(value, name)) continue;
+    Object.defineProperty(out, name, {
+      value: trimmedKeys(inner),
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+  }
+  return out;
+}
 const USAGE_LOG_MAX_BYTES = 5 * 1024 * 1024;
 const usageNumber = (value) =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -612,8 +634,9 @@ export function createClaudeGateway({
           throw error;
         }
         try {
-          const answer = firstJsonObject(text);
-          if (!answer) throw Error("The reply held no JSON object");
+          const parsed = firstJsonObject(text);
+          if (!parsed) throw Error("The reply held no JSON object");
+          const answer = trimmedKeys(parsed);
           validate(job, answer);
           logCall(call, measured, "accepted");
           answered = answer;

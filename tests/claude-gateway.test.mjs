@@ -19,6 +19,7 @@ import {
   firstJsonObject,
   textFieldReader,
   taskProfile,
+  trimmedKeys,
 } from "../scripts/claude-gateway.mjs";
 import { validateAnswer } from "../scripts/lib/ai-contracts.mjs";
 
@@ -186,6 +187,27 @@ test("a reply with stray text still yields its JSON object", () => {
     a: { b: "}" },
   });
   assert.equal(firstJsonObject("no object"), undefined);
+});
+
+test("a field name written with stray spaces is still that field", async () => {
+  assert.deepEqual(
+    trimmedKeys({ " complete": false, a: [{ "id ": "x" }], b: 1, " b": 2 }),
+    { complete: false, a: [{ id: "x" }], b: 1 },
+  );
+  const calls = [];
+  const g = gateway(
+    [
+      '{"help":{"nudges":[],"hints":[],"gives":[],"offers":[]},"text":"Try again."," complete":false}',
+    ],
+    calls,
+    { validate: validateAnswer },
+  );
+  const answer = await g.run("tutor", {
+    mode: "terminal-dialogue",
+    helpPolicy: { unlocked: [] },
+  });
+  assert.equal(answer.complete, false);
+  assert.equal(calls.length, 1);
 });
 
 test("a rejected answer gets one correction, then fails plainly", async () => {
