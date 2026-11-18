@@ -150,22 +150,26 @@ test("terminal dialogue validation enforces topicAssessments on completion", () 
 test("each task runs its chosen model and effort, latest aliases only", () => {
   assert.deepEqual(
     Object.fromEntries(
-      ["tutor", "complete", "assess", "generate", "reconcile-roadmap"].map(
-        (op) => {
-          const p = taskProfile(op, {});
-          return [op, `${p.model}/${p.effort}`];
-        },
-      ),
+      [
+        "tutor",
+        "assess",
+        "generate",
+        "review-environment",
+        "reconcile-roadmap",
+      ].map((op) => {
+        const p = taskProfile(op, {});
+        return [op, `${p.model}/${p.effort}`];
+      }),
     ),
     {
       tutor: "sonnet/low",
-      complete: "sonnet/high",
       assess: "haiku/high",
       generate: "opus/medium",
+      "review-environment": "haiku/medium",
       "reconcile-roadmap": "opus/high",
     },
   );
-  assert.throws(() => taskProfile("design-run"), /Unknown AI task/);
+  assert.throws(() => taskProfile("complete"), /Unknown AI task/);
 });
 
 test("calls are locked down and cannot bill an API key", () => {
@@ -271,7 +275,7 @@ test("a rejected answer gets one correction, then fails plainly", async () => {
       if (answer.bad) throw Error("wrong shape");
     },
   });
-  assert.deepEqual(await g.run("complete", {}), { ok: 1 });
+  assert.deepEqual(await g.run("review-environment", {}), { ok: 1 });
   assert.equal(seen, 2);
   assert.ok(calls[1].input.includes("wrong shape"));
   const failing = gateway(['{"bad":1}', '{"bad":2}'], [], {
@@ -279,7 +283,7 @@ test("a rejected answer gets one correction, then fails plainly", async () => {
       throw Error("still wrong");
     },
   });
-  await assert.rejects(failing.run("complete", {}), {
+  await assert.rejects(failing.run("review-environment", {}), {
     code: "CLAUDE_INVALID_ANSWER",
   });
 });
@@ -289,11 +293,11 @@ test("a repeated request id joins the same call and never pays twice", async () 
   const g = gateway(['{"ok":1}'], calls);
   const payload = { requestId: "same" };
   const [a, b] = await Promise.all([
-    g.run("complete", payload),
-    g.run("complete", payload),
+    g.run("review-environment", payload),
+    g.run("review-environment", payload),
   ]);
   assert.deepEqual(a, b);
-  assert.deepEqual(await g.run("complete", payload), a);
+  assert.deepEqual(await g.run("review-environment", payload), a);
   assert.equal(calls.length, 1);
 });
 
@@ -302,13 +306,13 @@ test("failures say what to do: usage limit, sign-in, wrong model", async () => {
     result: { type: "result", subtype: "error", is_error: true, result },
   });
   await assert.rejects(
-    gateway([fail("You hit your limit")], []).run("complete", {}),
+    gateway([fail("You hit your limit")], []).run("review-environment", {}),
     {
       code: "CLAUDE_USAGE_LIMIT",
     },
   );
   await assert.rejects(
-    gateway([fail("Not logged in")], []).run("complete", {}),
+    gateway([fail("Not logged in")], []).run("review-environment", {}),
     {
       code: "CLAUDE_NOT_SIGNED_IN",
     },
@@ -317,12 +321,12 @@ test("failures say what to do: usage limit, sign-in, wrong model", async () => {
     gateway(
       [
         {
-          model: "claude-haiku-5-5",
+          model: "claude-sonnet-5-5",
           result: { type: "result", subtype: "success", result: "{}" },
         },
       ],
       [],
-    ).run("complete", {}),
+    ).run("review-environment", {}),
     { code: "CLAUDE_WRONG_MODEL" },
   );
 });
@@ -330,7 +334,7 @@ test("failures say what to do: usage limit, sign-in, wrong model", async () => {
 test("cancelling stops the running process", async () => {
   const cancel = new AbortController();
   const g = gateway(["hang"], []);
-  const running = g.run("complete", {}, { signal: cancel.signal });
+  const running = g.run("review-environment", {}, { signal: cancel.signal });
   setImmediate(() => cancel.abort());
   await assert.rejects(running, { code: "CLAUDE_CANCELLED" });
 });
@@ -347,8 +351,8 @@ test("a request cancelled while queued never starts a process", async () => {
     validate: () => {},
     spawn: (...args) => (first = base(...args)),
   });
-  const blocker = g.run("complete", {}).catch(() => {});
-  const queued = g.run("complete", {}, { signal: cancel.signal });
+  const blocker = g.run("review-environment", {}).catch(() => {});
+  const queued = g.run("review-environment", {}, { signal: cancel.signal });
   await new Promise((r) => setImmediate(r));
   cancel.abort();
   first.kill();
@@ -370,8 +374,8 @@ test("a joined call survives one caller leaving and stops when all have", async 
   const a = new AbortController();
   const b = new AbortController();
   const payload = { requestId: "shared" };
-  const first = g.run("complete", payload, { signal: a.signal });
-  const second = g.run("complete", payload, { signal: b.signal });
+  const first = g.run("review-environment", payload, { signal: a.signal });
+  const second = g.run("review-environment", payload, { signal: b.signal });
   await new Promise((r) => setImmediate(r));
   a.abort();
   await new Promise((r) => setImmediate(r));
@@ -412,16 +416,16 @@ test("a retry of a request whose every caller left starts afresh instead of inhe
   const g = createClaudeGateway({ env, cwd: dir, validate: () => {}, spawn });
   const payload = { requestId: "reloaded" };
   const left = new AbortController();
-  const first = g.run("complete", payload, { signal: left.signal });
+  const first = g.run("review-environment", payload, { signal: left.signal });
   await new Promise((r) => setImmediate(r));
   left.abort();
   // The page reloads and asks again before the first process has exited.
-  const retry = g.run("complete", payload);
+  const retry = g.run("review-environment", payload);
   await assert.rejects(first, { code: "CLAUDE_CANCELLED" });
   assert.deepEqual(await retry, { ok: 2 });
   assert.equal(children.length, 2);
   // The stopped call's cleanup left the finished answer reachable by its id.
-  assert.deepEqual(await g.run("complete", payload), { ok: 2 });
+  assert.deepEqual(await g.run("review-environment", payload), { ok: 2 });
   assert.equal(children.length, 2);
 });
 
@@ -505,23 +509,23 @@ const resultEvent = (extra = {}) => ({
   ...extra,
 });
 const fullReply = (extra = {}) => ({
-  model: "claude-sonnet-5-5",
+  model: "claude-haiku-5-5",
   result: resultEvent(extra),
 });
 
 test("a successful call logs exactly one measured row", async () => {
   const { rows, log } = usageRows();
   const g = gateway([fullReply()], [], { usageLog: log });
-  assert.deepEqual(await g.run("complete", {}), { ok: 1 });
+  assert.deepEqual(await g.run("review-environment", {}), { ok: 1 });
   assert.equal(rows.length, 1);
   const row = rows[0];
   assert.equal(row.v, 1);
   assert.equal(row.at, new Date(row.at).toISOString());
-  assert.equal(row.operation, "complete");
+  assert.equal(row.operation, "review-environment");
   assert.equal(row.attempt, 0);
-  assert.equal(row.alias, "sonnet");
-  assert.equal(row.effort, "high");
-  assert.equal(row.model, "claude-sonnet-5-5");
+  assert.equal(row.alias, "haiku");
+  assert.equal(row.effort, "medium");
+  assert.equal(row.model, "claude-haiku-5-5");
   assert.equal(row.costUsd, 0.0123);
   assert.equal(row.inputTokens, 120);
   assert.equal(row.outputTokens, 45);
@@ -542,7 +546,7 @@ test("a rejected reply then a valid correction logs both attempts", async () => 
       if (answer.bad) throw Error("wrong shape");
     },
   });
-  assert.deepEqual(await g.run("complete", {}), { ok: 1 });
+  assert.deepEqual(await g.run("review-environment", {}), { ok: 1 });
   assert.deepEqual(
     rows.map((row) => [row.attempt, row.outcome]),
     [
@@ -568,7 +572,9 @@ test("a failed call logs its failure outcome and null measurements", async () =>
     [],
     { usageLog: log },
   );
-  await assert.rejects(g.run("complete", {}), { code: "CLAUDE_USAGE_LIMIT" });
+  await assert.rejects(g.run("review-environment", {}), {
+    code: "CLAUDE_USAGE_LIMIT",
+  });
   assert.equal(rows.length, 1);
   assert.equal(rows[0].outcome, "usage-limit");
   assert.equal(rows[0].costUsd, null);
@@ -582,7 +588,7 @@ test("usage rows carry no prompt, reply or request id content", async () => {
   const g = gateway(
     [
       {
-        model: "claude-sonnet-5-5",
+        model: "claude-haiku-5-5",
         result: resultEvent({
           result: `{"text":"REPLY-${marker}"}`,
           stderr: `STDERR-${marker}`,
@@ -593,9 +599,12 @@ test("usage rows carry no prompt, reply or request id content", async () => {
     { usageLog: log },
   );
   const requestId = "REQ-SECRET-7";
-  assert.deepEqual(await g.run("complete", { requestId, note: marker }), {
-    text: `REPLY-${marker}`,
-  });
+  assert.deepEqual(
+    await g.run("review-environment", { requestId, note: marker }),
+    {
+      text: `REPLY-${marker}`,
+    },
+  );
   assert.equal(rows.length, 1);
   const line = JSON.stringify(rows[0]);
   for (const secret of [marker, requestId]) assert.ok(!line.includes(secret));
@@ -630,7 +639,7 @@ test("a throwing usage sink never fails the call", async () => {
         throw Error("disk full");
       },
     });
-    assert.deepEqual(await g.run("complete", {}), { ok: 1 });
+    assert.deepEqual(await g.run("review-environment", {}), { ok: 1 });
   } finally {
     console.warn = warn;
   }
@@ -645,15 +654,15 @@ test("the path sink appends private JSONL and rotates above the limit", async ()
     usageLog: file,
     usageLogMaxBytes: 1,
   });
-  await g.run("complete", {});
+  await g.run("review-environment", {});
   const firstLines = readFileSync(file, "utf8").trim().split("\n");
   assert.equal(firstLines.length, 1);
-  assert.equal(JSON.parse(firstLines[0]).operation, "complete");
+  assert.equal(JSON.parse(firstLines[0]).operation, "review-environment");
   assert.equal(statSync(file).mode & 0o777, 0o600);
-  await g.run("complete", {});
+  await g.run("review-environment", {});
   assert.equal(readFileSync(`${file}.1`, "utf8").trim().split("\n").length, 1);
   assert.equal(readFileSync(file, "utf8").trim().split("\n").length, 1);
-  await g.run("complete", {});
+  await g.run("review-environment", {});
   assert.equal(statSync(file).mode & 0o777, 0o600);
   assert.equal(readFileSync(`${file}.1`, "utf8").trim().split("\n").length, 1);
   assert.equal(readFileSync(file, "utf8").trim().split("\n").length, 1);
@@ -700,9 +709,9 @@ test("a streamed call records the time to its first text", async () => {
   );
 });
 
-const sampleNames = (store, operation = "complete") =>
+const sampleNames = (store, operation = "review-environment") =>
   readdirSync(join(store, operation)).sort();
-const readSample = (store, operation = "complete") => {
+const readSample = (store, operation = "review-environment") => {
   const names = sampleNames(store, operation);
   return JSON.parse(
     readFileSync(join(store, operation, names[names.length - 1]), "utf8"),
@@ -724,7 +733,7 @@ test("a profile override changes the model and effort the CLI runs with", async 
       }),
     },
   );
-  assert.deepEqual(await g.run("complete", {}), { ok: 1 });
+  assert.deepEqual(await g.run("review-environment", {}), { ok: 1 });
   assert.equal(calls[0].args[calls[0].args.indexOf("--model") + 1], "opus");
   assert.equal(calls[0].args[calls[0].args.indexOf("--effort") + 1], "xhigh");
   assert.equal(rows.length, 1);
@@ -737,25 +746,25 @@ test("replay samples capture one private JSON per finished call", async () => {
   const store = mkdtempSync(join(tmpdir(), "claude-replay-"));
   const g = gateway([fullReply()], [], { replaySamples: store });
   const payload = { requestId: "req-1", note: "value" };
-  assert.deepEqual(await g.run("complete", payload), { ok: 1 });
+  assert.deepEqual(await g.run("review-environment", payload), { ok: 1 });
   const names = sampleNames(store);
   assert.equal(names.length, 1);
   assert.match(
     names[0],
     /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d{3}Z-[a-f0-9]{8}\.json$/,
   );
-  const file = join(store, "complete", names[0]);
+  const file = join(store, "review-environment", names[0]);
   assert.equal(statSync(file).mode & 0o777, 0o600);
   const sample = JSON.parse(readFileSync(file, "utf8"));
   assert.equal(sample.v, 1);
   assert.equal(sample.at, new Date(sample.at).toISOString());
-  assert.equal(sample.operation, "complete");
+  assert.equal(sample.operation, "review-environment");
   assert.deepEqual(sample.payload, payload);
   assert.deepEqual(sample.answer, { ok: 1 });
   assert.equal(sample.outcome, "accepted");
-  assert.equal(sample.alias, "sonnet");
-  assert.equal(sample.effort, "high");
-  assert.equal(sample.model, "claude-sonnet-5-5");
+  assert.equal(sample.alias, "haiku");
+  assert.equal(sample.effort, "medium");
+  assert.equal(sample.model, "claude-haiku-5-5");
   assert.equal(sample.costUsd, 0.0123);
   assert.equal(typeof sample.durationMs, "number");
   assert.equal(sample.attempts, 1);
@@ -766,11 +775,11 @@ test("replay capture records a rejected answer as invalid", async () => {
   const g = gateway(
     [
       {
-        model: "claude-sonnet-5-5",
+        model: "claude-haiku-5-5",
         result: resultEvent({ result: '{"bad":1}' }),
       },
       {
-        model: "claude-sonnet-5-5",
+        model: "claude-haiku-5-5",
         result: resultEvent({ result: '{"bad":2}' }),
       },
     ],
@@ -782,7 +791,7 @@ test("replay capture records a rejected answer as invalid", async () => {
       },
     },
   );
-  await assert.rejects(g.run("complete", {}), {
+  await assert.rejects(g.run("review-environment", {}), {
     code: "CLAUDE_INVALID_ANSWER",
   });
   const sample = readSample(store);
@@ -802,7 +811,7 @@ test("a broken replay store never fails a call", async () => {
     const g = gateway([fullReply()], [], {
       replaySamples: join(blocker, "samples"),
     });
-    assert.deepEqual(await g.run("complete", {}), { ok: 1 });
+    assert.deepEqual(await g.run("review-environment", {}), { ok: 1 });
   } finally {
     console.warn = warn;
   }

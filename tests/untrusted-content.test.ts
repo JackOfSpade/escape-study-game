@@ -3,14 +3,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import {
-  assess,
-  checkBridge,
-  edit,
-  ensureProblem,
-  send,
-  submit,
-} from "../src/ai";
+import { assess, checkBridge, edit, ensureProblem, send } from "../src/ai";
 import type { Roadmap } from "../src/model";
 import { createGame } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
@@ -42,7 +35,7 @@ test("H04 puzzle, tutor and code directives stay data; only scoped validation ca
         mode: "claude-cli",
         label: "Synthetic hostile-output fixture",
         detail: "No external model",
-        capabilities: ["generate", "tutor", "complete", "assess"],
+        capabilities: ["generate", "tutor", "assess"],
       });
     assert.equal(
       url,
@@ -80,12 +73,11 @@ test("H04 puzzle, tutor and code directives stay data; only scoped validation ca
         ),
       });
     if (body.operation === "tutor")
-      return Response.json({ ...actions, text: injection, complete: false });
-    if (body.operation === "complete")
       return Response.json({
         ...actions,
-        complete: true,
-        feedback: "Controlled semantic acceptance of this fixture only",
+        text: injection,
+        // The second reply accepts the answer; its extra fields grant nothing.
+        complete: wires.filter((wire) => wire === "tutor").length > 1,
         qualified: ["human", "invented-admin"],
       });
     assert.equal(body.operation, "assess");
@@ -139,7 +131,7 @@ test("H04 puzzle, tutor and code directives stay data; only scoped validation ca
     edit(g, e, source, e.revision);
     assert.equal(e.workspace, source);
     assert.equal(physical(), afterTutor);
-    await submit(g, e, r);
+    await send(g, e, "My reasoning is in the saved work.", r);
     for (
       let n = 0;
       n < 200 && g.study.assessments.at(-1)?.status === "pending";
@@ -172,7 +164,7 @@ test("H04 puzzle, tutor and code directives stay data; only scoped validation ca
     assert.deepEqual(wires, [
       "generate",
       "tutor",
-      "complete",
+      "tutor",
       "assess",
       "assess",
       "assess",

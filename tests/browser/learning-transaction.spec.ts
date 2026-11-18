@@ -47,7 +47,7 @@ for (const fixtureKind of ["checkpoint", "transfer", "historical"] as const) {
           mode: "claude-cli",
           label: "Test bridge fixture",
           detail: "Synthetic transport fixture only",
-          capabilities: ["generate", "tutor", "complete", "assess"],
+          capabilities: ["generate", "tutor", "assess"],
         },
       }),
     );
@@ -94,13 +94,9 @@ for (const fixtureKind of ["checkpoint", "transfer", "historical"] as const) {
         });
         return;
       }
-      if (operation === "complete") {
+      if (operation === "tutor") {
         await route.fulfill({
-          json: {
-            complete: true,
-            feedback: "Fixture completion response.",
-            qualified: ["human"],
-          },
+          json: { text: "Fixture completion response.", complete: true },
         });
         return;
       }
@@ -184,7 +180,7 @@ for (const fixtureKind of ["checkpoint", "transfer", "historical"] as const) {
     await page.evaluate(async () => {
       const d = (window as any).__deadAir,
         root = "/src/";
-      const { ensureProblem, presentProblem, edit, submit } = await import(
+      const { ensureProblem, presentProblem, edit, send } = await import(
         root + "ai.ts"
       );
       const e = d.game.encounters["question-0"];
@@ -197,7 +193,7 @@ for (const fixtureKind of ["checkpoint", "transfer", "historical"] as const) {
         e.revision,
         d.roadmap,
       );
-      await submit(d.game, e, d.roadmap);
+      await send(d.game, e, "My reasoning is in the saved work.", d.roadmap);
     });
     await expect
       .poll(() =>

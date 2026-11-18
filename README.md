@@ -9,8 +9,8 @@ Every AI task runs through the signed-in Claude CLI on this computer, using `scr
 The workspace shows a skill map of the current tier, a progress summary, and a terminal for the open question.
 
 1. **Start next question** asks Claude for the next question the curriculum schedules. A question can be regenerated before it is answered.
-2. Work in the terminal. The side conversation is a tutor that probes for what you already know, records gaps, and gives footholds rather than full answers. The answer box is for submissions only.
-3. **Submit answer** sends the captured answer for a completion check. **Run code** executes the answer for questions that carry a runtime (see Code execution).
+2. Answer in the conversation beside the question. The tutor probes for what you already know, records gaps, and gives footholds rather than full answers.
+3. The tutor's reply decides when the question is finished; there is no separate submit step.
 4. A separate assessment judges the frozen question and its evidence. Finishing a question never certifies mastery on its own.
 
 The menu (Menu or Esc) holds Settings: display scale, the role profile, the Claude connection, and full backup export and import. **Report a bug** in the toolbar writes a diagnostic report (see [run logging](docs/RUN_LOGGING.md)).

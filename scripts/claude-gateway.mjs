@@ -44,7 +44,6 @@ export const TASK_PROFILES = Object.freeze({
       "problem",
     ],
   },
-  complete: { ...live(120_000, "sonnet", "high"), stableKeys: ["problem"] },
   assess: {
     ...live(5 * 60_000, "haiku", "high"),
     stableKeys: ["assessmentCriteria", "curriculum", "problem"],

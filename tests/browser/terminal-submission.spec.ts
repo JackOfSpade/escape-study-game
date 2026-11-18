@@ -13,7 +13,7 @@ test("a reply that cannot be accepted keeps the exact request and its retry comp
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   const id = await openStudyQuestion(page);
-  await expect(page.locator("#workspace")).toBeHidden();
+  await expect(page.locator("#workspace")).toHaveCount(0);
   relay.reply(() => ({
     text: "Solved.",
     complete: true,

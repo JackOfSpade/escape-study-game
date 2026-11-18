@@ -1,16 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import {
-  checkBridge,
-  edit,
-  ensureProblem,
-  retrySubmission,
-  send,
-  submit,
-} from "../src/ai";
+import { checkBridge, edit, ensureProblem, send } from "../src/ai";
 import { completionVerdict } from "../src/completion-verdict";
-import { submissionView } from "../src/terminal-view";
 import type { Roadmap } from "../src/model";
 import { createGame } from "./helpers/record";
 import { devProblem } from "./helpers/practice-questions";
@@ -38,7 +30,7 @@ async function transport(
           mode: connected ? "claude-cli" : "development",
           label: "Synthetic transport",
           detail: "No external AI",
-          capabilities: connected ? ["complete", "tutor"] : [],
+          capabilities: connected ? ["tutor"] : [],
         })
       : reply(JSON.parse(String(init?.body)));
   const set = async (value: boolean, handler?: typeof reply) => {
@@ -69,100 +61,10 @@ async function fixture() {
   assert.equal(e.problem!.provenance, "development");
   return { g, e };
 }
-test("offline answers never pass heuristics; captured content retries independently of later edits", async () =>
-  transport(async (set) => {
-    const { g, e } = await fixture();
-    const learning = JSON.stringify(g.study.learner!.evidence);
-    edit(
-      g,
-      e,
-      "Prediction: 999. Reasoning: " + "long answer with headings ".repeat(30),
-      e.revision,
-      roadmap,
-    );
-    await submit(g, e, roadmap);
-    const s = e.submissions[0];
-    assert.equal(s.status, "error");
-    assert.equal(submissionView(e).label, "Unable to check");
-    assert.notEqual(e.state, "consumed");
-    const captured = s.content;
-    edit(g, e, "Later unsent draft", e.revision, roadmap);
-    await set(true, async (request) => {
-      assert.equal(request.operation, "complete");
-      assert.equal(request.payload.submission.content, captured);
-      assert.equal(request.payload.requestId, s.id);
-      assert.equal(request.payload.responseFormat.complete, "boolean");
-      return Response.json({
-        complete: false,
-        feedback: "Synthetic rejection",
-        qualified: [],
-      });
-    });
-    await retrySubmission(g, e, roadmap, s.id);
-    assert.equal(s.status, "needs-work");
-    assert.equal(submissionView(e).label, "Not accepted");
-    assert.equal(e.workspace, "Later unsent draft");
-    assert.equal(JSON.stringify(g.study.learner!.evidence), learning);
-  }));
-test("only structured AI acceptance consumes a development question, without granting academic credit", async () =>
-  transport(async (set) => {
-    const { g, e } = await fixture();
-    const evidence = JSON.stringify(g.study.learner!.evidence);
-    let release!: (r: Response) => void;
-    await set(
-      true,
-      async () => new Promise<Response>((resolve) => (release = resolve)),
-    );
-    edit(g, e, "Fictional answer", e.revision, roadmap);
-    const pending = submit(g, e, roadmap);
-    assert.equal(submissionView(e).label, "Checking answer…");
-    assert.notEqual(e.state, "consumed");
-    release(
-      Response.json({
-        complete: true,
-        feedback: "Synthetic acceptance only",
-        qualified: ["human"],
-      }),
-    );
-    await pending;
-    assert.equal(submissionView(e).label, "Accepted");
-    assert.equal(e.state, "consumed");
-    assert.equal(JSON.stringify(g.study.learner!.evidence), evidence);
-    assert.equal(g.study.profile, "development");
-  }));
-for (const change of ["malformed", "disconnected", "changed question"] as const)
-  test(`${change} completion cannot solve a puzzle`, async () =>
-    transport(async (set) => {
-      const { g, e } = await fixture();
-      let release!: (r: Response) => void;
-      await set(
-        true,
-        async () => new Promise<Response>((resolve) => (release = resolve)),
-      );
-      edit(g, e, "Fictional answer", e.revision, roadmap);
-      const pending = submit(g, e, roadmap);
-      if (change === "disconnected") await set(false);
-      if (change === "changed question") e.problem!.prompt += " changed";
-      release(
-        Response.json(
-          change === "malformed"
-            ? { complete: "true", feedback: "yes", qualified: ["human"] }
-            : {
-                complete: true,
-                feedback: "Synthetic acceptance",
-                qualified: ["human"],
-              },
-        ),
-      );
-      await pending;
-      assert.equal(e.submissions[0].status, "error");
-      assert.notEqual(e.state, "consumed");
-    }));
-test("the tutor receives current draft JSON and chat cannot submit", async () =>
+test("the tutor receives the saved draft and a follow-up reply records no submission", async () =>
   transport(async (set) => {
     const { g, e } = await fixture();
     edit(g, e, "Current unsubmitted draft", e.revision, roadmap);
-    e.mode = "solo";
     const calls: any[] = [];
     await set(true, async (request) => {
       calls.push(request);
@@ -181,27 +83,31 @@ test("the tutor receives current draft JSON and chat cannot submit", async () =>
     assert.equal(e.submissions.length, 0);
     assert.notEqual(e.state, "consumed");
   }));
-test("offline capture also binds the original question before any reconnect", async () =>
+test("a saved shared question with an unchecked submission is answered and finished in the conversation", async () =>
   transport(async (set) => {
     const { g, e } = await fixture();
-    edit(g, e, "Saved answer", e.revision, roadmap);
-    await submit(g, e, roadmap);
-    assert.ok(e.submissions[0].completionRequest);
-    e.problem!.prompt += " changed later";
-    let calls = 0;
-    await set(true, async () => {
-      calls++;
-      return Response.json({
-        complete: true,
-        feedback: "Synthetic",
-        qualified: ["human"],
-      });
+    e.mode = "shared";
+    e.submissions.push({
+      id: "saved-check",
+      revision: e.revision,
+      author: "human",
+      content: "Saved earlier answer",
+      seq: ++g.seq,
+      status: "error",
+      feedback: "Evaluation unavailable; snapshot retained.",
+      completionRequest: { provider: "claude-cli", payloadJson: "{}" },
     });
-    await retrySubmission(g, e, roadmap, e.submissions[0].id);
-    assert.equal(calls, 0);
-    assert.equal(e.submissions[0].status, "error");
-    assert.match(e.submissions[0].feedback, /captured question/);
-    assert.notEqual(e.state, "consumed");
+    const saved = structuredClone(e.submissions[0]);
+    await set(true, async (request) => {
+      assert.equal(request.operation, "tutor");
+      assert.equal(request.payload.mode, "terminal-dialogue");
+      return Response.json({ text: "That settles it.", complete: true });
+    });
+    await send(g, e, "My final answer", roadmap);
+    assert.equal(e.state, "consumed");
+    assert.deepEqual(e.submissions[0], saved);
+    assert.equal(e.submissions.length, 2);
+    assert.equal(e.accepted, e.submissions[1].id);
   }));
 test("completion JSON rejects truthy values, missing fields, blank explanations and malformed qualification lists", () => {
   for (const v of [

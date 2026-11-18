@@ -61,11 +61,6 @@ const live = (g: StudyRecord) =>
 const interactiveConnected = (g: StudyRecord) =>
   live(g) ||
   (g.study.profile === "development" && status().mode !== "development");
-const completionConnected = (g: StudyRecord, e: Encounter) =>
-  live(g) ||
-  (g.study.profile === "development" &&
-    e.problem?.provenance === "development" &&
-    status().mode !== "development");
 const activeProvider = (): Provider =>
   status().mode === "development" ? "study-mode" : (status().mode as Provider);
 /** Work captured while disconnected is bound to the provider that wrote its
@@ -220,7 +215,7 @@ export function releaseRetiredChatRequests(g: StudyRecord) {
       ) {
         submission.status = "error";
         submission.feedback =
-          "This answer was waiting on a connection that no longer exists. Submit it again.";
+          "This answer was waiting on a connection that no longer exists. No verdict was recorded.";
         delete submission.completionRequest;
       }
   }
@@ -563,8 +558,7 @@ export function retryTutorRequest(
           status().mode !== job.provider ||
           g.encounters[e.id] !== e ||
           (dialogue &&
-            (e.mode !== "solo" ||
-              (e.owner && e.owner !== "human") ||
+            ((e.owner && e.owner !== "human") ||
               JSON.stringify(payload.problem) !== JSON.stringify(e.problem) ||
               payload.draftRevision !== e.revision ||
               payload.workspace !== e.workspace ||
@@ -730,7 +724,7 @@ export function retryTutorRequest(
  * said or requested since.
  */
 export function offeredHelp(e: Encounter): string[] {
-  if (e.mode !== "solo" || e.state === "consumed") return [];
+  if (e.state === "consumed") return [];
   if (e.tutorRequests?.some((j) => j.state === "pending")) return [];
   const last = e.tutor.at(-1);
   return last?.kind === "tutor" ? (last.help?.offers ?? []) : [];
@@ -753,21 +747,12 @@ export async function send(
   } catch {
     /* Non-eligible participation stays unscheduled. */
   }
-  if (
-    e.mode !== "solo" &&
-    g.study.profile !== "live" &&
-    !interactiveConnected(g)
-  ) {
-    e.error =
-      "The study connection is unavailable. Check that Claude CLI is installed and signed in, then retry. Your question and answer draft are saved.";
-    return;
-  }
   const provider = capturedProvider(problem);
   const id = `tutor-${g.id}-${e.id}-${g.seq}`;
   const capture = () => ({
     requestId: id,
     sessionId: `${g.id}/${e.id}/private`,
-    ...(e.mode === "solo" && e.state !== "consumed"
+    ...(e.state !== "consumed"
       ? {
           mode: "terminal-dialogue",
           responseFormat: TERMINAL_DIALOGUE_FORMAT,
@@ -827,156 +812,6 @@ export async function send(
     state: "pending",
   });
   await retryTutorRequest(g, e, id, r);
-}
-export async function submit(g: StudyRecord, e: Encounter, r: Roadmap) {
-  if (
-    !e.problem ||
-    e.state === "consumed" ||
-    e.submissions.some((s) => s.status === "pending")
-  )
-    return;
-  try {
-    beginVisit(r, g.study, e);
-  } catch (err) {
-    e.error = String(err);
-  }
-  const s: Submission = {
-    id: `submit-${g.id}-${nextSeq(g)}`,
-    revision: e.revision,
-    author: "human",
-    content: e.workspace,
-    status: "pending",
-    feedback: "Checking captured revision…",
-    seq: g.seq,
-  };
-  e.submissions.push(s);
-  e.state = "submitted";
-  return retrySubmission(g, e, r, s.id);
-}
-const completionInFlight = new WeakMap<Submission, Promise<void>>();
-export function retrySubmission(
-  g: StudyRecord,
-  e: Encounter,
-  r: Roadmap,
-  id: string,
-): Promise<void> {
-  const s = e.submissions.find((item) => item.id === id);
-  if (
-    !s ||
-    !e.problem ||
-    e.state === "consumed" ||
-    g.encounters[e.id] !== e ||
-    s.status === "complete" ||
-    s.status === "needs-work" ||
-    e.submissions.some((other) => other !== s && other.status === "pending")
-  )
-    return Promise.resolve();
-  const pending = completionInFlight.get(s);
-  if (pending) return pending;
-  const operation = evaluateSubmission(g, e, r, s);
-  completionInFlight.set(s, operation);
-  void operation.finally(() => completionInFlight.delete(s));
-  return operation;
-}
-async function evaluateSubmission(
-  g: StudyRecord,
-  e: Encounter,
-  r: Roadmap,
-  s: Submission,
-) {
-  if (!e.problem) return;
-  s.status = "pending";
-  s.feedback = "Checking captured revision…";
-  e.state = "submitted";
-  try {
-    if (
-      s.completionRequest &&
-      (!completionConnected(g, e) ||
-        status().mode !== s.completionRequest.provider)
-    )
-      throw Error(
-        "Reconnect the original completion provider to retry this saved evaluation",
-      );
-    let result: { complete: boolean; feedback: string; qualified: string[] };
-    if (!s.completionRequest) {
-      // Bind a disconnected capture to the provider that wrote the question.
-      const provider: Provider = capturedProvider(e.problem);
-      const payload = {
-        requestId: s.id,
-        encounterId: e.id,
-        problem: e.problem,
-        submission: { ...s },
-        submitter: s.author,
-        responseFormat: {
-          complete: "boolean",
-          feedback: "string",
-          qualified: "array of IDs",
-        },
-        instruction:
-          "Judge the exact submitted answer against the question and rubric. Accept only a semantically correct, sufficiently supported answer. Headings, answer length and chat activity are not proof. Return only the structured completion JSON; answer acceptance does not certify individual mastery.",
-        history: e.history,
-        executions: (e.executions ?? [])
-          .filter(
-            (j) =>
-              j.revision === s.revision &&
-              j.code === s.content &&
-              j.status === "finished",
-          )
-          .map(executionEvidence),
-      };
-      s.completionRequest = {
-        provider,
-        payloadJson: JSON.stringify(payload),
-      };
-    }
-    if (g.study.profile === "live" && !live(g))
-      throw Error(
-        "Live completion unavailable; captured work retained. Development evaluation cannot replace it.",
-      );
-    if (completionConnected(g, e)) {
-      const saved = s.completionRequest,
-        payload = JSON.parse(saved.payloadJson);
-      if (status().mode !== saved.provider)
-        throw Error(
-          "Reconnect the original completion provider to retry this saved evaluation",
-        );
-      if (
-        payload.requestId !== s.id ||
-        payload.encounterId !== e.id ||
-        payload.submitter !== s.author ||
-        payload.submission?.id !== s.id ||
-        payload.submission?.content !== s.content ||
-        payload.submission?.revision !== s.revision ||
-        payload.submission?.seq !== s.seq ||
-        payload.submission?.author !== s.author ||
-        JSON.stringify(payload.problem) !== JSON.stringify(e.problem)
-      )
-        throw Error(
-          "Saved completion request no longer matches its captured question and revision",
-        );
-      result = await request<typeof result>("complete", payload);
-      if (
-        !completionConnected(g, e) ||
-        status().mode !== saved.provider ||
-        JSON.stringify(payload.problem) !== JSON.stringify(e.problem)
-      )
-        throw Error(
-          "Original completion connection or captured question changed during review",
-        );
-    } else {
-      throw Error(
-        "The study connection is unavailable. Check that Claude CLI is installed and signed in, then retry. No AI acceptance was received; your captured answer is saved.",
-      );
-    }
-    result = completionVerdict(result);
-    applyCompletion(g, e, r, s, result);
-  } catch (err) {
-    if ((e.state as string) === "consumed" && e.accepted === s.id) return;
-    s.status = "error";
-    s.feedback = `Evaluation unavailable; snapshot retained. ${String(err)}`;
-    if ((e.state as string) !== "consumed" && g.encounters[e.id] === e)
-      e.state = "in-progress";
-  }
 }
 // Every validated completion uses this exactly-once reward and evidence path.
 // Only a validated provider reply may reach it; tests apply a fixed verdict here.

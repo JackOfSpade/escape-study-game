@@ -43,22 +43,14 @@ for (const scenario of ["unchanged", "stale", "new-work"])
     );
     const r = JSON.parse(await readFile("public/curriculum.json", "utf8"));
     let release!: () => void,
-      assessCalls = 0,
-      completeCalls = 0;
+      assessCalls = 0;
     await page.route("**/api/status", (route) =>
       route.fulfill({
         json: {
           mode: "claude-cli",
           label: "Synthetic active-work fixture",
           detail: "Not genuine native certification",
-          capabilities: [
-            "generate",
-            "tutor",
-            "group",
-            "complete",
-            "assess",
-            "reconcile-roadmap",
-          ],
+          capabilities: ["generate", "tutor", "assess", "reconcile-roadmap"],
         },
       }),
     );
@@ -134,17 +126,6 @@ for (const scenario of ["unchanged", "stale", "new-work"])
               })),
             rationale:
               "Synthetic current-work resolution; the gameplay puzzle remains unfinished",
-          },
-        });
-        return;
-      }
-      if (operation === "complete") {
-        completeCalls++;
-        await route.fulfill({
-          json: {
-            complete: true,
-            qualified: ["human"],
-            feedback: "Synthetic world completion only",
           },
         });
         return;
@@ -348,8 +329,25 @@ for (const scenario of ["unchanged", "stale", "new-work"])
     await page.evaluate(async () => {
       const d = (window as any).__deadAir,
         root = "/src/";
-      const { submit } = await import(root + "ai.ts");
-      await submit(d.game, d.game.encounters["question-0"], d.roadmap);
+      // A fixed verdict on the saved draft: answering in the conversation
+      // would itself count as new work after the import.
+      const { applyCompletion } = await import(root + "ai.ts");
+      const e = d.game.encounters["question-0"];
+      const submission = {
+        id: "fixture-completion",
+        revision: e.revision,
+        author: "human",
+        content: e.workspace,
+        seq: ++d.game.seq,
+        status: "pending",
+        feedback: "",
+      };
+      e.submissions.push(submission);
+      applyCompletion(d.game, e, d.roadmap, submission, {
+        complete: true,
+        feedback: "Synthetic world completion only",
+        qualified: ["human"],
+      });
     });
     await expect
       .poll(() =>
@@ -358,7 +356,6 @@ for (const scenario of ["unchanged", "stale", "new-work"])
         ),
       )
       .toBe("consumed");
-    expect(completeCalls).toBe(1);
     await expect.poll(() => assessCalls).toBe(scenario === "new-work" ? 1 : 0);
     if (scenario === "new-work")
       await expect
