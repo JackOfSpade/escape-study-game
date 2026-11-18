@@ -37,4 +37,6 @@ A report holds:
 - the newest 60 AI calls from `claude-usage.jsonl` (counts, timings and outcomes only);
 - the last 120 lines of the relay log and the app server log, with repeated blocks collapsed to one copy and a count.
 
+When the relay rejects a Claude reply it writes one line to its log: the task, the attempt, the validation problem and the reply's structure, with every string longer than 24 characters replaced by its length. Field names, facet ids and enum values stay readable; conversation text does not.
+
 Reports are owner-only files. The newest 20 are kept and any older than seven days is removed on each write. Service log lines are timestamped. Verify with `node --import tsx --test tests/bug-report.test.ts tests/bug-report-diagnostics.test.ts`.

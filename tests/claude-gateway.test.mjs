@@ -19,6 +19,7 @@ import {
   firstJsonObject,
   textFieldReader,
   taskProfile,
+  replySkeleton,
   trimmedKeys,
 } from "../scripts/claude-gateway.mjs";
 import { validateAnswer } from "../scripts/lib/ai-contracts.mjs";
@@ -187,6 +188,28 @@ test("a reply with stray text still yields its JSON object", () => {
     a: { b: "}" },
   });
   assert.equal(firstJsonObject("no object"), undefined);
+  assert.deepEqual(firstJsonObject('Set {x} then {"a":1} ok'), { a: 1 });
+});
+
+test("a malformed answer is never mistaken for one of its own fields", async () => {
+  const broken =
+    '{"help":{"nudges":["f"],"hints":[],"gives":[],"offers":[]},"text":"no \\"Done\\" button"),"complete":false,"knowledge":{"facets":[{"id":"f","status":"gap"}],"signal":{"fluency":"partial"}}}';
+  assert.equal(firstJsonObject(broken), undefined);
+  const calls = [];
+  const g = gateway(
+    [
+      broken,
+      '{"help":{"nudges":[],"hints":[],"gives":[],"offers":[]},"text":"ok","complete":false}',
+    ],
+    calls,
+    { validate: validateAnswer },
+  );
+  const answer = await g.run("tutor", {
+    mode: "terminal-dialogue",
+    helpPolicy: { unlocked: [] },
+  });
+  assert.equal(answer.complete, false);
+  assert.match(calls[1].input, /not one valid JSON object/);
 });
 
 test("a field name written with stray spaces is still that field", async () => {
@@ -208,6 +231,15 @@ test("a field name written with stray spaces is still that field", async () => {
   });
   assert.equal(answer.complete, false);
   assert.equal(calls.length, 1);
+});
+
+test("a rejected reply's logged skeleton keeps structure and drops long text", () => {
+  assert.equal(
+    replySkeleton(
+      '{"text":"a learner sentence that is longer than the limit"),"complete":false}',
+    ),
+    '{"text":"<48>"),"complete":false}',
+  );
 });
 
 test("a rejected answer gets one correction, then fails plainly", async () => {
