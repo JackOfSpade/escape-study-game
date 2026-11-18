@@ -3,7 +3,8 @@ import type { StudyRecord } from "./model";
 export const LOG_KEY = "recent-game-diagnostics-v1";
 export const LOG_LIMITS = { games: 3, entries: 400, bytesPerGame: 256_000 };
 interface Entry {
-  at: number;
+  /** Wall-clock time the entry was recorded, ISO 8601. */
+  at: string;
   type: string;
   data: unknown;
 }
@@ -79,7 +80,9 @@ export class RunLogs {
           const retained = new Map<string, RunLog>();
           for (const value of data.runs) {
             const run = restoredRun(value);
-            if (!run) continue;
+            // A run left with nothing readable says nothing; it must not
+            // hold one of the few retained slots.
+            if (!run?.entries.length) continue;
             retained.delete(run.id);
             retained.set(run.id, run);
           }
@@ -158,7 +161,9 @@ export class RunLogs {
   }
 
   record(g: StudyRecord, type: string, data: unknown = null) {
-    const at = Math.round(g.time * 100) / 100;
+    // The record's own clock no longer advances, so only wall-clock time can
+    // order entries and line them up with the bridge's log.
+    const at = new Date().toISOString();
     // Serialize once and keep a detached copy: retained diagnostics cannot
     // drift with later mutation of live objects, so byte accounting always
     // matches what is written.
@@ -219,10 +224,13 @@ function restoredRun(value: unknown): RunLog | undefined {
     return;
   const entries: Entry[] = [];
   for (const e of value.entries.slice(-LOG_LIMITS.entries))
+    // Entries stamped with a number came from the record's old clock: the
+    // removed game's bulky state dumps, and later entries that all carry the
+    // same frozen value. They are dropped so they cannot crowd out a report.
     if (
       isRecord(e) &&
-      typeof e.at === "number" &&
-      Number.isFinite(e.at) &&
+      typeof e.at === "string" &&
+      e.at.length <= 64 &&
       typeof e.type === "string" &&
       e.type.length <= 128
     )

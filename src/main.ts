@@ -113,6 +113,12 @@ function latestStudyEncounter(g: StudyRecord): string | undefined {
     )[0]?.id;
 }
 lastQuestion = latestStudyEncounter(game);
+/** Record one diagnostic entry and store it at once: an entry held only in
+ * memory is lost when the page reloads, which is when it is most wanted. */
+function logEvent(type: string, data?: unknown) {
+  runLogs.record(game, type, data);
+  void runLogs.flush();
+}
 const runLogs = new RunLogs({
   read: () => readDurable(LOG_KEY),
   write: (value) => writeDurable(LOG_KEY, value),
@@ -442,7 +448,7 @@ const studySession = installStudySession({
   openTerminal: openStudyTerminal,
   prepareQuestion,
   resumeQuestions,
-  log: (type, data) => runLogs.record(game, type, data),
+  log: logEvent,
 });
 /** Show the workspace for the current record, or the recovery card while a
  * checkpoint that failed to load is still protected. */
@@ -469,10 +475,7 @@ function showStudy() {
   void persist();
 }
 mountBugReport({
-  log: (type, data) => {
-    runLogs.record(game, type, data);
-    void runLogs.flush();
-  },
+  log: logEvent,
   async collect() {
     const e =
       (active ? game.encounters[active] : undefined) ??
@@ -539,19 +542,17 @@ const errorText = (value: unknown) =>
     value instanceof Error ? `${value.name}: ${value.message}` : value,
   ).slice(0, 300);
 window.addEventListener("error", (event) => {
-  runLogs.record(game, "browser-error", {
+  logEvent("browser-error", {
     file: event.filename.split("/").pop(),
     line: event.lineno,
     column: event.colno,
     message: errorText(event.error ?? event.message),
   });
-  void runLogs.flush();
 });
 window.addEventListener("unhandledrejection", (event) => {
-  runLogs.record(game, "unhandled-rejection", {
+  logEvent("unhandled-rejection", {
     message: errorText(event.reason),
   });
-  void runLogs.flush();
 });
 
 // ---- The terminal: one question and its conversation -----------------------
@@ -828,14 +829,14 @@ $("#chat-form").onsubmit = (ev) => {
     input = $<HTMLTextAreaElement>("#chat-input"),
     text = input.value;
   if (!text.trim() || e.tutorRequests?.some((j) => j.state === "pending")) {
-    runLogs.record(game, "terminal-message-blocked", {
+    logEvent("terminal-message-blocked", {
       reason: !text.trim() ? "empty" : "tutor-pending",
     });
     return;
   }
   input.value = "";
   e.chatDraft = "";
-  runLogs.record(game, "terminal-message", { chars: text.length });
+  logEvent("terminal-message", { chars: text.length });
   startTerminalRequest(() => send(game, e, text, roadmap));
 };
 

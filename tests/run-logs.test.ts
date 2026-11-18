@@ -66,7 +66,10 @@ test("corrupt diagnostic records are skipped individually and cannot poison the 
             seed: 7,
             summary: { duration: "bad" },
             audit: { events: [] },
-            entries: [null, { at: 1, type: "valid", data: { x: 2 } }],
+            entries: [
+              null,
+              { at: "2026-11-18T18:04:51.504Z", type: "valid", data: { x: 2 } },
+            ],
           },
         ],
       }),
@@ -217,4 +220,43 @@ test("recorded diagnostics are detached from later mutation of live objects", as
     await storage.read(),
     JSON.stringify({ version: 1, runs: logs.runs }),
   );
+});
+
+test("entries carry wall-clock time, and old-clock entries from earlier builds are dropped on load", async () => {
+  const g = record(),
+    fresh = new RunLogs(memory());
+  const before = Date.now();
+  fresh.record(g, "terminal-message", { chars: 3 });
+  const at = Date.parse(fresh.runs[0].entries[0].at);
+  assert.ok(at >= before && at <= Date.now());
+  const stale = { at: 157.03, type: "snapshot", data: { actors: [] } };
+  const restored = new RunLogs({
+    read: async () =>
+      JSON.stringify({
+        version: 1,
+        runs: [
+          {
+            id: "old-only",
+            started: "2026-11-13T09:31:37.147Z",
+            entries: [stale],
+          },
+          {
+            id: g.id,
+            started: "2026-11-15T06:56:13.014Z",
+            entries: [
+              stale,
+              { at: 157.03, type: "terminal-message", data: { chars: 34 } },
+              fresh.runs[0].entries[0],
+            ],
+          },
+        ],
+      }),
+    write: async () => {},
+  });
+  await restored.load();
+  assert.deepEqual(
+    restored.runs.map((r) => r.id),
+    [g.id],
+  );
+  assert.deepEqual(restored.runs[0].entries, fresh.runs[0].entries);
 });
