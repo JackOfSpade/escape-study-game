@@ -654,6 +654,19 @@ export function createClaudeGateway({
               'The reply was not one valid JSON object. Write a single JSON object with every required field, and inside a string value write each double quote as \\" and each line break as \\n',
             );
           const answer = trimmedKeys(parsed);
+          // A tutor turn that gives no verdict at all is a follow-up, never
+          // a completion: it continues the conversation and awards nothing.
+          if (
+            operation === "tutor" &&
+            payload?.mode === "terminal-dialogue" &&
+            answer.complete === undefined &&
+            answer.outcome === undefined
+          ) {
+            answer.complete = false;
+            console.error(
+              `Tutor reply (attempt ${attempt}) omitted complete; read as complete:false`,
+            );
+          }
           validate(job, answer);
           logCall(call, measured, "accepted");
           answered = answer;
