@@ -117,8 +117,10 @@ export const PROBE_STANCE =
 
 export const TERMINAL_DIALOGUE_FORMAT = {
   help: {
-    supplies: ["probe facet ids this reply's text supplies help for"],
-    offers: ["probe facet ids this reply offers help on and awaits a choice"],
+    nudges: ["probe facet ids this reply's text gives a free nudge on"],
+    hints: ["probe facet ids this reply's text gives a concrete hint on"],
+    gives: ["probe facet ids this reply's text states the step or answer for"],
+    offers: ["probe facet ids this reply warns about before a first hint"],
   },
   text: "string",
   complete: "boolean",
