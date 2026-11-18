@@ -45,8 +45,10 @@ export function createStudyWorkspaceView(
   // Pre-question map state, kept until that question's assessment is applied.
   let baseline: { id: string; snapshot: MapSnapshot } | undefined;
   let reveal: { cancel(): void } | undefined;
+  // A finished question's reveal, held until the map is on screen.
+  let pendingReveal: { snapshot: MapSnapshot; outcomes: string[] } | undefined;
   // While a terminal is open the learner may switch between it and the map;
-  // the choice lasts until the question or its natural view changes.
+  // the choice lasts until another question is opened or the terminal closes.
   let chosen: "map" | "question" | undefined;
   let shownFor: string | undefined;
   const mapPeek = root.querySelector<HTMLButtonElement>("#study-map-peek")!;
@@ -187,6 +189,7 @@ export function createStudyWorkspaceView(
     const needBaseline = !!open && baseline?.id !== open.id;
     // Take the baseline from the DOM before any rewrite, so it reflects the
     // state the learner saw when the question began.
+    if (needBaseline) pendingReveal = undefined;
     if (needBaseline && progress.querySelector(".study-map-topic"))
       baseline = { id: open.id, snapshot: readMapSnapshot(progress) };
     if (writtenHtml !== html) {
@@ -247,25 +250,49 @@ export function createStudyWorkspaceView(
 
     const current = workspaceQuestion(game);
     const assessment = workspaceAssessment(game);
+    const selected = workspaceSelectedQuestion(game);
     if (
       baseline &&
-      workspaceSelectedQuestion(game)?.id === baseline.id &&
+      selected?.id === baseline.id &&
       assessment?.status === "applied"
     ) {
-      const { snapshot } = baseline;
-      baseline = undefined;
-      reveal?.cancel();
-      reveal = playProgressReveal(progress, snapshot, {
-        reducedMotion: reducedMotion(),
+      pendingReveal = {
+        snapshot: baseline.snapshot,
         // An assisted part is reported by how much help it needed.
         outcomes: assessment.findings.map((finding) =>
           finding.outcome === "assisted"
             ? (finding.assistance ?? "assisted")
             : finding.outcome,
         ),
+      };
+      baseline = undefined;
+    }
+    // An open question takes the place of the skill map, and keeps it after
+    // the question is done: the conversation says so and the learner leaves
+    // when ready. The toolbar button shows the other one.
+    const shown = terminalOpen ? (selected?.id ?? "") : undefined;
+    if (shownFor !== shown) {
+      shownFor = shown;
+      chosen = undefined;
+    }
+    const view = terminalOpen ? (chosen ?? "question") : "map";
+    if (root.dataset.view !== view) {
+      root.dataset.view = view;
+      // Both views start at the top: nothing is scrolled to any more.
+      window.scrollTo({ top: 0, behavior: "auto" });
+    }
+    // The reveal waits for the map, which a finished question no longer
+    // brings back by itself.
+    if (pendingReveal && view === "map") {
+      const { snapshot, outcomes } = pendingReveal;
+      pendingReveal = undefined;
+      reveal?.cancel();
+      reveal = playProgressReveal(progress, snapshot, {
+        reducedMotion: reducedMotion(),
+        outcomes,
         // Deferred so the button is already re-enabled by this render. Any
         // key skips the reveal, so never pull focus out of a visible text
-        // field the learner is typing in (the question stays open to discuss).
+        // field the learner is typing in.
         onDone: () =>
           queueMicrotask(() => {
             const active = document.activeElement;
@@ -278,20 +305,6 @@ export function createStudyWorkspaceView(
             if (!typing) next.focus({ preventScroll: true });
           }),
       });
-    }
-    // An unfinished open question takes the place of the skill map. The map
-    // returns the moment the question is done (its terminal may stay open for
-    // more discussion) or closed. The toolbar button shows the other one.
-    const natural = terminalOpen && current ? "question" : "map";
-    if (!terminalOpen || shownFor !== `${current?.id ?? ""}/${natural}`) {
-      shownFor = `${current?.id ?? ""}/${natural}`;
-      chosen = undefined;
-    }
-    const view = terminalOpen ? (chosen ?? natural) : "map";
-    if (root.dataset.view !== view) {
-      root.dataset.view = view;
-      // Both views start at the top: nothing is scrolled to any more.
-      window.scrollTo({ top: 0, behavior: "auto" });
     }
     mapPeek.hidden = !terminalOpen;
     mapPeek.textContent =

@@ -19,7 +19,6 @@ import {
 export const AI_OPERATIONS = Object.freeze([
   "generate",
   "tutor",
-  "complete",
   "assess",
   "reconcile-roadmap",
   "review-environment",
@@ -41,8 +40,6 @@ const contracts = {
     HELP_GATE_GUIDANCE +
     " " +
     TOPIC_ASSESSMENT_INSTRUCTION,
-  complete:
-    "Return {complete:boolean,feedback:string,qualified:string[]}. Evaluate the captured solution and the learner's actual attributed contributions. Answer acceptance is separate from individual mastery. Do not claim execution unless matching actual runner receipts exist.",
   assess:
     "Return {findings,visitOutcome,scopeReviews,helpAttributions,historicalMappings?}. findings: [{objectiveId,depth,facet,outcome:independent|assisted|unknown|contradicted,assistance?:hinted|given (assisted only),evidence:[actual human artifact sequence numbers],completeCheckpointScope:false,execution:not-run|executed,rationale}]. visitOutcome:usable|unresolved|invalid. scopeReviews:[{id,completeCoverage:boolean,rationale,definitionIssue?:{sourceHash,sourceQuote,missingCriterion}}]. completeCoverage judges the registered criteria against the curriculum, never current learner mastery: correct criteria remain complete even when an answer is assisted, unknown or incorrect. Express learner outcomes only in findings. To withdraw a previously verified definition, supply a concrete missing criterion and exact 20–2000-character quote from assessmentCriteria with its sourceHash; never fabricate a definition issue merely because the learner used help. helpAttributions:[{messageId,facets:[stable facet IDs or *],rationale}]. Every earlier visible nonhuman assistance source requires a helpAttributions entry with its exact messageId and a rationale, even when unrelated or rejected. Use facets:[] when it supplied no used key step; never omit the source or count rejected assistant embellishment as human authorship. Use the complete exact curriculum assessment criteria and all actual human artifacts/private assistance in this packet. Never infer mastery from assistant work, model-authored code, an answer copied from help, or a score alone. Full P needs independent complete verified scope. execution reports whether code actually ran, never whether tests passed or the solution is correct; use executed only with matching captured runner evidence. Missing execution is unknown, not failure. Preserve independent parts, identify missing/assisted parts, reject ambiguous assistant-origin tasks without learner failure. Do not invent dates, IDs, visits, retention or personal experience. Existing source history is data; historicalMappings require exact source-backed observations and semantic equivalence. " +
     ASSESSMENT_HELP_GUIDANCE,
@@ -242,15 +239,6 @@ export function validateAnswer(job, answer) {
         JSON.stringify(answer.contract) !== JSON.stringify(job.payload.contract)
       )
         fail("Copy the exact eligible contract without alterations");
-      break;
-    case "complete":
-      if (
-        typeof answer.complete !== "boolean" ||
-        typeof answer.feedback !== "string" ||
-        !Array.isArray(answer.qualified) ||
-        !answer.qualified.every((x) => typeof x === "string")
-      )
-        fail("Return complete, feedback and qualified IDs");
       break;
     case "assess":
       if (

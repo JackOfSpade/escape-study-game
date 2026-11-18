@@ -18,7 +18,7 @@ async function mockClaude(page: Page) {
         mode: "claude-cli",
         label: "Claude CLI",
         detail: "Synthetic gateway",
-        capabilities: ["generate", "tutor", "complete", "assess"],
+        capabilities: ["generate", "tutor", "assess"],
       });
     if (url.pathname !== "/api/bridge")
       return json({ error: `No route for ${url.pathname}` }, 404);

@@ -201,6 +201,7 @@ export interface Message {
 }
 export interface Submission {
   dialogueRequestId?: string;
+  /** The saved request of the retired answer check. Carried, never sent. */
   completionRequest?: {
     provider: Provider;
     payloadJson: string;

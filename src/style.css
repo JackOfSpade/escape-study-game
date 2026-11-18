@@ -174,43 +174,6 @@ p {
   overflow: auto;
   margin-bottom: 20px;
 }
-.editor-label {
-  display: flex;
-  justify-content: space-between;
-  font-size: 11px;
-  color: var(--muted);
-  margin-bottom: 8px;
-}
-#workspace {
-  width: 100%;
-  min-height: 180px;
-  resize: vertical;
-  background: var(--editor);
-  color: var(--terminal);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 12px;
-  font:
-    12px/1.6 ui-monospace,
-    monospace;
-  tab-size: 4;
-}
-.submit-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 12px 0 20px;
-}
-.submit-row button {
-  font-size: 10px;
-  padding: 10px;
-  flex-shrink: 0;
-}
-.submit-row span {
-  font-size: 9px;
-  color: var(--muted);
-  line-height: 1.5;
-}
 #messages {
   max-height: 200px;
   min-height: 60px;
@@ -222,6 +185,23 @@ p {
   padding: 10px;
   border-radius: 4px;
   background: var(--editor);
+}
+/* Marks where in the conversation the question was finished. */
+.message-complete {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 10px;
+  padding: 10px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+}
+.message-complete strong {
+  font-size: 13px;
+  color: var(--accent);
 }
 .message strong {
   font-size: 10px;
@@ -471,9 +451,7 @@ pre {
   margin: 0 0 8px;
   font-size: 16px;
 }
-#conversation-context,
-#answer-context,
-#submission-help {
+#conversation-context {
   font-size: 12px;
   line-height: 1.5;
 }
@@ -481,36 +459,17 @@ pre {
   font-size: 14px;
   max-height: 270px;
 }
-#workspace {
-  min-height: 240px;
-  font-size: 14px;
-}
-#workspace[data-mode="text"] {
-  font-family: inherit;
-}
-#submission-status {
-  display: inline-block;
-  padding: 7px 10px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  font-size: 12px;
-  font-weight: 700;
-}
-#submission-status[data-state="accepted"] {
-  color: var(--accent);
-}
-#submission-status[data-state="rejected"],
-#submission-status[data-state="error"] {
-  color: var(--danger);
-}
 .submit-row {
+  display: flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: 10px;
-  margin-bottom: 8px;
+  margin: 12px 0 8px;
 }
 .submit-row button {
   font-size: 13px;
   padding: 11px 16px;
+  flex-shrink: 0;
 }
 .conversation-panel #messages {
   flex: 1;
@@ -533,7 +492,7 @@ pre {
   }
 }
 
-/* Solo answers live in one continuous conversation; old shared saves retain their editor. */
+/* Every answer lives in one continuous conversation beside its question. */
 .dialogue-terminal .terminal-layout {
   grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr);
 }

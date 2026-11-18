@@ -1485,7 +1485,7 @@ test("live question generation sends the track's probe records and a policy that
       return Response.json({
         mode: "claude-cli",
         label: "Isolated transport fixture",
-        capabilities: ["generate", "tutor", "group", "complete", "assess"],
+        capabilities: ["generate", "tutor", "assess"],
         detail: "Test fixture only; not a native Study Mode verification.",
       });
     const body = JSON.parse(String(init?.body));

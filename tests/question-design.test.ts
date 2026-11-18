@@ -38,7 +38,7 @@ function fixtureFetch(sent: any[]) {
       return Response.json({
         mode: "claude-cli",
         label: "Isolated question design fixture",
-        capabilities: ["generate", "tutor", "group", "complete", "assess"],
+        capabilities: ["generate", "tutor", "assess"],
         detail: "Test fixture only; not a native Study Mode verification.",
       });
     const body = JSON.parse(String(init?.body));

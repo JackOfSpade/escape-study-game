@@ -25,8 +25,7 @@ export function workspaceQuestion(g: StudyRecord): Encounter | undefined {
   const current = Object.values(g.encounters);
   const selected = workspaceSelectedQuestion(g);
   const available = (e: Encounter) =>
-    e.state !== "consumed" &&
-    !(e.mode === "solo" && e.owner && e.owner !== "human");
+    e.state !== "consumed" && !(e.owner && e.owner !== "human");
   const preferSelected = (
     candidates: Encounter[],
     matches: (e: Encounter) => boolean,

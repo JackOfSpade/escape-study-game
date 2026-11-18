@@ -1,6 +1,5 @@
 import {
   checkBridge,
-  edit,
   ensureProblem,
   generatingEncounter,
   generationProgress,
@@ -8,10 +7,8 @@ import {
   presentMessages,
   presentProblem,
   releaseRetiredChatRequests,
-  retrySubmission,
   send,
   status,
-  submit,
   watchStreamingReplies,
 } from "./ai";
 import { mountBugReport } from "./bug-report";
@@ -24,7 +21,6 @@ import { connectionSteps } from "./connection-steps";
 import { initialStudy, syncLearningView } from "./curriculum";
 import { displayScale } from "./display-scale";
 import { $, setHtml, setNodeText, setText } from "./dom";
-import { canRunWorkspace, runWorkspace } from "./execution";
 import { executionText } from "./execution-presentation";
 import studyShell from "./study-shell.html?raw";
 import { escapeHtml as escape } from "./html";
@@ -59,7 +55,6 @@ import {
   provenanceText,
 } from "./terminal-panels";
 import { settleRequest } from "./terminal-request";
-import { submissionView } from "./terminal-view";
 import { emptyRecord } from "./record";
 
 const app = $("#app");
@@ -70,7 +65,6 @@ let game: StudyRecord,
   /** The encounter open in the terminal, if any. */
   active: string | undefined,
   lastUI = 0,
-  editorRevision = 0,
   /** The learner's latest question, open or still being prepared. */
   lastQuestion: string | undefined;
 try {
@@ -145,7 +139,6 @@ if (refusedCopy) {
     notice.hidden = true;
   };
 }
-const editor = $<HTMLTextAreaElement>("#workspace");
 syncDisplayScale();
 
 // ---- Saving ----------------------------------------------------------------
@@ -510,7 +503,6 @@ mountBugReport({
             ["save", "#study-save-status"],
             ["dialogue", "#dialogue-status"],
             ["tutor request", "#tutor-request-status"],
-            ["submission", "#submission-status"],
           ] as const
         )
           .map(([name, selector]) => [name, shown(selector)])
@@ -567,15 +559,10 @@ window.addEventListener("unhandledrejection", (event) => {
 function closeTerminal() {
   if (active) {
     const e = game.encounters[active];
-    if (e) {
-      e.scroll = editor.scrollTop;
-      e.selection = [editor.selectionStart, editor.selectionEnd];
-      e.chatOpen = false;
-    }
+    if (e) e.chatOpen = false;
   }
   active = undefined;
   $("#terminal").hidden = true;
-  editor.blur();
   void persist();
 }
 /** Opens a question in the workspace's terminal. */
@@ -714,28 +701,15 @@ function renderTerminal(force = false) {
 }
 /** The question, its title and what the conversation beside it is for. */
 function renderHeading(e: Encounter) {
-  const composer = $<HTMLTextAreaElement>("#chat-input");
   setText("#conversation-title", "Answer");
   // The panel is titled "Answer" and needs no further instruction.
   $("#conversation-context").hidden = true;
   setText("#conversation-context", "");
-  setText(
-    "#answer-context",
-    "This is your submission. Your tutor can help in the panel beside it.",
-  );
-  const dialogue = e.mode === "solo";
-  $("#terminal").classList.toggle("dialogue-terminal", dialogue);
-  $("#legacy-answer").hidden = dialogue;
   const progress = dialogueStatus(game, e);
-  $("#dialogue-status").hidden = !dialogue || progress.hidden;
+  $("#dialogue-status").hidden = progress.hidden;
   setText("#dialogue-status", progress.text);
-  $("#saved-answer").hidden = !dialogue || !e.workspace;
+  $("#saved-answer").hidden = !e.workspace;
   setText("#saved-answer-text", e.workspace);
-  $("#submission-help").hidden = dialogue;
-  composer.setAttribute(
-    "aria-label",
-    dialogue ? "Message your tutor" : "Message",
-  );
   presentProblem(game, e, roadmap);
   setText("#terminal-type", "QUESTION");
   setText(
@@ -762,54 +736,17 @@ function renderHeading(e: Encounter) {
           ),
   );
 }
-/** The message draft, and the answer editor a question outside a solo
- * conversation still submits from, with its checks and captured runs. */
+/** The message draft and any code runs saved with the question. */
 function renderAnswer(e: Encounter, force: boolean) {
   const composer = $<HTMLTextAreaElement>("#chat-input");
   if (force || document.activeElement !== composer)
     composer.value = e.chatDraft ?? "";
-  editor.dataset.mode = e.problem?.runtime ? "code" : "text";
-  if (force || document.activeElement !== editor || e.state === "consumed") {
-    if (editor.value !== e.workspace) editor.value = e.workspace;
-    editorRevision = e.revision;
-    if (force) {
-      editor.scrollTop = e.scroll;
-      editor.setSelectionRange(...e.selection);
-    }
-  }
-  editor.readOnly = e.state === "consumed";
-  setText(
-    "#revision",
-    `v${e.revision}${e.state === "consumed" ? " · consumed / read-only" : ""}`,
-  );
-  const checking = e.submissions.some((s) => s.status === "pending");
-  $<HTMLButtonElement>("#submit").disabled =
-    !e.problem || e.state === "consumed" || checking;
-  const retry = $<HTMLButtonElement>("#retry-submission");
-  retry.hidden =
-    e.state === "consumed" || e.submissions.at(-1)?.status !== "error";
-  retry.disabled = checking;
-  const run = $<HTMLButtonElement>("#run-code");
-  run.hidden = !canRunWorkspace(game, e, roadmap);
-  run.disabled = e.executions?.some((job) => job.status === "pending") ?? false;
-  setNodeText(
-    run,
-    run.disabled
-      ? "Running captured code…"
-      : e.problem?.runtime?.environment === "react"
-        ? "Run React checks"
-        : `Run ${e.problem?.runtime?.language ?? "code"}`,
-  );
   $("#execution-results").hidden = !e.executions?.length;
   setText(
     "#execution-output",
     (e.executions ?? []).slice(-5).map(executionText).join("\n\n"),
   );
   renderExecutionPreview(e);
-  const submission = submissionView(e);
-  setText("#submission-status", submission.label);
-  $("#submission-status").dataset.state = submission.tone;
-  setText("#submission-help", submission.help);
 }
 /** Captured React output is shown only as a bounded inline JPEG. */
 const PREVIEW_URL = /^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/;
@@ -843,19 +780,6 @@ function renderExecutionPreview(e: Encounter) {
   );
   figure.append(image, caption);
 }
-editor.addEventListener("input", () => {
-  if (!active) return;
-  try {
-    if (
-      edit(game, game.encounters[active], editor.value, editorRevision, roadmap)
-    )
-      editorRevision = game.encounters[active].revision;
-    void persist();
-  } catch (err) {
-    game.notice = String(err);
-    renderTerminal(true);
-  }
-});
 /** Save and repaint once a request the terminal started has settled. A
  * request that throws is shown on its terminal instead of being lost. */
 function settleTerminalRequest(pending: Promise<unknown>, e: Encounter) {
@@ -872,16 +796,7 @@ function startTerminalRequest(start: (e: Encounter) => Promise<unknown>) {
   renderTerminal();
   void persist();
 }
-$("#run-code").onclick = () =>
-  startTerminalRequest((e) => runWorkspace(game, e, roadmap));
 $("#terminal-connect-retry").onclick = () => void recheckConnection();
-$("#submit").onclick = () =>
-  startTerminalRequest((e) => submit(game, e, roadmap));
-$("#retry-submission").onclick = () => {
-  const s = active ? game.encounters[active]?.submissions.at(-1) : undefined;
-  if (s?.status !== "error") return;
-  startTerminalRequest((e) => retrySubmission(game, e, roadmap, s.id));
-};
 // Shortcuts for answering the tutor's one warning; typing works too.
 $("#help-accept").onclick = () => {
   const e = active ? game.encounters[active] : undefined;

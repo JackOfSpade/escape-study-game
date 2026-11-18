@@ -56,7 +56,7 @@
       </div>
     </section>
     <div id="study-terminal-slot">
-      <section id="terminal" hidden>
+      <section id="terminal" class="dialogue-terminal" hidden>
         <div class="terminal-heading">
           <div>
             <span class="eyebrow" id="terminal-type"></span>
@@ -80,31 +80,6 @@
                 <summary>Previously saved work</summary>
                 <pre id="saved-answer-text"></pre>
               </details>
-              <div id="legacy-answer">
-                <label class="editor-label" for="workspace"
-                  >Answer to submit <span id="revision"></span></label
-                ><textarea
-                  id="workspace"
-                  spellcheck="false"
-                  aria-label="Answer to submit"
-                  placeholder="Write your answer here. Explain your reasoning where the question asks for it."
-                  aria-describedby="answer-context"
-                ></textarea>
-                <p id="answer-context" class="muted"></p>
-                <div class="submit-row">
-                  <button id="submit">Submit answer</button
-                  ><button id="run-code" class="quiet" hidden>Run code</button
-                  ><span
-                    id="submission-status"
-                    role="status"
-                    aria-live="polite"
-                  ></span>
-                </div>
-              </div>
-              <p id="submission-help" class="muted"></p>
-              <button id="retry-submission" class="quiet" hidden>
-                Retry answer check
-              </button>
               <details id="execution-results" hidden>
                 <summary>Saved code runs</summary>
                 <figure id="execution-preview" hidden></figure>
@@ -139,7 +114,7 @@
                   rows="3"
                   id="chat-input"
                   autocomplete="off"
-                  aria-label="Message"
+                  aria-label="Message your tutor"
                 ></textarea>
               </form>
             </aside>

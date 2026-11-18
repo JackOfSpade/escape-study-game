@@ -59,7 +59,7 @@ test("a question is asked, answered and kept across a reload", async ({
     "Why does the leading index column matter?",
   );
   await expect(page.locator("#problem-title")).toHaveText("Synthetic question");
-  await expect(page.locator("#workspace")).toBeHidden();
+  await expect(page.locator("#workspace")).toHaveCount(0);
   await page.locator("#chat-input").fill("It decides which rows are skipped");
   await page.locator("#chat-input").press("Enter");
   await expect.poll(() => relay.tutorCalls().length).toBe(1);

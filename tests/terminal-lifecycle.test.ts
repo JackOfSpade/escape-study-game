@@ -1,12 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import {
-  checkBridge,
-  completeQuestion,
-  ensureProblem,
-  submit,
-} from "../src/ai";
+import { checkBridge, completeQuestion, ensureProblem, send } from "../src/ai";
 import { eligible } from "../src/curriculum";
 import type { Problem, Roadmap } from "../src/model";
 import { decode, encode, recover } from "../src/persistence";
@@ -163,7 +158,7 @@ test("late completion errors and successes cannot reopen or rewrite another acce
       async () => new Promise((resolve) => (finish = resolve)),
     );
     try {
-      const pending = submit(g, e, r);
+      const pending = send(g, e, "Fixture answer", r);
       while (!finish) await tick();
       completeQuestion(g, e, "winning-completion", "Fixture accepted outcome");
       const accepted = {
@@ -174,11 +169,7 @@ test("late completion errors and successes cannot reopen or rewrite another acce
       finish(
         failure
           ? Response.json({ error: "offline" }, { status: 503 })
-          : Response.json({
-              complete: true,
-              feedback: "late",
-              qualified: ["human"],
-            }),
+          : Response.json({ text: "late", complete: true }),
       );
       await pending;
       assert.equal(e.state, "consumed");
@@ -189,7 +180,7 @@ test("late completion errors and successes cannot reopen or rewrite another acce
         e.history.filter((h) => h.kind === "completion").length,
         accepted.history,
       );
-      assert.notEqual(e.submissions.at(-1)!.status, "pending");
+      assert.equal(e.submissions.length, 0);
     } finally {
       await restore();
     }
@@ -248,47 +239,33 @@ test("a generation response from a replaced study profile cannot install a quest
   }
 });
 
-test("accepting a captured submission freezes its revision and later duplicate errors or successes cannot invalidate it", async () => {
+test("accepting a captured submission freezes its revision against a newer draft", async () => {
   const { edit } = await import("../src/ai");
-  for (const failure of [true, false]) {
-    const { g, e } = fixture();
-    g.study.profile = "live";
-    e.problem = problem(eligible(r, g.study));
-    edit(g, e, "Captured actual revision", 0);
-    const captured = e.workspace,
-      revision = e.revision;
-    let finish!: (r: Response) => void;
-    const restore = await bridge(
-      async () => new Promise((resolve) => (finish = resolve)),
-    );
-    try {
-      const pending = submit(g, e, r);
-      while (!finish) await tick();
-      const s = e.submissions.at(-1)!;
-      edit(g, e, "Newer unsubmitted draft", e.revision);
-      completeQuestion(g, e, s.id, "First accepted outcome");
-      finish(
-        failure
-          ? Response.json({ error: "late outage" }, { status: 503 })
-          : Response.json({
-              complete: true,
-              feedback: "Different late feedback",
-              qualified: [],
-            }),
-      );
-      await pending;
-      assert.equal(e.state, "consumed");
-      assert.equal(e.workspace, captured);
-      assert.equal(e.revision, revision);
-      assert.equal(
-        e.history.find((h) => h.kind === "completion")!.revision,
-        revision,
-      );
-      assert.equal(s.status, "complete");
-      assert.equal(s.feedback, "First accepted outcome");
-      assert.equal(e.history.filter((h) => h.kind === "completion").length, 1);
-    } finally {
-      await restore();
-    }
-  }
+  const { g, e } = fixture();
+  g.study.profile = "live";
+  e.problem = problem(eligible(r, g.study));
+  edit(g, e, "Captured actual revision", 0);
+  const captured = e.workspace,
+    revision = e.revision;
+  e.submissions.push({
+    id: "captured-answer",
+    revision,
+    author: "human",
+    content: captured,
+    seq: ++g.seq,
+    status: "pending",
+    feedback: "",
+  });
+  edit(g, e, "Newer unsubmitted draft", e.revision);
+  completeQuestion(g, e, "captured-answer", "First accepted outcome");
+  assert.equal(e.state, "consumed");
+  assert.equal(e.workspace, captured);
+  assert.equal(e.revision, revision);
+  assert.equal(
+    e.history.find((h) => h.kind === "completion")!.revision,
+    revision,
+  );
+  assert.equal(e.submissions[0].status, "complete");
+  assert.equal(e.submissions[0].feedback, "First accepted outcome");
+  assert.equal(e.history.filter((h) => h.kind === "completion").length, 1);
 });

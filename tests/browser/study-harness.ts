@@ -39,13 +39,7 @@ export async function mockClaudeStudy(
               mode: "claude-cli",
               label: "Claude CLI",
               detail: "Synthetic browser fixture; no live AI",
-              capabilities: [
-                "generate",
-                "tutor",
-                "complete",
-                "assess",
-                "group",
-              ],
+              capabilities: ["generate", "tutor", "assess"],
             }
           : {
               mode: "development",

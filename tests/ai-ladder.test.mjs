@@ -16,7 +16,7 @@ import { taskProfile } from "../scripts/claude-gateway.mjs";
 
 const store = () => mkdtempSync(join(tmpdir(), "ai-ladder-"));
 const cases = [
-  { id: "a", operation: "complete", payload: {} },
+  { id: "a", operation: "review-environment", payload: {} },
   { id: "b", operation: "assess", payload: {} },
 ];
 
@@ -113,10 +113,13 @@ test("each case and setting gets a fresh gateway and one measured row", async ()
     gatewayFactory: factory,
   });
   assert.equal(arms.length, 4);
-  const override = arms[0].options.profileFor("complete", {});
+  const override = arms[0].options.profileFor("review-environment", {});
   assert.equal(override.model, "haiku");
   assert.equal(override.effort, "low");
-  assert.equal(override.timeoutMs, taskProfile("complete", {}).timeoutMs);
+  assert.equal(
+    override.timeoutMs,
+    taskProfile("review-environment", {}).timeoutMs,
+  );
   assert.equal(result.rows.length, 4);
   const rows = readLadderRows(out);
   assert.equal(rows.length, 4);
@@ -125,7 +128,7 @@ test("each case and setting gets a fresh gateway and one measured row", async ()
   const a = pick("a", "haiku:low");
   assert.equal(a.v, 1);
   assert.equal(a.runId, "run-1");
-  assert.equal(a.operation, "complete");
+  assert.equal(a.operation, "review-environment");
   assert.equal(a.rep, 0);
   assert.equal(a.outcome, "valid");
   assert.deepEqual(a.answers, [{ ok: true, model: "haiku", effort: "low" }]);
@@ -185,8 +188,12 @@ test("a usage limit stops the whole run after writing its row", async () => {
   const messages = [];
   const result = await runLadder({
     cases: [
-      { id: "limit", operation: "complete", payload: { limit: true } },
-      { id: "later", operation: "complete", payload: {} },
+      {
+        id: "limit",
+        operation: "review-environment",
+        payload: { limit: true },
+      },
+      { id: "later", operation: "review-environment", payload: {} },
     ],
     settings: ["haiku:low"],
     out,
@@ -298,21 +305,21 @@ test("the summary reports exact reliability, cost and speed figures", () => {
 
 test("a replay-sample directory becomes one case per sample", () => {
   const directory = store();
-  const complete = join(directory, "complete");
+  const complete = join(directory, "review-environment");
   mkdirSync(complete, { recursive: true });
   writeFileSync(
     join(complete, "2025-01-01T00-00-00.000Z-aaaa1111.json"),
     JSON.stringify({
       v: 1,
       at: "2025-01-01T00:00:00.000Z",
-      operation: "complete",
+      operation: "review-environment",
       payload: { note: "one" },
     }),
   );
   assert.deepEqual(readCases(directory), [
     {
       id: "2025-01-01T00-00-00.000Z-aaaa1111",
-      operation: "complete",
+      operation: "review-environment",
       payload: { note: "one" },
     },
   ]);

@@ -4,6 +4,8 @@ import { mockClaudeStudy } from "./study-harness";
 async function openStudyQuestion(page: Page) {
   await mockClaudeStudy(page);
   await page.goto("/");
+  // The hook appears only after the saved record has loaded.
+  await page.waitForFunction(() => !!(window as any).__deadAir);
   await page.evaluate(() => {
     (window as any).__deadAir.game.study.profile = "live";
   });
@@ -128,7 +130,7 @@ test("reduced motion shows the final state immediately with a banner", async ({
   await expect(page.locator(".study-reveal-particle")).toHaveCount(0);
 });
 
-test("finishing a question returns to the map and plays the reveal once", async ({
+test("a finished question stays open with a marker in chat, and the map reveal waits", async ({
   page,
 }) => {
   const study = await mockClaudeStudy(page);
@@ -142,6 +144,8 @@ test("finishing a question returns to the map and plays the reveal once", async 
     });
   });
   await page.goto("/");
+  // The hook appears only after the saved record has loaded.
+  await page.waitForFunction(() => !!(window as any).__deadAir);
   await page.evaluate(() => {
     (window as any).__deadAir.game.study.profile = "live";
   });
@@ -154,21 +158,52 @@ test("finishing a question returns to the map and plays the reveal once", async 
   study.solve();
   await page.locator("#chat-input").fill("It decides what the index can seek.");
   await page.locator("#chat-input").press("Enter");
-  await expect(page.locator(".study-reveal-banner")).toHaveCount(1, {
-    timeout: 15000,
-  });
-  // The finished question gives the screen back to the map.
+  // The conversation says the question is done, after the final reply.
+  const marker = page.locator("#messages .message-complete");
+  await expect(marker).toContainText("Question complete");
+  await expect(page.locator("#messages > :last-child")).toHaveClass(
+    "message-complete",
+  );
+  await expect(
+    page.locator("#messages .message-complete ~ .message"),
+  ).toHaveCount(0);
+  await expect(page.locator("#study-save-status")).toContainText(
+    "Progress assessment validated and saved.",
+    { timeout: 15000 },
+  );
+  // The learner stays on the question; nothing plays on the hidden map.
   await expect(page.locator("#study-workspace")).toHaveAttribute(
     "data-view",
-    "map",
+    "question",
   );
+  await expect(page.locator("#study-terminal-slot #terminal")).toBeVisible();
+  await expect(page.locator(".study-reveal-banner")).toHaveCount(0);
+  // Later discussion follows the marker instead of moving it.
+  study.reply(() => ({ text: "Glad to go deeper." }));
+  await page.locator("#chat-input").fill("One more thing?");
+  await page.locator("#chat-input").press("Enter");
+  await expect(
+    page.locator("#messages .message-complete ~ .message"),
+  ).toHaveCount(2);
+  await expect(page.locator("#study-workspace")).toHaveAttribute(
+    "data-view",
+    "question",
+  );
+  // The map is the learner's choice, and the reveal plays when it shows.
+  await page.locator("#study-map-peek").click();
+  await expect(page.locator(".study-reveal-banner")).toHaveCount(1);
   await expect(page.locator("#study-progress")).toBeVisible();
   await expect(page.locator("#study-next")).toBeEnabled();
   await expect(page.locator("#study-next")).toHaveText("Start next question");
+  await expect(page.locator("#study-map-peek")).toHaveText(
+    "Review the last question",
+  );
   // The banner fades out on its own and the reveal does not repeat.
   await expect(page.locator(".study-reveal-banner")).toHaveCount(0, {
     timeout: 8000,
   });
+  await page.locator("#study-map-peek").click();
+  await page.locator("#study-map-peek").click();
   await page.waitForTimeout(1500);
   await expect(page.locator(".study-reveal-banner")).toHaveCount(0);
 });

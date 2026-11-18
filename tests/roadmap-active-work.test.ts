@@ -381,7 +381,7 @@ test("new technical work after import is assessed and retained for review, while
         mode: "claude-cli",
         label: "Synthetic follow-up reviewer",
         detail: "Not native certification",
-        capabilities: ["generate", "tutor", "complete", "assess", "group"],
+        capabilities: ["generate", "tutor", "assess"],
       });
     const { operation, payload } = JSON.parse(String(init?.body));
     assert.equal(operation, "assess");

@@ -1,13 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import {
-  assess,
-  edit,
-  ensureProblem,
-  facetAssistance,
-  submit,
-} from "../src/ai";
+import { assess, edit, ensureProblem, facetAssistance, send } from "../src/ai";
 import {
   beginVisit,
   eligible,
@@ -519,9 +513,10 @@ test("development assessments cannot apply academic evidence; live disconnection
   assert.equal(g.study.learner!.evidence.length, 0);
   assert.equal(g.study.assessments[0].status, "review-required");
   g.study.profile = "live";
-  await submit(g, e, r);
+  await send(g, e, "My answer is in the saved work.", r);
   assert.notEqual(e.state, "consumed");
-  assert.equal(e.submissions.at(-1)?.status, "error");
+  assert.equal(e.submissions.length, 0);
+  assert.equal(e.tutorRequests!.at(-1)!.state, "interrupted");
   assert.equal(g.study.learner!.evidence.length, 0);
 });
 
@@ -775,7 +770,7 @@ test("controlled bridge fixture: live snapshot completion awards access before s
       return response({
         mode: "claude-cli",
         label: "Isolated transport fixture",
-        capabilities: ["generate", "tutor", "group", "complete", "assess"],
+        capabilities: ["generate", "tutor", "assess"],
         detail:
           "Test fixture only; this is not a native Study Mode verification.",
       });
@@ -805,7 +800,7 @@ test("controlled bridge fixture: live snapshot completion awards access before s
       };
       return response(generated);
     }
-    if (body.operation === "complete")
+    if (body.operation === "tutor")
       return new Promise((resolve) => {
         releaseCompletion = resolve;
       });
@@ -813,7 +808,7 @@ test("controlled bridge fixture: live snapshot completion awards access before s
       return new Promise((resolve) => {
         releaseAssessment = resolve;
       });
-    return response({ text: "Fixture guidance" });
+    throw Error(`Unexpected operation ${body.operation}`);
   };
   try {
     await ai.checkBridge();
@@ -829,14 +824,12 @@ test("controlled bridge fixture: live snapshot completion awards access before s
       0,
       r,
     );
-    const task = ai.submit(g, e, r);
-    assert.equal(e.state, "submitted");
+    const task = ai.send(g, e, "My explanation is in the saved work.", r);
+    for (let i = 0; i < 10 && !releaseCompletion; i++)
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.notEqual(e.state, "consumed");
     releaseCompletion(
-      response({
-        complete: true,
-        feedback: "Fixture completion only.",
-        qualified: ["human"],
-      }),
+      response({ text: "Fixture completion only.", complete: true }),
     );
     await task;
     assert.equal(e.state, "consumed");

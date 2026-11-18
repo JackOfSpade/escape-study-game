@@ -6,6 +6,8 @@ import {
 } from "./study-harness";
 
 async function openSettings(page: Page) {
+  // Escape is handled only once the saved record has loaded.
+  await page.waitForFunction(() => !!(window as any).__deadAir);
   await page.keyboard.press("Escape");
   await expect(page.locator("#pause-menu")).toBeVisible();
   await page.locator("#settings-toggle").click();
