@@ -75,6 +75,20 @@ export function dialogueStatus(game: StudyRecord, e: Encounter) {
   return { hidden: e.state !== "consumed" && !probeLine, text };
 }
 
+/** How many messages precede the "question complete" marker: those up to the
+ * reply that finished it, so later discussion follows the marker. Undefined
+ * while the question is unfinished. */
+export function completionMarkerIndex(e: Encounter): number | undefined {
+  if (e.state !== "consumed") return undefined;
+  const accepted = e.submissions.find((s) => s.id === e.accepted);
+  if (!accepted) return e.tutor.length;
+  let index = 0;
+  while (index < e.tutor.length && e.tutor[index].seq < accepted.seq) index++;
+  return index;
+}
+const COMPLETION_MARKER =
+  '<div class="message-complete"><strong>✓ Question complete</strong><span>Your result is saved. You can keep discussing it here, or open the Skill map for the next question.</span></div>';
+
 export function createTerminalPanels(host: TerminalPanelHost) {
   const { roadmap } = host;
   /** Saved questions that are waiting or were interrupted. */
@@ -122,8 +136,12 @@ export function createTerminalPanels(host: TerminalPanelHost) {
         escape(m.author === "human" ? "You" : speakerLabel(m.author)),
         m.text,
       );
+    const done = completionMarkerIndex(e);
     const html =
-      e.tutor.map((m) => said(m)).join("") +
+      e.tutor
+        .map((m, i) => (i === done ? COMPLETION_MARKER : "") + said(m))
+        .join("") +
+      (done === e.tutor.length ? COMPLETION_MARKER : "") +
       (e.tutorRequests ?? [])
         .map((j) => (j.state === "pending" ? streamingReply(j) : undefined))
         .filter((text): text is string => !!text)
