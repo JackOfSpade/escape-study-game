@@ -237,11 +237,9 @@ export function claudeArgs({ model, effort, system, stream }) {
 /** The reply may carry stray text around its object, so scan for a balanced one. */
 export function firstJsonObject(text) {
   const source = String(text ?? "");
-  for (
-    let start = source.indexOf("{");
-    start >= 0;
-    start = source.indexOf("{", start + 1)
-  ) {
+  const first = source.indexOf("{");
+  const last = source.lastIndexOf("}");
+  for (let start = first; start >= 0; start = source.indexOf("{", start + 1)) {
     let depth = 0,
       quoted = false,
       escaped = false;
@@ -254,6 +252,10 @@ export function firstJsonObject(text) {
       } else if (c === '"') quoted = true;
       else if (c === "{") depth++;
       else if (c === "}" && --depth === 0) {
+        // Past the first brace, an object that stops short of the reply's
+        // last brace is a fragment of a malformed answer (its help or
+        // knowledge field), never the answer itself.
+        if (start !== first && i !== last) break;
         try {
           return JSON.parse(source.slice(start, i + 1));
         } catch {
@@ -285,6 +287,18 @@ export function trimmedKeys(value) {
     });
   }
   return out;
+}
+/**
+ * A rejected reply's structure for the service log: every string longer than
+ * 24 characters is replaced by its length, so field names, ids and enum
+ * values stay readable while the conversation text does not.
+ */
+export function replySkeleton(text, max = 1500) {
+  const skeleton = String(text ?? "").replace(
+    /"(?:[^"\\]|\\.)*"/gs,
+    (literal) => (literal.length > 26 ? `"<${literal.length - 2}>"` : literal),
+  );
+  return skeleton.length > max ? `${skeleton.slice(0, max)}...` : skeleton;
 }
 const USAGE_LOG_MAX_BYTES = 5 * 1024 * 1024;
 const usageNumber = (value) =>
@@ -635,7 +649,10 @@ export function createClaudeGateway({
         }
         try {
           const parsed = firstJsonObject(text);
-          if (!parsed) throw Error("The reply held no JSON object");
+          if (!parsed)
+            throw Error(
+              'The reply was not one valid JSON object. Write a single JSON object with every required field, and inside a string value write each double quote as \\" and each line break as \\n',
+            );
           const answer = trimmedKeys(parsed);
           validate(job, answer);
           logCall(call, measured, "accepted");
@@ -644,6 +661,9 @@ export function createClaudeGateway({
         } catch (error) {
           problem = String(error?.message ?? error);
           logCall(call, measured, "rejected");
+          console.error(
+            `Rejected ${operation} reply (attempt ${attempt}): ${problem.slice(0, 300)} | ${replySkeleton(text)}`,
+          );
           // The correction restarts the reply, so the partial text is dropped.
           onText?.("");
           prompt = `${user}\n\nYour previous answer was rejected: ${problem}\nReturn the complete corrected JSON object.`;
