@@ -29,7 +29,7 @@ The policy asks for:
 - short reading: a few terse facts, only those a correct answer turns on (plus deliberate distractors when filtering is the skill), with no framing story, cast or restated instructions;
 - one of each kind: items of the same kind are asked about once; "identify each" and "for each one" are used only when finding every instance is the skill, and never in front of a justification that would read the same for every item;
 - facets and rubric: a new scope definition has one facet per distinct understanding, never one per list member, because the tutor probes every facet; a rubric line is one checkable judgement;
-- parts: most questions have one. A part is added only when it tests something the first does not.
+- parts: most questions have one. A part is added only when it tests something the first does not. An ask that has the learner audit their own answer (naming its most exposed claim, say) is kept only when the objective assesses it, and then as its own last part.
 
 The tutor and the assessor follow the same rule: one general statement, or the point worked for one item, establishes facets of the same kind; a correct answer is not kept open for elaboration; and a short correct answer is never marked down.
 
