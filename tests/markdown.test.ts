@@ -107,6 +107,22 @@ test("a numbered list resumed after other content keeps its number", () => {
   );
 });
 
+test("a numbered list only carries a start between 2 and 999999", () => {
+  const start = (text: string) =>
+    /<ol( start="\d+")?>/.exec(markdownToHtml(text))![1];
+  assert.equal(start("2. a"), ' start="2"');
+  assert.equal(start("999999. a"), ' start="999999"');
+  assert.equal(start("1. a"), undefined);
+  assert.equal(start("0. a"), undefined);
+  assert.equal(start("1000000. a"), undefined);
+  assert.equal(start("1234567) a"), undefined);
+  assert.equal(
+    markdownToHtml("99999999999999999999) x"),
+    "<ol><li>x</li></ol>",
+  );
+  assert.equal(markdownToHtml("1".repeat(400) + ". x"), "<ol><li>x</li></ol>");
+});
+
 test("paragraph lines keep indentation relative to the shallowest line", () => {
   assert.equal(
     markdownToHtml("for v in vs:\n    if v > 4:\n\tcount += 1"),

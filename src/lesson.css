@@ -1,0 +1,933 @@
+/* Lesson view: everything is scoped under .lesson. Sizes are in rem and em so
+   the display scale setting reaches them. The page imports this file. */
+.lesson {
+  /* Contains the absolutely positioned .lesson-sr text, so it scrolls with
+     and is clipped by whatever pane the lesson is in. */
+  position: relative;
+  --lesson-radius: 0.5em;
+  --lesson-warn: #e6c27a;
+  --lesson-bad: #e69a9a;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--ink, #e1e7f0);
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.lesson *,
+.lesson *::before,
+.lesson *::after {
+  box-sizing: border-box;
+}
+.lesson [hidden] {
+  display: none !important;
+}
+.lesson-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Header, notice and section rail */
+.lesson-header {
+  margin-bottom: 1rem;
+}
+.lesson-title {
+  margin: 0 0 0.25rem;
+  font-size: 1.3rem;
+  line-height: 1.3;
+}
+.lesson-summary {
+  margin: 0 0 0.25rem;
+}
+.lesson-minutes {
+  margin: 0 0 0.75rem;
+  color: var(--muted, #a0adbf);
+  font-size: 0.8125rem;
+}
+.lesson-notice {
+  margin: 0;
+  padding: 0.6em 0.8em;
+  background: var(--study-inset, #141b25);
+  border: 1px solid var(--line, #303a4a);
+  border-left: 0.25em solid var(--lesson-warn);
+  border-radius: var(--lesson-radius);
+  color: var(--muted, #a0adbf);
+  font-size: 0.8125rem;
+  line-height: 1.55;
+}
+.lesson-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+.lesson-rail-button,
+.lesson-button,
+.lesson-option {
+  min-height: 44px;
+  padding: 0.4em 0.9em;
+  background: var(--panel, #1a202b);
+  color: var(--ink, #e1e7f0);
+  border: 1px solid var(--line, #303a4a);
+  border-radius: var(--lesson-radius);
+  font: inherit;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.lesson-rail-button:hover,
+.lesson-button:hover,
+.lesson-option:hover {
+  background: color-mix(
+    in srgb,
+    var(--accent, #8bb8f2) 12%,
+    var(--panel, #1a202b)
+  );
+}
+.lesson-rail-button:focus-visible,
+.lesson-button:focus-visible,
+.lesson-option:focus-visible,
+.lesson-recall-input:focus-visible,
+.lesson-steps:focus-visible,
+.lesson-figure-body:focus-visible,
+.lesson-pre:focus-visible,
+.lesson-text-version summary:focus-visible,
+.lesson-section-title:focus-visible {
+  outline: 2px solid var(--accent, #8bb8f2);
+  outline-offset: 3px;
+}
+.lesson-button:disabled,
+.lesson-button[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Sections and prose */
+.lesson-section {
+  margin: 0 0 2rem;
+}
+.lesson-section-title {
+  margin: 0 0 0.75rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--line, #303a4a);
+  font-size: 1.1rem;
+  line-height: 1.4;
+}
+.lesson-section > * + * {
+  margin-top: 0.9rem;
+}
+.lesson-prose p,
+.lesson-prose ul,
+.lesson-prose ol,
+.lesson-callout-body p,
+.lesson-callout-body ul,
+.lesson-callout-body ol,
+.lesson-explanation p,
+.lesson-explanation ul,
+.lesson-explanation ol {
+  margin: 0 0 0.75rem;
+}
+.lesson-prose li + li,
+.lesson-callout-body li + li,
+.lesson-explanation li + li {
+  margin-top: 0.4rem;
+}
+.lesson-prose > :last-child,
+.lesson-callout-body > :last-child,
+.lesson-explanation > :last-child {
+  margin-bottom: 0;
+}
+.lesson-prose h4,
+.lesson-callout-body h4,
+.lesson-explanation h4 {
+  margin: 0.5rem 0 0.4rem;
+  font-size: 1em;
+}
+.lesson code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+.lesson-prose code,
+.lesson-callout-body code,
+.lesson-explanation code {
+  padding: 0.05em 0.35em;
+  background: var(--study-inset, #141b25);
+  border-radius: 0.25em;
+}
+.lesson-prose pre,
+.lesson-callout-body pre,
+.lesson-explanation pre,
+.lesson-pre {
+  max-width: 100%;
+  margin: 0.5rem 0 0.9rem;
+  padding: 0.75rem 0.9rem;
+  overflow-x: auto;
+  background: var(--study-inset, #141b25);
+  border: 1px solid var(--line, #303a4a);
+  border-radius: var(--lesson-radius);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+.lesson pre code {
+  padding: 0;
+  background: none;
+  font-size: inherit;
+}
+
+/* Callouts: the label carries the meaning, the bar and tint only echo it */
+.lesson-callout {
+  padding: 0.7em 0.9em;
+  background: var(--study-inset, #141b25);
+  border: 1px solid var(--line, #303a4a);
+  border-left: 0.3em solid var(--accent, #8bb8f2);
+  border-radius: var(--lesson-radius);
+}
+.lesson-callout.is-misconception {
+  border-left-color: var(--lesson-bad);
+}
+.lesson-callout.is-watch-out {
+  border-left-color: var(--lesson-warn);
+}
+.lesson-callout-label {
+  margin: 0 0 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Figures */
+.lesson-figure {
+  margin: 0;
+  min-width: 0;
+}
+.lesson-figure > figcaption {
+  margin-top: 0.4rem;
+  color: var(--muted, #a0adbf);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+.lesson-figure-body {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.lesson-code-figure .lesson-figure-body {
+  overflow: visible;
+}
+.lesson-code-figure .lesson-pre {
+  margin: 0;
+}
+.lesson-line {
+  display: grid;
+  grid-template-columns: 2.5em minmax(0, 1fr);
+  border-left: 0.2em solid transparent;
+}
+.lesson-line-no {
+  padding-right: 0.8em;
+  color: var(--muted, #a0adbf);
+  text-align: right;
+  user-select: none;
+}
+.lesson-line-text {
+  min-height: 1.6em;
+  white-space: pre;
+}
+.lesson-line.is-highlight,
+.lesson-line.is-current {
+  background: color-mix(in srgb, var(--accent, #8bb8f2) 16%, transparent);
+  border-left-color: var(--accent, #8bb8f2);
+}
+.lesson-line.is-highlight .lesson-line-no,
+.lesson-line.is-current .lesson-line-no {
+  color: var(--ink, #e1e7f0);
+  font-weight: 700;
+}
+
+/* Tables */
+.lesson-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+.lesson-table th,
+.lesson-table td {
+  padding: 0.5em 0.7em;
+  border: 1px solid var(--line, #303a4a);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: break-word;
+}
+.lesson-table th {
+  background: var(--study-inset, #141b25);
+}
+
+/* Diagrams */
+.lesson-diagram-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0 auto;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  /* Keep the text readable: a wide diagram scrolls inside its figure instead
+     of shrinking. */
+  --cols: 1;
+  min-width: calc(var(--cols) * 9.5rem);
+  max-width: calc(var(--cols) * 14rem);
+}
+.lesson-diagram-svg.cols-2 {
+  --cols: 2;
+}
+.lesson-diagram-svg.cols-3 {
+  --cols: 3;
+}
+.lesson-diagram-svg.cols-4 {
+  --cols: 4;
+}
+.lesson-diagram-svg.cols-5 {
+  --cols: 5;
+}
+.lesson-diagram-svg.cols-6 {
+  --cols: 6;
+}
+.lesson-node-box {
+  fill: var(--study-inset, #141b25);
+  stroke: var(--muted, #a0adbf);
+  stroke-width: 1.5;
+}
+.lesson-node.is-accent .lesson-node-box {
+  fill: color-mix(
+    in srgb,
+    var(--accent, #8bb8f2) 18%,
+    var(--study-inset, #141b25)
+  );
+  stroke: var(--accent, #8bb8f2);
+  stroke-width: 2.5;
+}
+.lesson-node.is-good .lesson-node-box {
+  stroke: var(--study-success, #8cd1aa);
+  stroke-width: 2.5;
+}
+.lesson-node.is-bad .lesson-node-box {
+  stroke: var(--lesson-bad);
+  stroke-width: 2.5;
+  stroke-dasharray: 6 4;
+}
+.lesson-node-text,
+.lesson-edge-label {
+  fill: var(--ink, #e1e7f0);
+  font-size: 13px;
+}
+.lesson-edge-label {
+  font-size: 11.5px;
+}
+.lesson-edge-label-bg {
+  fill: var(--bg, #11151d);
+  fill-opacity: 0.9;
+}
+.lesson-edge-line {
+  stroke: var(--muted, #a0adbf);
+  stroke-width: 1.6;
+}
+.lesson-arrow-head {
+  fill: var(--muted, #a0adbf);
+}
+.lesson-text-version {
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+}
+.lesson-text-version summary {
+  min-height: 44px;
+  padding: 0.6em 0;
+  color: var(--accent, #8bb8f2);
+  cursor: pointer;
+}
+.lesson-text-label {
+  margin: 0.4rem 0 0.2rem;
+  font-weight: 700;
+}
+.lesson-text-list {
+  margin: 0 0 0.5rem;
+  padding-left: 1.3em;
+}
+
+/* Step-through figures */
+.lesson-steps {
+  padding: 0.9rem;
+  background: var(--panel, #1a202b);
+  border: 1px solid var(--line, #303a4a);
+  border-radius: var(--lesson-radius);
+}
+.lesson-steps .lesson-figure-body {
+  display: grid;
+  gap: 0.8rem;
+}
+.lesson-steps-code .lesson-pre {
+  margin: 0;
+}
+.lesson-cells {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.4rem;
+  padding: 0.2rem 0 0.4rem;
+  overflow-x: auto;
+}
+.lesson-cell {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  min-width: 3.2em;
+  padding: 0.3em 0.6em;
+  background: var(--study-inset, #141b25);
+  border: 1px solid var(--line, #303a4a);
+  border-radius: 0.4em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.875rem;
+}
+.lesson-cell-index {
+  color: var(--muted, #a0adbf);
+  font-size: 0.7rem;
+}
+.lesson-cell.is-marked {
+  background: color-mix(
+    in srgb,
+    var(--accent, #8bb8f2) 18%,
+    var(--study-inset, #141b25)
+  );
+  border: 3px double var(--accent, #8bb8f2);
+}
+.lesson-cell-pointers {
+  margin-top: 0.15em;
+  color: var(--accent, #8bb8f2);
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.lesson-vars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+}
+.lesson-var-eq {
+  margin: 0 0.35em;
+  color: var(--muted, #a0adbf);
+}
+.lesson-steps-caption {
+  min-height: 3.4em;
+  margin: 0;
+}
+.lesson-steps-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.1rem;
+}
+.lesson-steps-count {
+  margin-left: auto;
+  color: var(--muted, #a0adbf);
+  font-size: 0.8125rem;
+}
+
+/* Predict-first and recall */
+.lesson-predict,
+.lesson-recall {
+  padding: 0.9rem;
+  background: var(--panel, #1a202b);
+  border: 1px solid var(--line, #303a4a);
+  border-radius: var(--lesson-radius);
+}
+.lesson-prompt {
+  margin: 0 0 0.6rem;
+  font-weight: 600;
+}
+.lesson-options {
+  display: grid;
+  gap: 0.5rem;
+}
+.lesson-option {
+  width: 100%;
+  text-align: left;
+}
+.lesson-option.is-locked {
+  cursor: default;
+}
+.lesson-option.is-chosen {
+  background: color-mix(
+    in srgb,
+    var(--accent, #8bb8f2) 18%,
+    var(--panel, #1a202b)
+  );
+  border: 3px double var(--accent, #8bb8f2);
+}
+.lesson-predict-result {
+  margin: 0.7rem 0 0.4rem;
+  font-weight: 600;
+}
+.lesson-explanation {
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--line, #303a4a);
+}
+.lesson-recall-label {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: var(--muted, #a0adbf);
+  font-size: 0.8125rem;
+}
+.lesson-recall-input {
+  display: block;
+  width: 100%;
+  min-height: 7rem;
+  padding: 0.6em 0.8em;
+  background: var(--study-inset, #141b25);
+  color: var(--ink, #e1e7f0);
+  border: 1px solid var(--line, #303a4a);
+  border-radius: var(--lesson-radius);
+  font: inherit;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  resize: vertical;
+}
+.lesson-note,
+.lesson-recall-hint {
+  margin: 0.4rem 0 0;
+  color: var(--muted, #a0adbf);
+  font-size: 0.8125rem;
+}
+.lesson-recall-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+}
+.lesson-recall-actions .lesson-recall-hint {
+  margin: 0;
+}
+.lesson-recall-compare {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.8rem;
+  margin-top: 0.8rem;
+}
+.lesson-compare-col {
+  min-width: 0;
+  padding: 0.6em 0.8em;
+  background: var(--study-inset, #141b25);
+  border: 1px solid var(--line, #303a4a);
+  border-radius: var(--lesson-radius);
+}
+.lesson-compare-label {
+  margin: 0 0 0.3rem;
+  color: var(--muted, #a0adbf);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.lesson-compare-text {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lesson *,
+  .lesson *::before,
+  .lesson *::after {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---- The lesson screen ------------------------------------------------------
+   An open lesson (data-lesson="open" on #study-workspace) takes the place of
+   the map and the question, and fills the rest of the viewport the way the
+   question terminal does: the lesson pane and the tutor's messages scroll on
+   their own and the document never does. Rules keyed to #study-terminal-slot
+   elsewhere are repeated here for #study-lesson-slot. */
+#study-workspace[data-lesson="open"] #study-progress,
+#study-workspace[data-lesson="open"] .study-session h2,
+#study-workspace[data-lesson="open"] #study-next,
+#study-workspace[data-lesson="open"] #study-regenerate,
+#study-workspace[data-lesson="open"] #study-gaps,
+#study-workspace[data-lesson="open"] #study-terminal-slot,
+#study-workspace[data-lesson="open"] #study-map-peek {
+  display: none;
+}
+#study-workspace[data-lesson="open"] .study-workspace-toolbar {
+  margin-bottom: 12px;
+}
+/* The session card keeps only its status lines and recovery buttons, as it
+   does under a question, so save and load problems stay visible and
+   reachable above the lesson. */
+#study-workspace[data-lesson="open"] .study-session {
+  margin: 0 auto 12px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+#study-workspace[data-lesson="open"]
+  .study-actions:not(
+    :has(button:not([hidden]):not(#study-next):not(#study-regenerate))
+  ) {
+  display: none;
+}
+#study-workspace[data-lesson="open"] #study-lesson-slot {
+  flex: 1 1 0;
+  min-height: 0;
+}
+#study-lesson-slot {
+  min-width: 0;
+  max-width: 100%;
+}
+#study-lesson-slot #lesson {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+#study-lesson-slot .terminal-heading {
+  flex: none;
+  padding: 20px 24px;
+}
+#study-lesson-slot .terminal-heading .eyebrow {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+}
+#study-lesson-slot .terminal-heading h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+#lesson-title:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+/* The fixed notice, always shown above both panes. The lesson draws its own
+   copy in its header, and its own title, which this screen already shows. */
+#lesson-notice {
+  flex: none;
+  margin: 0;
+  padding: 10px 24px;
+  font-size: 13px;
+  line-height: 1.55;
+  letter-spacing: 0;
+  border-left: 4px solid var(--lesson-warn, #e6c27a);
+}
+#lesson-body .lesson-notice,
+#lesson-body .lesson-title {
+  display: none;
+}
+#lesson-status {
+  flex: none;
+  padding: 12px 24px 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+#lesson-status p {
+  margin: 0 0 8px;
+}
+#lesson-status p.muted,
+#lesson-chat-status p {
+  font-size: 13px;
+  color: var(--muted);
+}
+#lesson-status .lesson-generating {
+  margin: 0 0 8px;
+}
+#lesson-status .lesson-generating p {
+  margin: 0;
+}
+#lesson-status[hidden] {
+  display: none;
+}
+#lesson .terminal-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 24px;
+  grid-template-columns: minmax(0, 1.35fr) minmax(340px, 0.65fr);
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 28px;
+}
+#lesson .lesson-pane {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 12px;
+}
+#lesson-footer {
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+#lesson-footer p {
+  margin: 0;
+  font-size: 13px;
+}
+#lesson-footer .submit-row {
+  margin: 12px 0 0;
+}
+#lesson-footer button {
+  min-height: 44px;
+}
+#lesson-read.is-read {
+  opacity: 0.55;
+  cursor: default;
+}
+#study-lesson-slot .conversation-panel {
+  position: static;
+  align-self: start;
+  height: auto;
+  min-height: 0;
+  max-height: 100%;
+}
+#study-lesson-slot .conversation-panel h3 {
+  margin-bottom: 8px;
+}
+#study-lesson-slot .conversation-panel > p.muted {
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+#lesson-messages {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 4px 0 0;
+}
+#lesson-messages:empty {
+  display: none;
+}
+#study-lesson-slot .message {
+  padding: 12px 14px;
+  border-radius: 8px;
+}
+#study-lesson-slot .message.human {
+  background: color-mix(in srgb, var(--accent) 9%, var(--study-inset));
+}
+#study-lesson-slot .message strong {
+  font-size: 11px;
+  letter-spacing: 0.4px;
+}
+#study-lesson-slot .message p,
+#study-lesson-slot .message-body {
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+#study-lesson-slot .message-body pre {
+  margin: 10px 0 14px;
+  padding: 12px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-x: auto;
+}
+#study-lesson-slot .message-body > :last-child {
+  margin-bottom: 0;
+}
+.lesson-show {
+  margin: -4px 0 10px;
+  min-height: 44px;
+  font-size: 13px;
+  text-align: left;
+}
+.lesson-suggestions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.lesson-suggestions button {
+  min-height: 44px;
+  font-size: 13px;
+  text-align: left;
+}
+#lesson-chat-status {
+  flex: none;
+  margin-top: 8px;
+}
+#lesson-chat-status p {
+  margin: 0 0 6px;
+}
+#lesson-chat-status button {
+  min-height: 44px;
+}
+#lesson-chat-form {
+  display: flex;
+  flex: none;
+  gap: 8px;
+  margin-top: 0;
+  padding: 0;
+  border: 0;
+}
+#lesson-messages:not(:empty) ~ #lesson-chat-form,
+#lesson-chat-status:not([hidden]) ~ #lesson-chat-form {
+  margin-top: 12px;
+}
+#lesson-chat-input {
+  flex: 1;
+  width: 0;
+  min-height: 96px;
+  max-height: 220px;
+  padding: 12px 14px;
+  resize: vertical;
+  background: var(--study-inset);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+#lesson-chat-input:disabled {
+  opacity: 0.55;
+}
+
+/* Entry points: the offers under a finished question and the map's gap list. */
+#lesson-offers {
+  margin: 0 0 12px;
+}
+.lesson-offer,
+#study-gaps-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--study-inset);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.lesson-offer + .lesson-offer {
+  margin-top: 8px;
+}
+.lesson-offer span,
+#study-gaps-list li > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.lesson-offer button,
+#study-gaps-list button {
+  min-height: 44px;
+}
+#study-gaps {
+  flex: 1 0 100%;
+  margin: 0;
+  font-size: 14px;
+}
+#study-gaps summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  color: var(--ink);
+}
+#study-gaps-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+#study-workspace[data-view="question"] #study-gaps {
+  display: none;
+}
+.lesson-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  /* Stacked: one column, so the layout is the single scroller. */
+  #lesson .terminal-layout {
+    display: block;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 16px;
+  }
+  #lesson .lesson-pane {
+    overflow: visible;
+    padding-right: 0;
+  }
+  #study-lesson-slot .terminal-heading {
+    padding: 16px;
+    flex-wrap: wrap;
+  }
+  #lesson-notice,
+  #lesson-status {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  #study-lesson-slot .conversation-panel {
+    max-height: none;
+    margin-top: 20px;
+    padding: 20px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+  #lesson-messages {
+    overflow: visible;
+  }
+}
+
+/* The workspace paints every plain button in the accent colour. The lesson's
+   own controls are quiet, as its own stylesheet draws them. */
+#study-workspace .lesson button.lesson-rail-button,
+#study-workspace .lesson button.lesson-button,
+#study-workspace .lesson button.lesson-option {
+  background: var(--panel);
+  color: var(--ink);
+  font-weight: 600;
+}
+#study-workspace .lesson button.lesson-rail-button:hover,
+#study-workspace .lesson button.lesson-button:hover,
+#study-workspace .lesson button.lesson-option:hover {
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+  filter: none;
+}
+#study-workspace .lesson button.lesson-option.is-chosen {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--panel));
+}

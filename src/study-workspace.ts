@@ -101,6 +101,29 @@ export function nextWorkspaceQuestion(
     );
   // Respect curriculum gates before allocating any new saved task.
   eligible(roadmap, g.study);
+  return newWorkspaceEncounter(g);
+}
+
+/**
+ * A new, empty question for a practice re-test of a recorded gap. The caller
+ * seeds its generation (`seedGapPractice`). Refused while another question is
+ * unfinished or a learning result is still under review, as a normal next
+ * question is; the scheduler is not consulted because practice is not a visit.
+ */
+export function gapPracticeQuestion(g: StudyRecord): Encounter {
+  if (!g.studyWorkspace?.enabled)
+    throw Error("Open the study workspace first.");
+  if (workspaceQuestion(g))
+    throw Error("Finish your open question before testing this gap.");
+  const assessment = workspaceAssessment(g);
+  if (assessment && assessment.status !== "applied")
+    throw Error(
+      "Finish reviewing your previous learning result before starting another question.",
+    );
+  return newWorkspaceEncounter(g);
+}
+
+function newWorkspaceEncounter(g: StudyRecord): Encounter {
   const id = `study-${crypto.randomUUID()}`;
   const e: Encounter = {
     id,
@@ -121,7 +144,7 @@ export function nextWorkspaceQuestion(
     ...RETIRED_ENCOUNTER_FIELDS,
   };
   g.encounters[id] = e;
-  g.studyWorkspace.encounter = encounterKey(e);
+  g.studyWorkspace!.encounter = encounterKey(e);
   return e;
 }
 

@@ -117,7 +117,11 @@ export function markdownToHtml(text: string): string {
         i = next;
       }
       const tag = list === BULLET ? "ul" : "ol";
-      const attrs = tag === "ol" && start !== 1 ? ` start="${start}"` : "";
+      // A huge or non-integer number is dropped: it would print as 1e+23.
+      const attrs =
+        tag === "ol" && Number.isInteger(start) && start >= 2 && start <= 999999
+          ? ` start="${start}"`
+          : "";
       out.push(`<${tag}${attrs}>${items.join("")}</${tag}>`);
       continue;
     }

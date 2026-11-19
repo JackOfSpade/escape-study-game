@@ -299,6 +299,8 @@ test("each task runs its chosen model and effort, latest aliases only", () => {
         "generate",
         "review-environment",
         "reconcile-roadmap",
+        "lesson",
+        "lesson-chat",
       ].map((op) => {
         const p = taskProfile(op, {});
         return [op, `${p.model}/${p.effort}`];
@@ -310,8 +312,23 @@ test("each task runs its chosen model and effort, latest aliases only", () => {
       generate: "opus/medium",
       "review-environment": "haiku/medium",
       "reconcile-roadmap": "opus/high",
+      lesson: "opus/high",
+      "lesson-chat": "sonnet/medium",
     },
   );
+  assert.deepEqual(taskProfile("lesson").stableKeys, [
+    "curriculum",
+    "lessonPolicy",
+  ]);
+  assert.equal(taskProfile("lesson").timeoutMs, 30 * 60_000);
+  assert.deepEqual(taskProfile("lesson-chat").stableKeys, [
+    "instruction",
+    "responseFormat",
+    "lesson",
+    "gap",
+    "sectionIds",
+  ]);
+  assert.equal(taskProfile("lesson-chat").timeoutMs, 120_000);
   assert.throws(() => taskProfile("complete"), /Unknown AI task/);
 });
 
@@ -628,6 +645,71 @@ test("streamed text arrives before the answer, and a correction clears it", asyn
   const answer = await g.run("tutor", {}, { onText: (t) => seen.push(t) });
   assert.equal(answer.text, "Hello");
   assert.deepEqual(seen, ["Hel", "Hello", "", "Hel", "Hello"]);
+});
+
+test("a lesson-chat reply streams its text, an invalid section is corrected, and a lesson never streams", async () => {
+  const payload = {
+    requestId: "chat-1",
+    sectionIds: ["idea", "worked"],
+    lesson: "## idea: The idea",
+  };
+  const replies = [
+    ['{"text":"Look he', 're","section":"nowhere"}'],
+    ['{"text":"Look he', 're","section":"worked"}'],
+  ];
+  const spawn = (binary, args) => {
+    assert.ok(args.includes("--include-partial-messages"));
+    const deltas = replies.shift();
+    const child = new EventEmitter();
+    child.stdout = new PassThrough();
+    child.stderr = new PassThrough();
+    child.stdin = new PassThrough();
+    child.kill = () => {};
+    setImmediate(() => {
+      const model = args[args.indexOf("--model") + 1];
+      child.stdout.write(
+        `${JSON.stringify({ type: "system", subtype: "init", model: `claude-${model}-5-5` })}\n`,
+      );
+      for (const text of deltas)
+        child.stdout.write(
+          `${JSON.stringify({ type: "stream_event", event: { delta: { type: "text_delta", text } } })}\n`,
+        );
+      child.stdout.write(
+        `${JSON.stringify({ type: "result", subtype: "success", is_error: false, result: deltas.join("") })}\n`,
+      );
+      child.stdout.end();
+      child.emit("close", 0);
+    });
+    return child;
+  };
+  const g = createClaudeGateway({
+    env,
+    cwd: dir,
+    spawn,
+    validate: validateAnswer,
+  });
+  const seen = [];
+  const answer = await g.run("lesson-chat", payload, {
+    onText: (t) => seen.push(t),
+  });
+  assert.deepEqual(answer, { text: "Look here", section: "worked" });
+  // Text streams as written, with no gate; the rejected reply's text is
+  // cleared and the correction streams afresh.
+  assert.deepEqual(seen, ["Look he", "Look here", "", "Look he", "Look here"]);
+  // A lesson's top-level object has no text field, so nothing streams.
+  const lessonSeen = [];
+  const lessonReply = [
+    '{"requestId":"l-1","gapId":"g","lesson":{"sections":[{"blocks":[{"text":"deep"}]}]}}',
+  ];
+  replies.push(lessonReply, lessonReply);
+  await g
+    .run(
+      "lesson",
+      { requestId: "l-1", gapId: "g" },
+      { onText: (t) => lessonSeen.push(t) },
+    )
+    .catch(() => {});
+  assert.deepEqual(lessonSeen.filter(Boolean), []);
 });
 
 const usageRows = () => {

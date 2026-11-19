@@ -41,6 +41,8 @@ test("actual relay forwards a complete large reconciliation to the gateway and r
     assert.equal(status.mode, "claude-cli");
     assert.deepEqual(status.capabilities, AI_OPERATIONS);
     assert.ok(status.capabilities.includes("reconcile-roadmap"));
+    assert.ok(status.capabilities.includes("lesson"));
+    assert.ok(status.capabilities.includes("lesson-chat"));
     // Exceeds the old 1.5 MB route cap, within the complete-document context limit.
     const candidate = "Untrusted source data only. ".repeat(65_000);
     const payload = {

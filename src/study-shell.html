@@ -40,6 +40,10 @@
           Retry question
         </button>
       </div>
+      <details id="study-gaps" hidden>
+        <summary id="study-gaps-summary"></summary>
+        <ul id="study-gaps-list"></ul>
+      </details>
       <p id="study-message" role="status" aria-live="polite"></p>
       <p id="study-save-status" role="status" aria-live="polite"></p>
       <div id="study-load-notice" role="alert" hidden>
@@ -92,6 +96,7 @@
             >
               <h3 id="conversation-title">Answer</h3>
               <p id="dialogue-status" class="muted" role="status" hidden></p>
+              <div id="lesson-offers" hidden></div>
               <p id="conversation-context" class="muted"></p>
               <div id="messages" aria-live="polite"></div>
               <div id="tutor-request-status" hidden></div>
@@ -119,6 +124,58 @@
               </form>
             </aside>
           </div>
+        </div>
+      </section>
+    </div>
+    <div id="study-lesson-slot" hidden>
+      <section
+        id="lesson"
+        class="dialogue-terminal lesson-terminal"
+        aria-labelledby="lesson-title"
+      >
+        <div class="terminal-heading">
+          <div>
+            <span class="eyebrow">LESSON</span>
+            <h2 id="lesson-title" tabindex="-1"></h2>
+          </div>
+          <button id="lesson-close" class="quiet" type="button">Back</button>
+        </div>
+        <p id="lesson-notice" class="provenance">
+          Written by AI and may contain errors. Reading it gives no credit: this
+          gap stays open until a question shows you have it.
+        </p>
+        <div id="lesson-status" role="status"></div>
+        <div class="terminal-layout">
+          <section class="answer-panel lesson-pane" aria-label="Lesson">
+            <div id="lesson-body" class="lesson"></div>
+            <div id="lesson-footer">
+              <p id="lesson-footer-note" class="muted" role="status"></p>
+              <div class="submit-row">
+                <button id="lesson-read" type="button">Done reading</button>
+                <button id="lesson-test" type="button">Test me on this</button>
+                <button id="lesson-rewrite" type="button" class="quiet">
+                  Write a different lesson
+                </button>
+              </div>
+            </div>
+          </section>
+          <aside class="conversation-panel" aria-labelledby="lesson-chat-title">
+            <h3 id="lesson-chat-title">Tutor</h3>
+            <p class="muted">
+              Ask anything about this lesson. Nothing here is graded or recorded
+              on your skill map.
+            </p>
+            <div id="lesson-messages" aria-live="polite"></div>
+            <div id="lesson-chat-status" hidden></div>
+            <form id="lesson-chat-form">
+              <textarea
+                rows="3"
+                id="lesson-chat-input"
+                autocomplete="off"
+                aria-label="Ask your tutor about this lesson"
+              ></textarea>
+            </form>
+          </aside>
         </div>
       </section>
     </div>

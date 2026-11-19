@@ -7,10 +7,12 @@ import {
   presentMessages,
   presentProblem,
   releaseRetiredChatRequests,
+  seedGapPractice,
   send,
   status,
   watchStreamingReplies,
 } from "./ai";
+import { bridgeRequest } from "./bridge-client";
 import { mountBugReport } from "./bug-report";
 import {
   activateCareerFocus,
@@ -26,6 +28,10 @@ import studyShell from "./study-shell.html?raw";
 import { escapeHtml as escape } from "./html";
 import { createInspector } from "./inspector-panel";
 import { encounterKey } from "./learner";
+import type { KnowledgeGapRecord } from "./knowledge-probe";
+import { createLessons } from "./lesson";
+import { createLessonSurface, type LessonSurface } from "./lesson-surface";
+import { lessonStore } from "./lesson-store";
 import { moveToLiveStudy } from "./live-study";
 import { openPart, questionHtml } from "./question-parts";
 import type { Encounter, StudyRecord, Roadmap } from "./model";
@@ -45,11 +51,14 @@ import { readDurable, writeDurable } from "./storage";
 import { installStudySession } from "./study-session";
 import {
   enterStudyWorkspace,
+  gapPracticeQuestion,
+  workspaceAssessment,
   workspaceQuestion,
   workspaceSelectedQuestion,
 } from "./study-workspace";
 import "./style.css";
 import "./study-workspace.css";
+import "./lesson.css";
 import {
   createTerminalPanels,
   dialogueStatus,
@@ -125,11 +134,36 @@ const runLogs = new RunLogs({
   write: (value) => writeDurable(LOG_KEY, value),
 });
 await runLogs.load();
+/** Lessons live in their own database, never in the saved record. A lesson
+ * database that cannot be read costs the lessons, not the app. */
+let lessonSurface!: LessonSurface;
+const lessons = createLessons({
+  store: lessonStore,
+  request: bridgeRequest,
+  capabilities: () => status().capabilities,
+  onChange: () => lessonSurface?.render(),
+});
+try {
+  await lessons.load();
+} catch {
+  // createLessons reports a failed read itself; the app starts regardless.
+}
 // Replies, completions, gradings and a failed fallback save copy are logged
 // as they settle, so a later report can be checked against the saved record.
 watchStudyEvents(logEvent);
 await checkBridge();
 app.innerHTML = studyShell;
+lessonSurface = createLessonSurface({
+  game: () => game,
+  roadmap,
+  lessons,
+  reducedMotion: () =>
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  log: logEvent,
+  testGap: startGapTest,
+  canTest: canTestGap,
+  questionOpen: () => !!workspaceQuestion(game),
+});
 // One stored copy was refused while the other loaded. The first save replaces
 // it, so its bytes are offered for download while they are still in memory.
 const refusedCopy = rejectedCopy();
@@ -297,6 +331,17 @@ $("#pause-menu").addEventListener("cancel", (event) => {
   else studyMenu(false);
 });
 window.addEventListener("keydown", (ev) => {
+  // An open lesson closes on Escape instead of the menu opening.
+  if (
+    lessonSurface.isOpen() &&
+    ev.code === "Escape" &&
+    !ev.repeat &&
+    !document.querySelector("dialog[open]")
+  ) {
+    ev.preventDefault();
+    lessonSurface.close();
+    return;
+  }
   // Escape opens the menu; the dialog's cancel event closes it again.
   if (
     game.studyWorkspace?.enabled &&
@@ -414,6 +459,7 @@ async function restoreRunBackup(file: File) {
     const next = recover(decode(await file.text()));
     moveToLiveStudy(next, roadmap);
     activateRunFocus(next.study);
+    lessonSurface.close();
     closeTerminal();
     game = next;
     saveRecoveryError = "";
@@ -499,7 +545,9 @@ mountBugReport({
       build,
       userAgent: navigator.userAgent,
       viewport: `${innerWidth}×${innerHeight} at ${devicePixelRatio}x`,
-      view: $("#study-workspace").dataset.view ?? "question",
+      view: lessonSurface.isOpen()
+        ? "lesson"
+        : ($("#study-workspace").dataset.view ?? "question"),
       terminalOpen: !!active,
       connection: `${status().mode}${status().reason ? ` (${status().reason})` : ""}: ${status().detail}`,
       saveError: saveError || undefined,
@@ -572,11 +620,63 @@ function closeTerminal() {
 }
 /** Opens a question in the workspace's terminal. */
 function openStudyTerminal(e: Encounter) {
+  // A question opening replaces a lesson.
+  lessonSurface.close();
   if (active && active !== e.id) closeTerminal();
   lastQuestion = e.id;
   game.lastStudyEncounter = e.id;
   active = e.id;
   showTerminal(e);
+}
+/** The question that recorded a gap, if it is still saved. */
+const gapSource = (gap: KnowledgeGapRecord) =>
+  [...Object.values(game.encounters), ...game.study.archives].find(
+    (x) => encounterKey(x) === gap.encounter,
+  );
+/** Why "Test me on this" cannot work now, or nothing when it can. */
+function canTestGap(gap: KnowledgeGapRecord): string | undefined {
+  if (status().mode !== "claude-cli")
+    return "Claude is not connected, so this gap cannot be tested now.";
+  const assessment = workspaceAssessment(game);
+  if (assessment && assessment.status !== "applied")
+    return "Finish reviewing your previous learning result first.";
+  if (!gapSource(gap)?.problem?.contract)
+    return "The question that recorded this gap is no longer saved.";
+  return undefined;
+}
+/** "Test me on this": a practice question on the gap's own contract. It is
+ * never the scheduled visit; answering it is what can close the gap. Returns
+ * the reason it could not start, in plain words, and closes the lesson only
+ * once the question exists. */
+function startGapTest(gap: KnowledgeGapRecord): string | undefined {
+  const refused = canTestGap(gap);
+  if (refused) return refused;
+  const selected = game.studyWorkspace?.encounter;
+  let e: Encounter | undefined;
+  try {
+    e = gapPracticeQuestion(game);
+    seedGapPractice(game, roadmap, e, gap);
+  } catch (error) {
+    // Nothing was asked for: leave no empty question behind.
+    if (e) {
+      delete game.encounters[e.id];
+      if (game.studyWorkspace) game.studyWorkspace.encounter = selected;
+    }
+    return String(error instanceof Error ? error.message : error).replace(
+      /^Error: /,
+      "",
+    );
+  }
+  const practice = e;
+  lessonSurface.close();
+  logEvent("gap-practice-started", { encounter: practice.id });
+  openStudyTerminal(practice);
+  studySession.render();
+  void prepareQuestion(practice).finally(() => {
+    studySession.render();
+    void persist();
+  });
+  return undefined;
 }
 /** Without Claude a terminal cannot be used, only explain how to enable it. */
 const connectionLocked = (e: Encounter) =>
@@ -889,12 +989,18 @@ $("#chat-form").onsubmit = (ev) => {
 window.addEventListener("blur", () => void persist());
 // A closing tab gets a full save: its synchronous local copy lands even when
 // the IndexedDB write cannot finish before the page goes away.
-window.addEventListener("pagehide", () => void persist());
+window.addEventListener("pagehide", () => {
+  void persist();
+  void lessons.flush();
+});
 window.addEventListener("online", () => {
   if (!saveRecoveryError) void checkBridge().then(() => resumeQuestions());
 });
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "hidden") void persist();
+  if (document.visibilityState === "hidden") {
+    void persist();
+    void lessons.flush();
+  }
 });
 /** The periodic repaint: status lines, the skill map and the open question. */
 function ui() {
@@ -906,6 +1012,9 @@ function ui() {
   studySession.renderWorkspace();
   if (active) watchTerminalConnection();
   renderTerminal();
+  lessonSurface.render();
+  lessonSurface.renderGapList();
+  lessonSurface.renderOffers(active ? game.encounters[active] : undefined);
 }
 function tick(time: number) {
   if (time - lastUI > 200) {
