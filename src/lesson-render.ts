@@ -85,6 +85,7 @@ const PROSE_TAGS = new Set("p br strong em code pre ul ol li h4".split(" "));
 /** Throws unless `html` is what markdownToHtml produces: a few formatting tags
  * with no attributes (an ordered list may carry a numeric start). */
 function assertProseHtml(html: string) {
+  let tags = 0;
   for (const match of html.matchAll(/<(\/?)([a-zA-Z][a-zA-Z0-9]*)([^>]*)>/g)) {
     const tag = match[2].toLowerCase();
     const attrs = match[3].trim();
@@ -95,10 +96,11 @@ function assertProseHtml(html: string) {
       throw new Error(
         `Lesson prose holds markup that is not allowed: <${tag}>`,
       );
+    tags++;
   }
-  // Every "<" the renderer escapes is "&lt;", so any "<" left once the checked
-  // tags are removed is a defect.
-  if (html.replace(/<\/?[a-zA-Z][a-zA-Z0-9]*[^>]*>/g, "").includes("<"))
+  // Every "<" the renderer escapes is "&lt;" and each checked tag holds exactly
+  // one, so any other "<" is a defect.
+  if (html.split("<").length - 1 !== tags)
     throw new Error("Lesson prose holds a stray <.");
 }
 

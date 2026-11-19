@@ -501,13 +501,27 @@ export function createLessonSurface(host: LessonSurfaceHost) {
   gapList.addEventListener("click", (event) => onEntry(event, true));
 
   /** Under a finished question: its recorded gaps that are still open. */
+  /** Writes a list of lesson buttons. A button's label changes as its lesson
+   * is written, and the rewrite replaces the node: keep focus on that gap. */
+  function writeButtons(box: HTMLElement, html: string) {
+    const held = document.activeElement;
+    const gap =
+      held instanceof HTMLElement && box.contains(held)
+        ? held.dataset.lessonGap
+        : undefined;
+    if (!setHtml(box, html) || gap === undefined) return;
+    box
+      .querySelector<HTMLElement>(`[data-lesson-gap="${CSS.escape(gap)}"]`)
+      ?.focus({ preventScroll: true });
+  }
+
   function renderOffers(e: Encounter | undefined) {
     const gaps =
       e && e.state === "consumed"
         ? encounterGaps(host.game(), e).filter((gap) => !gap.resolved)
         : [];
     offers.hidden = !gaps.length;
-    setHtml(
+    writeButtons(
       offers,
       gaps
         .map(
@@ -524,7 +538,7 @@ export function createLessonSurface(host: LessonSurfaceHost) {
     const gaps = openGap === undefined ? openLessonGaps(host.game()) : [];
     box.hidden = !gaps.length;
     setText("#study-gaps-summary", `Gaps to study (${gaps.length})`);
-    setHtml(
+    writeButtons(
       gapList,
       gaps
         .map(
