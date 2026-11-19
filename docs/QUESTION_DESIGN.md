@@ -28,8 +28,24 @@ The policy asks for:
 
 - short reading: a few terse facts, only those a correct answer turns on (plus deliberate distractors when filtering is the skill), with no framing story, cast or restated instructions;
 - one of each kind: items of the same kind are asked about once; "identify each" and "for each one" are used only when finding every instance is the skill, and never in front of a justification that would read the same for every item;
-- facets and rubric: a new scope definition has one facet per distinct understanding, never one per list member, because the tutor probes every facet; a rubric line is one checkable judgement;
+- facets and rubric: a new scope definition has one facet per distinct understanding, never one per list member, because the tutor probes every facet; a rubric line is one checkable judgement that requires only what its ask requests and its facet describes. Where a line needs a particular element (specific figures, a named caveat, a format, a length) the ask names it; a line for a written answer lists the claims that must not appear and the elements the ask names, never one preferred wording; and a later part's line never requires an item an earlier part's "at least N of" let the learner skip;
 - parts: most questions have one. A part is added only when it tests something the first does not. An ask that has the learner audit their own answer (naming its most exposed claim, say) is kept only when the objective assesses it, and then as its own last part.
+
+## What the tutor accepts
+
+The learner cannot see the rubric, so it is not the pass bar. The tutor's copy of the question carries the rubric lines as `problem.evidenceExamples` (`tutorProblem` in `src/ai.ts`), never as `rubric`, and `QUESTION_ADAPTATION_GUIDANCE` tells it to accept on the question or part on screen and the facet descriptions:
+
+- an answer that is correct, makes no false or unsupported claim and contains every element the ask names is accepted, even where an example line words it differently or holds detail the ask does not request (a notation, a number format, both of two equivalent values, a caveat the ask does not call for);
+- a value derived correctly from the given facts is a real value, and stating it loosely is a refinement unless the loose form claims more than the facts support;
+- such a refinement is offered in at most one sentence while accepting, never as a reason to keep the question open;
+- what the task needs is still required: a wrong result, a case whose absence makes the solution incorrect, a skipped element the ask names, or a claim the facts do not support is a miss;
+- the tutor gives one reason for a miss and, when the learner shows that reason was wrong, says so and judges the answer again.
+
+`TERMINAL_DIALOGUE_INSTRUCTION` states the test once more at the point of decision: keep the question open only for something false, unsupported or missing that can be named.
+
+This came from a real question on 2026-11-19 whose rubric line required both completion rates and both measurement windows while the ask requested neither: the tutor held a truthful rewrite open over "increased by 7%" (61% to 68%), gave two different reasons for it, and delivered a credit-costing hint the learner had not asked for. The assessment still reads the full rubric.
+
+`node --import tsx scripts/ai-capture/build-acceptance-cases.ts --out <file>` builds nine tutor cases for this rule, with no network use: one question whose rubric line is deliberately more specific than its ask, and one learner answer each. A case id starts with the verdict written down beforehand, `accept-` or `open-`; the `open-` cases (an unmeasured figure, an unhedged cause, a teammate's work claimed, a solution that ignores a named requirement) guard against over-leniency. Replay them with `npm run ai:ladder -- run --cases <file> --settings sonnet:low --reps 3 --name <name>`, which prints where it wrote `results.jsonl`; then `node --import tsx scripts/ai-capture/build-acceptance-cases.ts --score <results.jsonl>` prints how many replies per case gave the expected verdict. Results are in [AI model and effort selection](AI_MODEL_SELECTION.md).
 
 The tutor and the assessor follow the same rule: one general statement, or the point worked for one item, establishes facets of the same kind; a correct answer is not kept open for elaboration; and a short correct answer is never marked down.
 
@@ -57,7 +73,7 @@ A reply the gateway's validator rejects gets one correction, which shows the mod
 
 ## Measuring questions
 
-`node scripts/ai-capture/question-metrics.mjs <results.jsonl>` prints, with no network use, the reading load of generated questions in a ladder results file: words and bullet lines outside code, part count, the share of text shown up front, facet count, and whether a part asks for a per-item justification. There is no hard length limit: code-reading questions are legitimately long, so length is reported, not rejected.
+`node scripts/ai-capture/question-metrics.mjs <results.jsonl>` prints, with no network use, the reading load of generated questions in a ladder results file: words and bullet lines outside code, part count, the share of text shown up front, facet count, the longest rubric line in words (`rubricLineWordsMax`: a long line usually joins several requirements, and each one the ask does not name is a requirement the learner cannot see), and whether a part asks for a per-item justification. No text metric can tell whether a rubric line asks for more than its ask does; the acceptance cases above test that on the tutor's side. There is no hard length limit: code-reading questions are legitimately long, so length is reported, not rejected.
 
 ## Limits
 
@@ -68,6 +84,6 @@ A reply the gateway's validator rejects gets one correction, which shows the mod
 
 ```sh
 npx tsc --noEmit -p .
-node --import tsx --test tests/question-design.test.ts tests/question-clarity.test.ts tests/question-parts.test.ts tests/question-metrics.test.ts
+node --import tsx --test tests/question-design.test.ts tests/question-clarity.test.ts tests/question-parts.test.ts tests/question-metrics.test.ts tests/ai-capture-acceptance.test.ts
 npx playwright test tests/browser/question-parts.spec.ts
 ```

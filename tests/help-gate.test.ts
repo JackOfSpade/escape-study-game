@@ -145,19 +145,75 @@ test("a third free nudge on a facet is refused until the learner has been offere
   assert.match(HELP_GATE_GUIDANCE, /two free rungs at most/);
 });
 
-test("a facet stays unlocked once any earlier tutor reply warned about it", () => {
-  const messages = [
-    { kind: "tutor", help: help({ nudges: ["a"] }) },
-    { kind: "human" },
-    { kind: "tutor", help: help({ offers: ["a"] }) },
-    { kind: "human" },
-    { kind: "tutor", help: help({ hints: ["a"], offers: ["b"] }) },
-    // A learner message can never unlock anything, whatever it carries.
-    { kind: "human", help: help({ offers: ["c"] }) },
-    { kind: "tutor" },
-  ];
-  assert.deepEqual(unlockedHelp(messages), ["a", "b"]);
+test("a hint unlocks only when the learner accepts the tutor's offer", () => {
+  const offer = { kind: "tutor", help: help({ offers: ["a", "b"] }) };
+  // A warning alone unlocks nothing, and neither does a typed reply to it.
+  assert.deepEqual(unlockedHelp([offer]), []);
+  assert.deepEqual(unlockedHelp([offer, { kind: "human" }]), []);
+  // The hint button records which offered facets the learner accepted.
+  assert.deepEqual(unlockedHelp([offer, { kind: "human", accepts: ["a"] }]), [
+    "a",
+  ]);
+  // Acceptance counts only for a facet an earlier reply offered.
+  assert.deepEqual(
+    unlockedHelp([
+      { kind: "human", accepts: ["a"] },
+      offer,
+      { kind: "human", accepts: ["c"] },
+    ]),
+    [],
+  );
+  // A learner message can never unlock anything by declaring help itself.
+  assert.deepEqual(
+    unlockedHelp([offer, { kind: "human", help: help({ offers: ["a"] }) }]),
+    [],
+  );
+  // Once accepted, the facet stays unlocked for the rest of the ladder.
+  assert.deepEqual(
+    unlockedHelp([
+      offer,
+      { kind: "human", accepts: ["a"] },
+      { kind: "tutor", help: help({ hints: ["a"] }) },
+      { kind: "human" },
+      { kind: "tutor" },
+    ]),
+    ["a"],
+  );
+  // A conversation saved before acceptance was recorded keeps the facets it
+  // already hinted on.
+  assert.deepEqual(
+    unlockedHelp([
+      offer,
+      { kind: "human" },
+      { kind: "tutor", help: help({ gives: ["b"] }) },
+    ]),
+    ["b"],
+  );
   assert.deepEqual(unlockedHelp(undefined), []);
+  assert.match(HELP_GATE_GUIDANCE, /An offer alone unlocks nothing/);
+});
+
+test("after a declined offer the tutor may nudge again only by offering again", () => {
+  const payload = {
+    ...gated(),
+    messages: [
+      { kind: "tutor", help: help({ nudges: ["a"] }) },
+      { kind: "tutor", help: help({ nudges: ["a"], offers: ["a"] }) },
+      { kind: "human" },
+    ],
+  };
+  assert.match(
+    helpGateProblem(payload, reply(help({ hints: ["a"] })))!,
+    /not warned about/,
+  );
+  assert.match(
+    helpGateProblem(payload, reply(help({ nudges: ["a"] })))!,
+    /asks the same point again/,
+  );
+  assert.equal(
+    helpGateProblem(payload, reply(help({ nudges: ["a"], offers: ["a"] }))),
+    undefined,
+  );
 });
 
 test("a streamed reply stays hidden until its declaration passes", () => {

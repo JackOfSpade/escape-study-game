@@ -58,15 +58,28 @@ test("hints ramp up freely, then wait for one warning before costing credit", as
   await page.locator("#help-retry").click();
   await expect(page.locator("#chat-input")).toBeFocused();
 
-  // A typed yes is enough: the facet is unlocked for the hint and beyond.
+  // A typed reply is a new attempt, not acceptance: the facet stays locked,
+  // and the tutor repeats the warning so the choice shows again.
+  relay.reply(() => ({
+    help: help({ nudges: ["scope"], offers: ["scope"] }),
+    text: "STILL OPEN: that part is still incomplete. Do you want the hint?",
+    complete: false,
+  }));
+  await say("A third attempt");
+  await expect.poll(() => relay.tutorCalls().length).toBe(4);
+  expect(relay.tutorCalls()[3].payload.helpPolicy).toEqual({ unlocked: [] });
+  await expect(page.locator("#messages")).toContainText("STILL OPEN");
+  await expect(choice).toBeVisible();
+
+  // The button is the acceptance: the facet is unlocked for the hint and beyond.
   relay.reply(() => ({
     help: help({ hints: ["scope"] }),
     text: "CONCRETE HINT",
     complete: false,
   }));
-  await say("yes please");
-  await expect.poll(() => relay.tutorCalls().length).toBe(4);
-  expect(relay.tutorCalls()[3].payload.helpPolicy).toEqual({
+  await page.locator("#help-accept").click();
+  await expect.poll(() => relay.tutorCalls().length).toBe(5);
+  expect(relay.tutorCalls()[4].payload.helpPolicy).toEqual({
     unlocked: ["scope"],
   });
   await expect(page.locator("#messages")).toContainText("CONCRETE HINT");
@@ -77,7 +90,10 @@ test("hints ramp up freely, then wait for one warning before costing credit", as
     complete: false,
   }));
   await say("still stuck");
-  await expect.poll(() => relay.tutorCalls().length).toBe(5);
+  await expect.poll(() => relay.tutorCalls().length).toBe(6);
+  expect(relay.tutorCalls()[5].payload.helpPolicy).toEqual({
+    unlocked: ["scope"],
+  });
   await expect(page.locator("#messages")).toContainText("GIVEN STEP");
   expect(errors).toEqual([]);
 });

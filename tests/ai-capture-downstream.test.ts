@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { tutorProblem } from "../src/ai";
 import test from "node:test";
 import { scopeKey } from "../src/learning-model";
 import type { Contract } from "../src/model";
@@ -88,10 +89,11 @@ test("downstream cases carry the generated problem exactly", async () => {
   const expected = problemFrom(answer);
   assert.equal(expected.provenance, "claude-cli");
   assert.equal("text" in expected, false);
-  const tutorProblem = tutor.payload.problem as Record<string, unknown>;
-  assert.deepEqual(tutorProblem, expected);
-  assert.equal(tutorProblem.title, answer.title);
-  assert.equal(tutorProblem.prompt, answer.prompt);
+  // The tutor's copy holds the rubric as examples of evidence.
+  const sent = tutor.payload.problem as Record<string, unknown>;
+  assert.deepEqual(sent, tutorProblem(expected));
+  assert.equal(sent.title, answer.title);
+  assert.equal(sent.prompt, answer.prompt);
   assert.equal(tutor.payload.prompt, TUTOR_MESSAGE);
 
   const packet = assess.payload.packet as Record<string, unknown>;
