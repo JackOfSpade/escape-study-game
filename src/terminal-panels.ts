@@ -10,7 +10,7 @@
 import { retryTutorRequest, streamingReply } from "./ai";
 import { $, setHtml } from "./dom";
 import { escapeHtml as escape } from "./html";
-import { encounterGaps, probeSummary } from "./knowledge-probe";
+import { encounterGaps, gapsClosedBy, probeSummary } from "./knowledge-probe";
 import { encounterKey } from "./learner";
 import { markdownToHtml } from "./markdown";
 import {
@@ -68,13 +68,17 @@ export function provenanceText(game: StudyRecord, e: Encounter): string {
 /** The line above a solo conversation: its outcome, or how the probe stands. */
 export function dialogueStatus(game: StudyRecord, e: Encounter) {
   const probeLine = probeSummary(e);
-  const conceded = encounterGaps(game, e);
+  const recorded = encounterGaps(game, e);
+  const conceded = recorded.filter((r) => !r.resolved);
+  const closed = recorded.length - conceded.length;
   const text =
     e.state === "consumed"
       ? `${
           conceded.length
             ? `Solved with a recorded gap. Recorded for later study: ${conceded.map((r) => r.facet.description).join("; ")}.`
-            : "Solved."
+            : closed
+              ? `Solved. ${closed === 1 ? "The recorded gap was" : `${closed} recorded gaps were`} closed later.`
+              : "Solved."
         } You can keep discussing the question.${probeLine ? ` ${probeLine}.` : ""}`
       : probeLine
         ? `Knowledge probe · ${probeLine}. Say so if you do not know something; the gap is recorded.`
@@ -95,6 +99,21 @@ export function completionMarkerIndex(e: Encounter): number | undefined {
 }
 const COMPLETION_MARKER =
   '<div class="message-complete"><strong>✓ Question complete</strong><span>Your result is saved. You can keep discussing it here, or open the Skill map for the next question.</span></div>';
+
+/** The notice under a reply that closed a gap recorded at this question. */
+export function gapClosedMarker(
+  game: StudyRecord,
+  e: Encounter,
+  m: Encounter["tutor"][number],
+): string {
+  if (m.kind !== "tutor") return "";
+  const closed = gapsClosedBy(game, e, m.requestId);
+  return closed.length
+    ? `<div class="message-complete gap-closed"><strong>✓ Gap closed</strong><span>${escape(
+        closed.map((r) => r.facet.description).join("; "),
+      )}. Saved: this is no longer a study target.</span></div>`
+    : "";
+}
 
 export function createTerminalPanels(host: TerminalPanelHost) {
   const { roadmap } = host;
@@ -155,6 +174,7 @@ export function createTerminalPanels(host: TerminalPanelHost) {
             ? ""
             : (i === done ? COMPLETION_MARKER : "") +
               said(m) +
+              gapClosedMarker(host.game(), e, m) +
               (parts.get(m.seq) ?? ""),
         )
         .join("") +
