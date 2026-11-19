@@ -182,6 +182,12 @@ test("new probes are bounded to one prerequisite level and scope guidance exclud
     /never add them as mandatory facets/,
   );
   assert.equal(careerScopeGuidance(c, "full"), "");
+  // The role setting never overrides a question about the learner's own work,
+  // and the whole text stays under its cap with the longest ending.
+  const own = careerScopeGuidance({ ...c, objectiveIds: ["PE:X09.1"] }, "product-feature-owner"); // prettier-ignore
+  assert.match(own, /nor is about the learner's own projects or experience/);
+  assert.match(own, /one level of prerequisite clarification\.$/);
+  assert.ok(own.length < 900);
   const facets = [{ id: "root", description: "Explain rendering" }];
   assert.equal(
     probeContract({ rubric: ["Explain rendering"] }).maxPrerequisiteDepth,

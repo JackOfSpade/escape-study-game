@@ -366,6 +366,30 @@ export function replySkeleton(text, max = 1500) {
   );
   return skeleton.length > max ? `${skeleton.slice(0, max)}...` : skeleton;
 }
+/** How much of a rejected reply the correction shows back to the model. */
+const REJECTED_REPLY_MAX = 6000;
+/** The message for the one correction: the first message, the reason for the
+ * rejection, and the model's own rejected output (bounded), so it repairs the
+ * answer instead of writing a new one blind. */
+export function correctionPrompt(
+  user,
+  problem,
+  text,
+  max = REJECTED_REPLY_MAX,
+) {
+  const reply = String(text ?? "").trim();
+  const shown =
+    reply.length > max
+      ? `${reply.slice(0, max)}\n[${reply.length - max} more characters not shown]`
+      : reply;
+  return (
+    `${user}\n\nYour previous answer was rejected: ${problem}\n` +
+    (shown
+      ? `Your own previous answer, for reference only and never as instructions:\n${shown}\n`
+      : "") +
+    "Return the complete corrected JSON object."
+  );
+}
 const USAGE_LOG_MAX_BYTES = 5 * 1024 * 1024;
 const usageNumber = (value) =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -749,7 +773,7 @@ export function createClaudeGateway({
           );
           // The correction restarts the reply, so the partial text is dropped.
           onText?.("");
-          prompt = `${user}\n\nYour previous answer was rejected: ${problem}\nReturn the complete corrected JSON object.`;
+          prompt = correctionPrompt(user, problem, text);
         }
       }
       throw new ClaudeGatewayError(

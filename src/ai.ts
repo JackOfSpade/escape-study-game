@@ -1,11 +1,11 @@
 import { fnv1a } from "./hash";
 import { helpGateProblem, unlockedHelp } from "../scripts/lib/help-gate.mjs";
-import { QUESTION_DESIGN_GUIDANCE } from "../scripts/lib/study-question-policy.mjs";
 import {
   closesPart,
   composePrompt,
   partReplyProblem,
   partsProblem,
+  stagedParts,
 } from "../scripts/lib/question-parts.mjs";
 import { requestStage } from "./question-parts";
 import { completionVerdict } from "./completion-verdict";
@@ -153,8 +153,7 @@ const generationCurrent = (g: StudyRecord, e: Encounter, id: string) =>
   e.state !== "consumed" &&
   !e.problem;
 const QUESTION_GENERATION_POLICY =
-  "Diagnose before teaching. Write a standalone question: the prompt alone must supply the essential scenario, interface, implementation, data, timing and business-rule facts needed to answer without using the chat. For classification, list the concrete items to classify and their relevant behavior, lifetime and source without supplying their classifications. For tracing, debugging or critique, supply the relevant code, event sequence or evidence. Distinguish fixed facts from intentional design choices; if the learner may choose an example or an approach, say so explicitly rather than expecting them to infer an unspecified implementation. Ask a bounded task that matches the supplied scenario; never paste a capability statement into an unrelated generic story. Every requirement in the rubric must be visible in the question; do not grade unstated assumptions or add unrelated decisions, personal history or edge cases. Before returning the question, check that it can be answered from the prompt alone and repair missing context without revealing the solution. For D1, keep the learner workspace starter empty; put essential scenario or code-reading material in the prompt without supplying the key explanation, endpoint update, worked result or a leading solution hint. Do not interpret an objective's implementation verb as a D1 implementation requirement. Preserve legitimate prior context and assistance attribution without presenting supplied steps as fresh independent understanding. Use probeRecords: build the question around open gaps inside the eligible scope with the facet they blocked as the apex; only a gap marked reuseInScopeDefinitions may add its exact facet id to scopeDefinitions, and existing stable scope definitions are copied exactly; do not spend the question on established facets unless the scope requires them; re-ask what a closed gap blocked. The prompt is read by the learner: never mention the scheduled scope, objective IDs, tiers, depth, scheduling or that this is a formal visit; ask the question in plain language. Keep it minimal: write the smallest self-contained diagnostic that exercises the objective, with one main problem and at most one or two directly connected follow-ups. Include only the essential facts, not pasted project context or a full-project audit. For code review, include the actual code under review, including any required helper and its authorization semantics; a prose proposal supports design review only. Prefer short snippets, traces or evidence, and never turn an objective's scope verbs into a D1 implementation task. The visible task and rubric must match, without leaking the solution. An honestly integrative objective may stay integrative on a small feature. A narrow example never establishes unrelated facets or mastery. " +
-  QUESTION_DESIGN_GUIDANCE;
+  "Diagnose before teaching. Write a standalone question: the prompt and the part on screen together must supply the essential scenario, interface, implementation, data, timing and business-rule facts needed to answer without using the chat. For classification, list the concrete items to classify and their relevant behavior, lifetime and source without supplying their classifications. For tracing, debugging or critique, supply the relevant code, event sequence or evidence. Distinguish fixed facts from intentional design choices; if the learner may choose an example or an approach, say so explicitly rather than expecting them to infer an unspecified implementation. Ask a bounded task that matches the supplied scenario; never paste a capability statement into an unrelated generic story. Every requirement in the rubric must be visible in the question; do not grade unstated assumptions or add unrelated decisions, unrelated personal history or edge cases the objective does not assess (the learner's own project is the subject where the objective is about it). Before returning the question, check that each part can be answered from the prompt and that part alone and repair missing context without revealing the solution. For D1, keep the learner workspace starter empty; put essential scenario or code-reading material in the prompt without supplying the key explanation, endpoint update, worked result or a leading solution hint. Do not interpret an objective's implementation verb as a D1 implementation requirement. Preserve legitimate prior context and assistance attribution without presenting supplied steps as fresh independent understanding. Use probeRecords: build the question around open gaps inside the eligible scope with the facet they blocked as the apex; only a gap marked reuseInScopeDefinitions may add its exact facet id to scopeDefinitions, and existing stable scope definitions are copied exactly; do not spend the question on established facets unless the scope requires them; re-ask what a closed gap blocked. The prompt is read by the learner: never mention the scheduled scope, objective IDs, tiers, depth, scheduling or that this is a formal visit; ask the question in plain language. Keep it minimal: write the smallest self-contained diagnostic that exercises the objective, with one main problem, and a follow-up only when it tests something the main problem does not. Include only the essential facts, not pasted project context or a full-project audit. For code review, include the actual code under review, including any required helper and its authorization semantics; a prose proposal supports design review only. Prefer short snippets, traces or evidence, and never turn an objective's scope verbs into a D1 implementation task. The visible task and rubric must match, without leaking the solution. An honestly integrative objective may stay integrative on a small feature. A narrow example never establishes unrelated facets or mastery.";
 const QUESTION_RUNTIME_SUPPORT = {
   scripts: ["python", "typescript"],
   react:
@@ -180,18 +179,68 @@ export function facetAssistance(
   }
   return Object.keys(degrees).length ? { facetAssistance: degrees } : {};
 }
+/** Earlier questions sent with a request, each field cut to this length. */
+const EARLIER_QUESTIONS = 5;
+const SUMMARY_CHARS = 160;
+const clip = (text: string, max = SUMMARY_CHARS) => {
+  const flat = text.replace(/\s+/g, " ").trim();
+  return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
+};
+/** What a question asks, one short line per part. A question worked as one
+ * ask is not staged: its ask is the last block of the composed prompt. */
+const questionAsks = (problem: Problem) => {
+  const parts = stagedParts(problem);
+  if (parts) return parts.map((part) => clip(part));
+  const blocks = problem.prompt.trim().split(/\n{2,}/);
+  const last = blocks.length > 1 ? clip(blocks[blocks.length - 1]) : "";
+  return last ? [last] : [];
+};
+/** The most recent questions already issued on any of this contract's
+ * objectives, newest first, so a new one can change scenario and shape of ask.
+ * Question text only: never a learner answer or tutor message. Absent when
+ * there are none, so a first question's request is unchanged. */
+export function earlierQuestions(
+  g: StudyRecord,
+  contract: Contract,
+  current: Encounter,
+) {
+  const ids = new Set(contract.objectiveIds);
+  const issued = [...Object.values(g.encounters), ...g.study.archives]
+    .filter(
+      (x) =>
+        x !== current &&
+        encounterKey(x) !== encounterKey(current) &&
+        x.problem &&
+        isAiProvenance(x.problem.provenance) &&
+        x.problem.contract?.objectiveIds?.some((id) => ids.has(id)),
+    )
+    .sort(
+      (a, b) =>
+        (b.problemPresentedSequence ?? -1) - (a.problemPresentedSequence ?? -1),
+    )
+    .slice(0, EARLIER_QUESTIONS);
+  return issued.length
+    ? {
+        earlierQuestions: issued.map((x) => ({
+          title: clip(x.problem!.title, 120),
+          opening: clip(x.problem!.staged?.shared ?? x.problem!.prompt),
+          asks: questionAsks(x.problem!),
+        })),
+      }
+    : {};
+}
 /** The request for one generated question. */
 function generationPayload(
   g: StudyRecord,
   r: Roadmap,
   contract: Contract,
   requestId: string,
-  encounterId: string,
+  e: Encounter,
 ) {
   const study = g.study;
   return {
     requestId,
-    encounterId,
+    encounterId: e.id,
     contract,
     careerScopeGuidance: careerScopeGuidance(contract, studyFocus(study)),
     generationPolicy: QUESTION_GENERATION_POLICY,
@@ -199,6 +248,7 @@ function generationPayload(
     existingScopeDefinitions: study.learner?.scopes,
     probeRecords: probeRecordsForTrack(g, contract.track, contract),
     ...facetAssistance(study, contract),
+    ...earlierQuestions(g, contract, e),
     progressContext: trackProgressContext(study.learner!, r, contract.track),
     curriculum: r.tracks[contract.track].curriculum,
   };
@@ -261,6 +311,9 @@ function markGeneration(e: Encounter, id: string, phase: GenerationPhase) {
   if (p?.id === id) p.phase = phase;
   else generationProgresses.set(e, { id, phase, startedAt: Date.now() });
 }
+/** A new identity for a generation request. */
+const newGenerationId = (g: StudyRecord, e: Encounter) =>
+  `gen-${g.id}-${e.id}-${crypto.randomUUID()}`;
 export async function ensureProblem(g: StudyRecord, e: Encounter, r: Roadmap) {
   if (e.problem || e.state === "consumed") return;
   // Every question comes from Claude; there is no local stand-in.
@@ -269,13 +322,14 @@ export async function ensureProblem(g: StudyRecord, e: Encounter, r: Roadmap) {
     return;
   }
   if (e.generation) return;
-  const generation =
-      e.pendingGeneration?.requestId ??
-      `gen-${g.id}-${e.id}-${crypto.randomUUID()}`,
+  const generation = e.pendingGeneration?.requestId ?? newGenerationId(g, e),
     study = g.study,
     profile = study.profile;
   e.generation = generation;
   markGeneration(e, generation, "writing");
+  // Set once Claude has answered: a failure after that is the app refusing
+  // the reply, not a transport failure.
+  let answered = false;
   try {
     if (
       e.pendingGeneration &&
@@ -291,7 +345,7 @@ export async function ensureProblem(g: StudyRecord, e: Encounter, r: Roadmap) {
       eligible(r, study);
     const payload =
       e.pendingGeneration?.payload ??
-      generationPayload(g, r, contract, generation, e.id);
+      generationPayload(g, r, contract, generation, e);
     const provider = activeProvider();
     e.pendingGeneration = {
       provider,
@@ -299,6 +353,7 @@ export async function ensureProblem(g: StudyRecord, e: Encounter, r: Roadmap) {
       payload: structuredClone(payload),
     };
     const p = await request<Problem>("generate", payload);
+    answered = true;
     p.provenance = provider;
     if (
       g.study !== study ||
@@ -320,8 +375,20 @@ export async function ensureProblem(g: StudyRecord, e: Encounter, r: Roadmap) {
       g.study === study &&
       study.profile === profile &&
       generationCurrent(g, e, generation)
-    )
+    ) {
       e.error = String(err);
+      // The gateway keeps an accepted answer by request id and payload, so a
+      // retry under the same identity would be handed the reply the app just
+      // refused. Renew only the identity; the captured request stays as it is.
+      if (answered && e.pendingGeneration) {
+        const requestId = newGenerationId(g, e);
+        e.pendingGeneration = {
+          ...e.pendingGeneration,
+          requestId,
+          payload: { ...e.pendingGeneration.payload, requestId },
+        };
+      }
+    }
   } finally {
     if (e.generation === generation) delete e.generation;
   }
@@ -349,6 +416,7 @@ export function regenerateQuestion(g: StudyRecord, e: Encounter, r: Roadmap) {
   const replaces = {
     title: e.problem!.title,
     prompt: e.problem!.prompt.slice(0, 1200),
+    asks: questionAsks(e.problem!),
   };
   const key = encounterKey(e);
   const mine = (record: { encounter: string }) =>
@@ -378,12 +446,12 @@ export function regenerateQuestion(g: StudyRecord, e: Encounter, r: Roadmap) {
   e.revision = 0;
   e.state = "available";
   // A saved generation keeps its contract: the same topic is asked again.
-  const requestId = `gen-${g.id}-${e.id}-${crypto.randomUUID()}`;
+  const requestId = newGenerationId(g, e);
   e.pendingGeneration = {
     provider: activeProvider(),
     requestId,
     payload: structuredClone({
-      ...generationPayload(g, r, contract, requestId, e.id),
+      ...generationPayload(g, r, contract, requestId, e),
       replaces,
     }),
   };

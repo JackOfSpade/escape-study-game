@@ -215,7 +215,8 @@ export interface Submission {
   seq: number;
 }
 export interface Problem {
-  /** Generation-time typical active solve duration; local policy owns HP. */
+  /** Generation-time seconds a learner who already has the skill needs for one
+   * complete correct answer; pacing metadata only, nothing schedules from it. */
   estimatedSolveSeconds?: number;
   runtime?: {
     language: "python" | "typescript";

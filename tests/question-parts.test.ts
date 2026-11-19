@@ -7,6 +7,7 @@ import {
   closesPart,
   composePrompt,
   partReplyProblem,
+  MAX_GENERATED_PARTS,
   partsProblem,
   stagedParts,
 } from "../scripts/lib/question-parts.mjs";
@@ -54,6 +55,10 @@ test("generated parts are validated and composed into one whole prompt", () => {
   assert.equal(partsProblem(["One ask"]), undefined);
   for (const bad of [[], "one", [""], ["a", 2], Array(6).fill("ask")])
     assert.match(partsProblem(bad) ?? "", /parts must be an array/);
+  // A newly generated question is held to three parts; stored ones to five.
+  assert.equal(partsProblem(Array(5).fill("ask")), undefined);
+  assert.equal(partsProblem(Array(3).fill("ask"), MAX_GENERATED_PARTS), undefined); // prettier-ignore
+  assert.match(partsProblem(Array(4).fill("ask"), MAX_GENERATED_PARTS) ?? "", /1 to 3 nonempty/); // prettier-ignore
   assert.equal(composePrompt("Scenario.", ["Why?"]), "Scenario.\n\nWhy?");
   assert.equal(
     composePrompt("Scenario.", ["Why?", "What next?"]),
