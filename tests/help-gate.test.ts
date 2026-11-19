@@ -112,6 +112,39 @@ test("the relay's answer validation applies the ladder", () => {
   );
 });
 
+test("a third free nudge on a facet is refused until the learner has been offered a hint", () => {
+  const nudge = { kind: "tutor", help: help({ nudges: ["a"] }) };
+  const asked = (times: number, unlocked: string[] = []) => ({
+    ...gated(unlocked),
+    messages: Array.from({ length: times }, () => [nudge, { kind: "human" }])
+      .flat()
+      // A learner message can never use up a rung, whatever it carries.
+      .concat({ kind: "human", help: help({ nudges: ["a", "b"] }) }),
+  });
+  const again = reply(help({ nudges: ["a"] }));
+  assert.equal(helpGateProblem(asked(1), again), undefined);
+  assert.match(helpGateProblem(asked(2), again)!, /after 2 free nudges \(a\)/);
+  // The offer itself, a different facet, and a closing reply all pass.
+  for (const fine of [
+    reply(help({ nudges: ["a"], offers: ["a"] })),
+    reply(help({ offers: ["a"] })),
+    reply(help({ nudges: ["b"] })),
+    reply(help({ nudges: ["a"] }), true),
+  ])
+    assert.equal(helpGateProblem(asked(2), fine), undefined);
+  // Once offered, the learner chose to keep trying: nothing more is forced.
+  assert.equal(helpGateProblem(asked(3, ["a"]), again), undefined);
+  assert.throws(
+    () => validateAnswer({ operation: "tutor", payload: asked(2) }, again),
+    /free nudges/,
+  );
+  // A refused reply is never streamed word by word either.
+  const free = JSON.stringify(help({ nudges: ["a"] }));
+  assert.equal(helpStreamGate(asked(1))!(`{"help":${free},`), true);
+  assert.equal(helpStreamGate(asked(2))!(`{"help":${free},`), false);
+  assert.match(HELP_GATE_GUIDANCE, /two free rungs at most/);
+});
+
 test("a facet stays unlocked once any earlier tutor reply warned about it", () => {
   const messages = [
     { kind: "tutor", help: help({ nudges: ["a"] }) },

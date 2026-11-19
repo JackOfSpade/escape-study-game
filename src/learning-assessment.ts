@@ -3,6 +3,7 @@ import { bridgeRequest, status } from "./bridge-client";
 import { evidencePacket, syncLearningView } from "./curriculum";
 import { applyLearningAssessment, encounterKey } from "./learner";
 import type { Assessment, Encounter, StudyRecord, Roadmap } from "./model";
+import { studyEvent } from "./study-events";
 
 const connected = (g: StudyRecord) =>
   g.study.profile === "live" && status().mode !== "development";
@@ -16,8 +17,34 @@ const latestHumanSequence = (e: Encounter) =>
     0,
   );
 
-/** An assessment reviews one immutable cutoff, even across reloads and retries. */
+/** Grade a finished question, then report to diagnostics how that settled. */
 export async function assess(
+  g: StudyRecord,
+  e: Encounter,
+  r: Roadmap,
+  cutoff?: number,
+  retry = false,
+) {
+  const latest = () =>
+    g.study.assessments.filter((a) => a.encounter === e.id).at(-1);
+  const before = latest()?.status;
+  try {
+    await runAssessment(g, e, r, cutoff, retry);
+  } finally {
+    const a = latest();
+    if (a && a.status !== "pending" && (retry || a.status !== before))
+      studyEvent("assessment-settled", {
+        encounter: e.id,
+        assessment: a.id,
+        status: a.status,
+        visitOutcome: a.visitOutcome ?? null,
+        findings: a.findings.length,
+        retry,
+      });
+  }
+}
+/** An assessment reviews one immutable cutoff, even across reloads and retries. */
+async function runAssessment(
   g: StudyRecord,
   e: Encounter,
   r: Roadmap,

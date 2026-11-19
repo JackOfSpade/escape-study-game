@@ -9,7 +9,7 @@ import { isRecord as object } from "./is-record.mjs";
  * that warning is rejected before the learner sees it.
  */
 export const HELP_GATE_GUIDANCE =
-  "Hint ladder (whenever payload.helpPolicy is present): write help first in the JSON object, before text: help:{nudges:[facet ids],hints:[facet ids],gives:[facet ids],offers:[facet ids]}, using probe facet ids and empty arrays where nothing applies. After help, write text and complete as in every reply: complete (true or false) is required even when the reply only nudges. Each time the learner misses a facet, move one rung up for that facet, never more, and read the earlier messages' help to see which rung it has reached. Rung 1 (nudges): say which part is wrong or incomplete. Rung 2 (nudges): reword the question or narrow what to think about, without any assessed content. Rungs 1 and 2 are free: give them without warning. Rung 3 (hints): a concrete hint, such as a worked example on other values or where to look, that leaves the reasoning step to the learner; the part is then recorded as hinted. Rung 4 (gives): state the missing step. Rung 5 (gives): give the full answer and close that part. Rungs 4 and 5 are recorded as given. Before the first rung 3 on a facet, stop once: say in one sentence that the next hint will be recorded as answered with a hint instead of unaided, ask whether they want it, and list the facet in offers. The app accepts hints or gives only for facets in payload.helpPolicy.unlocked, which holds every facet an earlier reply of yours offered, and rejects any other reply before the learner sees it. When the learner's reply to that offer means yes, in any words, continue up the ladder from rung 3 without asking again; when it is a new attempt, judge the attempt; when they want to move on, close with outcome gap. A learner who asks outright for the answer still gets the one warning first, then may be given it directly. After rung 4 or 5 do not quiz the learner on that step again.";
+  "Hint ladder (whenever payload.helpPolicy is present): write help first in the JSON object, before text: help:{nudges:[facet ids],hints:[facet ids],gives:[facet ids],offers:[facet ids]}, using probe facet ids and empty arrays where nothing applies. After help, write text and complete as in every reply: complete (true or false) is required even when the reply only nudges. Each time the learner misses a facet, move one rung up for that facet, never more, and read the earlier messages' help to see which rung it has reached. Rung 1 (nudges): say which part is wrong or incomplete. Rung 2 (nudges): reword the question or narrow what to think about, without any assessed content. Rungs 1 and 2 are free: give them without warning. A free rung names the claim that is wrong or the part that is missing and stops there: it never states the correct fact, the value or the reason, and never says what the right answer contains or relies on, because the assessment records any such statement as given even when you declare it a nudge. A facet gets two free rungs at most: once two earlier replies of yours list it in nudges, do not ask the same point a third time; a reply that still finds it missed must be the warning described below, and the app rejects a third free nudge on a facet you never offered a hint on. A reply that only clarifies the question lists no facet at all. Rung 3 (hints): a concrete hint, such as a worked example on other values or where to look, that leaves the reasoning step to the learner; the part is then recorded as hinted. Rung 4 (gives): state the missing step. Rung 5 (gives): give the full answer and close that part. Rungs 4 and 5 are recorded as given. Before the first rung 3 on a facet, stop once: say in one sentence that the next hint will be recorded as answered with a hint instead of unaided, ask whether they want it, and list the facet in offers. The app accepts hints or gives only for facets in payload.helpPolicy.unlocked, which holds every facet an earlier reply of yours offered, and rejects any other reply before the learner sees it. When the learner's reply to that offer means yes, in any words, continue up the ladder from rung 3 without asking again; when it is a new attempt, judge the attempt; when they want to move on, close with outcome gap. A learner who asks outright for the answer still gets the one warning first, then may be given it directly. After rung 4 or 5 do not quiz the learner on that step again.";
 
 const FIELDS = ["nudges", "hints", "gives", "offers"];
 const ids = (value) =>
@@ -41,6 +41,28 @@ function unlockedBy(payload) {
 /** The facets a declaration spends credit on. */
 const costly = (help) => [...new Set([...help.hints, ...help.gives])];
 
+/** How many free nudges one facet gets before the tutor must offer a hint. */
+const FREE_NUDGES = 2;
+
+/**
+ * The facets a declaration nudges once more although their free rungs are
+ * used up and the learner was never offered a hint: asking again would only
+ * repeat the question, so the reply has to make the offer instead.
+ */
+function exhausted(payload, help, unlocked) {
+  const used = new Map();
+  for (const m of Array.isArray(payload.messages) ? payload.messages : [])
+    if (object(m) && m.kind === "tutor" && object(m.help) && ids(m.help.nudges))
+      for (const id of new Set(m.help.nudges))
+        used.set(id, (used.get(id) ?? 0) + 1);
+  return [...new Set(help.nudges)].filter(
+    (id) =>
+      (used.get(id) ?? 0) >= FREE_NUDGES &&
+      !unlocked.includes(id) &&
+      !help.offers.includes(id),
+  );
+}
+
 /**
  * Why a reply breaks the ladder, or undefined when it passes. `required`
  * also insists that the declaration is present (the relay does; the app
@@ -55,6 +77,9 @@ export function helpGateProblem(payload, answer, required = false) {
   const early = costly(answer.help).filter((id) => !unlocked.includes(id));
   if (early.length)
     return `This reply gives a hint or a step the learner was not warned about (${early.join(", ")}). Rewrite text so it stays on a free rung for those facets, remove them from hints and gives, and list them in offers with a one-sentence warning that the next hint will be recorded as answered with a hint.`;
+  const stuck = exhausted(payload, answer.help, unlocked);
+  if (stuck.length)
+    return `This reply asks the same point again after ${FREE_NUDGES} free nudges (${stuck.join(", ")}). Do not rephrase the question another time: say in one sentence that the next hint will be recorded as answered with a hint instead of unaided, ask whether they want it, and list those facets in offers.`;
   return undefined;
 }
 
@@ -74,7 +99,9 @@ export function helpStreamGate(payload) {
     try {
       const help = JSON.parse(found[1]);
       verdict =
-        validHelp(help) && costly(help).every((id) => unlocked.includes(id));
+        validHelp(help) &&
+        costly(help).every((id) => unlocked.includes(id)) &&
+        !exhausted(payload, help, unlocked).length;
     } catch {
       verdict = false;
     }

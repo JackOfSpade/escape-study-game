@@ -9,6 +9,7 @@ import {
   releaseSettledRequests,
 } from "./run-learning";
 import { readDurable, writeDurable } from "./storage";
+import { briefError, studyEvent } from "./study-events";
 const KEY = "dead-air-save-v1";
 interface Envelope {
   schema: 1;
@@ -93,6 +94,8 @@ function unpack(raw: string) {
     throw Error("Invalid saved checkpoint");
   return { serial: stored.serial, game: decode(stored.data) };
 }
+/** Whether the last full save reached the localStorage fallback copy. */
+let mirrorCurrent = true;
 /** A background checkpoint skips the synchronous localStorage mirror: copying a
  * megabyte there on every autosave hitches the page. IndexedDB still receives
  * it, and the queue above falls back to localStorage if that write fails. */
@@ -106,11 +109,23 @@ export function save(g: StudyRecord, options: { background?: boolean } = {}) {
   // Capture the whole snapshot before yielding to IndexedDB, including large
   // drafts/archives when they still fit the browser's actual storage quota.
   // A fixed size cutoff silently left those edits without crash recovery.
-  if (!options.background)
+  if (!options.background) {
     try {
       localStorage.setItem(KEY, payload);
       checkpoint = true;
-    } catch {}
+    } catch (error) {
+      // IndexedDB still takes this save, so nothing is shown to the learner;
+      // the fallback copy, though, now stays at an older checkpoint.
+      if (mirrorCurrent)
+        studyEvent("save-fallback-copy-failed", {
+          chars: payload.length,
+          error: briefError(error),
+        });
+    }
+    if (checkpoint && !mirrorCurrent)
+      studyEvent("save-fallback-copy-restored", { chars: payload.length });
+    mirrorCurrent = checkpoint;
+  }
   return checkpoints.enqueue({ payload, checkpoint, serial });
 }
 async function storedCopies() {

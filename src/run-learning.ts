@@ -3,6 +3,13 @@ import { isRecord } from "./records";
 
 /** Static roadmap texts re-derivable from the curriculum; never re-read once settled. */
 const RELEASED_REQUEST_FIELDS = ["curriculum", "progressContext"] as const;
+/** What a settled request keeps of its topic-assessment context. */
+const KEPT_TOPIC_CONTEXT_FIELDS = new Set([
+  "topicIds",
+  "depth",
+  "sourceHash",
+  "frozenBeforeCurrentConversation",
+]);
 
 /** Drop static context from a stored request; keeps every auditable field. */
 function releaseRequestContext(job: { payloadJson: string }): boolean {
@@ -20,6 +27,21 @@ function releaseRequestContext(job: { payloadJson: string }): boolean {
       delete record[field];
       removed = true;
     }
+  // The learner snapshot sent for the topic assessment is about 100 kB per
+  // request. A settled request is never sent again, so only what identifies
+  // the snapshot stays.
+  const context = record.topicAssessmentContext;
+  if (
+    isRecord(context) &&
+    Object.keys(context).some((key) => !KEPT_TOPIC_CONTEXT_FIELDS.has(key))
+  ) {
+    record.topicAssessmentContext = Object.fromEntries(
+      Object.entries(context).filter(([key]) =>
+        KEPT_TOPIC_CONTEXT_FIELDS.has(key),
+      ),
+    );
+    removed = true;
+  }
   if (removed) job.payloadJson = JSON.stringify(record);
   return removed;
 }
