@@ -27,7 +27,7 @@ import { escapeHtml as escape } from "./html";
 import { createInspector } from "./inspector-panel";
 import { encounterKey } from "./learner";
 import { moveToLiveStudy } from "./live-study";
-import { markdownToHtml } from "./markdown";
+import { openPart, questionHtml } from "./question-parts";
 import type { Encounter, StudyRecord, Roadmap } from "./model";
 import {
   decode,
@@ -724,10 +724,47 @@ function renderHeading(e: Encounter) {
   );
   // One write: appending to the line would replace its text on every tick.
   setText("#terminal-provenance", provenanceText(game, e));
+  renderQuestion(e);
+}
+/** The part of the open question on screen, and a swap to the next under way. */
+let shownPart: { id: string; part?: number } | undefined;
+let partSwap: { id: string; timer: number } | undefined;
+const PART_FADE_MS = 260;
+/** The question text. When the tutor closes a part, the old part fades out
+ * before the next one is written in its place. */
+function renderQuestion(e: Encounter) {
+  const box = $("#problem");
+  if (partSwap) {
+    if (partSwap.id === e.id) return;
+    clearTimeout(partSwap.timer);
+    partSwap = undefined;
+  }
+  const part = e.state === "consumed" ? undefined : openPart(e)?.part;
+  const leaving = box.querySelector<HTMLElement>(".question-part");
+  if (
+    leaving &&
+    part !== undefined &&
+    shownPart?.id === e.id &&
+    shownPart.part !== undefined &&
+    part > shownPart.part &&
+    !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  ) {
+    leaving.classList.add("is-leaving");
+    partSwap = {
+      id: e.id,
+      timer: window.setTimeout(() => {
+        partSwap = undefined;
+        shownPart = { id: e.id, part };
+        renderTerminal();
+      }, PART_FADE_MS),
+    };
+    return;
+  }
+  shownPart = { id: e.id, part };
   setHtml(
-    $("#problem"),
+    box,
     e.problem?.prompt !== undefined
-      ? markdownToHtml(e.problem.prompt)
+      ? questionHtml(e)
       : (e.state !== "consumed" && !e.error && generationHtml(e)) ||
           escape(
             e.state === "consumed"

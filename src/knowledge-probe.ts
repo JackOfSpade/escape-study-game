@@ -124,6 +124,8 @@ export const TERMINAL_DIALOGUE_FORMAT = {
   },
   text: "string",
   complete: "boolean",
+  partComplete:
+    "boolean, only when stage is present: true closes the current part so the next one is shown",
   outcome: "solved|gap (only with complete:true; omit while continuing)",
   knowledge: {
     facets: [
@@ -450,6 +452,8 @@ export function recordProbeTurn(
     provider: string;
     statement: string;
     at?: string;
+    /** This reply closed one part of a question worked part by part. */
+    partClosed?: boolean;
   },
 ): KnowledgeGapRecord[] {
   const problem = e.problem;
@@ -481,7 +485,9 @@ export function recordProbeTurn(
   // rewrites what the terminal established nor opens new study targets.
   if (e.state === "consumed") return [];
   syncEstablished(g, e, context, at);
-  if (reply.outcome !== "gap") return [];
+  // Leaving one part of a staged question concedes what that reply names,
+  // exactly as conceding the whole question does.
+  if (reply.outcome !== "gap" && !context.partClosed) return [];
   const state = probeState(e);
   const declared = new Set(
     reply.findings.filter((f) => f.status === "gap").map((f) => f.id),

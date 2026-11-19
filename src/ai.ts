@@ -1,6 +1,13 @@
 import { fnv1a } from "./hash";
 import { helpGateProblem, unlockedHelp } from "../scripts/lib/help-gate.mjs";
 import { QUESTION_DESIGN_GUIDANCE } from "../scripts/lib/study-question-policy.mjs";
+import {
+  closesPart,
+  composePrompt,
+  partReplyProblem,
+  partsProblem,
+} from "../scripts/lib/question-parts.mjs";
+import { openPart } from "./question-parts";
 import { completionVerdict } from "./completion-verdict";
 import { careerScopeGuidance, studyFocus } from "./career-profile";
 import {
@@ -125,6 +132,19 @@ function validateProblem(
   )
     throw Error(`Stale or altered learning contract for ${e.id}`);
   p.contract = structuredClone(c);
+  // A reply names its asks as `parts`; the stored question keeps the whole
+  // text in `prompt` and, when there is more than one ask, the staged form.
+  const reply = p as Problem & { parts?: unknown };
+  const malformed = partsProblem(reply.parts);
+  if (malformed)
+    throw Error(`Invalid generated problem for ${e.id}: ${malformed}`);
+  delete p.staged;
+  if (Array.isArray(reply.parts)) {
+    const parts = (reply.parts as string[]).map((part) => part.trim());
+    if (parts.length > 1) p.staged = { shared: p.prompt.trim(), parts };
+    p.prompt = composePrompt(p.prompt, parts);
+  }
+  delete reply.parts;
 }
 const generationCurrent = (g: StudyRecord, e: Encounter, id: string) =>
   g.encounters[e.id] === e &&
@@ -341,6 +361,7 @@ export function regenerateQuestion(g: StudyRecord, e: Encounter, r: Roadmap) {
     );
   delete e.problem;
   delete e.probe;
+  delete e.partsDone;
   delete e.tutorRequests;
   delete e.chatDraft;
   delete e.executions;
@@ -602,6 +623,12 @@ export function retryTutorRequest(
         ? helpGateProblem(payload, answer as Record<string, unknown>)
         : undefined;
       if (helpProblem) throw Error(`Tutor reply withheld. ${helpProblem}`);
+      // Also rejected by the relay: a question cannot finish while parts of
+      // it are still hidden from the learner.
+      const partProblem = dialogue
+        ? partReplyProblem(payload, answer as Record<string, unknown>)
+        : undefined;
+      if (partProblem) throw Error(`Tutor reply withheld. ${partProblem}`);
       const probe = dialogue
         ? parseProbeReply(
             answer as Record<string, unknown>,
@@ -651,6 +678,13 @@ export function retryTutorRequest(
           offers: [...help.offers],
         };
       job.responseMessageId = delivered.id;
+      // The tutor confirmed the open part: the next one takes its place.
+      const partClosed =
+        dialogue &&
+        e.state !== "consumed" &&
+        closesPart(payload, answer as Record<string, unknown>) &&
+        (e.partsDone?.length ?? 0) === payload.stage.part - 1;
+      if (partClosed) (e.partsDone ??= []).push(delivered.seq);
       const gaps = probe
         ? recordProbeTurn(g, e, probe, {
             requestId: job.id,
@@ -660,6 +694,7 @@ export function retryTutorRequest(
               payload.messages
                 ?.filter((m: Message) => m.kind === "human")
                 .at(-1)?.text ?? "",
+            partClosed,
           })
         : [];
       if (dialogue && answer.complete === true && e.state !== "consumed") {
@@ -760,6 +795,8 @@ export async function send(
           probe: encounterProbeContract(e, problem),
           // Hints may follow only on facets the tutor already warned about.
           helpPolicy: { unlocked: unlockedHelp(e.tutor) },
+          // Which part the learner can see, when the question has several.
+          ...(openPart(e) ? { stage: openPart(e) } : {}),
           ...(g.study.profile === "live" && r
             ? {
                 topicAssessmentContext: topicAssessmentContext(
