@@ -13,7 +13,13 @@ import { escapeHtml as escape } from "./html";
 import { encounterGaps, probeSummary } from "./knowledge-probe";
 import { encounterKey } from "./learner";
 import { markdownToHtml } from "./markdown";
-import { partMarkers } from "./question-parts";
+import {
+  advancePart,
+  clearedThrough,
+  nextPartOffer,
+  partMarkers,
+} from "./question-parts";
+import { settleTutorRequest } from "./run-learning";
 import type { Encounter, StudyRecord, Roadmap } from "./model";
 
 /** What the question's conversation partner is called. */
@@ -139,15 +145,20 @@ export function createTerminalPanels(host: TerminalPanelHost) {
       );
     const done = completionMarkerIndex(e);
     const parts = partMarkers(e);
+    // Earlier parts' messages left the screen when their part was left.
+    const cleared = clearedThrough(e) ?? -Infinity;
+    const pending = (e.tutorRequests ?? []).some((j) => j.state === "pending");
     const html =
       e.tutor
-        .map(
-          (m, i) =>
-            (i === done ? COMPLETION_MARKER : "") +
-            said(m) +
-            (parts.get(m.seq) ?? ""),
+        .map((m, i) =>
+          m.seq <= cleared
+            ? ""
+            : (i === done ? COMPLETION_MARKER : "") +
+              said(m) +
+              (parts.get(m.seq) ?? ""),
         )
         .join("") +
+      (pending ? "" : nextPartOffer(e)) +
       (done === e.tutor.length ? COMPLETION_MARKER : "") +
       (e.tutorRequests ?? [])
         .map((j) => (j.state === "pending" ? streamingReply(j) : undefined))
@@ -155,7 +166,21 @@ export function createTerminalPanels(host: TerminalPanelHost) {
         .map((text) => bubble("tutor", TUTOR, text))
         .join("");
     const box = $("#messages");
-    if (setHtml(box, html)) box.scrollTop = box.scrollHeight;
+    if (!setHtml(box, html)) return;
+    box.scrollTop = box.scrollHeight;
+    const next = box.querySelector<HTMLButtonElement>("[data-next-part]");
+    if (next)
+      next.onclick = () => {
+        if (!advancePart(e)) return;
+        // A request interrupted on the part just left is not retried on the next.
+        for (const job of e.tutorRequests ?? [])
+          if (job.state === "interrupted")
+            settleTutorRequest(job, "superseded");
+        delete e.error;
+        host.persist();
+        host.render();
+        $<HTMLTextAreaElement>("#chat-input").focus();
+      };
   }
 
   return { requestStatus, messages };

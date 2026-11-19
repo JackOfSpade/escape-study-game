@@ -7,7 +7,7 @@ import {
   partReplyProblem,
   partsProblem,
 } from "../scripts/lib/question-parts.mjs";
-import { openPart } from "./question-parts";
+import { requestStage } from "./question-parts";
 import { completionVerdict } from "./completion-verdict";
 import { careerScopeGuidance, studyFocus } from "./career-profile";
 import {
@@ -362,6 +362,7 @@ export function regenerateQuestion(g: StudyRecord, e: Encounter, r: Roadmap) {
   delete e.problem;
   delete e.probe;
   delete e.partsDone;
+  delete e.partReady;
   delete e.tutorRequests;
   delete e.chatDraft;
   delete e.executions;
@@ -678,13 +679,14 @@ export function retryTutorRequest(
           offers: [...help.offers],
         };
       job.responseMessageId = delivered.id;
-      // The tutor confirmed the open part: the next one takes its place.
+      // The tutor confirmed the open part: the learner is offered the next
+      // one, and opens it when ready.
       const partClosed =
         dialogue &&
         e.state !== "consumed" &&
         closesPart(payload, answer as Record<string, unknown>) &&
         (e.partsDone?.length ?? 0) === payload.stage.part - 1;
-      if (partClosed) (e.partsDone ??= []).push(delivered.seq);
+      if (partClosed) e.partReady = delivered.seq;
       const gaps = probe
         ? recordProbeTurn(g, e, probe, {
             requestId: job.id,
@@ -796,7 +798,7 @@ export async function send(
           // Hints may follow only on facets the tutor already warned about.
           helpPolicy: { unlocked: unlockedHelp(e.tutor) },
           // Which part the learner can see, when the question has several.
-          ...(openPart(e) ? { stage: openPart(e) } : {}),
+          ...(requestStage(e) ? { stage: requestStage(e) } : {}),
           ...(g.study.profile === "live" && r
             ? {
                 topicAssessmentContext: topicAssessmentContext(

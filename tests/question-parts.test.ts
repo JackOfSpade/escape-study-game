@@ -19,7 +19,15 @@ import {
 import { initialStudy } from "../src/curriculum";
 import { probeFacets } from "../src/knowledge-probe";
 import type { Encounter, Roadmap } from "../src/model";
-import { openPart, partMarkers, questionHtml } from "../src/question-parts";
+import {
+  advancePart,
+  clearedThrough,
+  nextPartOffer,
+  openPart,
+  partMarkers,
+  questionHtml,
+  requestStage,
+} from "../src/question-parts";
 import { localHandoff } from "./helpers/local-handoff";
 import { preparePracticeRooms } from "./helpers/practice-questions";
 import { createGame } from "./helpers/record";
@@ -118,8 +126,35 @@ test("the question pane shows the shared material with the open part only", () =
     questionHtml({ state: "in-progress", problem: { prompt: "**Plain**" } } as Encounter), // prettier-ignore
     "<p><strong>Plain</strong></p>",
   );
-  assert.match(partMarkers(staged([7])).get(7) ?? "", /Part 1 of 2 answered[^]*shows part 2/); // prettier-ignore
+  assert.match(partMarkers(staged([7])).get(7) ?? "", /Part 1 of 2 answered[^]*Part 2 follows/); // prettier-ignore
   assert.equal(partMarkers(staged()).size, 0);
+});
+
+test("a confirmed part waits for the learner, then clears the conversation", () => {
+  const e = staged();
+  e.tutor = [{ seq: 4 }, { seq: 5 }] as Encounter["tutor"];
+  // Nothing is offered until the tutor confirms the part.
+  assert.equal(nextPartOffer(e), "");
+  assert.equal(advancePart(e), false);
+  e.partReady = 5;
+  assert.match(nextPartOffer(e), /Part 1 of 2 answered[^]*data-next-part/);
+  assert.deepEqual(requestStage(e), { part: 1, of: 2, question: "FIRST ask", confirmed: true }); // prettier-ignore
+  assert.equal(clearedThrough(e), undefined);
+  // A follow-up on the confirmed part is cleared with the rest of it.
+  e.tutor.push(...([{ seq: 6 }, { seq: 7 }] as Encounter["tutor"]));
+  assert.equal(advancePart(e), true);
+  assert.deepEqual(e.partsDone, [7]);
+  assert.equal(e.partReady, undefined);
+  assert.equal(clearedThrough(e), 7);
+  assert.equal(nextPartOffer(e), "");
+  // The tutor is told which messages belong to the part now open.
+  assert.deepEqual(requestStage(e), { part: 2, of: 2, question: "SECOND ask", since: 7 }); // prettier-ignore
+  // The last part has nothing after it, and a finished question shows all.
+  e.partReady = 9;
+  assert.equal(nextPartOffer(e), "");
+  assert.equal(advancePart(e), false);
+  assert.equal(clearedThrough({ ...e, state: "consumed" }), undefined);
+  assert.equal(requestStage({ problem: { prompt: "plain" } } as Encounter), undefined); // prettier-ignore
 });
 
 test("real bridge: a generated question is staged, worked part by part, and finished once", async () => {
@@ -162,20 +197,37 @@ test("real bridge: a generated question is staged, worked part by part, and fini
     assert.deepEqual(jobs[0].payload.stage, { part: 1, of: 2, question: "FIRST ask" }); // prettier-ignore
     assert.equal(relay.rejected, 1);
     assert.equal(e.state === "consumed", false);
-    assert.deepEqual(e.partsDone, [e.tutor.at(-1)!.seq]);
-    assert.equal(openPart(e)?.part, 2);
+    // The part is confirmed but stays open until the learner moves on.
+    assert.equal(e.partReady, e.tutor.at(-1)!.seq);
+    assert.deepEqual(e.partsDone ?? [], []);
+    assert.equal(openPart(e)?.part, 1);
     assert.deepEqual(
       (g.study.knowledgeGaps ?? []).map((gap) => gap.facet.id),
       [facets[0].id],
       "a point given up when leaving a part is recorded as a gap",
     );
 
+    // A follow-up before moving on is still about the confirmed part.
+    relay.answerWith((job) => {
+      jobs.push(job);
+      return { valid: { help: noHelp, text: "Because of the fixed facts.", complete: false, partComplete: true } }; // prettier-ignore
+    });
+    await send(g, e, "Why was that accepted?", roadmap);
+    assert.deepEqual(jobs[1].payload.stage, { part: 1, of: 2, question: "FIRST ask", confirmed: true }); // prettier-ignore
+    const left = e.tutor.at(-1)!.seq;
+    assert.equal(advancePart(e), true);
+    assert.deepEqual(e.partsDone, [left]);
+    assert.equal(openPart(e)?.part, 2);
+
     relay.answerWith((job) => {
       jobs.push(job);
       return { valid: { help: noHelp, text: "Solved.", complete: true, partComplete: true } }; // prettier-ignore
     });
-    await send(g, e, "My answer to the second part", roadmap);
-    assert.deepEqual(jobs[1].payload.stage, { part: 2, of: 2, question: "SECOND ask" }); // prettier-ignore
+    // The learner answers the new part without restating it: the request
+    // names the part and where its messages start.
+    await send(g, e, "It is the second one", roadmap);
+    assert.deepEqual(jobs.at(-1).payload.stage, { part: 2, of: 2, question: "SECOND ask", since: left }); // prettier-ignore
+    assert.equal(jobs.at(-1).payload.messages.length, e.tutor.length - 1, "the tutor still receives the earlier parts' conversation"); // prettier-ignore
     assert.equal(e.state, "consumed");
     assert.equal(e.partsDone!.length, 1);
     assert.equal(e.submissions.length, 1);
@@ -185,7 +237,7 @@ test("real bridge: a generated question is staged, worked part by part, and fini
       return { valid: { text: "Happy to discuss." } };
     });
     await send(g, e, "One more thought", roadmap);
-    assert.equal(jobs[2].payload.stage, undefined);
+    assert.equal(jobs.at(-1).payload.stage, undefined);
   } finally {
     globalThis.fetch = status("development");
     await checkBridge();
@@ -232,6 +284,7 @@ test("a generated reply's parts become the stored staged question", async () => 
     assert.equal("parts" in e.problem!, false);
     // A discarded question starts its replacement at the first part.
     e.partsDone = [3];
+    e.partReady = 9;
     assert.equal(regenerateQuestion(g, e, roadmap), true);
     assert.equal(e.partsDone, undefined);
     parts = ["Only ask"];

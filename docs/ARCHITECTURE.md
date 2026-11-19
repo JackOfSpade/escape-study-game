@@ -17,7 +17,7 @@ TypeScript, a semantic DOM and Vite build the local browser app (`src/`, entry `
 
 - `ai.ts`: question generation, tutor messages (streamed, display-only until validated), submission and completion checks, regeneration and retry. Every call goes through `bridge-client.ts`. A saved request keeps the provider that captured it.
 - `bridge-client.ts`: the handshake (`GET /api/status`) and `POST /api/bridge`, with timeouts, plain-text proxy errors and NDJSON streaming. It only moves requests; learning stays in the owning modules.
-- `question-parts.ts`: a question with several asks shown one part at a time: which part is open, the question pane's markup and the conversation's part markers. The rules and validators are in `scripts/lib/question-parts.mjs`.
+- `question-parts.ts`: a question with several asks shown one part at a time: which part is open, the question pane's markup, the "Next part" offer and which messages the conversation shows. The rules and validators are in `scripts/lib/question-parts.mjs`.
 - `knowledge-probe.ts`: the tutor's probing stance and its validated reply (`outcome`, findings, implied and declared sub-facets, answer signals), per-question probe state and the carried established-knowledge and gap records. Probe observations are never ledger mastery.
 - `topic-assessment.ts`: narrative topic reflections, validated whole before any effect applies. Never curriculum proof.
 - `completion-verdict.ts`, `record.ts`, `run-learning.ts`, `provider-label.ts`, `live-study.ts`: completion verdict parsing; the empty record a first visit starts from; settling tutor requests and recovering saved chat sessions as data; labels for saved providers; moving a save recorded on the old practice profile to the live profile with its ledger intact.

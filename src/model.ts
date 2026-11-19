@@ -269,9 +269,12 @@ export interface Encounter {
   directStudy?: DirectStudySession;
   chatDraft?: string;
   tutorRequests?: TutorRequest[];
-  /** For a question worked part by part: the tutor message that closed each
-   * finished part, in order. Its length is the index of the open part. */
+  /** For a question worked part by part: the last message of each part the
+   * learner has left, in order. Its length is the index of the open part. */
   partsDone?: number[];
+  /** The tutor message that confirmed the open part, while the learner has
+   * not opened the next one yet. */
+  partReady?: number;
   /** Knowledge probe: facets, per-turn findings and answer signals. */
   probe?: import("./knowledge-probe").KnowledgeProbe;
   executions?: import("./execution").WorkspaceExecution[];
