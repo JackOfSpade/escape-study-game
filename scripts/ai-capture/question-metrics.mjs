@@ -20,6 +20,7 @@ const METRICS = [
   "partCount",
   "sharedShare",
   "rubricLines",
+  "rubricLineWordsMax",
   "facetCount",
   "estimatedSolveSeconds",
 ];
@@ -90,6 +91,14 @@ export function questionMetrics(problem) {
     rubricLines: rubric
       .flatMap((entry) => entry.split("\n"))
       .filter((line) => line.trim()).length,
+    // A long line usually joins several requirements, and each one the ask
+    // does not name is a requirement the learner cannot see.
+    rubricLineWordsMax: Math.max(
+      0,
+      ...rubric
+        .flatMap((entry) => entry.split("\n"))
+        .map((line) => words(line)),
+    ),
     facetCount,
     perItemJustification: prose2.some(hasPerItemJustification),
     estimatedSolveSeconds: isNumber(problem?.estimatedSolveSeconds)

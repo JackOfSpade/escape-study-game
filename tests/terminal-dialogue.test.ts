@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { preparePracticeRooms } from "./helpers/practice-questions";
-import { checkBridge, retryTutorRequest, send } from "../src/ai";
+import { checkBridge, retryTutorRequest, send, tutorProblem } from "../src/ai";
 import { probeFacets, probeState } from "../src/knowledge-probe";
 import type { Roadmap } from "../src/model";
 import { createPlayableGame } from "./helpers/record";
@@ -68,7 +68,7 @@ test("one private tutor conversation accumulates answers and completes once, onl
       assert.ok(!c.payload.prompt.startsWith("@study"));
       assert.equal(c.payload.studyPrompt, undefined);
       assert.equal(c.payload.mode, "terminal-dialogue");
-      assert.deepEqual(c.payload.problem, e.problem);
+      assert.deepEqual(c.payload.problem, tutorProblem(e.problem));
       assert.match(c.payload.instruction, /Assume the learner already has/);
       assert.match(c.payload.probe.stance, /highest-leverage question/);
       assert.deepEqual(c.payload.probe.facets, probeFacets(e.problem));
@@ -116,6 +116,26 @@ test("interrupted chat retries its exact captured context after reload and never
     await retryTutorRequest(loaded, resumed, resumed.tutorRequests![0].id, r);
     assert.equal(resumed.submissions.length, 0);
     assert.match(resumed.tutorRequests![0].error!, /changed during review/);
+  }));
+test("a request saved when the tutor still received the rubric retries unchanged", async () =>
+  fixture(async (g, e, calls, reply) => {
+    reply(async () =>
+      Response.json({ error: "Synthetic outage" }, { status: 503 }),
+    );
+    await send(g, e, "Captured answer", r);
+    const loaded = recover(decode(encode(g))),
+      resumed = loaded.encounters[e.id],
+      job = resumed.tutorRequests![0];
+    // The shape every request had before the rubric travelled as examples.
+    const saved = JSON.parse(job.payloadJson);
+    saved.problem = JSON.parse(JSON.stringify(resumed.problem));
+    job.payloadJson = JSON.stringify(saved);
+    reply(async () => Response.json({ text: "Keep going", complete: false }));
+    await retryTutorRequest(loaded, resumed, job.id, r);
+    assert.equal(job.state, "applied");
+    assert.equal(job.error, undefined);
+    assert.deepEqual(calls.at(-1)!.payload.problem, saved.problem);
+    assert.ok("rubric" in calls.at(-1)!.payload.problem);
   }));
 test("pending turns coalesce, newer turns supersede interrupted checks, and a disconnected reply cannot award", async () =>
   fixture(async (g, e, calls, reply) => {

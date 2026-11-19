@@ -6,7 +6,7 @@ export interface DeclaredHelp {
   hints: string[];
   /** The step or the full answer. */
   gives: string[];
-  /** Facets this reply warned about before hinting. */
+  /** Facets this reply warned about before hinting; the learner's acceptance unlocks them. */
   offers: string[];
 }
 export function validHelp(help: unknown): boolean;

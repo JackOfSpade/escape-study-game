@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { preparePracticeRooms } from "./helpers/practice-questions";
-import { checkBridge, offeredHelp, retryTutorRequest, send } from "../src/ai";
+import {
+  checkBridge,
+  offeredHelp,
+  retryTutorRequest,
+  send,
+  tutorProblem,
+} from "../src/ai";
 import type { Roadmap } from "../src/model";
 import { decode, encode, recover } from "../src/persistence";
 import { createGame } from "./helpers/record";
@@ -63,7 +69,9 @@ test("real bridge and gateway: chat follow-up, malformed correction, interrupted
       false,
       "the prompt is plain text with no retired chat prefix",
     );
-    assert.deepEqual(one.payload.problem, e.problem);
+    // The rubric travels as examples of evidence, never as `rubric`.
+    assert.deepEqual(one.payload.problem, tutorProblem(e.problem!));
+    assert.equal("rubric" in one.payload.problem, false);
     assert.equal(relay.rejected, 1, "the malformed answer was refused");
     assert.equal(e.tutorRequests![0].state, "applied");
     assert.equal(e.submissions.length, 0);
@@ -84,8 +92,8 @@ test("real bridge and gateway: chat follow-up, malformed correction, interrupted
       roadmap,
     );
     const two = jobs[1];
-    // The earlier warning unlocks hints on that facet from here on.
-    assert.deepEqual(two.payload.helpPolicy, { unlocked: ["synthetic-facet"] });
+    // A typed attempt is not acceptance: the warning alone unlocks nothing.
+    assert.deepEqual(two.payload.helpPolicy, { unlocked: [] });
     assert.equal(two.payload.messages.length, 3);
     assert.equal(two.payload.messages[1].text, followup.text);
     const context = JSON.stringify(two.payload);

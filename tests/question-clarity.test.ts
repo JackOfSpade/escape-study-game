@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { checkBridge, send } from "../src/ai";
+import { checkBridge, send, tutorProblem } from "../src/ai";
 import { eligible } from "../src/curriculum";
 import {
   encounterProbeContract,
@@ -137,7 +137,7 @@ test("a clarification-only terminal turn receives the clarity policy and preserv
       );
       assert.doesNotMatch(policy, /asking what the question means are signals/);
     }
-    assert.deepEqual(packet.problem, beforeProblem);
+    assert.deepEqual(packet.problem, tutorProblem(beforeProblem));
     assert.deepEqual(e.problem, beforeProblem);
     assert.deepEqual(probeState(e), beforeState);
     assert.deepEqual(g.study.knowledgeEstablished, beforeEstablished);

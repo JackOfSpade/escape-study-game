@@ -188,6 +188,8 @@ export interface Artifact {
 export interface Message {
   /** A tutor reply's own declaration: facets it supplied help for, and facets it offered help on. */
   help?: import("../scripts/lib/help-gate.mjs").DeclaredHelp;
+  /** On a learner message sent with the hint button: the offered facets they accepted a hint on. */
+  accepts?: string[];
   sourceRefs?: number[];
   requestId?: string;
   id: string;

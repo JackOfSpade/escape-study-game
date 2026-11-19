@@ -839,11 +839,14 @@ function startTerminalRequest(start: (e: Encounter) => Promise<unknown>) {
   void persist();
 }
 $("#terminal-connect-retry").onclick = () => void recheckConnection();
-// Shortcuts for answering the tutor's one warning; typing works too.
+// Answers to the tutor's one warning. Only the accept button unlocks a hint;
+// a typed reply is judged as a new attempt.
 $("#help-accept").onclick = () => {
   const e = active ? game.encounters[active] : undefined;
   if (!e || !offeredHelp(e).length) return;
-  startTerminalRequest(() => send(game, e, "Yes, give me a hint.", roadmap));
+  startTerminalRequest(() =>
+    send(game, e, "Yes, give me a hint.", roadmap, true),
+  );
 };
 $("#help-retry").onclick = () => $<HTMLTextAreaElement>("#chat-input").focus();
 $("#help-skip").onclick = () => {

@@ -60,6 +60,12 @@ test("a problem with no parts", () => {
   assert.deepEqual(m.partWords, []);
   assert.equal(m.sharedShare, 1);
   assert.equal(m.rubricLines, 2);
+  assert.equal(m.rubricLineWordsMax, 1);
+  assert.equal(
+    questionMetrics({ prompt: "x", rubric: ["one two", "a b c d\ne"] })
+      .rubricLineWordsMax,
+    4,
+  );
   assert.equal(m.facetCount, 3);
   assert.equal(m.estimatedSolveSeconds, 90);
   assert.equal(questionMetrics({ title: "t", prompt: "x" }).estimatedSolveSeconds, null); // prettier-ignore

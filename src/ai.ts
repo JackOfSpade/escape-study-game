@@ -557,9 +557,11 @@ function message(
   text: string,
   provenance: string,
   sourceSeq?: number | number[],
+  accepts?: string[],
 ) {
   const ev = { seq: nextSeq(g) };
   const m: Message = {
+    ...(accepts?.length ? { accepts } : {}),
     id: `message-${ev.seq}`,
     author,
     kind,
@@ -650,7 +652,7 @@ export function retryTutorRequest(
           g.encounters[e.id] !== e ||
           (dialogue &&
             ((e.owner && e.owner !== "human") ||
-              JSON.stringify(payload.problem) !== JSON.stringify(e.problem) ||
+              !sameIssuedProblem(payload.problem, e.problem) ||
               payload.draftRevision !== e.revision ||
               payload.workspace !== e.workspace ||
               current?.seq !== job.questionSequence ||
@@ -706,7 +708,7 @@ export function retryTutorRequest(
             e.probe?.facets ??
               (Array.isArray(payload.probe?.facets)
                 ? payload.probe.facets
-                : probeFacets(payload.problem)),
+                : probeFacets(e.problem ?? payload.problem)),
             1,
           )
         : undefined;
@@ -834,6 +836,25 @@ export function retryTutorRequest(
   void operation.finally(() => tutorInFlight.delete(job));
   return operation;
 }
+/** A request saved before the rubric was sent as examples holds the question unchanged. */
+const sameIssuedProblem = (sent: unknown, problem?: Problem) => {
+  const text = JSON.stringify(sent);
+  return (
+    !!problem &&
+    (text === JSON.stringify(tutorProblem(problem)) ||
+      text === JSON.stringify(problem))
+  );
+};
+/**
+ * The question as the tutor receives it. The rubric goes under
+ * `evidenceExamples`: the tutor accepts on what the question asks and the
+ * facet descriptions, and reads these lines as what a full answer may
+ * contain, never as a checklist the learner cannot see.
+ */
+export function tutorProblem(problem: Problem) {
+  const { rubric, ...rest } = problem;
+  return { ...rest, evidenceExamples: rubric };
+}
 /**
  * The facets the tutor's latest reply warned about before hinting, while that offer is
  * still the open decision: the question is unfinished and nothing has been
@@ -850,6 +871,8 @@ export async function send(
   e: Encounter,
   text: string,
   r: Roadmap,
+  /** Set by the hint button only: the learner accepts the hint the tutor just offered. */
+  acceptHint = false,
 ) {
   const problem = e.problem;
   if (!text.trim() || !problem) return;
@@ -857,7 +880,8 @@ export async function send(
   for (const job of e.tutorRequests ?? [])
     if (job.state === "interrupted") settleTutorRequest(job, "superseded");
   delete e.error;
-  message(g, e, "human", "human", text, "live-human");
+  const accepts = acceptHint ? offeredHelp(e) : [];
+  message(g, e, "human", "human", text, "live-human", undefined, accepts);
   try {
     if (e.state !== "consumed") beginVisit(r, g.study, e);
   } catch {
@@ -889,7 +913,7 @@ export async function send(
             : {}),
         }
       : {}),
-    problem,
+    problem: tutorProblem(problem),
     workspace: e.workspace,
     draftRevision: e.revision,
     submissions: e.submissions.slice(-5).map((s) => ({
