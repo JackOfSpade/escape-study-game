@@ -1544,7 +1544,7 @@ test("live question generation sends the track's probe records and a policy that
     assert.match(generatePayload.generationPolicy, /Use probeRecords/);
     assert.match(
       generatePayload.generationPolicy,
-      /prompt alone must supply.*without using the chat/,
+      /prompt and the part on screen together must supply.*without using the chat/,
     );
     assert.match(
       generatePayload.generationPolicy,

@@ -161,7 +161,7 @@ export function careerScopeGuidance(
   if (!roleFocused(focus) || contract.track !== "PE") return "";
   const priorities = contract.objectiveIds.map(careerPriority);
   const base =
-    "Role profile: product engineer who owns a consumer/creative web feature end to end. Judge useful, polished, reliable UX with appropriate API, data and security correctness, not specialist infrastructure depth. Operational settings, protocol and handshake details may be supplied as facts or consulted documentation; never add them as mandatory facets outside the issued task.";
+    "Role profile: product engineer who owns a consumer/creative web feature end to end. Judge useful, polished, reliable UX with appropriate API, data and security correctness, not specialist infrastructure depth. Operational settings, protocol and handshake details may be supplied as facts or consulted documentation; never add them as mandatory facets outside the issued task. When the objective neither fixes a domain nor is about the learner's own projects or experience, set the question in a consumer or creative web feature, such as an editor, gallery, feed, upload or checkout.";
   const extra = priorities.includes("core")
     ? ` Ask only what the issued task states${contract.depth <= 1 ? "; at D1 keep it to bounded conceptual reasoning with at most one level of prerequisite clarification" : ""}.`
     : " This objective is working-awareness reference for the role: accept looked-up specifics, and do not treat it as a profile requirement.";

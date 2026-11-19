@@ -15,6 +15,7 @@ import {
   buildPrompt,
   claudeArgs,
   claudeChildEnv,
+  correctionPrompt,
   createClaudeGateway,
   firstJsonObject,
   textFieldReader,
@@ -81,6 +82,15 @@ test("stable material goes in the system prompt, varying fields in the message",
   assert.ok(a.system.includes('"curriculum":{"big":true}'));
   assert.ok(!a.user.includes("curriculum"));
   assert.ok(a.user.includes("probeRecords"));
+  // The earlier-question summary changes per request, so it must stay out of
+  // the cached system text.
+  const c = buildPrompt("generate", {
+    requestId: "three",
+    curriculum: { big: true },
+    earlierQuestions: [{ title: "x", opening: "y", asks: [] }],
+  });
+  assert.equal(c.system, a.system);
+  assert.ok(c.user.includes("earlierQuestions"));
 });
 
 test("tutor instructions request topic assessments only on completion, without ChatGPT wording", () => {
@@ -930,4 +940,32 @@ test("a broken replay store never fails a call", async () => {
   }
   assert.equal(warnings.length, 1);
   assert.match(warnings[0], /replay sample failed/i);
+});
+
+test("a correction shows the model its own rejected reply, bounded", async () => {
+  const calls = [];
+  const g = gateway(['{"bad":1,"note":"REJECTED-MARKER"}', '{"ok":1}'], calls, {
+    validate: (_job, answer) => {
+      if (answer.bad) throw Error("wrong shape");
+    },
+  });
+  assert.deepEqual(await g.run("review-environment", {}), { ok: 1 });
+  assert.ok(!calls[0].input.includes("REJECTED-MARKER"));
+  assert.ok(calls[1].input.includes("REJECTED-MARKER"));
+  assert.ok(calls[1].input.includes("wrong shape"));
+  assert.ok(calls[1].input.includes("Your own previous answer"));
+  const out = correctionPrompt("U", "why", "y".repeat(50), 10);
+  assert.ok(out.startsWith("U\n\nYour previous answer was rejected: why\n"));
+  assert.ok(out.includes("y".repeat(10)) && !out.includes("y".repeat(11)));
+  assert.match(out, /40 more characters not shown/);
+  assert.ok(out.endsWith("Return the complete corrected JSON object."));
+  assert.doesNotMatch(correctionPrompt("U", "why", ""), /Your own previous/);
+});
+
+test("a fresh request id is never answered from an earlier answer", async () => {
+  const calls = [];
+  const g = gateway(['{"n":1}', '{"n":2}'], calls);
+  assert.deepEqual(await g.run("review-environment", { requestId: "one" }), { n: 1 }); // prettier-ignore
+  assert.deepEqual(await g.run("review-environment", { requestId: "two" }), { n: 2 }); // prettier-ignore
+  assert.equal(calls.length, 2);
 });
