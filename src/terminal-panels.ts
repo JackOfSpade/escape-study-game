@@ -28,6 +28,13 @@ const TUTOR = "Tutor";
 const speakerLabel = (author: string) =>
   author === "Terminal AI" ? TUTOR : author;
 
+/** One chat bubble: the speaker's name as plain text and the message as
+ * markdown, which markdownToHtml escapes. Shared by the question's
+ * conversation and the lesson's tutor chat. */
+export function messageBubble(kind: string, name: string, text: string) {
+  return `<div class="message ${escape(kind)}"><strong>${escape(name)}</strong><div class="message-body">${markdownToHtml(text)}</div></div>`;
+}
+
 interface TerminalPanelHost {
   /** The current record: an import replaces it. */
   game(): StudyRecord;
@@ -53,7 +60,7 @@ export function provenanceText(game: StudyRecord, e: Encounter): string {
             : "Earlier practice question · No academic credit";
   if (e.problem?.contract.practice)
     text +=
-      " · Variety practice on another topic of this tier: knowledge is probed and recorded, but this is not the scheduled visit";
+      " · Practice question: what you show here is recorded and can close a gap, but this is not a scheduled visit and gives no credit";
   if (
     game.study.learner?.attempts.some(
       (a) =>
@@ -154,12 +161,10 @@ export function createTerminalPanels(host: TerminalPanelHost) {
 
   /** The conversation, then a reply still arriving. */
   function messages(e: Encounter) {
-    const bubble = (kind: string, name: string, text: string) =>
-      `<div class="message ${escape(kind)}"><strong>${name}</strong><div class="message-body">${markdownToHtml(text)}</div></div>`;
     const said = (m: Encounter["tutor"][number]) =>
-      bubble(
+      messageBubble(
         m.kind,
-        escape(m.author === "human" ? "You" : speakerLabel(m.author)),
+        m.author === "human" ? "You" : speakerLabel(m.author),
         m.text,
       );
     const done = completionMarkerIndex(e);
@@ -183,7 +188,7 @@ export function createTerminalPanels(host: TerminalPanelHost) {
       (e.tutorRequests ?? [])
         .map((j) => (j.state === "pending" ? streamingReply(j) : undefined))
         .filter((text): text is string => !!text)
-        .map((text) => bubble("tutor", TUTOR, text))
+        .map((text) => messageBubble("tutor", TUTOR, text))
         .join("");
     const box = $("#messages");
     if (!setHtml(box, html)) return;

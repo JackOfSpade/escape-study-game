@@ -22,6 +22,13 @@ TypeScript, a semantic DOM and Vite build the local browser app (`src/`, entry `
 - `topic-assessment.ts`: narrative topic reflections, validated whole before any effect applies. Never curriculum proof.
 - `completion-verdict.ts`, `record.ts`, `run-learning.ts`, `provider-label.ts`, `live-study.ts`: completion verdict parsing; the empty record a first visit starts from; settling tutor requests and recovering saved chat sessions as data; labels for saved providers; moving a save recorded on the old practice profile to the live profile with its ledger intact.
 
+**Lessons**
+
+- `lesson-surface.ts`: the lesson screen opened from a recorded gap (two panes: the lesson, and a tutor chat that only answers about it) and its entry points, the offers under a finished question and the map's list of open gaps. The lesson body is mounted once; repaints only touch status text, buttons and the chat. Which lesson is open is memory only. `lesson.css` holds the layout and the block styles.
+- `lesson.ts` / `lesson-store.ts`: the controller (request payloads, request identity and retry, chat, saved answers) and its separate IndexedDB database `dead-air-lessons`, with checksummed rows that fail closed. `lesson-types.ts` holds the record types.
+- `gapPracticeQuestion` (`study-workspace.ts`) opens an empty question for "Test me on this", and `seedGapPractice` (`ai.ts`) seeds its `generate` request with the recorded gap's contract marked `practice`; a practice question is never the scheduled visit and is not assessed.
+- `lesson-render.ts` / `lesson-figures.ts`: turn a validated lesson into a safe node tree and draw it with `createElement` and `textContent`. Prose goes through `markdown.ts`; diagrams and step-through figures are drawn from data. `scripts/lib/lesson-schema.mjs` (shared with the relay) validates the model's JSON and `lesson-policy.mjs` holds what the model is told.
+
 **Curriculum and ledger**
 
 - `curriculum.ts`: the scheduler view over the roadmap, eligibility, visit bookkeeping and the evidence packet handed to assessment. `career-profile.ts` is the reversible role overlay (51 core Product Engineering objectives, depth at most 3) that changes future scheduling only.
@@ -55,6 +62,8 @@ TypeScript, a semantic DOM and Vite build the local browser app (`src/`, entry `
 - `scripts/ai-ladder.mjs`, `ai-judge.mjs`, `ai-usage-report.mjs`, `ai-capture/`: measurement tooling ([AI model and effort selection](AI_MODEL_SELECTION.md)).
 
 ## Trust boundaries
+
+Lessons are model-written data, not markup: the relay validates a typed JSON document, and trusted code in the browser draws every block, so no model string reaches `innerHTML` unescaped, an attribute, a URL, a style or an event handler. A lesson is never evidence. It, its checks and its chat live only in the `dead-air-lessons` database; they never write the learner's record, never set a gap's `resolved`, and are never sent into question, assessment or tutor requests. A gap closes only when a question shows the learner has it, and the saved record is untouched by anything in a lesson.
 
 Model, tutor and question text is escaped or assigned through `textContent`; markdown has no links or raw HTML. Structured completion and evidence replies pass scoped validators and cannot grant a pass, key or mastery by themselves. The relay accepts only known operations and bounded JSON, binds loopback, and starts the Claude process without `ANTHROPIC_*` variables. It never evaluates submitted code itself: `/api/execute` delegates to disposable Docker containers with no network or host mounts, a non-root user, a read-only root filesystem, dropped capabilities and bounded resources, and there is no host fallback.
 

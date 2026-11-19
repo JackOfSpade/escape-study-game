@@ -12,6 +12,7 @@ import { completionVerdict } from "./completion-verdict";
 import { briefError, studyEvent } from "./study-events";
 import { careerScopeGuidance, studyFocus } from "./career-profile";
 import {
+  type KnowledgeGapRecord,
   knowledgeProbeContext,
   parseProbeReply,
   probeRecordsForTrack,
@@ -20,6 +21,7 @@ import {
   probeFacets,
   recordGapReview,
   recordProbeTurn,
+  reconcileKnowledgeGaps,
   reviewContract,
   TERMINAL_DIALOGUE_FORMAT,
   TERMINAL_DIALOGUE_INSTRUCTION,
@@ -397,6 +399,42 @@ export async function ensureProblem(g: StudyRecord, e: Encounter, r: Roadmap) {
     if (e.generation === generation) delete e.generation;
   }
 }
+/**
+ * Prepare a practice question that re-tests one recorded gap. It reuses the
+ * contract of the question that recorded the gap, marked `practice`, so the
+ * conversation probes and records knowledge (which is what can close the gap)
+ * while the scheduler, the formal visit and the assessment are left alone.
+ * The caller then prepares the question as usual.
+ */
+export function seedGapPractice(
+  g: StudyRecord,
+  r: Roadmap,
+  e: Encounter,
+  gap: Pick<KnowledgeGapRecord, "encounter">,
+) {
+  if (!live(g) || status().mode !== "claude-cli")
+    throw Error("Claude is not connected. Your work is saved.");
+  const source = [...Object.values(g.encounters), ...g.study.archives].find(
+    (x) => encounterKey(x) === gap.encounter,
+  );
+  const issued = source?.problem?.contract;
+  if (!issued)
+    throw Error("The question that recorded this gap is no longer saved.");
+  const contract: Contract = {
+    ...structuredClone(issued),
+    id: `practice-${issued.id}-${e.id}`,
+    practice: true,
+    review: false,
+    ledgerVersion: g.study.learner?.version ?? issued.ledgerVersion,
+  };
+  delete contract.scheduleNote;
+  const requestId = newGenerationId(g, e);
+  e.pendingGeneration = {
+    provider: activeProvider(),
+    requestId,
+    payload: structuredClone(generationPayload(g, r, contract, requestId, e)),
+  };
+}
 /** A workspace question that can be thrown away and written again. */
 const regenerable = (g: StudyRecord, e: Encounter) =>
   !!e.studyOnly &&
@@ -428,10 +466,14 @@ export function regenerateQuestion(g: StudyRecord, e: Encounter, r: Roadmap) {
   const study = g.study;
   if (study.knowledgeGaps)
     study.knowledgeGaps = study.knowledgeGaps.filter((x) => !mine(x));
-  if (study.knowledgeEstablished)
-    study.knowledgeEstablished = study.knowledgeEstablished.filter(
-      (x) => !mine(x),
-    );
+  // A gap the discarded question had closed opens again: resolutions follow
+  // the established records, so they are re-derived when any was removed.
+  const established = study.knowledgeEstablished;
+  if (established) {
+    const kept = established.filter((x) => !mine(x));
+    study.knowledgeEstablished = kept;
+    if (kept.length !== established.length) reconcileKnowledgeGaps(g);
+  }
   delete e.problem;
   delete e.probe;
   delete e.partsDone;
@@ -1004,7 +1046,8 @@ export function applyCompletion(
     );
     e.contributors =
       worked && result.qualified.includes("human") ? ["human"] : [];
-    countStudyTurn(g.study, e);
+    // A practice question never spends a scheduled track turn.
+    if (!e.problem?.contract.practice) countStudyTurn(g.study, e);
     completeQuestion(g, e, s.id, result.feedback);
     e.workspace = s.content;
     e.revision = s.revision;

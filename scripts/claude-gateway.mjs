@@ -78,6 +78,23 @@ export const TASK_PROFILES = Object.freeze({
     stableKeys: ["instruction", "definition"],
   },
   "reconcile-roadmap": { ...authoring("high"), stableKeys: ["instruction"] },
+  // Chosen by judgement, not measured (docs/AI_MODEL_SELECTION.md): a lesson
+  // is authored like a question, one step above `generate`; the side chat is
+  // a short live reply like `tutor`, one step above its setting.
+  lesson: {
+    ...authoring("high"),
+    stableKeys: ["curriculum", "lessonPolicy"],
+  },
+  "lesson-chat": {
+    ...live(120_000, "sonnet", "medium"),
+    stableKeys: [
+      "instruction",
+      "responseFormat",
+      "lesson",
+      "gap",
+      "sectionIds",
+    ],
+  },
 });
 /** Every task runs the model and effort in its own profile. The
  * unknown task still throws so a typo cannot silently call the wrong model. */
