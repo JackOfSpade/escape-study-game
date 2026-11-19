@@ -60,7 +60,19 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run import:curriculum
-      - run: npx playwright install --with-deps chromium
+      # The system packages come from Ubuntu's mirrors, which time out now and
+      # then. Without a retry one failed download fails the job before any test.
+      - name: Install Chromium and its system packages
+        run: |
+          for attempt in 1 2 3 4; do
+            if npx playwright install --with-deps chromium; then exit 0; fi
+            if [ "$attempt" -lt 4 ]; then
+              echo "::warning::Chromium install failed (attempt $attempt of 4); retrying in $((attempt * 30))s"
+              sleep $((attempt * 30))
+            fi
+          done
+          echo "::error::Chromium install failed 4 times"
+          exit 1
       - name: Run selected synthetic browser regressions
         run: npx playwright test --config=playwright.ci.config.ts
       - name: Retain synthetic browser failures
