@@ -19,6 +19,7 @@ export async function mockClaudeStudy(
     why = reason,
     holding = false;
   const forced: any[] = [];
+  let questionFields: object = {};
   let respond: (body: any) => object | Promise<object> = () => ({
     text: "What would the planner do then?",
     complete: false,
@@ -63,6 +64,7 @@ export async function mockClaudeStudy(
         rubric: ["fixture"],
         contract: c,
         estimatedSolveSeconds: 120,
+        ...questionFields,
         scopeDefinitions: c.objectiveIds.map((id: string, i: number) => ({
           id: `${id}/D${c.depth}`,
           objectiveId: id,
@@ -92,6 +94,10 @@ export async function mockClaudeStudy(
     /** Answer the next generate call with this contract instead of the requested one. */
     forceNextContract(contract: unknown) {
       forced.push(contract);
+    },
+    /** Fields the next generated questions carry, over the fixture's own. */
+    question(fields: object) {
+      questionFields = fields;
     },
     /** Keep tutor requests in flight until `release`. */
     hold() {

@@ -13,6 +13,7 @@ import { escapeHtml as escape } from "./html";
 import { encounterGaps, probeSummary } from "./knowledge-probe";
 import { encounterKey } from "./learner";
 import { markdownToHtml } from "./markdown";
+import { partMarkers } from "./question-parts";
 import type { Encounter, StudyRecord, Roadmap } from "./model";
 
 /** What the question's conversation partner is called. */
@@ -137,9 +138,15 @@ export function createTerminalPanels(host: TerminalPanelHost) {
         m.text,
       );
     const done = completionMarkerIndex(e);
+    const parts = partMarkers(e);
     const html =
       e.tutor
-        .map((m, i) => (i === done ? COMPLETION_MARKER : "") + said(m))
+        .map(
+          (m, i) =>
+            (i === done ? COMPLETION_MARKER : "") +
+            said(m) +
+            (parts.get(m.seq) ?? ""),
+        )
         .join("") +
       (done === e.tutor.length ? COMPLETION_MARKER : "") +
       (e.tutorRequests ?? [])

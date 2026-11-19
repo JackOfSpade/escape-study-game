@@ -1,0 +1,252 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+// @ts-expect-error Direct .mjs contract test.
+import { taskInstructions, validateAnswer } from "../scripts/lib/ai-contracts.mjs"; // prettier-ignore
+import {
+  closesPart,
+  composePrompt,
+  partReplyProblem,
+  partsProblem,
+  stagedParts,
+} from "../scripts/lib/question-parts.mjs";
+import {
+  checkBridge,
+  ensureProblem,
+  regenerateQuestion,
+  send,
+} from "../src/ai";
+import { initialStudy } from "../src/curriculum";
+import { probeFacets } from "../src/knowledge-probe";
+import type { Encounter, Roadmap } from "../src/model";
+import { openPart, partMarkers, questionHtml } from "../src/question-parts";
+import { localHandoff } from "./helpers/local-handoff";
+import { preparePracticeRooms } from "./helpers/practice-questions";
+import { createGame } from "./helpers/record";
+
+const roadmap: Roadmap = JSON.parse(
+  readFileSync("public/curriculum.json", "utf8"),
+);
+const noHelp = { nudges: [], hints: [], gives: [], offers: [] };
+const staged = (
+  partsDone?: number[],
+  state: Encounter["state"] = "in-progress",
+) =>
+  ({
+    state,
+    partsDone,
+    problem: {
+      prompt: "ignored when staged",
+      staged: { shared: "SHARED facts", parts: ["FIRST ask", "SECOND ask"] },
+    },
+  }) as unknown as Encounter;
+
+test("generated parts are validated and composed into one whole prompt", () => {
+  assert.equal(partsProblem(undefined), undefined);
+  assert.equal(partsProblem(["One ask"]), undefined);
+  for (const bad of [[], "one", [""], ["a", 2], Array(6).fill("ask")])
+    assert.match(partsProblem(bad) ?? "", /parts must be an array/);
+  assert.equal(composePrompt("Scenario.", ["Why?"]), "Scenario.\n\nWhy?");
+  assert.equal(
+    composePrompt("Scenario.", ["Why?", "What next?"]),
+    "Scenario.\n\n**Part 1 of 2**\n\nWhy?\n\n**Part 2 of 2**\n\nWhat next?",
+  );
+  // One ask, or none recorded, is a question shown whole.
+  assert.equal(
+    stagedParts({ staged: { shared: "s", parts: ["only"] } }),
+    undefined,
+  );
+  assert.equal(stagedParts({ prompt: "plain" }), undefined);
+  assert.deepEqual(stagedParts({ staged: { shared: "s", parts: ["a", "b"] } }), ["a", "b"]); // prettier-ignore
+});
+
+test("the tutor contract and validators enforce one part at a time", () => {
+  assert.match(taskInstructions("generate", {}), /One part at a time/);
+  assert.match(taskInstructions("tutor", {}), /payload\.stage is present/);
+  const first = { stage: { part: 1, of: 2, question: "FIRST ask" } };
+  const last = { stage: { part: 2, of: 2, question: "SECOND ask" } };
+  assert.equal(partReplyProblem({}, { complete: true }), undefined);
+  assert.equal(partReplyProblem(last, { complete: true }), undefined);
+  assert.match(
+    partReplyProblem(first, { complete: true }) ?? "",
+    /only seen part 1 of 2/,
+  );
+  assert.match(
+    partReplyProblem(first, { complete: false, partComplete: "yes" }) ?? "",
+    /partComplete must be true or false/,
+  );
+  assert.equal(
+    closesPart(first, { complete: false, partComplete: true }),
+    true,
+  );
+  assert.equal(closesPart(first, { complete: false }), false);
+  // The last part is closed by finishing the question, never by partComplete.
+  assert.equal(
+    closesPart(last, { complete: false, partComplete: true }),
+    false,
+  );
+  assert.equal(closesPart({}, { complete: false, partComplete: true }), false);
+  const job = (payload: object) => ({
+    operation: "tutor",
+    payload: { mode: "terminal-dialogue", helpPolicy: { unlocked: [] }, ...payload }, // prettier-ignore
+  });
+  assert.throws(
+    () => validateAnswer(job(first), { help: noHelp, text: "Done", complete: true }), // prettier-ignore
+    /cannot be complete yet/,
+  );
+  validateAnswer(job(first), { help: noHelp, text: "Accepted.", complete: false, partComplete: true }); // prettier-ignore
+  validateAnswer(job(last), { help: noHelp, text: "Done", complete: true });
+});
+
+test("the question pane shows the shared material with the open part only", () => {
+  assert.deepEqual(openPart(staged()), { part: 1, of: 2, question: "FIRST ask" }); // prettier-ignore
+  assert.equal(openPart(staged([7]))?.part, 2);
+  assert.equal(openPart({ problem: { prompt: "plain" } } as Encounter), undefined); // prettier-ignore
+  const one = questionHtml(staged());
+  assert.match(one, /SHARED facts/);
+  assert.match(one, /class="question-part" data-part="1"/);
+  assert.match(one, /Part 1 of 2/);
+  assert.doesNotMatch(one, /SECOND ask|earlier-parts/);
+  const two = questionHtml(staged([7]));
+  assert.match(two, /class="question-part" data-part="2"[^]*SECOND ask/);
+  assert.match(two, /<details class="earlier-parts">[^]*FIRST ask/);
+  // A finished question shows every part, with nothing left to fade.
+  const done = questionHtml(staged([7], "consumed"));
+  assert.match(done, /FIRST ask[^]*SECOND ask/);
+  assert.doesNotMatch(done, /class="question-part"|earlier-parts/);
+  assert.equal(
+    questionHtml({ state: "in-progress", problem: { prompt: "**Plain**" } } as Encounter), // prettier-ignore
+    "<p><strong>Plain</strong></p>",
+  );
+  assert.match(partMarkers(staged([7])).get(7) ?? "", /Part 1 of 2 answered[^]*shows part 2/); // prettier-ignore
+  assert.equal(partMarkers(staged()).size, 0);
+});
+
+test("real bridge: a generated question is staged, worked part by part, and finished once", async () => {
+  const original = globalThis.fetch;
+  const relay = await localHandoff();
+  const status = (mode: string) => async () =>
+    Response.json({ mode, label: "Synthetic", detail: "No real AI", capabilities: [] }); // prettier-ignore
+  try {
+    globalThis.fetch = status("development");
+    await checkBridge();
+    const g = createGame(1, roadmap);
+    preparePracticeRooms(g, roadmap);
+    const e = g.encounters["question-0"];
+    e.owner = "human";
+    e.problem!.staged = { shared: "SHARED", parts: ["FIRST ask", "SECOND ask"] }; // prettier-ignore
+    const facets = probeFacets(e.problem!);
+    globalThis.fetch = (url, options) =>
+      original(new URL(String(url), relay.base), {
+        ...options,
+        headers: { ...options?.headers, Origin: "http://127.0.0.1:5173" },
+      });
+    await checkBridge();
+    const jobs: any[] = [];
+    const accepted = {
+      help: noHelp,
+      text: "Accepted: that covers this part. You left one point open.",
+      complete: false,
+      partComplete: true,
+      knowledge: { facets: [{ id: facets[0].id, status: "gap" }] },
+    };
+    relay.answerWith((job) => {
+      jobs.push(job);
+      return {
+        valid: accepted,
+        // Finishing while part 2 is still hidden is refused by the relay.
+        invalid: [{ help: noHelp, text: "All done.", complete: true }],
+      };
+    });
+    await send(g, e, "My answer to the first part; I do not know the rest", roadmap); // prettier-ignore
+    assert.deepEqual(jobs[0].payload.stage, { part: 1, of: 2, question: "FIRST ask" }); // prettier-ignore
+    assert.equal(relay.rejected, 1);
+    assert.equal(e.state === "consumed", false);
+    assert.deepEqual(e.partsDone, [e.tutor.at(-1)!.seq]);
+    assert.equal(openPart(e)?.part, 2);
+    assert.deepEqual(
+      (g.study.knowledgeGaps ?? []).map((gap) => gap.facet.id),
+      [facets[0].id],
+      "a point given up when leaving a part is recorded as a gap",
+    );
+
+    relay.answerWith((job) => {
+      jobs.push(job);
+      return { valid: { help: noHelp, text: "Solved.", complete: true, partComplete: true } }; // prettier-ignore
+    });
+    await send(g, e, "My answer to the second part", roadmap);
+    assert.deepEqual(jobs[1].payload.stage, { part: 2, of: 2, question: "SECOND ask" }); // prettier-ignore
+    assert.equal(e.state, "consumed");
+    assert.equal(e.partsDone!.length, 1);
+    assert.equal(e.submissions.length, 1);
+    // Chat after the question is finished carries no stage.
+    relay.answerWith((job) => {
+      jobs.push(job);
+      return { valid: { text: "Happy to discuss." } };
+    });
+    await send(g, e, "One more thought", roadmap);
+    assert.equal(jobs[2].payload.stage, undefined);
+  } finally {
+    globalThis.fetch = status("development");
+    await checkBridge();
+    globalThis.fetch = original;
+    await relay.close();
+  }
+});
+
+test("a generated reply's parts become the stored staged question", async () => {
+  const original = globalThis.fetch;
+  let parts: unknown = ["FIRST ask", " SECOND ask "];
+  try {
+    globalThis.fetch = (async (input: unknown, init?: RequestInit) => {
+      if (String(input) === "/api/status")
+        return Response.json({ mode: "claude-cli", label: "Fixture", capabilities: ["generate", "tutor", "assess"], detail: "Test fixture" }); // prettier-ignore
+      const c = JSON.parse(String(init?.body)).payload.contract;
+      return Response.json({
+        title: "Fixture",
+        prompt: "SHARED facts.",
+        parts,
+        // A reply cannot supply the staged form itself.
+        staged: { shared: "forged", parts: ["x", "y"] },
+        starter: "",
+        rubric: ["fixture"],
+        contract: c,
+        estimatedSolveSeconds: 120,
+        scopeDefinitions: c.objectiveIds.map((id: string, i: number) => ({
+          id: `${id}/D${c.depth}`,
+          objectiveId: id,
+          depth: c.depth,
+          sourceScope: c.scopes[i],
+          facets: [{ id: "scope", description: "Synthetic scope" }],
+        })),
+      });
+    }) as typeof fetch;
+    await checkBridge();
+    const g = createGame(1, roadmap, initialStudy(roadmap, "live"));
+    const e = g.encounters["question-0"];
+    e.studyOnly = true;
+    await ensureProblem(g, e, roadmap);
+    assert.equal(e.error, undefined);
+    assert.deepEqual(e.problem!.staged, { shared: "SHARED facts.", parts: ["FIRST ask", "SECOND ask"] }); // prettier-ignore
+    assert.match(e.problem!.prompt, /^SHARED facts\.\n\n\*\*Part 1 of 2\*\*\n\nFIRST ask/); // prettier-ignore
+    assert.equal("parts" in e.problem!, false);
+    // A discarded question starts its replacement at the first part.
+    e.partsDone = [3];
+    assert.equal(regenerateQuestion(g, e, roadmap), true);
+    assert.equal(e.partsDone, undefined);
+    parts = ["Only ask"];
+    await ensureProblem(g, e, roadmap);
+    assert.equal(e.problem!.staged, undefined);
+    assert.equal(e.problem!.prompt, "SHARED facts.\n\nOnly ask");
+    regenerateQuestion(g, e, roadmap);
+    parts = ["ok", ""];
+    await ensureProblem(g, e, roadmap);
+    assert.equal(e.problem, undefined);
+    assert.match(e.error ?? "", /parts must be an array/);
+  } finally {
+    globalThis.fetch = async () =>
+      Response.json({ mode: "development", label: "Cleanup", detail: "", capabilities: [] }); // prettier-ignore
+    await checkBridge();
+    globalThis.fetch = original;
+  }
+});

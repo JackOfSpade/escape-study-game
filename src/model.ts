@@ -230,6 +230,9 @@ export interface Problem {
   validation?: { kind: "trace"; answer: number };
   contract: Contract;
   scopeDefinitions?: ScopeDefinition[];
+  /** A question worked one part at a time: the material every part shares
+   * and each ask in order. `prompt` still holds the whole question. */
+  staged?: { shared: string; parts: string[] };
 }
 export interface TutorRequest {
   id: string;
@@ -266,6 +269,9 @@ export interface Encounter {
   directStudy?: DirectStudySession;
   chatDraft?: string;
   tutorRequests?: TutorRequest[];
+  /** For a question worked part by part: the tutor message that closed each
+   * finished part, in order. Its length is the index of the open part. */
+  partsDone?: number[];
   /** Knowledge probe: facets, per-turn findings and answer signals. */
   probe?: import("./knowledge-probe").KnowledgeProbe;
   executions?: import("./execution").WorkspaceExecution[];

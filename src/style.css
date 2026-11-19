@@ -199,6 +199,54 @@ p {
   font-size: 11px;
   color: var(--muted);
 }
+/* One part of a question worked part by part: the open one fades in, and
+   fades out before the next part takes its place. */
+.question-part,
+.question-part-done {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-left: 2px solid var(--accent);
+  background: var(--editor);
+  border-radius: 0 4px 4px 0;
+}
+.question-part > :last-child,
+.question-part-done > :last-child {
+  margin-bottom: 0;
+}
+.question-part {
+  animation: question-part-in 0.36s ease both;
+  transition: opacity 0.24s ease;
+}
+.question-part.is-leaving {
+  opacity: 0;
+}
+.question-part-done {
+  border-left-color: var(--line);
+}
+.part-label {
+  display: block;
+  margin-bottom: 6px;
+}
+.earlier-parts {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.earlier-parts summary {
+  cursor: pointer;
+}
+@keyframes question-part-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .question-part {
+    animation: none;
+    transition: none;
+  }
+}
 .message-complete strong {
   font-size: 13px;
   color: var(--accent);
