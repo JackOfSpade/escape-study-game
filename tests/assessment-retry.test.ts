@@ -5,6 +5,7 @@ import { assess, checkBridge, edit } from "../src/ai";
 import { eligible, evidencePacket, initialStudy } from "../src/curriculum";
 import type { Roadmap } from "../src/model";
 import { decode, encode, recover } from "../src/persistence";
+import { watchStudyEvents } from "../src/study-events";
 import { createGame } from "./helpers/record";
 
 const roadmap: Roadmap = JSON.parse(
@@ -70,7 +71,11 @@ const unresolved = () =>
 
 test("an offline assessment freezes the original partial work before reconnect and reload", async () => {
   const { g, e, r } = fixture(),
-    bodies: string[] = [];
+    bodies: string[] = [],
+    settled: Record<string, unknown>[] = [];
+  watchStudyEvents((type, data) => {
+    if (type === "assessment-settled") settled.push(data);
+  });
   const bridge = await connection(async (_url, init) => {
     bodies.push(String(init?.body));
     return unresolved();
@@ -107,7 +112,16 @@ test("an offline assessment freezes the original partial work before reconnect a
     assert.equal(restored.study.assessments[0].status, "applied");
     assert.deepEqual(restored.study.learner!.evidence, []);
     assert.equal(g.study.learner && JSON.stringify(g.study.learner), ledger);
+    // Diagnostics hear how each grading settled, by id and state only.
+    assert.deepEqual(
+      settled.map((s) => [s.assessment, s.status, s.retry]),
+      [
+        [assessment.id, "review-required", false],
+        [assessment.id, "applied", true],
+      ],
+    );
   } finally {
+    watchStudyEvents(undefined);
     await bridge.restore();
   }
 });

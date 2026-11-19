@@ -1324,11 +1324,27 @@ test("F10 assistance on a later boundary does not erase an earlier independent p
   a.visitOutcome = "usable";
   a.findings[1].outcome = "assisted";
   a.findings[1].evidence = [4];
+  // A reply shown after the boundary answer restates it; it shaped nothing.
+  e.tutor.push({
+    id: "boundary-recap",
+    author: "Terminal AI",
+    kind: "tutor",
+    text: "Synthetic recap of the boundary answer",
+    seq: 5,
+    presented: 6,
+    worldTime: 5,
+    provenance: "test-fixture",
+  });
   a.helpAttributions = [
     {
       messageId: "boundary-help",
       facets: ["boundary"],
       rationale: "Only the later boundary work uses this supplied key step.",
+    },
+    {
+      messageId: "boundary-recap",
+      facets: ["boundary"],
+      rationale: "Restated the boundary after the learner had answered.",
     },
   ];
   applyLearningAssessment(r, l, e, a, when, "test-fixture");

@@ -1089,6 +1089,9 @@ export function applyLearningAssessment(
         setProgressStatus(progress, d.depth, "G");
     }
   const newEvidence: string[] = [];
+  const helpPresented = new Map(
+    assistanceSources(e).map((m) => [m.id, m.presented]),
+  );
   for (const finding of a.findings) {
     if (!attempt || !technical) continue;
     const depth: number = finding.depth ?? e.problem!.contract.depth;
@@ -1107,9 +1110,13 @@ export function applyLearningAssessment(
       helpMessageIds: (a.helpAttributions ?? [])
         .filter(
           (h) =>
-            h.facets.includes("*") ||
-            h.facets.includes(finding.facet) ||
-            h.facets.includes(`${finding.objectiveId}:${finding.facet}`),
+            (h.facets.includes("*") ||
+              h.facets.includes(finding.facet) ||
+              h.facets.includes(`${finding.objectiveId}:${finding.facet}`)) &&
+            // Help shown after the last cited answer cannot have shaped it.
+            (!finding.evidence.length ||
+              (helpPresented.get(h.messageId) ?? 0) <=
+                Math.max(...finding.evidence)),
         )
         .map((h) => h.messageId),
       at,

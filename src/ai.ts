@@ -9,6 +9,7 @@ import {
 } from "../scripts/lib/question-parts.mjs";
 import { requestStage } from "./question-parts";
 import { completionVerdict } from "./completion-verdict";
+import { briefError, studyEvent } from "./study-events";
 import { careerScopeGuidance, studyFocus } from "./career-profile";
 import {
   knowledgeProbeContext,
@@ -745,10 +746,20 @@ export function retryTutorRequest(
           });
       }
       settleTutorRequest(job, "applied");
+      studyEvent("tutor-reply", {
+        encounter: e.id,
+        request: job.id,
+        complete: answer.complete === true,
+      });
     } catch (error) {
       if ((job.state as string) === "superseded") return;
       job.state = "interrupted";
       job.error = String(error);
+      studyEvent("tutor-reply-failed", {
+        encounter: e.id,
+        request: job.id,
+        error: briefError(error),
+      });
     }
   })();
   tutorInFlight.set(job, operation);
@@ -919,6 +930,10 @@ export function completeQuestion(
     text: `Study question completed. ${provenance}`,
     at: g.time,
     revision: e.revision,
+  });
+  studyEvent("question-completed", {
+    encounter: e.id,
+    submission: submissionId,
   });
   return true;
 }

@@ -90,6 +90,45 @@ test("an applied tutor job releases curriculum and progressContext but keeps its
     );
   }));
 
+test("a settled job keeps only what identifies its topic-assessment context", () => {
+  const g = createPlayableGame(717, r);
+  const e = Object.values(g.encounters)[0];
+  const context = {
+    topicIds: ["PY:T05"],
+    depth: 1,
+    sourceHash: "hash",
+    frozenBeforeCurrentConversation: true,
+    learner: "l".repeat(30_000),
+    importedContext: "i".repeat(40_000),
+    completedConversations: ["c".repeat(15_000)],
+  };
+  const job = (id: string, state: TutorRequest["state"]): TutorRequest => ({
+    id,
+    provider: "claude-cli",
+    payloadJson: JSON.stringify({
+      requestId: id,
+      topicAssessmentContext: context,
+    }),
+    questionSequence: 1,
+    state,
+  });
+  e.tutorRequests = [job("applied-job", "applied"), job("open-job", "pending")];
+  const loaded = recover(decode(encode(g)));
+  const [applied, open] = loaded.encounters[e.id].tutorRequests!;
+  assert.deepEqual(parsed(applied), {
+    requestId: "applied-job",
+    topicAssessmentContext: {
+      topicIds: ["PY:T05"],
+      depth: 1,
+      sourceHash: "hash",
+      frozenBeforeCurrentConversation: true,
+    },
+  });
+  // A request that can still be retried is sent again exactly as captured.
+  assert.equal(open.state, "interrupted");
+  assert.deepEqual(parsed(open).topicAssessmentContext, context);
+});
+
 test("an interrupted live job keeps its full payload through reload and retries identically", async () =>
   fixture(async (g, e, calls, reply) => {
     reply(async () => Response.json({ error: "outage" }, { status: 503 }));

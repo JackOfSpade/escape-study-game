@@ -40,6 +40,7 @@ import {
   save,
 } from "./persistence";
 import { LOG_KEY, RunLogs } from "./run-logs";
+import { watchStudyEvents } from "./study-events";
 import { readDurable, writeDurable } from "./storage";
 import { installStudySession } from "./study-session";
 import {
@@ -124,6 +125,9 @@ const runLogs = new RunLogs({
   write: (value) => writeDurable(LOG_KEY, value),
 });
 await runLogs.load();
+// Replies, completions, gradings and a failed fallback save copy are logged
+// as they settle, so a later report can be checked against the saved record.
+watchStudyEvents(logEvent);
 await checkBridge();
 app.innerHTML = studyShell;
 // One stored copy was refused while the other loaded. The first save replaces
