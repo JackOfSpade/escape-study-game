@@ -18,9 +18,13 @@ import {
   concessionFeedback,
   encounterProbeContract,
   probeFacets,
+  recordGapReview,
   recordProbeTurn,
+  reviewContract,
   TERMINAL_DIALOGUE_FORMAT,
   TERMINAL_DIALOGUE_INSTRUCTION,
+  TERMINAL_REVIEW_FORMAT,
+  TERMINAL_REVIEW_INSTRUCTION,
 } from "./knowledge-probe";
 import { bridgeRequest as request, status } from "./bridge-client";
 import { isRecord } from "./records";
@@ -638,6 +642,8 @@ export function retryTutorRequest(
           "Saved tutor request does not match its original private question",
         );
       const dialogue = payload.mode === "terminal-dialogue";
+      // Discussion after the question finished: it may close a recorded gap.
+      const review = payload.mode === "terminal-review";
       const checkSnapshot = () => {
         const captured = payload.messages
           ?.filter((m: Message) => m.kind === "human")
@@ -657,7 +663,10 @@ export function retryTutorRequest(
               payload.workspace !== e.workspace ||
               current?.seq !== job.questionSequence ||
               captured?.seq !== current?.seq ||
-              captured?.text !== current?.text))
+              captured?.text !== current?.text)) ||
+          (review &&
+            (!sameIssuedProblem(payload.problem, e.problem) ||
+              current?.seq !== job.questionSequence))
         )
           throw Error(
             "Saved terminal conversation changed during review; no credit applied",
@@ -770,6 +779,12 @@ export function retryTutorRequest(
             partClosed,
           })
         : [];
+      if (review)
+        recordGapReview(g, e, answer as Record<string, unknown>, {
+          requestId: job.id,
+          questionSequence: job.questionSequence,
+          provider: job.provider,
+        });
       if (dialogue && answer.complete === true && e.state !== "consumed") {
         const ev = { seq: nextSeq(g) };
         const captured = [
@@ -912,7 +927,13 @@ export async function send(
               }
             : {}),
         }
-      : {}),
+      : {
+          // The result is final; only a gap recorded here can still close.
+          mode: "terminal-review",
+          responseFormat: TERMINAL_REVIEW_FORMAT,
+          instruction: TERMINAL_REVIEW_INSTRUCTION,
+          review: reviewContract(g, e),
+        }),
     problem: tutorProblem(problem),
     workspace: e.workspace,
     draftRevision: e.revision,

@@ -152,6 +152,32 @@ export const TERMINAL_DIALOGUE_INSTRUCTION =
   ' Ask a focused follow-up with complete:false only for a facet that nothing the learner has said establishes; an answer that already covers a facet, in any wording, closes it. Set complete:true with outcome:"solved" as soon as the learner\'s messages and saved work supply a correct and complete answer, including its reason where the question asks for the reason; never ask them to elaborate, restate, give more examples or show again what they already showed; set complete:true with outcome:"gap" when the learner has declared they do not know what remains or wants to move on; do not require a prerequisite tree, and name those facets as gaps in knowledge.facets. In knowledge.facets use ids from probe.facets, or declare a prerequisite part the question did not list as a new id with partOf (a known facet id) and description, with status demonstrated, implied (with impliedBy) or gap; add knowledge.signal only when the learner supplies an answer to assess. Your own explanations are assistance, not learner evidence. Do not demand a separate submission or repeat already demonstrated reasoning. Do not claim execution without matching receipts. Answer acceptance is separate from independent mastery. ' +
   HELP_GATE_GUIDANCE;
 
+/** The reply a finished question's later discussion returns. */
+export const TERMINAL_REVIEW_FORMAT = {
+  text: "string",
+  knowledge: {
+    facets: [
+      {
+        id: "a facet id from review.openGaps",
+        status: "demonstrated",
+        note: "the learner's own words that establish it",
+      },
+    ],
+  },
+} as const;
+
+export const TERMINAL_REVIEW_INSTRUCTION =
+  "This question is already complete and its saved result is final, except for the recorded gaps listed in review.openGaps. Keep discussing the question in text. Return {text,knowledge?}. " +
+  'When the learner\'s own messages in this conversation now supply a correct answer for a facet in review.openGaps, in their own reasoning and before you or a hint stated that answer, report it in knowledge.facets as {id,status:"demonstrated",note}. The app then closes that recorded gap and shows a notice under your reply. An answer the learner gave after the question completed counts the same, including one from an earlier turn of this discussion. Otherwise omit knowledge. ' +
+  "You cannot reopen the question, record a new gap or change anything else about the saved result. Never say a gap was cleared, saved or updated unless this same reply reports it in knowledge.facets; when review.openGaps is empty, or the learner asks for a change you cannot make, say plainly that the saved result is final. Repeating or agreeing with your explanation is not evidence: your own explanations are assistance, never learner evidence. Closing a gap is not mastery.";
+
+/** The recorded gaps a finished question's later discussion may still close. */
+export const reviewContract = (g: StudyRecord, e: Encounter) => ({
+  openGaps: encounterGaps(g, e)
+    .filter((r) => !r.resolved)
+    .map((r) => ({ id: r.facet.id, description: r.facet.description })),
+});
+
 const facetId = (value: string) =>
   value
     .trim()
@@ -521,6 +547,82 @@ export function recordProbeTurn(
   }
   return created;
 }
+
+/**
+ * Record a reply from the discussion that follows a finished question. The
+ * saved result stays final with one exception: a gap recorded at this
+ * question closes when the tutor reports that the learner has since answered
+ * it. Any other finding in the reply is dropped. Returns the gaps closed.
+ */
+export function recordGapReview(
+  g: StudyRecord,
+  e: Encounter,
+  answer: Record<string, unknown>,
+  context: {
+    requestId: string;
+    questionSequence: number;
+    provider: string;
+    at?: string;
+  },
+): KnowledgeGapRecord[] {
+  if (e.state !== "consumed" || !e.probe || !e.problem) return [];
+  if (e.probe.turns.some((t) => t.requestId === context.requestId)) return [];
+  const knowledge = answer.knowledge;
+  const reported =
+    object(knowledge) && Array.isArray(knowledge.facets)
+      ? knowledge.facets
+      : [];
+  const open = encounterGaps(g, e).filter((r) => !r.resolved);
+  const findings: ProbeFinding[] = [];
+  for (const f of reported) {
+    if (!object(f) || f.status !== "demonstrated" || typeof f.id !== "string")
+      continue;
+    const gap = open.find(
+      (r) => r.facet.id === f.id || r.facet.id === facetId(f.id as string),
+    );
+    if (!gap || findings.some((x) => x.id === gap.facet.id)) continue;
+    // The facet must still stand as a gap in this question's own record.
+    if (
+      probeState(e).facets.find((x) => x.id === gap.facet.id)?.status !== "gap"
+    )
+      continue;
+    const note = shortText(f.note, 400);
+    findings.push({
+      id: gap.facet.id,
+      status: "demonstrated",
+      ...(note ? { note } : {}),
+    });
+  }
+  if (!findings.length) return [];
+  const at = context.at ?? new Date().toISOString();
+  e.probe.turns.push({
+    complete: false,
+    outcome: "continue",
+    findings,
+    requestId: context.requestId,
+    questionSequence: context.questionSequence,
+    at,
+  });
+  syncEstablished(g, e, context, at);
+  return open.filter(
+    (r) =>
+      r.resolved?.requestId === context.requestId &&
+      findings.some((f) => f.id === r.facet.id),
+  );
+}
+
+/** The gaps of this question that one tutor reply closed, for the notice under it. */
+export const gapsClosedBy = (
+  g: StudyRecord,
+  e: Encounter,
+  requestId: string | undefined,
+): KnowledgeGapRecord[] => {
+  if (!requestId) return [];
+  const ref = `${e.runId ?? g.id}/${e.id}`;
+  return encounterGaps(g, e).filter(
+    (r) => r.resolved?.requestId === requestId && r.resolved.encounter === ref,
+  );
+};
 
 /**
  * Mirror this encounter's established facets into the carried study state:

@@ -7,6 +7,7 @@ import { probeFacets, probeState } from "../src/knowledge-probe";
 import type { Roadmap } from "../src/model";
 import { createPlayableGame } from "./helpers/record";
 import { decode, encode, recover } from "../src/persistence";
+import { dialogueStatus, gapClosedMarker } from "../src/terminal-panels";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 async function fixture(
   run: (
@@ -517,4 +518,104 @@ test("a message whose question context cannot be captured is reported instead of
     assert.equal(calls.length, 1);
     assert.equal(e.error, undefined);
     assert.equal(e.tutor.at(-1).text, "What changes?");
+  }));
+
+test("discussion after a conceded question closes only the gap the learner then answers", async () =>
+  fixture(async (g, e, calls, reply) => {
+    const facets = probeFacets(e.problem);
+    const [known, first] = facets;
+    // A prerequisite part the tutor declared, recorded as a second gap.
+    const second = { id: "declared-part", description: "A declared part" };
+    reply(async () =>
+      Response.json({
+        text: "Recorded. Moving on.",
+        complete: true,
+        outcome: "gap",
+        knowledge: {
+          facets: [
+            { id: known.id, status: "demonstrated" },
+            { id: first.id, status: "gap" },
+            { ...second, partOf: first.id, status: "gap" },
+          ],
+          signal: { fluency: "declared-gap" },
+        },
+      }),
+    );
+    await send(g, e, "I know the first part; no idea about the rest", r);
+    assert.equal(e.state, "consumed");
+    assert.equal(g.study.knowledgeGaps.length, 2);
+    assert.match(dialogueStatus(g, e).text, /Solved with a recorded gap/);
+    const accepted = e.accepted;
+    const feedback = e.submissions[0].feedback;
+
+    // A reply that claims a change in words alone changes nothing.
+    reply(async () =>
+      Response.json({ text: "Yes, I cleared that gap for you." }),
+    );
+    await send(g, e, "Can you save it without the gap?", r);
+    const sent = calls.at(-1).payload;
+    assert.equal(sent.mode, "terminal-review");
+    assert.match(sent.instruction, /saved result is final/);
+    assert.deepEqual(
+      sent.review.openGaps.map((x: any) => x.id),
+      [first.id, second.id],
+    );
+    assert.equal(e.tutorRequests.at(-1).state, "applied");
+    assert.ok(g.study.knowledgeGaps.every((x: any) => !x.resolved));
+    assert.equal(gapClosedMarker(g, e, e.tutor.at(-1)), "");
+
+    // Findings outside the open gaps are dropped; the named gap closes.
+    reply(async () =>
+      Response.json({
+        text: "That is the reason the question asked for.",
+        knowledge: {
+          facets: [
+            { id: first.id, status: "demonstrated", note: "learner's reason" },
+            { id: second.id, status: "gap" },
+            { id: known.id, status: "gap" },
+            { id: "not-a-facet", status: "demonstrated" },
+          ],
+        },
+      }),
+    );
+    await send(g, e, "Because it shows the cost of the choice", r);
+    const [gapOne, gapTwo] = g.study.knowledgeGaps;
+    assert.equal(gapOne.resolved.status, "demonstrated");
+    assert.equal(gapOne.resolved.encounter, `${e.runId}/${e.id}`);
+    assert.equal(gapOne.resolved.requestId, e.tutorRequests.at(-1).id);
+    assert.equal(gapTwo.resolved, undefined);
+    const state = probeState(e);
+    assert.equal(state.gaps, 1);
+    assert.equal(state.established, 2);
+    assert.match(
+      gapClosedMarker(g, e, e.tutor.at(-1)),
+      /Gap closed.*no longer a study target/,
+    );
+    assert.equal(gapClosedMarker(g, e, e.tutor.at(-2)), "");
+    assert.match(dialogueStatus(g, e).text, /Solved with a recorded gap/);
+    assert.ok(!dialogueStatus(g, e).text.includes(first.description));
+    // The completed result itself is untouched.
+    assert.equal(e.state, "consumed");
+    assert.equal(e.accepted, accepted);
+    assert.equal(e.submissions.length, 1);
+    assert.equal(e.submissions[0].feedback, feedback);
+    // The next request offers only the gap still open, and survives a reload.
+    reply(async () =>
+      Response.json({
+        text: "And that covers the last one.",
+        knowledge: { facets: [{ id: second.id, status: "demonstrated" }] },
+      }),
+    );
+    await send(g, e, "And the other one works like this", r);
+    assert.deepEqual(
+      calls.at(-1).payload.review.openGaps.map((x: any) => x.id),
+      [second.id],
+    );
+    assert.match(
+      dialogueStatus(g, e).text,
+      /^Solved\. 2 recorded gaps were closed later\./,
+    );
+    const loaded = recover(decode(encode(g))) as any;
+    assert.ok(loaded.study.knowledgeGaps.every((x: any) => x.resolved));
+    assert.equal(probeState(loaded.encounters[e.id]).gaps, 0);
   }));

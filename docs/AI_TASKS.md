@@ -23,6 +23,7 @@ The operation names, their instructions and the validators that check each answe
 - The tutor's copy of a question carries the rubric as `problem.evidenceExamples`, not `rubric`: it accepts on what the question asks and the facet descriptions ([question design](QUESTION_DESIGN.md)). `assess` still receives the rubric.
 - Every answer is validated before it is applied. The app decides what it grants; a reply cannot grant a pass or mastery by itself.
 - A saved request keeps the provider that captured it. The relay refuses a request whose provider is not `claude-cli` rather than forwarding it.
+- A finished question's result is final. Later discussion is sent as mode `terminal-review` with the gaps recorded at that question and still open (`review.openGaps`), and replies `{text, knowledge?}`. A `demonstrated` finding for one of those gaps closes it: the app marks the gap resolved, shows a "Gap closed" notice under the reply and updates the status line. Every other finding is dropped, and nothing else about the result can change.
 
 A `complete` operation once judged an answer submitted from a separate editor. It was removed on 2026-11-18: every question is a conversation that a `tutor` reply finishes, and an older saved question that used the editor is answered the same way.
 

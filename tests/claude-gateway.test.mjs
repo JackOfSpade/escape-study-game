@@ -233,6 +233,25 @@ test("a correction turn reuses the first attempt's system prompt and message", a
   assert.ok(sent(calls[1]).includes("Synthetic rejection"));
 });
 
+test("discussion after completion returns text and, at most, facet findings", () => {
+  const job = { operation: "tutor", payload: { mode: "terminal-review" } };
+  assert.doesNotThrow(() => validateAnswer(job, { text: "Still final." }));
+  assert.doesNotThrow(() =>
+    validateAnswer(job, {
+      text: "Closed.",
+      knowledge: { facets: [{ id: "f1", status: "demonstrated" }] },
+    }),
+  );
+  assert.throws(
+    () => validateAnswer(job, { text: "Closed.", knowledge: { facets: "f1" } }),
+    /Terminal review/,
+  );
+  assert.match(
+    buildPrompt("tutor", { requestId: "x", mode: "terminal-review" }).system,
+    /For mode terminal-review the question is already complete/,
+  );
+});
+
 test("terminal dialogue validation enforces topicAssessments on completion", () => {
   const job = {
     operation: "tutor",
