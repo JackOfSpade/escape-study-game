@@ -1,8 +1,10 @@
 /**
  * A question worked one part at a time: which part is open, and how the
  * question pane and the conversation show it. The learner sees the shared
- * material with the open part only; the next part takes its place when the
- * tutor confirms the open one. A finished question shows every part.
+ * material with the open part only. When the tutor confirms it the
+ * conversation offers a "Next part" button; pressing it puts the next part in
+ * its place and clears the conversation on screen. A finished question shows
+ * every part and the whole conversation.
  */
 import { stagedParts } from "../scripts/lib/question-parts.mjs";
 import { escapeHtml as escape } from "./html";
@@ -10,6 +12,7 @@ import { markdownToHtml } from "./markdown";
 import type { Encounter } from "./model";
 
 type Staged = Pick<Encounter, "problem" | "partsDone">;
+type Open = Staged & Pick<Encounter, "state" | "partReady">;
 
 /** The part the learner can see, 1-based, or undefined for a question that
  * is shown whole. */
@@ -18,6 +21,56 @@ export function openPart(e: Staged) {
   if (!parts) return undefined;
   const index = Math.min(e.partsDone?.length ?? 0, parts.length - 1);
   return { part: index + 1, of: parts.length, question: parts[index] };
+}
+
+/** The last message of the part before the open one: the conversation on
+ * screen starts after it. Undefined on the first part, on a question shown
+ * whole and on a finished question, which shows everything. */
+export function clearedThrough(e: Staged & Pick<Encounter, "state">) {
+  const parts = stagedParts(e.problem);
+  if (!parts || e.state === "consumed") return undefined;
+  return (e.partsDone ?? []).slice(0, parts.length - 1).at(-1);
+}
+
+/** What a tutor request says about the open part. `since` separates the
+ * messages of earlier parts, which the learner no longer sees, from those
+ * written with this part on screen. */
+export function requestStage(e: Open) {
+  const open = openPart(e);
+  if (!open) return undefined;
+  const since = clearedThrough({ ...e, state: "in-progress" });
+  return {
+    ...open,
+    ...(since !== undefined ? { since } : {}),
+    ...(nextPartReady(e) ? { confirmed: true } : {}),
+  };
+}
+
+/** Whether the tutor has confirmed the open part and a later one waits. */
+export function nextPartReady(e: Open) {
+  const open = openPart(e);
+  return (
+    e.state !== "consumed" &&
+    e.partReady !== undefined &&
+    !!open &&
+    open.part < open.of
+  );
+}
+
+/** Leave the confirmed part: the next one opens and the conversation so far
+ * drops off the screen. It stays in the record. */
+export function advancePart(e: Open & Pick<Encounter, "tutor">) {
+  if (!nextPartReady(e)) return false;
+  (e.partsDone ??= []).push(e.tutor.at(-1)?.seq ?? e.partReady!);
+  delete e.partReady;
+  return true;
+}
+
+/** The offer that ends the conversation once the open part is confirmed. */
+export function nextPartOffer(e: Open): string {
+  const open = openPart(e);
+  if (!open || !nextPartReady(e)) return "";
+  return `<div class="message-complete message-part next-part"><strong>✓ Part ${open.part} of ${open.of} answered</strong><span>Ask anything more about it here, or move on. The conversation clears for the next part.</span><button type="button" data-next-part>Next part</button></div>`;
 }
 
 const partHtml = (
@@ -56,8 +109,8 @@ export function questionHtml(e: Staged & Pick<Encounter, "state">): string {
   );
 }
 
-/** The line that follows the tutor message which closed a part, keyed by that
- * message's sequence number. */
+/** The line that follows the last message of each finished part, keyed by
+ * that message's sequence number. */
 export function partMarkers(e: Staged): Map<number, string> {
   const markers = new Map<number, string>();
   const of = stagedParts(e.problem)?.length;
@@ -68,7 +121,7 @@ export function partMarkers(e: Staged): Map<number, string> {
       markers.set(
         seq,
         `<div class="message-complete message-part"><strong>✓ Part ${i + 1} of ${of} answered</strong><span>${escape(
-          `The question now shows part ${i + 2}.`,
+          `Part ${i + 2} follows.`,
         )}</span></div>`,
       ),
     );

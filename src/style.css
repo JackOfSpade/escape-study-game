@@ -247,6 +247,10 @@ p {
     transition: none;
   }
 }
+.next-part button {
+  align-self: center;
+  margin-top: 6px;
+}
 .message-complete strong {
   font-size: 13px;
   color: var(--accent);
