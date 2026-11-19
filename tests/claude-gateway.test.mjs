@@ -100,13 +100,126 @@ test("tutor instructions request topic assessments only on completion, without C
   assert.ok(!/chatgpt/i.test(system));
 });
 
-test("topicAssessmentContext stays in the tutor message, not the cached system text", () => {
+test("only the observations of topicAssessmentContext stay in the tutor message", () => {
   const prompt = buildPrompt("tutor", {
     mode: "terminal-dialogue",
-    topicAssessmentContext: { topicIds: ["PY:T01"], marker: "volatile-marker" },
+    topicAssessmentContext: {
+      topicIds: ["PY:T01"],
+      marker: "fixed-marker",
+      observations: { established: ["changing-marker"] },
+    },
   });
-  assert.ok(!prompt.system.includes("volatile-marker"));
-  assert.ok(prompt.user.includes("volatile-marker"));
+  assert.ok(prompt.system.includes("fixed-marker"));
+  assert.ok(!prompt.user.includes("fixed-marker"));
+  assert.ok(!prompt.system.includes("changing-marker"));
+  assert.deepEqual(JSON.parse(prompt.user).topicAssessmentContext, {
+    observations: { established: ["changing-marker"] },
+  });
+});
+
+test("a tutor request's changing parts never alter its system prompt", () => {
+  const turn = (requestId, notes, facets, observed) =>
+    buildPrompt("tutor", {
+      requestId,
+      mode: "terminal-dialogue",
+      instruction: "Synthetic instruction",
+      probe: { stance: "Synthetic stance", facets },
+      topicAssessmentContext: {
+        topicIds: ["PY:T01"],
+        observations: { established: observed },
+      },
+      problem: { title: "Synthetic question" },
+      messages: [requestId],
+      curriculum: "Synthetic curriculum",
+      progressContext: `Synthetic roadmap progress${notes}`,
+    });
+  const first = turn("one", "", [{ id: "a" }], []);
+  for (const later of [
+    turn(
+      "two",
+      "\n\nFacets already established at earlier terminals (answered): a",
+      [{ id: "a" }, { id: "a-part" }],
+      ["a"],
+    ),
+    turn(
+      "three",
+      "\n\nLearner-declared knowledge gaps recorded at earlier terminals: b",
+      [{ id: "a" }],
+      [],
+    ),
+    turn("four", "\n\nGaps since closed: c", [{ id: "a" }], []),
+  ])
+    assert.equal(later.system, first.system);
+  for (const text of [
+    "Synthetic curriculum",
+    "Synthetic roadmap progress",
+    "Synthetic stance",
+    "Synthetic question",
+  ]) {
+    assert.ok(first.system.includes(text), `${text} is cached`);
+    assert.ok(!first.user.includes(text), `${text} is not sent twice`);
+  }
+  const second = JSON.parse(
+    turn(
+      "two",
+      "\n\nFacets already established at earlier terminals (answered): a",
+      [{ id: "a" }, { id: "a-part" }],
+      ["a"],
+    ).user,
+  );
+  assert.equal(
+    second.progressContext,
+    "\n\nFacets already established at earlier terminals (answered): a",
+  );
+  assert.deepEqual(second.probe, { facets: [{ id: "a" }, { id: "a-part" }] });
+  // Notes with no roadmap progress before them still leave the system text alone.
+  const bare = (progressContext) =>
+    buildPrompt("tutor", { requestId: "x", progressContext });
+  assert.equal(
+    bare("Gaps since closed: c").system,
+    bare("Learner-declared knowledge gaps recorded at earlier terminals: d")
+      .system,
+  );
+});
+
+test("a tutor request too large for one argument falls back to the small system prompt", () => {
+  const payload = {
+    requestId: "one",
+    instruction: "Synthetic instruction",
+    probe: { stance: "Synthetic stance", facets: [] },
+    curriculum: "c".repeat(5000),
+    progressContext: "Synthetic roadmap progress",
+  };
+  assert.equal(buildPrompt("tutor", payload).compact, undefined);
+  const small = buildPrompt("tutor", payload, { maxSystemBytes: 4000 });
+  assert.equal(small.compact, true);
+  assert.ok(small.system.includes("Synthetic instruction"));
+  assert.ok(!small.system.includes("ccccc"));
+  const sent = JSON.parse(small.user);
+  assert.equal(sent.curriculum, payload.curriculum);
+  assert.equal(sent.progressContext, payload.progressContext);
+  assert.deepEqual(sent.probe, payload.probe);
+});
+
+test("a correction turn reuses the first attempt's system prompt and message", async () => {
+  const calls = [];
+  let checked = 0;
+  await gateway(['{"text":"bad"}', '{"text":"good","complete":false}'], calls, {
+    validate: () => {
+      if (!checked++) throw Error("Synthetic rejection");
+    },
+  }).run("tutor", {
+    requestId: "one",
+    mode: "terminal-dialogue",
+    curriculum: "Synthetic curriculum",
+  });
+  assert.equal(calls.length, 2);
+  const system = (call) => call.args[call.args.indexOf("--system-prompt") + 1];
+  const sent = (call) => JSON.parse(call.input).message.content[0].text;
+  assert.equal(system(calls[1]), system(calls[0]));
+  assert.ok(system(calls[0]).includes("Synthetic curriculum"));
+  assert.ok(sent(calls[1]).startsWith(sent(calls[0])));
+  assert.ok(sent(calls[1]).includes("Synthetic rejection"));
 });
 
 test("terminal dialogue validation enforces topicAssessments on completion", () => {
