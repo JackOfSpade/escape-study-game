@@ -469,6 +469,28 @@ function callMeta({
     timedOut,
   };
 }
+/** How an accepted reply was shaped, as counts only: how many parts a
+ * generated question has and how long it reads, and which part a tutor reply
+ * worked on. This is what tells a question written with one ask from one the
+ * app failed to split. Other tasks add nothing. */
+export function replyShape({ operation, payload }, answer) {
+  if (operation === "generate") {
+    const parts = Array.isArray(answer?.parts) ? answer.parts : null;
+    const chars = [answer?.prompt, ...(parts ?? [])].reduce(
+      (sum, text) => sum + (typeof text === "string" ? text.length : 0),
+      0,
+    );
+    return { parts: parts ? parts.length : null, questionChars: chars };
+  }
+  const stage = operation === "tutor" ? payload?.stage : undefined;
+  if (Number.isInteger(stage?.part) && Number.isInteger(stage?.of))
+    return {
+      part: stage.part,
+      ofParts: stage.of,
+      partComplete: answer?.partComplete === true,
+    };
+  return {};
+}
 /** The failure's own code in lower-kebab form; a killed timer reads as timeout. */
 function failureOutcome(error) {
   if (error?.meta?.timedOut) return "timeout";
@@ -694,7 +716,7 @@ export function createClaudeGateway({
       const cancelled = () =>
         new ClaudeGatewayError("CLAUDE_CANCELLED", "Request cancelled", 499);
       const job = { operation, payload };
-      const logCall = (call, meta, outcome) => {
+      const logCall = (call, meta, outcome, shape) => {
         const measured = meta ?? {};
         const row = {
           v: 1,
@@ -714,6 +736,7 @@ export function createClaudeGateway({
           apiDurationMs: measured.apiDurationMs ?? null,
           firstTextMs: measured.firstTextMs ?? null,
           outcome,
+          ...shape,
         };
         rows.push(row);
         logUsage?.(row);
@@ -762,7 +785,7 @@ export function createClaudeGateway({
             );
           }
           validate(job, answer);
-          logCall(call, measured, "accepted");
+          logCall(call, measured, "accepted", replyShape(job, answer));
           answered = answer;
           return answer;
         } catch (error) {

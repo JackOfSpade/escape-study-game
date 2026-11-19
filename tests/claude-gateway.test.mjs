@@ -22,6 +22,7 @@ import {
   taskProfile,
   replySkeleton,
   trimmedKeys,
+  replyShape,
 } from "../scripts/claude-gateway.mjs";
 import { validateAnswer } from "../scripts/lib/ai-contracts.mjs";
 
@@ -968,4 +969,24 @@ test("a fresh request id is never answered from an earlier answer", async () => 
   assert.deepEqual(await g.run("review-environment", { requestId: "one" }), { n: 1 }); // prettier-ignore
   assert.deepEqual(await g.run("review-environment", { requestId: "two" }), { n: 2 }); // prettier-ignore
   assert.equal(calls.length, 2);
+});
+
+test("an accepted reply's shape is logged as counts, never text", () => {
+  const generate = { operation: "generate", payload: {} };
+  assert.deepEqual(
+    replyShape(generate, { prompt: "abc", parts: ["de", "f"] }),
+    { parts: 2, questionChars: 6 },
+  );
+  assert.deepEqual(replyShape(generate, { prompt: "abc" }), {
+    parts: null,
+    questionChars: 3,
+  });
+  const tutor = { operation: "tutor", payload: { stage: { part: 1, of: 3 } } };
+  assert.deepEqual(replyShape(tutor, { partComplete: true }), {
+    part: 1,
+    ofParts: 3,
+    partComplete: true,
+  });
+  assert.deepEqual(replyShape({ operation: "tutor", payload: {} }, {}), {});
+  assert.deepEqual(replyShape({ operation: "assess", payload: {} }, {}), {});
 });
