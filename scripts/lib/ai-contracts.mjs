@@ -1,4 +1,5 @@
 import {
+  CODE_IN_PROSE_GUIDANCE,
   INTERVIEW_REALISM_GUIDANCE,
   MINIMUM_EVIDENCE_GUIDANCE,
   QUESTION_DESIGN_GUIDANCE,
@@ -50,12 +51,16 @@ const contracts = {
     " " +
     INTERVIEW_REALISM_GUIDANCE +
     " " +
+    CODE_IN_PROSE_GUIDANCE +
+    " " +
     PARTS_GENERATION_GUIDANCE +
     " " +
     QUESTION_SHAPE_GUIDANCE,
   tutor:
     MINIMUM_EVIDENCE_GUIDANCE +
     " For mode terminal-dialogue return {text:string,complete:boolean,partComplete?:boolean,outcome?:'solved'|'gap',knowledge?:{facets:[{id,status:'demonstrated'|'implied'|'gap',impliedBy?,note?,partOf?,description?}],signal?:{fluency:'fluent'|'partial'|'guessing'|'declared-gap',note?}}}. Follow payload.probe.stance: assume the learner already knows this and open with the highest-leverage question; one correct answer establishes every facet it depends on (mark those implied with impliedBy) instead of asking each rubric item in turn; read how the answer is given as evidence. Highest leverage means one focused question whose reasoning genuinely entails its prerequisites, never breadth inflation, unasked unrelated facets marked established or hidden full-project follow-up demands. Use complete:false with one focused follow-up only for a facet nothing said so far establishes, never to ask for elaboration, restatement or more examples. complete:true with outcome:'solved' as soon as the accumulated answers solve it, including the reason where the question asks for the reason (a missing reason that was asked for is an incomplete answer; a reason that was not asked for is not required); When the learner wants to clarify a missing facet, optionally probe its parts next, one level down, with at most one directly relevant question; if the parts turn out known re-ask that facet itself (known parts never imply it). Never require a prerequisite tree. Use complete:true with outcome:'gap' when the learner has said they do not know what remains or wants to move on, naming only explicit missing facets; unasked siblings stay unknown. knowledge.facets ids come from payload.probe.facets, or declare a prerequisite part the question did not list as a new id with partOf (a known facet id) and a short description so the gap is recorded at the part level. Never require a separate submission. Your own explanations are assistance, never learner evidence. For mode terminal-review the question is already complete: return {text:string,knowledge?:{facets:[{id,status:'demonstrated',note?}]}} and follow payload.instruction; knowledge.facets may name only ids from payload.review.openGaps. For other modes return {text:string}. Guide the learner's next reasoning step with a useful question or bounded hint. Use the exact task, draft and private transcript. Preserve prior assistance; never pretend supplied reasoning was independently demonstrated. Do not supply a completed solution by default. " +
+    CODE_IN_PROSE_GUIDANCE +
+    " " +
     QUESTION_ADAPTATION_GUIDANCE +
     " " +
     HELP_GATE_GUIDANCE +

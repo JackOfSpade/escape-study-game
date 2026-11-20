@@ -157,7 +157,14 @@
 }
 .lesson-prose code,
 .lesson-callout-body code,
-.lesson-explanation code {
+.lesson-explanation code,
+.lesson-summary code,
+.lesson-prompt code,
+.lesson-option code,
+.lesson-compare-text code,
+.lesson-steps-caption code,
+.lesson-figure > figcaption code,
+.lesson-table code {
   padding: 0.05em 0.35em;
   background: var(--study-inset, #141b25);
   border-radius: 0.25em;

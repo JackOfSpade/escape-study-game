@@ -141,3 +141,18 @@ test("links, images and raw urls stay plain text", () => {
   assert.ok(html.includes("![x](https://evil.example/i.png)"));
   assert.ok(html.includes("&lt;https://evil.example&gt;"));
 });
+
+test("a lesson's plain-text field shows backticked names as code nodes", async () => {
+  const { rich } = await import("../src/lesson-figures");
+  assert.deepEqual(rich("What does it return?"), {
+    text: "What does it return?",
+  });
+  assert.deepEqual(rich("`a` after `a.sort()`?"), {
+    children: [
+      { tag: "code", attrs: {}, text: "a" },
+      { tag: "span", attrs: {}, text: " after " },
+      { tag: "code", attrs: {}, text: "a.sort()" },
+      { tag: "span", attrs: {}, text: "?" },
+    ],
+  });
+});
