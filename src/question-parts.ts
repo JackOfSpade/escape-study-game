@@ -3,8 +3,8 @@
  * question pane and the conversation show it. The learner sees the shared
  * material with the open part only. When the tutor confirms it the
  * conversation offers a "Next part" button; pressing it puts the next part in
- * its place and clears the conversation on screen. A finished question shows
- * every part and the whole conversation.
+ * its place. The conversation stays on screen throughout, with a marker where
+ * each part ended. A finished question shows every part.
  */
 import { stagedParts } from "../scripts/lib/question-parts.mjs";
 import { escapeHtml as escape } from "./html";
@@ -23,22 +23,21 @@ export function openPart(e: Staged) {
   return { part: index + 1, of: parts.length, question: parts[index] };
 }
 
-/** The last message of the part before the open one: the conversation on
- * screen starts after it. Undefined on the first part, on a question shown
- * whole and on a finished question, which shows everything. */
-export function clearedThrough(e: Staged & Pick<Encounter, "state">) {
+/** The last message of the part before the open one: later messages were
+ * written with the open part on screen. Undefined on the first part and on a
+ * question shown whole. */
+export function openPartSince(e: Staged) {
   const parts = stagedParts(e.problem);
-  if (!parts || e.state === "consumed") return undefined;
+  if (!parts) return undefined;
   return (e.partsDone ?? []).slice(0, parts.length - 1).at(-1);
 }
 
 /** What a tutor request says about the open part. `since` separates the
- * messages of earlier parts, which the learner no longer sees, from those
- * written with this part on screen. */
+ * messages of earlier parts from those written with this part on screen. */
 export function requestStage(e: Open) {
   const open = openPart(e);
   if (!open) return undefined;
-  const since = clearedThrough({ ...e, state: "in-progress" });
+  const since = openPartSince(e);
   return {
     ...open,
     ...(since !== undefined ? { since } : {}),
@@ -57,8 +56,8 @@ export function nextPartReady(e: Open) {
   );
 }
 
-/** Leave the confirmed part: the next one opens and the conversation so far
- * drops off the screen. It stays in the record. */
+/** Leave the confirmed part: the next one opens, and the conversation so far
+ * stays on screen above a marker. */
 export function advancePart(e: Open & Pick<Encounter, "tutor">) {
   if (!nextPartReady(e)) return false;
   (e.partsDone ??= []).push(e.tutor.at(-1)?.seq ?? e.partReady!);
@@ -70,7 +69,7 @@ export function advancePart(e: Open & Pick<Encounter, "tutor">) {
 export function nextPartOffer(e: Open): string {
   const open = openPart(e);
   if (!open || !nextPartReady(e)) return "";
-  return `<div class="message-complete message-part next-part"><strong>✓ Part ${open.part} of ${open.of} answered</strong><span>Ask anything more about it here, or move on. The conversation clears for the next part.</span><button type="button" data-next-part>Next part</button></div>`;
+  return `<div class="message-complete message-part next-part"><strong>✓ Part ${open.part} of ${open.of} answered</strong><span>Ask anything more about it here, or move on.</span><button type="button" data-next-part>Next part</button></div>`;
 }
 
 const partHtml = (
