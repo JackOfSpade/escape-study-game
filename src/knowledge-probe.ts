@@ -1,5 +1,8 @@
 import { HELP_GATE_GUIDANCE } from "../scripts/lib/help-gate.mjs";
-import { QUESTION_ADAPTATION_GUIDANCE } from "../scripts/lib/study-question-policy.mjs";
+import {
+  QUESTION_ADAPTATION_GUIDANCE,
+  TUTOR_JUDGEMENT_GUIDANCE,
+} from "../scripts/lib/study-question-policy.mjs";
 import { scopeKey } from "./learning-model";
 import type { Contract, Encounter, StudyRecord, Problem } from "./model";
 import { isRecord as object } from "./records";
@@ -150,6 +153,8 @@ export const TERMINAL_DIALOGUE_INSTRUCTION =
   "Continue this private question conversation. Judge the learner's accumulated answers against what the question asks: keep it open only for something false, unsupported or missing that you can name. Wording that is merely loose, or that could be read two ways when neither reading claims more than the facts support, is accepted with one refinement. Return {help,text,complete,outcome?,knowledge?}. " +
   PROBE_STANCE +
   ' Ask a focused follow-up with complete:false only for a facet that nothing the learner has said establishes; an answer that already covers a facet, in any wording, closes it. Set complete:true with outcome:"solved" as soon as the learner\'s messages and saved work supply a correct and complete answer, including its reason where the question asks for the reason; never ask them to elaborate, restate, give more examples or show again what they already showed; set complete:true with outcome:"gap" when the learner has declared they do not know what remains or wants to move on; do not require a prerequisite tree, and name those facets as gaps in knowledge.facets. In knowledge.facets use ids from probe.facets, or declare a prerequisite part the question did not list as a new id with partOf (a known facet id) and description, with status demonstrated, implied (with impliedBy) or gap; add knowledge.signal only when the learner supplies an answer to assess. Your own explanations are assistance, not learner evidence. Do not demand a separate submission or repeat already demonstrated reasoning. Do not claim execution without matching receipts. Answer acceptance is separate from independent mastery. ' +
+  TUTOR_JUDGEMENT_GUIDANCE +
+  " " +
   HELP_GATE_GUIDANCE;
 
 /** The reply a finished question's later discussion returns. */
@@ -169,7 +174,8 @@ export const TERMINAL_REVIEW_FORMAT = {
 export const TERMINAL_REVIEW_INSTRUCTION =
   "This question is already complete and its saved result is final, except for the recorded gaps listed in review.openGaps. Keep discussing the question in text. Return {text,knowledge?}. " +
   'When the learner\'s own messages in this conversation now supply a correct answer for a facet in review.openGaps, in their own reasoning and before you or a hint stated that answer, report it in knowledge.facets as {id,status:"demonstrated",note}. The app then closes that recorded gap and shows a notice under your reply. An answer the learner gave after the question completed counts the same, including one from an earlier turn of this discussion. Otherwise omit knowledge. ' +
-  "You cannot reopen the question, record a new gap or change anything else about the saved result. Never say a gap was cleared, saved or updated unless this same reply reports it in knowledge.facets; when review.openGaps is empty, or the learner asks for a change you cannot make, say plainly that the saved result is final. Repeating or agreeing with your explanation is not evidence: your own explanations are assistance, never learner evidence. Closing a gap is not mastery.";
+  "You cannot reopen the question, record a new gap or change anything else about the saved result. Never say a gap was cleared, saved or updated unless this same reply reports it in knowledge.facets; when the learner asks to change, reopen or re-grade the result, or asks whether this discussion changes it, say plainly that the saved result is final; otherwise do not mention the saved result, its gaps or what was recorded as assisted, and answer the learner's actual question. Repeating or agreeing with your explanation is not evidence: your own explanations are assistance, never learner evidence. Closing a gap is not mastery. " +
+  TUTOR_JUDGEMENT_GUIDANCE;
 
 /** The recorded gaps a finished question's later discussion may still close. */
 export const reviewContract = (g: StudyRecord, e: Encounter) => ({

@@ -1091,3 +1091,55 @@ test("an accepted reply's shape is logged as counts, never text", () => {
   assert.deepEqual(replyShape({ operation: "tutor", payload: {} }, {}), {});
   assert.deepEqual(replyShape({ operation: "assess", payload: {} }, {}), {});
 });
+
+test("a tutor reply logs its mode, turn, outcome and help as counts", () => {
+  const dialogue = {
+    operation: "tutor",
+    payload: {
+      mode: "terminal-dialogue",
+      messages: [{ text: "secret one" }, { text: "secret two" }],
+      stage: { part: 3, of: 3 },
+    },
+  };
+  const shape = replyShape(dialogue, {
+    text: "secret reply",
+    complete: true,
+    outcome: "solved",
+    help: { nudges: ["a"], hints: [], gives: ["b", "c"], offers: [] },
+    knowledge: {
+      facets: [
+        { id: "a", status: "demonstrated", note: "secret note" },
+        { id: "b", status: "gap" },
+      ],
+    },
+  });
+  assert.deepEqual(shape, {
+    mode: "terminal-dialogue",
+    turn: 2,
+    complete: true,
+    verdict: "solved",
+    help: { nudges: 1, hints: 0, gives: 2, offers: 0 },
+    facets: { demonstrated: 1, implied: 0, gap: 1 },
+    part: 3,
+    ofParts: 3,
+    partComplete: false,
+  });
+  assert.doesNotMatch(JSON.stringify(shape), /secret|"a"|"b"/);
+  const review = {
+    operation: "tutor",
+    payload: {
+      mode: "terminal-review",
+      messages: [{}],
+      review: { openGaps: [] },
+    },
+  };
+  assert.deepEqual(replyShape(review, { text: "secret" }), {
+    mode: "terminal-review",
+    turn: 1,
+    openGaps: 0,
+  });
+  assert.deepEqual(
+    replyShape({ operation: "tutor", payload: { mode: "other" } }, {}),
+    {},
+  );
+});

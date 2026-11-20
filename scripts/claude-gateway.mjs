@@ -499,14 +499,57 @@ export function replyShape({ operation, payload }, answer) {
     );
     return { parts: parts ? parts.length : null, questionChars: chars };
   }
-  const stage = operation === "tutor" ? payload?.stage : undefined;
-  if (Number.isInteger(stage?.part) && Number.isInteger(stage?.of))
-    return {
-      part: stage.part,
-      ofParts: stage.of,
-      partComplete: answer?.partComplete === true,
-    };
-  return {};
+  if (operation !== "tutor") return {};
+  const stage = payload?.stage;
+  const staged =
+    Number.isInteger(stage?.part) && Number.isInteger(stage?.of)
+      ? {
+          part: stage.part,
+          ofParts: stage.of,
+          partComplete: answer?.partComplete === true,
+        }
+      : {};
+  return { ...tutorShape(payload, answer), ...staged };
+}
+const TUTOR_MODES = new Set(["terminal-dialogue", "terminal-review"]);
+const FACET_STATUSES = ["demonstrated", "implied", "gap"];
+const OUTCOMES = new Set(["solved", "gap"]);
+const count = (value) => (Array.isArray(value) ? value.length : 0);
+/** A tutor reply as counts and enums only: which conversation mode and turn it
+ * answered, whether it closed the question, how far up the hint ladder it went
+ * and which facet statuses it reported. Enough to follow one question's
+ * conversation in the usage log without any of its text. */
+function tutorShape(payload, answer) {
+  const mode = TUTOR_MODES.has(payload?.mode) ? payload.mode : null;
+  if (!mode) return {};
+  const shape = { mode, turn: count(payload?.messages) };
+  if (mode === "terminal-dialogue") {
+    shape.complete = answer?.complete === true;
+    // `outcome` is the call's own field (accepted, rejected...); the reply's
+    // solved/gap goes under `verdict` so it never overwrites it.
+    if (OUTCOMES.has(answer?.outcome)) shape.verdict = answer.outcome;
+    const help = answer?.help;
+    if (help && typeof help === "object")
+      shape.help = {
+        nudges: count(help.nudges),
+        hints: count(help.hints),
+        gives: count(help.gives),
+        offers: count(help.offers),
+      };
+  } else {
+    shape.openGaps = count(payload?.review?.openGaps);
+  }
+  const facets = Array.isArray(answer?.knowledge?.facets)
+    ? answer.knowledge.facets
+    : [];
+  if (facets.length)
+    shape.facets = Object.fromEntries(
+      FACET_STATUSES.map((status) => [
+        status,
+        facets.filter((f) => f?.status === status).length,
+      ]),
+    );
+  return shape;
 }
 /** The failure's own code in lower-kebab form; a killed timer reads as timeout. */
 function failureOutcome(error) {
@@ -752,8 +795,9 @@ export function createClaudeGateway({
           durationMs: measured.durationMs ?? null,
           apiDurationMs: measured.apiDurationMs ?? null,
           firstTextMs: measured.firstTextMs ?? null,
-          outcome,
           ...shape,
+          // Last, so no reply-shape field can replace the call's outcome.
+          outcome,
         };
         rows.push(row);
         logUsage?.(row);
