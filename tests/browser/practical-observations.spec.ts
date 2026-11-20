@@ -32,7 +32,7 @@ test("practical observations: unreviewed output is inert, persists without chang
   await page.goto("/");
   await openApp(page);
   const before = await page.evaluate(() => {
-    const g = (window as any).__deadAir.game;
+    const g = (window as any).__studyApp.record;
     return JSON.stringify(g.study.learner);
   });
   await openAgentMenu(page);
@@ -67,7 +67,7 @@ test("practical observations: unreviewed output is inert, persists without chang
   expect(await page.evaluate(() => (window as any).badENV)).toBeUndefined();
   expect(
     await page.evaluate(() =>
-      JSON.stringify((window as any).__deadAir.game.study.learner),
+      JSON.stringify((window as any).__studyApp.record.study.learner),
     ),
   ).toBe(before);
   expect(
@@ -92,7 +92,7 @@ test("practical observations: unreviewed output is inert, persists without chang
   await page.locator("#close-inspector").click();
   await flushStudySave(page);
   await page.reload();
-  await page.waitForFunction(() => !!(window as any).__deadAir);
+  await page.waitForFunction(() => !!(window as any).__studyApp);
   await openAgentMenu(page);
   await page.locator("#curriculum-button").click();
   await page.locator("#environment-observations summary").click();
@@ -101,7 +101,7 @@ test("practical observations: unreviewed output is inert, persists without chang
   );
   expect(
     await page.evaluate(() =>
-      JSON.stringify((window as any).__deadAir.game.study.learner),
+      JSON.stringify((window as any).__studyApp.record.study.learner),
     ),
   ).toBe(before);
 });
@@ -143,7 +143,7 @@ test("environment packet survives an actual browser-storage write failure and ca
     .getByRole("button", { name: "Save observation for review", exact: true })
     .click();
   await expect(page.locator("#environment-status")).toContainText(
-    "retained in this run, but local save failed",
+    "retained in this tab, but local save failed",
   );
   await expect(page.locator("#environment-observation-list")).toContainText(
     "1 saved observation packet",
@@ -168,10 +168,11 @@ test("environment packet survives an actual browser-storage write failure and ca
     "1 saved observation packet",
   );
   await page.reload();
-  await page.waitForFunction(() => !!(window as any).__deadAir);
+  await page.waitForFunction(() => !!(window as any).__studyApp);
   expect(
     await page.evaluate(
-      () => (window as any).__deadAir.game.study.environmentObservations[0].id,
+      () =>
+        (window as any).__studyApp.record.study.environmentObservations[0].id,
     ),
   ).toBe(packet.id);
 });
@@ -242,11 +243,11 @@ for (const { storageFailure, provider } of [
     await page.goto("/");
     // This review never needs the first-person city. Software WebGL makes
     // each of its frames cost seconds and starves every later UI step.
-    await page.waitForFunction(() => !!(window as any).__deadAir);
+    await page.waitForFunction(() => !!(window as any).__studyApp);
     await page.evaluate(() => {});
     await openApp(page);
     const before = await page.evaluate(async () => {
-      const g = (window as any).__deadAir.game,
+      const g = (window as any).__studyApp.record,
         root = "/src/",
         { checkBridge } = await import(root + "ai.ts");
       await checkBridge();
@@ -330,7 +331,7 @@ for (const { storageFailure, provider } of [
     ).toBeUndefined();
     expect(
       await page.evaluate(() => {
-        const g = (window as any).__deadAir.game;
+        const g = (window as any).__studyApp.record;
         return JSON.stringify({
           cells: g.study.learner.cells,
           attempts: g.study.learner.attempts,
@@ -360,7 +361,7 @@ for (const { storageFailure, provider } of [
     expect(text).not.toContain("window.badReview");
     expect(text).toContain("revision: 10");
     await page.reload();
-    await page.waitForFunction(() => !!(window as any).__deadAir);
+    await page.waitForFunction(() => !!(window as any).__studyApp);
     await openAgentMenu(page);
     await page.locator("#curriculum-button").click();
     await page.locator("#environment-observations summary").click();
@@ -373,15 +374,15 @@ for (const { storageFailure, provider } of [
     expect(
       await page.evaluate(
         () =>
-          (window as any).__deadAir.game.study.learner.environmentEvidence[0]
+          (window as any).__studyApp.record.study.learner.environmentEvidence[0]
             .provenance,
       ),
     ).toBe(provider);
     expect(calls).toBe(2);
     expect(
       await page.evaluate(() => ({
-        ev: (window as any).__deadAir.game.study.learner.evidence.length,
-        visits: (window as any).__deadAir.game.study.visits.length,
+        ev: (window as any).__studyApp.record.study.learner.evidence.length,
+        visits: (window as any).__studyApp.record.study.visits.length,
       })),
     ).toEqual({ ev: 0, visits: 0 });
     const again = page.waitForEvent("download");

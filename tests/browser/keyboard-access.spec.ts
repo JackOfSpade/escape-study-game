@@ -11,7 +11,7 @@ test("curriculum dropdown owns its keys while it has focus", async ({
 }) => {
   await mockClaudeStudy(page);
   await page.goto("/");
-  await page.waitForFunction(() => !!(window as any).__deadAir?.game);
+  await page.waitForFunction(() => !!(window as any).__studyApp?.record);
   await openAgentMenu(page);
   await page.getByRole("button", { name: "Inspect ↗" }).click();
   await page
@@ -46,7 +46,7 @@ test("settings has keyboard focus and explicit close preserves the open Claude q
   const id = await openStudyQuestion(page);
   await expect(page.locator("#problem-title")).toHaveText("Synthetic question");
   await page.evaluate((id) => {
-    (window as any).__deadAir.game.encounters[id].workspace =
+    (window as any).__studyApp.record.encounters[id].workspace =
       "preserved while changing settings";
   }, id);
   const captured = await studyState(page, id);
@@ -58,7 +58,7 @@ test("settings has keyboard focus and explicit close preserves the open Claude q
   await expect(page.locator("#settings-career-focus")).toBeFocused();
   await page.locator("#settings-close").click();
   await expect(page.locator("#settings")).toBeHidden();
-  await expect(page.locator("#pause-home")).toBeVisible();
+  await expect(page.locator("#menu-home")).toBeVisible();
   await expect(toggle).toBeFocused();
   expect((await studyState(page, id)).problem).toBe(captured.problem);
   expect((await studyState(page, id)).workspace).toBe(captured.workspace);
@@ -69,7 +69,7 @@ test("settings has keyboard focus and explicit close preserves the open Claude q
 test("closing a panel restores the invoking control", async ({ page }) => {
   await mockClaudeStudy(page);
   await page.goto("/");
-  await page.waitForFunction(() => !!(window as any).__deadAir?.game);
+  await page.waitForFunction(() => !!(window as any).__studyApp?.record);
   await page.keyboard.press("Escape");
   await page.locator("#settings-toggle").click();
   await page.getByRole("button", { name: "Done", exact: true }).click();
@@ -84,7 +84,7 @@ test("closing a panel restores the invoking control", async ({ page }) => {
   await page.locator("#close-inspector").click();
   await expect(page.locator("#inspector")).toBeHidden();
   await expect(inspect).toBeFocused();
-  await expect(page.locator("#pause-home")).toBeVisible();
+  await expect(page.locator("#menu-home")).toBeVisible();
 });
 
 test("menu submenus return home before Esc closes the menu", async ({
@@ -92,31 +92,31 @@ test("menu submenus return home before Esc closes the menu", async ({
 }) => {
   await mockClaudeStudy(page);
   await page.goto("/");
-  await page.waitForFunction(() => !!(window as any).__deadAir?.game);
+  await page.waitForFunction(() => !!(window as any).__studyApp?.record);
   const inspect = page.locator("#curriculum-button"),
     settings = page.locator("#settings-toggle");
   await openAgentMenu(page);
   await inspect.click();
   await expect(inspect).toHaveAttribute("aria-expanded", "true");
-  await expect(page.locator("#pause-home")).toBeHidden();
+  await expect(page.locator("#menu-home")).toBeHidden();
   await expect(page.locator("#settings")).toBeHidden();
-  await expect(page.locator("#pause-back")).toBeVisible();
+  await expect(page.locator("#menu-back")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.locator("#inspector")).toBeHidden();
-  await expect(page.locator("#pause-home")).toBeVisible();
+  await expect(page.locator("#menu-home")).toBeVisible();
   await expect(inspect).toBeFocused();
   await expect(inspect).toHaveAttribute("aria-expanded", "false");
 
   await settings.click();
   await expect(settings).toHaveAttribute("aria-expanded", "true");
-  await expect(page.locator("#pause-home")).toBeHidden();
+  await expect(page.locator("#menu-home")).toBeHidden();
   await expect(page.locator("#inspector")).toBeHidden();
   await page.getByRole("button", { name: "Back to menu" }).click();
   await expect(page.locator("#settings")).toBeHidden();
   await expect(settings).toBeFocused();
   await expect(settings).toHaveAttribute("aria-expanded", "false");
-  await expect(page.locator("#pause-home")).toBeVisible();
+  await expect(page.locator("#menu-home")).toBeVisible();
 
   await page.keyboard.press("Escape");
-  await expect(page.locator("#pause-menu")).toBeHidden();
+  await expect(page.locator("#menu")).toBeHidden();
 });

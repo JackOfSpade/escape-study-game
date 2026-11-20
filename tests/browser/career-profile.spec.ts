@@ -7,14 +7,14 @@ import {
 } from "./study-harness";
 
 async function inspect(page: Page) {
-  await page.evaluate(() => (window as any).__deadAir.openAgentMenu());
+  await page.evaluate(() => (window as any).__studyApp.openAgentMenu());
   await page.locator("#curriculum-button").click();
   await expect(page.locator("#career-focus")).toBeVisible();
 }
 
 const sourceEvidence = (page: Page) =>
   page.evaluate(async () => {
-    const d = (window as any).__deadAir;
+    const d = (window as any).__studyApp;
     const digest = await crypto.subtle.digest(
       "SHA-256",
       new TextEncoder().encode(d.roadmap.raw),
@@ -30,8 +30,8 @@ const sourceEvidence = (page: Page) =>
       ]
         .flat()
         .map((o: any) => ({ id: o.id, target: o.target, cells: o.cells })),
-      cells: d.game.study.learner.cells,
-      evidence: d.game.study.learner.evidence,
+      cells: d.record.study.learner.cells,
+      evidence: d.record.study.learner.evidence,
     });
   });
 
@@ -61,7 +61,7 @@ test("the role profile is explicit, reversible and persists without replacing is
   expect(await sourceEvidence(page)).toBe(before);
   await flushStudySave(page);
   await page.reload();
-  await page.waitForFunction(() => !!(window as any).__deadAir);
+  await page.waitForFunction(() => !!(window as any).__studyApp);
   await inspect(page);
   await expect(page.locator("#career-focus")).toHaveValue("full");
   expect(await sourceEvidence(page)).toBe(before);
@@ -73,7 +73,7 @@ test("the role profile is explicit, reversible and persists without replacing is
   expect(await sourceEvidence(page)).toBe(before);
   await flushStudySave(page);
   await page.reload();
-  await page.waitForFunction(() => !!(window as any).__deadAir);
+  await page.waitForFunction(() => !!(window as any).__studyApp);
   await inspect(page);
   await expect(page.locator("#career-focus")).toHaveValue(
     "product-feature-owner",

@@ -4,7 +4,7 @@ import { setImmediate as settle } from "node:timers/promises";
 import test from "node:test";
 import type { Roadmap } from "../src/model";
 import { decode, load, save } from "../src/persistence";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 test("a failed older durable write cannot overwrite a newer successful local checkpoint", async () => {
@@ -54,7 +54,7 @@ test("a failed older durable write cannot overwrite a newer successful local che
       },
     },
   });
-  const g = createGame(728, r),
+  const g = createRecord(728, r),
     e = g.encounters["question-0"];
   // This browser's local quota rejects the large checkpoint. A later compact
   // checkpoint can still be written while the first durable transaction is held.

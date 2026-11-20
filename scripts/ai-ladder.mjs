@@ -61,7 +61,7 @@ export function defaultOut(name) {
     homedir(),
     "Library",
     "Application Support",
-    "zombie-escape-study-game",
+    "study-app",
     "ai-test-runs",
     String(name),
   );

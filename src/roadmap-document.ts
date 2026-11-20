@@ -366,7 +366,7 @@ export async function parseRoadmapDocument(
         !supplement.includes("| Suspended state | Tier | Phase |"))
     )
       issues.push(
-        `${t} legacy game progress lacks exact retention or suspended-queue metadata; reconcile before resuming.`,
+        `${t} legacy exported progress lacks exact retention or suspended-queue metadata; reconcile before resuming.`,
       );
     const table = (header: string) => {
       const start = supplement.indexOf(header);
@@ -470,7 +470,7 @@ export async function parseRoadmapDocument(
       .filter((s) => /^\| S\d/.test(s))) {
       const c = cells(row),
         state = /^([A-Z-]+)\b/.exec(c[3])?.[1];
-      // Older game snapshots used engine labels. Read them without rewriting
+      // Older exports used engine labels. Read them without rewriting
       // history; every newly projected task uses the curriculum's dispositions.
       if (
         c.length !== 6 ||

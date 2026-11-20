@@ -19,12 +19,12 @@ import {
   readIdentifierCounters,
 } from "../src/roadmap-identifiers";
 import { inspectMergedDocument } from "../src/roadmap-structure";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 const excerpt =
   "Synthetic independent changed-context reasoning covers the complete reviewed requirement; actual runtime execution was not claimed.";
 async function review(track: Track, name: string, mode = "valid") {
-  const g = createGame(7, r);
+  const g = createRecord(7, r);
   g.study.profile = "live";
   const requirement = finalRequirements(r, track).find((d) => d.name === name)!;
   const id = "S0007-EV98",
@@ -59,7 +59,7 @@ async function review(track: Track, name: string, mode = "valid") {
   at = raw.indexOf("### 0.6 Facet gaps", at);
   raw =
     raw.slice(0, at) +
-    `| ${task} | S0007 / 2026-10-16 | ${name} independent changed-context assessment | ${mode === "invalidated" ? "INVALIDATED" : "COMPLETED"}; source-recorded result | ${id} | Synthetic actual source task, no game visit |\n\n` +
+    `| ${task} | S0007 / 2026-10-16 | ${name} independent changed-context assessment | ${mode === "invalidated" ? "INVALIDATED" : "COMPLETED"}; source-recorded result | ${id} | Synthetic actual source task, no app visit |\n\n` +
     raw.slice(at);
   const registerKey = [...inspectMergedDocument(raw).rows.keys()].find(
     (k) =>

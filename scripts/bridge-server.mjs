@@ -34,7 +34,9 @@ export async function startBridgeService(boot, options = {}) {
     createClaudeGateway({
       usageLog,
       // Opt-in only: a study install keeps no copies of prompts or replies.
-      ...(process.env.ZOMBIE_AI_REPLAY_SAMPLES === "1"
+      // ZOMBIE_AI_REPLAY_SAMPLES is the pre-rename name, still honoured.
+      ...((process.env.STUDY_AI_REPLAY_SAMPLES ??
+        process.env.ZOMBIE_AI_REPLAY_SAMPLES) === "1"
         ? { replaySamples: join(boot.directory, "ai-replay-samples") }
         : {}),
     });
@@ -96,7 +98,14 @@ export async function startBridgeService(boot, options = {}) {
   // immediately when the port becomes reachable.
   writePrivate(
     join(boot.directory, "service.json"),
-    JSON.stringify({ ...identity, token: boot.token, port: boot.port }),
+    JSON.stringify({
+      ...identity,
+      token: boot.token,
+      port: boot.port,
+      // The project's real path, so a later start can recognise this record after the project
+      // folder is moved or renamed (see bridge-service.mjs movedRecord). Owner-only file.
+      ...(typeof boot.rootPath === "string" ? { rootPath: boot.rootPath } : {}),
+    }),
   );
   await new Promise((resolve, reject) => {
     server.once("error", reject);

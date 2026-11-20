@@ -15,13 +15,13 @@ async function close(server) {
   await new Promise((resolve) => server.close(resolve));
 }
 async function fixture(t) {
-  const directory = await mkdtemp(join(tmpdir(), "zombie-production-"));
+  const directory = await mkdtemp(join(tmpdir(), "study-production-"));
   const root = join(directory, "dist");
   await mkdir(join(root, "assets"), { recursive: true });
-  await writeFile(join(root, "index.html"), "<title>Synthetic game</title>");
+  await writeFile(join(root, "index.html"), "<title>Synthetic app</title>");
   await writeFile(
-    join(root, "assets/game-abcdefgh.js"),
-    "export const game = 1;",
+    join(root, "assets/main-abcdefgh.js"),
+    "export const main = 1;",
   );
   await writeFile(join(root, "curriculum.json"), '{"synthetic":true}');
   await writeFile(join(directory, "secret"), "outside the build");
@@ -72,7 +72,7 @@ test("production serves the built app with fresh HTML and immutable hashed asset
     assert.equal(response.headers.get("cache-control"), "no-store");
     assert.match(await response.text(), /Synthetic/);
   }
-  const asset = await fetch(url + "/assets/game-abcdefgh.js?v=1");
+  const asset = await fetch(url + "/assets/main-abcdefgh.js?v=1");
   assert.match(asset.headers.get("content-type"), /javascript/);
   assert.match(asset.headers.get("cache-control"), /immutable/);
   assert.equal(
@@ -83,7 +83,7 @@ test("production serves the built app with fresh HTML and immutable hashed asset
   assert.equal(head.status, 200);
   assert.equal(await head.text(), "");
   const health = await (await fetch(url + "/_app-health")).json();
-  assert.equal(health.service, "zombie-study-escape");
+  assert.equal(health.service, "study-app");
   assert.match(health.build, /^[a-f0-9]{64}$/);
 });
 
@@ -143,7 +143,7 @@ test("production forwards exact API bodies/origins and reports relay outages", a
 });
 
 test("production refuses startup without a built entry point", async (t) => {
-  const directory = await mkdtemp(join(tmpdir(), "zombie-no-build-"));
+  const directory = await mkdtemp(join(tmpdir(), "study-no-build-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   await assert.rejects(createAppServer({ directory }), { code: "ENOENT" });
 });

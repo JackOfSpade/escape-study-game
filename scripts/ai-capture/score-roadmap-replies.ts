@@ -18,7 +18,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Roadmap } from "../../src/model";
 import { reconcileRoadmap } from "../../src/roadmap-adoption";
-import { createGame } from "../../tests/helpers/record";
+import { createRecord } from "../../tests/helpers/record";
 import {
   loadRoadmap,
   RECONCILE_OPERATION,
@@ -82,7 +82,7 @@ async function classifyRoadmapReply({
   // A fresh copy and a fresh record keep one replay out of the next; the saved
   // reply is graded on its content, never on a stale snapshot.
   const isolated = JSON.parse(JSON.stringify(roadmap)) as Roadmap;
-  const g = createGame(7, isolated);
+  const g = createRecord(7, isolated);
   g.study.profile = "live";
   let replayed = false;
   await reconcileRoadmap(

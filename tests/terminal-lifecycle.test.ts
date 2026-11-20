@@ -5,10 +5,10 @@ import { checkBridge, completeQuestion, ensureProblem, send } from "../src/ai";
 import { eligible } from "../src/curriculum";
 import type { Problem, Roadmap } from "../src/model";
 import { decode, encode, recover } from "../src/persistence";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 function fixture() {
-  const g = createGame(7, r),
+  const g = createRecord(7, r),
     e = g.encounters["question-0"];
   e.state = "in-progress";
   e.contributors = ["human"];

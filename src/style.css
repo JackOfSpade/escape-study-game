@@ -422,7 +422,7 @@ pre {
   color: var(--muted);
 }
 
-#pause-menu {
+#menu {
   width: min(420px, calc(var(--view-width) - 24px));
   max-width: none;
   max-height: calc(var(--view-height) - 24px);
@@ -434,38 +434,38 @@ pre {
   box-shadow: 0 24px 100px #0008;
   overflow: auto;
 }
-#pause-menu::backdrop {
+#menu::backdrop {
   background: #050c10c9;
 }
-#pause-home {
+#menu-home {
   padding: 28px;
 }
-#pause-home h2 {
+#menu-home h2 {
   margin-top: 10px;
 }
-#pause-home button {
+#menu-home button {
   display: block;
   width: 100%;
   margin-top: 12px;
   padding: 12px 16px;
   font-size: 13px;
 }
-#pause-save-status {
+#menu-save-status {
   font-size: 11px;
   color: var(--accent);
   margin: 18px 0 0;
 }
-#pause-menu[data-panel="settings"] {
+#menu[data-panel="settings"] {
   width: min(500px, calc(var(--view-width) - 24px));
 }
-#pause-menu[data-panel="inspector"] {
+#menu[data-panel="inspector"] {
   width: min(900px, calc(var(--view-width) - 24px));
 }
-#pause-panel-header {
+#menu-panel-header {
   padding: 12px 16px;
   border-bottom: 1px solid var(--line);
 }
-#pause-back {
+#menu-back {
   border: 0;
   margin: 0;
 }
@@ -474,7 +474,7 @@ pre {
   margin-top: 22px;
   padding-top: 18px;
 }
-#pause-menu p {
+#menu p {
   line-height: 1.6;
 }
 

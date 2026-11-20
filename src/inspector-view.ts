@@ -3,7 +3,7 @@ import { escapeHtml as escape } from "./html";
 import type { Contract, StudyRecord, Roadmap, Track } from "./model";
 
 /**
- * HTML for the curriculum inspector panel. Pure string builders over the game
+ * HTML for the curriculum inspector panel. Pure string builders over the study record
  * and roadmap; main.ts owns the DOM, the handlers and persistence.
  */
 export function inspectorSummaryHtml(

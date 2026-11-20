@@ -125,7 +125,7 @@ function counterClaim(shared: string): IdentifierCounters | undefined {
       )
       ?.split(CELL_SEPARATOR)[2]
       ?.trim() ?? "";
-  const game =
+  const portable =
     /^(S\d{4}): next shared attempt (S\d{4})-A(\d+), evidence (S\d{4})-EV(\d+); next gap G(\d+); next shared decision DEC(\d+); next genuinely new session S(\d+)$/.exec(
       field,
     );
@@ -133,15 +133,15 @@ function counterClaim(shared: string): IdentifierCounters | undefined {
     /Next (S\d{4}) attempt A(\d+) and evidence EV(\d+); next global gap G(\d+); next shared decision DEC(\d+)\. A genuinely new session after S\d{4} is S(\d+)/.exec(
       field,
     );
-  if (game) {
-    if (game[1] !== game[2] || game[1] !== game[4])
+  if (portable) {
+    if (portable[1] !== portable[2] || portable[1] !== portable[4])
       throw Error("Shared next identifiers name different allocation sessions");
     declared = {
-      nextSession: Number(game[8]),
-      nextGap: Number(game[6]),
-      nextDecision: Number(game[7]),
-      attempts: { [game[1]]: Number(game[3]) },
-      evidence: { [game[1]]: Number(game[5]) },
+      nextSession: Number(portable[8]),
+      nextGap: Number(portable[6]),
+      nextDecision: Number(portable[7]),
+      attempts: { [portable[1]]: Number(portable[3]) },
+      evidence: { [portable[1]]: Number(portable[5]) },
     };
   } else if (original)
     declared = {
@@ -153,7 +153,7 @@ function counterClaim(shared: string): IdentifierCounters | undefined {
     };
   return declared;
 }
-/** Exact portable counters; revision9 and earlier game saves retain a bounded
+/** Exact portable counters; revision9 and earlier app exports retain a bounded
  * legacy reader. An unfamiliar claim needs reconciliation, never a reset. */
 export function readIdentifierCounters(raw: string, strict = true) {
   const doc = inspectMergedDocument(raw),

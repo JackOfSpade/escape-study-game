@@ -163,7 +163,7 @@ export function renderEnvironmentObservations(
           "Observation packet saved locally for review. No ENV pass or academic credit awarded.";
       } catch (error) {
         status.textContent = recorded
-          ? `Observation retained in this run, but local save failed. Download its packet or a full backup. ${String(error)}`
+          ? `Observation retained in this tab, but local save failed. Download its packet or a full backup. ${String(error)}`
           : `Observation not saved: ${String(error)}`;
       } finally {
         button.disabled = false;

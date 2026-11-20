@@ -81,7 +81,7 @@ try {
   spec = browserSpec(input.code, input.steps);
   if (
     typeof input.marker !== "string" ||
-    !/^ZOMBIE_REACT_[a-z0-9-]{20,60}$/.test(input.marker)
+    !/^STUDY_REACT_[a-z0-9-]{20,60}$/.test(input.marker)
   )
     throw Error("Missing execution marker");
   phase("loading-runtime");
@@ -106,7 +106,7 @@ try {
         stdin: {
           contents: `import React from 'react';import {createRoot} from 'react-dom/client';import {flushSync} from 'react-dom';import App from '/work/Component.tsx';flushSync(()=>createRoot(document.getElementById('root')).render(<App/>));`,
           loader: "tsx",
-          resolveDir: "/opt/zombie-browser",
+          resolveDir: "/opt/study-browser",
         },
         bundle: true,
         write: false,

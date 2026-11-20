@@ -10,7 +10,7 @@ import {
   TERMINAL_DIALOGUE_INSTRUCTION,
 } from "../src/knowledge-probe";
 import type { Roadmap } from "../src/model";
-import { createPlayableGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 import {
   MINIMUM_EVIDENCE_GUIDANCE,
   QUESTION_DESIGN_GUIDANCE,
@@ -72,7 +72,7 @@ test("live generation payload carries the minimal concrete problem policy and ke
   globalThis.fetch = fixtureFetch(sent);
   try {
     await checkBridge();
-    const g = createPlayableGame(41, r, initialStudy(r, "live"));
+    const g = createRecord(41, r, initialStudy(r, "live"));
     const e = g.encounters["question-0"];
     await ensureProblem(g, e, r);
     assert.equal(sent.length, 1);
@@ -112,7 +112,7 @@ test("a saved generation retries with its exact captured payload and request ide
   globalThis.fetch = fixtureFetch(sent);
   try {
     await checkBridge();
-    const g = createPlayableGame(42, r, initialStudy(r, "live"));
+    const g = createRecord(42, r, initialStudy(r, "live"));
     const e = g.encounters["question-0"];
     const captured = {
       requestId: "gen-synthetic-saved",
@@ -275,7 +275,7 @@ test("study prompts carry no game framing and ask for interview-realistic questi
   assert.match(generate, /payload\.replaces/);
 });
 
-/** A question already issued on the contract a fresh game schedules first. */
+/** A question already issued on the contract a fresh record schedules first. */
 function issue(
   g: any,
   id: string,
@@ -306,7 +306,7 @@ test("a generation request carries a short summary of the newest earlier questio
   globalThis.fetch = fixtureFetch(sent);
   try {
     await checkBridge();
-    const g: any = createPlayableGame(43, r, initialStudy(r, "live"));
+    const g: any = createRecord(43, r, initialStudy(r, "live"));
     const e = g.encounters["question-0"];
     for (let i = 1; i <= 7; i++) issue(g, `question-${i}`, 9 + i);
     issue(g, "question-6", 15, { prompt: "Facts.\n\nWhat is the cause?" });
@@ -359,7 +359,7 @@ test("a first question's request has no earlier-question summary", async () => {
   globalThis.fetch = fixtureFetch(sent);
   try {
     await checkBridge();
-    const g = createPlayableGame(45, r, initialStudy(r, "live"));
+    const g = createRecord(45, r, initialStudy(r, "live"));
     await ensureProblem(g, g.encounters["question-0"], r);
     assert.equal("earlierQuestions" in sent[0], false);
   } finally {
@@ -374,7 +374,7 @@ test("regenerate carries the replaced question's asks and keeps it out of the hi
   globalThis.fetch = fixtureFetch(sent);
   try {
     await checkBridge();
-    const g: any = createPlayableGame(44, r, initialStudy(r, "live"));
+    const g: any = createRecord(44, r, initialStudy(r, "live"));
     const e = g.encounters["question-0"];
     e.studyOnly = true;
     issue(g, "question-0", 5, {
@@ -446,7 +446,7 @@ test("a reply the app refuses is retried under a fresh request identity", async 
   );
   try {
     await checkBridge();
-    const g: any = createPlayableGame(46, r, initialStudy(r, "live"));
+    const g: any = createRecord(46, r, initialStudy(r, "live"));
     const e = g.encounters["question-0"];
     await ensureProblem(g, e, r);
     assert.equal(e.problem, undefined);
@@ -487,7 +487,7 @@ test("a transport failure keeps the saved request identity", async () => {
   );
   try {
     await checkBridge();
-    const g: any = createPlayableGame(47, r, initialStudy(r, "live"));
+    const g: any = createRecord(47, r, initialStudy(r, "live"));
     const e = g.encounters["question-0"];
     await ensureProblem(g, e, r);
     const saved = structuredClone(e.pendingGeneration);

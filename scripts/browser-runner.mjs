@@ -7,8 +7,8 @@ import {
 import { browserSpec, browserSpecText } from "./browser-runner/spec.mjs";
 export async function executeReact(input, id) {
   const spec = browserSpec(input.code, input.steps),
-    name = "zombie-browser-run-" + id,
-    marker = "ZOMBIE_REACT_" + id,
+    name = "study-browser-run-" + id,
+    marker = "STUDY_REACT_" + id,
     startedAt = new Date().toISOString(),
     start = performance.now(),
     base = {
@@ -25,8 +25,7 @@ export async function executeReact(input, id) {
     const image = await docker([
       "image",
       "inspect",
-      process.env.CODE_RUNNER_REACT_IMAGE ??
-        "zombie-escape-browser-runtime:0.1.0",
+      process.env.CODE_RUNNER_REACT_IMAGE ?? "study-browser-runtime:0.1.0",
       "--format",
       "{{.Id}}",
     ]);
@@ -48,7 +47,7 @@ export async function executeReact(input, id) {
       "KILL",
       "14",
       "node",
-      "/opt/zombie-browser/runner.mjs",
+      "/opt/study-browser/runner.mjs",
     ]);
     if (created.exitCode !== 0)
       return {

@@ -40,7 +40,7 @@ test("a reply that cannot be accepted keeps the exact request and its retry comp
   ).toBe(true);
   await flushStudySave(page);
   await page.reload();
-  await page.waitForFunction(() => !!(window as any).__deadAir);
+  await page.waitForFunction(() => !!(window as any).__studyApp);
   expect((await studyState(page, id)).submissions).toBe(1);
   expect(relay.tutorCalls()).toHaveLength(2);
   expect(errors).toEqual([]);

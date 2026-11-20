@@ -36,7 +36,7 @@ import type { Roadmap } from "../../src/model";
 import { reconcileRoadmap } from "../../src/roadmap-adoption";
 import type { RoadmapReconciliation } from "../../src/roadmap-adoption-types";
 import { prepareRoadmapExport } from "../../src/roadmap-export";
-import { createGame } from "../../tests/helpers/record";
+import { createRecord } from "../../tests/helpers/record";
 import { CELL_SEPARATOR } from "../../src/table-row";
 
 export const RECONCILE_OPERATION = "reconcile-roadmap" as const;
@@ -486,8 +486,8 @@ async function capturePayload(
 async function openReconciliation(
   roadmap: Roadmap,
   candidate: string,
-): Promise<{ g: ReturnType<typeof createGame>; payload: RoadmapPayload }> {
-  const g = createGame(7, roadmap);
+): Promise<{ g: ReturnType<typeof createRecord>; payload: RoadmapPayload }> {
+  const g = createRecord(7, roadmap);
   g.study.profile = "live";
   let payload: unknown;
   await reconcileRoadmap(g, roadmap, candidate, async (captured) => {
@@ -677,7 +677,7 @@ if (entry === fileURLToPath(import.meta.url)) {
 
 /** A fresh live record, mirroring the study fixture the reference test proves. */
 function liveStudy(roadmap: Roadmap) {
-  const g = createGame(7, roadmap);
+  const g = createRecord(7, roadmap);
   g.study.profile = "live";
   if (!g.study.learner) throw Error("a live study profile has no learner");
   return { g, l: g.study.learner };

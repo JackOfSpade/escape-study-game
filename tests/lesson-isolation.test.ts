@@ -8,7 +8,7 @@ import { createLessons, openLessonGaps } from "../src/lesson";
 import type { LessonStore } from "../src/lesson-store";
 import type { Roadmap } from "../src/model";
 import { devProblem } from "./helpers/practice-questions";
-import { createPlayableGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 
@@ -53,7 +53,7 @@ function deepFreeze<T>(value: T): T {
 }
 
 test("a whole lesson flow leaves a frozen study record and roadmap untouched", async () => {
-  const g = createPlayableGame(1, r, initialStudy(r, "live"));
+  const g = createRecord(1, r, initialStudy(r, "live"));
   const contract = eligible(r, g.study);
   const e = g.encounters["question-0"];
   e.problem = devProblem(Object.assign({ rng: 3 }, g), r, contract);

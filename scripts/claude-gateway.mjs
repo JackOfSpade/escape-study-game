@@ -302,7 +302,7 @@ export function claudeArgs({ model, effort, system, stream }) {
     effort,
     "--system-prompt",
     system,
-    // These keep the player's own CLAUDE.md, hooks, memory and MCP servers out.
+    // These keep the learner's own CLAUDE.md, hooks, memory and MCP servers out.
     "--tools",
     "",
     "--setting-sources",
@@ -607,7 +607,7 @@ const CONNECTION_TIMEOUT_MS = 3000;
 export function createClaudeGateway({
   env = process.env,
   spawn = spawnChild,
-  cwd = join(tmpdir(), "zombie-study-claude"),
+  cwd = join(tmpdir(), "study-app-claude"),
   maxRunning = 3,
   validate = validateAnswer,
   now = Date.now,
@@ -941,7 +941,7 @@ export function createClaudeGateway({
     }
     return entry.promise;
   }
-  /** Whether a player request could reach Claude now. A check that cannot
+  /** Whether a learner request could reach Claude now. A check that cannot
    * conclude does not lock the terminals: the request itself reports the failure. */
   let checked, checking;
   const checkConnection = () =>

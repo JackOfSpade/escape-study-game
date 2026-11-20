@@ -11,13 +11,13 @@ import {
 } from "../src/roadmap-adoption";
 import type { RoadmapReconciliationPayload } from "../src/roadmap-adoption-types";
 import { prepareRoadmapExport } from "../src/roadmap-export";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 const oldRow = r.raw.split("\n").find((s) => s.startsWith("| S0004-A13 |"))!;
 const observation =
   "| S0004-EV99 | S0004-A13 | 2026-10-16 | T02.1 | D1 synthetic assisted metric definition | GUIDED | HINT | 1 | Synthetic external continuation; the learner used a supplied metric hint. No independent pass or actual runtime execution. |";
 function fixture() {
-  const g = createGame(7, r);
+  const g = createRecord(7, r);
   g.study.profile = "live";
   return g;
 }
@@ -103,7 +103,7 @@ test("reviewed historical continuation retains exact before/after rows in a port
     e = restored.encounters["question-0"],
     c = eligibleLearning(r, l, "2026-10-16T16:00:00Z");
   e.problem = {
-    title: "Synthetic later actual game study",
+    title: "Synthetic later actual app study",
     prompt: "Continue eligible work",
     starter: "",
     rubric: [],

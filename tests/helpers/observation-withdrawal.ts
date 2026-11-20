@@ -16,7 +16,7 @@ import {
   readIdentifierCounters,
 } from "../../src/roadmap-identifiers";
 import { inspectMergedDocument } from "../../src/roadmap-structure";
-import { createGame } from "./record";
+import { createRecord } from "./record";
 export const r: Roadmap = JSON.parse(
   readFileSync("public/curriculum.json", "utf8"),
 );
@@ -24,7 +24,7 @@ export const final = finalRequirements(r, "PY").find((d) => d.id === "PY:T01")!;
 export const excerpt =
   "Synthetic independently observed changed-context reasoning, without supplied choices; full source-defined facet was reviewed.";
 const originalTask =
-  "| S0007-A98 | S0007 / 2026-10-16 | T01 changed-context assessment | PARTIAL; task remains open despite its qualifying scope evidence | S0007-EV98 | Synthetic source-issued task; no gameplay visit |";
+  "| S0007-A98 | S0007 / 2026-10-16 | T01 changed-context assessment | PARTIAL; task remains open despite its qualifying scope evidence | S0007-EV98 | Synthetic source-issued task; no app visit |";
 export const evidence =
   "| S0007-EV98 | S0007-A98 | 2026-10-16 | T01 | D4 changed-context reasoning | TRANSFER | NONE | 3 | " +
   excerpt +
@@ -79,7 +79,7 @@ export async function setup(
   priorIndependent = false,
   initialStatus?: string,
 ) {
-  const g = createGame(7, r);
+  const g = createRecord(7, r);
   g.study.profile = "live";
   let raw = revision(r.raw, r.sourceHash, 10),
     at = raw.indexOf(
@@ -162,7 +162,7 @@ export async function setup(
   return g;
 }
 export async function withdraw(
-  g: ReturnType<typeof createGame>,
+  g: ReturnType<typeof createRecord>,
   status = "U",
   recycle = false,
   restoreEarlier = false,

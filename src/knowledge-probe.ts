@@ -314,7 +314,7 @@ export function parseProbeReply(
   if (complete) outcome = answer.outcome === "gap" ? "gap" : "solved";
   const known = new Map(facets.map((f) => [f.id, f] as const));
   // A model may repeat a declared part in its own spelling ("Generating
-  // Functions") after the game stored it normalised ("generating-functions").
+  // Functions") after the app stored it normalised ("generating-functions").
   const resolve = (value: unknown): string | undefined => {
     if (typeof value !== "string") return undefined;
     if (known.has(value)) return value;
@@ -444,7 +444,7 @@ export function probeState(e: Pick<Encounter, "probe">): ProbeState {
   };
 }
 
-/** One line for the terminal HUD. */
+/** One line for the terminal progress summary. */
 export function probeSummary(e: Pick<Encounter, "probe">): string {
   const s = probeState(e);
   if (!s.total) return "";
@@ -494,7 +494,8 @@ export function recordProbeTurn(
   e.probe ??= { facets: probeFacets(problem), turns: [] };
   if (e.probe.turns.some((t) => t.requestId === context.requestId)) return [];
   // Declared sub-facets join the encounter's universe so later turns, the
-  // HUD and the carried records treat them like the question's own facets.
+  // progress summary and the carried records treat them like the question's
+  // own facets.
   for (const f of reply.findings)
     if (
       f.partOf !== undefined &&

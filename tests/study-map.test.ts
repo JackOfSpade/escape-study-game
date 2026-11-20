@@ -5,7 +5,7 @@ import { activateCareerFocus } from "../src/career-profile";
 import { initialStudy } from "../src/curriculum";
 import type { Contract, Roadmap } from "../src/model";
 import { studyMapHtml } from "../src/study-map";
-import { createPlayableGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 
 const roadmap: Roadmap = JSON.parse(
   readFileSync("public/curriculum.json", "utf8"),
@@ -14,7 +14,7 @@ function setup() {
   const r = structuredClone(roadmap);
   const s = initialStudy(r, "live");
   activateCareerFocus(r, s);
-  return { r, g: createPlayableGame(125, r, s) };
+  return { r, g: createRecord(125, r, s) };
 }
 const issued: Contract = {
   id: "issued-synthetic",

@@ -323,9 +323,9 @@ export interface Settings {
 }
 /**
  * The saved record: the learner's study state, its questions and their
- * conversations, and the settings. Saves written by the retired game hold
- * more fields; they stay in the object untouched, so a save written here
- * still loads there.
+ * conversations, and the settings. Saves written by earlier builds hold more
+ * fields (legacy simulation state). They are neither read nor validated and
+ * are written back unchanged.
  */
 export interface StudyRecord {
   /** The saved record format. */

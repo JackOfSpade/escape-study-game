@@ -8,7 +8,7 @@ import type { Roadmap } from "../src/model";
 import { prepareRoadmapExport } from "../src/roadmap-export";
 import { reviewRoadmap } from "../src/roadmap-review";
 import { inspectMergedDocument } from "../src/roadmap-structure";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 const at = "2026-10-22T16:00:00Z";
 const block = (text: string, name: string) =>
@@ -17,7 +17,7 @@ const block = (text: string, name: string) =>
 test("source export recomputes original gates instead of projecting role-profile clearance as full mastery", async () => {
   const s = initialStudy(r, "live"),
     l = s.learner!;
-  const g = createGame(13, r, s),
+  const g = createRecord(13, r, s),
     e = Object.values(g.encounters)[0];
   const contract = eligibleLearning(r, l, at);
   e.problem = {
@@ -80,7 +80,7 @@ test("reviewed adoption under a role focus keeps exact source bytes and ancestry
   const { reconcileRoadmap, adoptReconciledRoadmap } =
     await import("../src/roadmap-adoption");
   const s = initialStudy(r, "live"),
-    g = createGame(91, r, s);
+    g = createRecord(91, r, s);
   activateCareerFocus(r, s);
   const originalCells = structuredClone(s.learner!.cells),
     originalSessions = structuredClone(s.learner!.sessions);

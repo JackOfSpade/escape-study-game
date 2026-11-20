@@ -23,7 +23,7 @@ import { messageBubble } from "./terminal-panels";
 
 export interface LessonSurfaceHost {
   /** The current record: an import replaces it. */
-  game(): StudyRecord;
+  studyRecord(): StudyRecord;
   roadmap: Roadmap;
   lessons: Lessons;
   reducedMotion(): boolean;
@@ -90,7 +90,7 @@ export function createLessonSurface(host: LessonSurfaceHost) {
 
   const gapRecord = (id: string | undefined) =>
     id
-      ? host.game().study.knowledgeGaps?.find((gap) => gap.id === id)
+      ? host.studyRecord().study.knowledgeGaps?.find((gap) => gap.id === id)
       : undefined;
 
   function unmount() {
@@ -101,7 +101,7 @@ export function createLessonSurface(host: LessonSurfaceHost) {
 
   function generate(gap: KnowledgeGapRecord, fresh: boolean) {
     host.log("lesson-requested", { gap: gap.id, fresh });
-    void lessons.generate(host.game(), host.roadmap, gap, { fresh });
+    void lessons.generate(host.studyRecord(), host.roadmap, gap, { fresh });
   }
 
   /** Only a gap with no lesson record at all is written on opening; a failed
@@ -110,7 +110,7 @@ export function createLessonSurface(host: LessonSurfaceHost) {
     if (
       !lessons.record(gap.id) &&
       lessons.available() &&
-      lessonOffer(host.game(), lessonGap(gap)).allowed
+      lessonOffer(host.studyRecord(), lessonGap(gap)).allowed
     )
       generate(gap, false);
   }
@@ -382,7 +382,7 @@ export function createLessonSurface(host: LessonSurfaceHost) {
     const gap = gapRecord(openGap);
     // A replaced record may no longer hold the gap that was open.
     if (!gap) return close();
-    const { allowed, reason } = lessonOffer(host.game(), lessonGap(gap));
+    const { allowed, reason } = lessonOffer(host.studyRecord(), lessonGap(gap));
     // A lesson opened while lessons were unavailable is written once they are.
     if (allowed) ensureLesson(gap);
     if (openGap === undefined) return;
@@ -518,7 +518,7 @@ export function createLessonSurface(host: LessonSurfaceHost) {
   function renderOffers(e: Encounter | undefined) {
     const gaps =
       e && e.state === "consumed"
-        ? encounterGaps(host.game(), e).filter((gap) => !gap.resolved)
+        ? encounterGaps(host.studyRecord(), e).filter((gap) => !gap.resolved)
         : [];
     offers.hidden = !gaps.length;
     writeButtons(
@@ -535,7 +535,8 @@ export function createLessonSurface(host: LessonSurfaceHost) {
   /** On the map: every open gap, newest first. */
   function renderGapList() {
     const box = $<HTMLDetailsElement>("#study-gaps");
-    const gaps = openGap === undefined ? openLessonGaps(host.game()) : [];
+    const gaps =
+      openGap === undefined ? openLessonGaps(host.studyRecord()) : [];
     box.hidden = !gaps.length;
     setText("#study-gaps-summary", `Gaps to study (${gaps.length})`);
     writeButtons(

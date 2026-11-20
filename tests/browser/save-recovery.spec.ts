@@ -22,15 +22,15 @@ test("a failed full-record import reports a clear unsaved warning", async ({
 }) => {
   await mockClaudeStudy(page);
   await page.goto("/");
-  await page.waitForFunction(() => !!(window as any).__deadAir?.game);
-  await page.evaluate(() => (window as any).__deadAir.openAgentMenu());
+  await page.waitForFunction(() => !!(window as any).__studyApp?.record);
+  await page.evaluate(() => (window as any).__studyApp.openAgentMenu());
   await page.locator("#settings-toggle").click();
   const { candidate, originalSeq, originalLocal } = await page.evaluate(
     async () => {
       const root = "/src/",
         { decode, encode, flushSaves } = await import(root + "persistence.ts");
       await flushSaves();
-      const current = (window as any).__deadAir.game,
+      const current = (window as any).__studyApp.record,
         copy = decode(encode(current));
       copy.seq = current.seq + 321;
       return {
@@ -73,13 +73,13 @@ test("a failed full-record import reports a clear unsaved warning", async ({
   );
   expect(
     await page.evaluate(() => ({
-      seq: (window as any).__deadAir.game.seq,
+      seq: (window as any).__studyApp.record.seq,
       local: localStorage.getItem("dead-air-save-v1"),
     })),
   ).toEqual({ seq: originalSeq + 321, local: originalLocal });
   await page.reload();
-  await page.waitForFunction(() => !!(window as any).__deadAir?.game);
-  expect(await page.evaluate(() => (window as any).__deadAir.game.seq)).toBe(
+  await page.waitForFunction(() => !!(window as any).__studyApp?.record);
+  expect(await page.evaluate(() => (window as any).__studyApp.record.seq)).toBe(
     originalSeq,
   );
 });
@@ -93,7 +93,7 @@ test("hiding the study tab synchronously checkpoints incomplete local work", asy
   const checkpoint = await page.evaluate(async (id) => {
     const root = "/src/";
     const { decode } = await import(/* @vite-ignore */ root + "persistence.ts");
-    const g = (window as any).__deadAir.game;
+    const g = (window as any).__studyApp.record;
     g.encounters[id].chatDraft = "Synthetic unfinished local reasoning";
     Object.defineProperty(document, "visibilityState", {
       configurable: true,
@@ -108,7 +108,7 @@ test("hiding the study tab synchronously checkpoints incomplete local work", asy
   await expect(page.locator("#study-workspace")).toBeVisible();
   expect(
     await page.evaluate(
-      (id) => (window as any).__deadAir.game.encounters[id].chatDraft,
+      (id) => (window as any).__studyApp.record.encounters[id].chatDraft,
       id,
     ),
   ).toBe("Synthetic unfinished local reasoning");
@@ -168,8 +168,8 @@ test("an unreadable checkpoint stays protected through lifecycle saves until a v
     const root = "/src/";
     const { encode } = await import(/* @vite-ignore */ root + "persistence.ts");
     const helpers = "/tests/helpers/record.ts";
-    const { createGame } = await import(/* @vite-ignore */ helpers);
-    const g = createGame(123, (window as any).__deadAir.roadmap);
+    const { createRecord } = await import(/* @vite-ignore */ helpers);
+    const g = createRecord(123, (window as any).__studyApp.roadmap);
     g.encounters["question-0"].chatDraft =
       "Synthetic unfinished answer restored from backup";
     return encode(g);
@@ -185,7 +185,8 @@ test("an unreadable checkpoint stays protected through lifecycle saves until a v
   await expect(page.locator("#study-workspace")).toBeVisible();
   expect(
     await page.evaluate(
-      () => (window as any).__deadAir.game.encounters["question-0"].chatDraft,
+      () =>
+        (window as any).__studyApp.record.encounters["question-0"].chatDraft,
     ),
   ).toBe("Synthetic unfinished answer restored from backup");
 });
@@ -195,7 +196,7 @@ test("a damaged copy beside a valid one is offered for download before a save re
 }) => {
   await mockClaudeStudy(page);
   await page.goto("/");
-  await page.waitForFunction(() => !!(window as any).__deadAir?.game);
+  await page.waitForFunction(() => !!(window as any).__studyApp?.record);
   const noticeHidden = () =>
     page.evaluate(
       () => document.querySelector<HTMLElement>("#study-load-notice")!.hidden,
@@ -212,7 +213,7 @@ test("a damaged copy beside a valid one is offered for download before a save re
     }
   });
   await page.reload();
-  await page.waitForFunction(() => !!(window as any).__deadAir?.game);
+  await page.waitForFunction(() => !!(window as any).__studyApp?.record);
   expect(await noticeHidden()).toBe(false);
   // Saving goes on as usual and replaces the damaged bytes in storage...
   await page.evaluate(() => window.dispatchEvent(new Event("blur")));
@@ -237,29 +238,31 @@ test("durable saves retain a large draft beyond localStorage capacity", async ({
 }) => {
   await mockClaudeStudy(page);
   await page.goto("/");
-  await page.waitForFunction(() => !!(window as any).__deadAir?.game);
+  await page.waitForFunction(() => !!(window as any).__studyApp?.record);
   const size = 8_000_000;
   await page.evaluate(async (size) => {
     const { question } = await import(
       /* @vite-ignore */ "/tests/helpers/" + "record.ts"
     );
-    const g = (window as any).__deadAir.game,
+    const g = (window as any).__studyApp.record,
       e = (g.encounters["question-0"] = question(g, "question-0"));
     // A controlled large-history fixture exercises the actual IndexedDB save path.
     e.workspace = "x".repeat(size);
   }, size);
   await openAgentMenu(page);
-  await page.getByRole("button", { name: "Save run", exact: true }).click();
-  await expect(page.locator("#pause-save-status")).toContainText(
+  await page
+    .getByRole("button", { name: "Save progress", exact: true })
+    .click();
+  await expect(page.locator("#menu-save-status")).toContainText(
     "Run saved locally",
     { timeout: 15000 },
   );
   await page.reload();
-  await page.waitForFunction(() => !!(window as any).__deadAir);
+  await page.waitForFunction(() => !!(window as any).__studyApp);
   expect(
     await page.evaluate(
       () =>
-        (window as any).__deadAir.game.encounters["question-0"].workspace
+        (window as any).__studyApp.record.encounters["question-0"].workspace
           .length,
     ),
   ).toBe(size);

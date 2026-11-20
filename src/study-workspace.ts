@@ -3,8 +3,8 @@ import { eligible, syncLearningView } from "./curriculum";
 import { encounterKey, interruptLearningAttempt } from "./learner";
 import type { Encounter, StudyRecord, Roadmap } from "./model";
 
-/** Fields the retired game required on every saved question. Nothing reads
- * them; they are written so a save made here still loads in the old build. */
+/** Fields an earlier build required on every saved question. Nothing reads
+ * them; they are kept so saves stay loadable by older builds. */
 const RETIRED_ENCOUNTER_FIELDS = {
   floor: 0,
   reward: "loot",

@@ -24,13 +24,13 @@ import {
   readIdentifierCounters,
 } from "../src/roadmap-identifiers";
 import { inspectMergedDocument } from "../src/roadmap-structure";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 const final = finalRequirements(r, "PY").find((d) => d.id === "PY:T01")!;
 const excerpt =
   "Synthetic independently observed changed-context reasoning, without supplied choices; full source-defined facet was reviewed.";
 const originalTask =
-  "| S0007-A98 | S0007 / 2026-10-16 | T01 changed-context assessment | COMPLETED; closed source task with independently reviewed scope | S0007-EV98 | Synthetic source-issued task; no gameplay visit |";
+  "| S0007-A98 | S0007 / 2026-10-16 | T01 changed-context assessment | COMPLETED; closed source task with independently reviewed scope | S0007-EV98 | Synthetic source-issued task; no app visit |";
 const correctionExcerpt =
   "Source audit found that the assessment supplied the central invariant; withdraw its score without treating it as learner failure.";
 const decision = `| DEC0028 | 2026-10-17 / source audit | ASSESSMENT_CORRECTION | PY:S0007-A98 | ${correctionExcerpt} | Persistent; preserve original facts and learner history | ACTIVE |`;
@@ -79,7 +79,7 @@ function finalRow(raw: string, status: string) {
   );
 }
 async function setup(partial = false, gap = false) {
-  const g = createGame(7, r);
+  const g = createRecord(7, r);
   g.study.profile = "live";
   let raw = revision(r.raw, r.sourceHash, 10),
     at = raw.indexOf(
@@ -144,7 +144,7 @@ async function setup(partial = false, gap = false) {
   return g;
 }
 async function withdraw(
-  g: ReturnType<typeof createGame>,
+  g: ReturnType<typeof createRecord>,
   status = "U",
   recycle = false,
 ) {

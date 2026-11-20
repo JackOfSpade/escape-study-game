@@ -1,3 +1,5 @@
+// Storage name kept from an earlier build; renaming it needs a migration
+// (see AGENTS.md).
 const DB = "dead-air-durable-state",
   STORE = "saves";
 

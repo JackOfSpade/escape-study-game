@@ -6,7 +6,7 @@ import type { RoadmapReconciliation } from "./roadmap-adoption-types";
 import { presentRoadmapReview } from "./roadmap-exposure";
 interface Options {
   provider?: Provider;
-  getGame: () => StudyRecord;
+  getRecord: () => StudyRecord;
   r: Roadmap;
   persist: () => Promise<unknown>;
   reconcile?: (
@@ -43,8 +43,8 @@ function baselineReview(p: RoadmapReconciliation, r: Roadmap) {
 }
 export function renderRoadmapAdoption(host: HTMLElement, options: Options) {
   views.set(host, options);
-  const { getGame, r, persist, reconcile, candidate, onAdopted } = options,
-    g = getGame(),
+  const { getRecord, r, persist, reconcile, candidate, onAdopted } = options,
+    g = getRecord(),
     jobs = g.study.roadmapReconciliations ?? [];
   const claude = options.provider === "claude-cli",
     label = `${claude ? "Claude CLI" : "Study bridge"} roadmap review`;
@@ -105,7 +105,7 @@ export function renderRoadmapAdoption(host: HTMLElement, options: Options) {
           j = jobs.find((job) => job.id === id);
         if (j?.review)
           presentRoadmapReview(
-            getGame(),
+            getRecord(),
             `${j.id}/${j.proposalHash}/diff`,
             j.review.changes
               .filter((c) => c.local !== c.incoming)
@@ -133,7 +133,7 @@ export function renderRoadmapAdoption(host: HTMLElement, options: Options) {
       await pending;
       refresh();
       await persist();
-      const job = getGame()
+      const job = getRecord()
         .study.roadmapReconciliations?.filter((j) =>
           id ? j.id === id : j.payload.candidate === text,
         )
@@ -183,7 +183,7 @@ export function renderRoadmapAdoption(host: HTMLElement, options: Options) {
       b.disabled = true;
       try {
         const adopted = await adoptReconciledRoadmap(
-          getGame(),
+          getRecord(),
           r,
           b.dataset.adoptRoadmap!,
         );
@@ -201,7 +201,7 @@ export function renderRoadmapAdoption(host: HTMLElement, options: Options) {
           );
         } catch (error) {
           status(
-            `Roadmap adopted in this run, but local save failed. Export a full evidence/run backup before leaving. ${String(error)}`,
+            `Roadmap adopted in this tab, but local save failed. Export a full evidence backup before leaving. ${String(error)}`,
           );
         }
       } catch (error) {

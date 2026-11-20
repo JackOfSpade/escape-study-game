@@ -12,15 +12,15 @@ test("the app opens straight into the learning workspace with its own menu and s
   await expect(page.locator(".study-skill-map")).toBeVisible();
   await expect(page.locator("#study-next")).toBeVisible();
   await expect(page.locator("#save-recovery")).toBeHidden();
-  // Nothing of the archived game is in the page.
+  // Nothing of the removed escape-game build is in the page.
   await expect(
     page.locator("canvas, .game-layout, #start-card, #hud"),
   ).toHaveCount(0);
 
-  const menu = page.locator("#pause-menu");
+  const menu = page.locator("#menu");
   await page.keyboard.press("Escape");
   await expect(menu).toBeVisible();
-  await expect(page.locator("#pause-title")).toHaveText("Menu");
+  await expect(page.locator("#menu-title")).toHaveText("Menu");
   await expect(page.locator("#agent-tools")).toBeHidden();
   await page.locator("#settings-toggle").click();
   await expect(page.locator("#settings")).toBeVisible();
@@ -118,7 +118,7 @@ test("an unreadable save shows the recovery card and a restored backup opens the
   const backup = await first.evaluate(async () => {
     const root = "/src/";
     const { encode } = await import(/* @vite-ignore */ root + "persistence.ts");
-    return encode((window as any).__deadAir.game);
+    return encode((window as any).__studyApp.record);
   });
   // A browser with no durable copy and a damaged local one.
   const context = await browser.newContext({

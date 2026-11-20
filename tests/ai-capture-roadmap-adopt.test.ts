@@ -14,7 +14,7 @@ import {
   reconcileRoadmap,
 } from "../src/roadmap-adoption";
 import { inspectMergedDocument } from "../src/roadmap-structure";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 import {
   ADOPT_FILE,
   ADOPT_RECIPES,
@@ -194,7 +194,7 @@ test("the real reconcileRoadmap reaches ready for every adopt case from an edits
       `${item.id} candidate is not a fully recorded revision 10`,
     );
     const roadmap = loadRoadmap(),
-      g = createGame(7, roadmap);
+      g = createRecord(7, roadmap);
     g.study.profile = "live";
     let edits: { find: string; replace: string }[] = [];
     await reconcileRoadmap(
@@ -335,10 +335,10 @@ const PROGRESS_IDS = [
   `${RECONCILE_OPERATION}-adopt-progress-checkpoint-pass`,
 ];
 
-/** A fresh live game, as the reference adoption test uses. */
-function liveGame() {
+/** A fresh live record, as the reference adoption test uses. */
+function liveRecord() {
   const roadmap = loadRoadmap(),
-    g = createGame(7, roadmap);
+    g = createRecord(7, roadmap);
   g.study.profile = "live";
   return { roadmap, g };
 }
@@ -360,13 +360,13 @@ function progressReply(
   };
 }
 
-/** Reconcile one progress case on a fresh live game, then adopt it. */
+/** Reconcile one progress case on a fresh live record, then adopt it. */
 async function adoptProgress(id: string) {
   const cases = await PROGRESS_CASES,
     item = cases.find((entry) => entry.id === id);
   assert.ok(item, `${id} was not built`);
   assert.ok(item.expected, `${id} stores no expected progress`);
-  const { roadmap, g } = liveGame();
+  const { roadmap, g } = liveRecord();
   let edits = 0;
   await reconcileRoadmap(
     g,
@@ -387,7 +387,7 @@ async function adoptProgress(id: string) {
   assert.deepEqual(job?.proposal?.completeScopes, item.expected.completeScopes);
   await adoptReconciledRoadmap(g, roadmap, job!.id);
   const l = g.study.learner;
-  assert.ok(l, `${id} adopted game has no learner`);
+  assert.ok(l, `${id} adopted record has no learner`);
   assert.deepEqual(
     [...l.verifiedScopes].sort(),
     [...item.expected.completeScopes].sort(),
@@ -457,7 +457,7 @@ test("the progress cases carry real study progress", async () => {
   }
 });
 
-test("progress adopt cases carry only realistic study text and real game evidence modes", async () => {
+test("progress adopt cases carry only realistic study text and real app evidence modes", async () => {
   const cases = await PROGRESS_CASES;
   for (const item of cases) {
     const candidate = JSON.stringify(item.payload.candidate),
@@ -474,7 +474,7 @@ test("progress adopt cases carry only realistic study text and real game evidenc
     );
     assert.ok(
       item.payload.candidate.includes("GAME_AI_ASSESSED_INDEPENDENT"),
-      `${item.id} candidate carries no game-assessed independent evidence row`,
+      `${item.id} candidate carries no GAME_AI_ASSESSED_INDEPENDENT evidence row`,
     );
   }
 });

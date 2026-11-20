@@ -5,7 +5,7 @@ export const $ = <T extends HTMLElement = HTMLElement>(selector: string) =>
   document.querySelector<T>(selector)!;
 
 // Open panels re-render on every UI tick. Rewriting unchanged text or markup
-// replaces nodes, which clears any selection the player is making, so panel
+// replaces nodes, which clears any selection the learner is making, so panel
 // writes only touch the DOM when the content actually changes.
 export function setNodeText(el: Element, text: string) {
   if (el.textContent !== text) el.textContent = text;

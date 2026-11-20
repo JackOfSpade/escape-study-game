@@ -14,9 +14,9 @@ test("a gap answered after the question finished shows as closed in chat and in 
     });
   });
   await page.goto("/");
-  await page.waitForFunction(() => !!(window as any).__deadAir);
+  await page.waitForFunction(() => !!(window as any).__studyApp);
   await page.evaluate(() => {
-    (window as any).__deadAir.game.study.profile = "live";
+    (window as any).__studyApp.record.study.profile = "live";
   });
   await page.locator("#study-next").click();
   await expect(page.locator("#study-terminal-slot #problem")).not.toBeEmpty();
@@ -85,7 +85,7 @@ test("a gap answered after the question finished shows as closed in chat and in 
   // The saved record holds the gap as closed.
   await page.waitForFunction(
     () =>
-      !(window as any).__deadAir.game.study.knowledgeGaps.some(
+      !(window as any).__studyApp.record.study.knowledgeGaps.some(
         (x: any) => !x.resolved,
       ),
   );

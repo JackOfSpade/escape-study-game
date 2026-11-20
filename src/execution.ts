@@ -100,7 +100,7 @@ export function executionEvidence(job: WorkspaceExecution) {
             height: preview.height,
             sha256: preview.sha256,
             observation:
-              "Saved image available in game; image pixels are not included in this evidence packet.",
+              "Saved image available in the workspace; image pixels are not included in this evidence packet.",
           },
         }
       : {}),

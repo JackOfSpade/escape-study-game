@@ -15,6 +15,8 @@ import { fnv1a } from "./hash";
 import type { LessonMessage, LessonRecord } from "./lesson-types";
 import { isRecord } from "./records";
 
+// Storage name kept from an earlier build; renaming it needs a migration
+// (see AGENTS.md).
 const DB = "dead-air-lessons",
   STORE = "lessons";
 

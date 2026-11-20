@@ -5,7 +5,7 @@ import { preparePracticeRooms } from "./helpers/practice-questions";
 import { checkBridge, retryTutorRequest, send, tutorProblem } from "../src/ai";
 import { probeFacets, probeState } from "../src/knowledge-probe";
 import type { Roadmap } from "../src/model";
-import { createPlayableGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 import { decode, encode, recover } from "../src/persistence";
 import { dialogueStatus, gapClosedMarker } from "../src/terminal-panels";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
@@ -36,7 +36,7 @@ async function fixture(
   };
   try {
     await checkBridge();
-    const g = createPlayableGame(717, r);
+    const g = createRecord(717, r);
     preparePracticeRooms(g, r);
     const e = g.encounters["question-0"];
     e.mode = "solo";
@@ -304,7 +304,7 @@ test("a declared gap lets the tutor concede the question, records the gap with t
       g.study.knowledgeEstablished.map((k: any) => k.facet.id),
       [facets[0].id],
     );
-    const nextRun = createPlayableGame(5, r, recover(decode(encode(g))).study);
+    const nextRun = createRecord(5, r, recover(decode(encode(g))).study);
     assert.equal(nextRun.study.knowledgeGaps!.length, facets.length - 1);
   }));
 

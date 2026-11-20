@@ -5,25 +5,19 @@ import { randomUUID } from "node:crypto";
 import { browserContainerOptions } from "./browser-container.mjs";
 const inspected = spawnSync(
     "docker",
-    [
-      "image",
-      "inspect",
-      "zombie-escape-browser-runtime:0.1.0",
-      "--format",
-      "{{.Id}}",
-    ],
+    ["image", "inspect", "study-browser-runtime:0.1.0", "--format", "{{.Id}}"],
     { encoding: "utf8", timeout: 5000 },
   ),
   imageId = inspected.stdout?.trim();
 if (inspected.status !== 0 || !/^sha256:[a-f0-9]{64}$/.test(imageId ?? ""))
   throw Error("Build this project's browser runtime image first");
-const name = "zombie-browser-preflight-" + randomUUID(),
+const name = "study-browser-preflight-" + randomUUID(),
   args = [
     "run",
     ...browserContainerOptions(name),
     imageId,
     "node",
-    "/opt/zombie-browser/preflight.mjs",
+    "/opt/study-browser/preflight.mjs",
   ];
 const startedAt = new Date().toISOString();
 try {

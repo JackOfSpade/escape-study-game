@@ -4,7 +4,7 @@ import test from "node:test";
 import { checkBridge, ensureProblem, send } from "../src/ai";
 import { knowledgeGapContext, probeFacets } from "../src/knowledge-probe";
 import type { Roadmap } from "../src/model";
-import { createPlayableGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 import { preparePracticeRooms } from "./helpers/practice-questions";
 // @ts-expect-error The gateway is intentionally plain JavaScript.
 import { buildPrompt } from "../scripts/claude-gateway.mjs";
@@ -33,7 +33,7 @@ async function conversation(replies: Record<string, unknown>[]) {
   };
   try {
     await checkBridge();
-    const g: any = createPlayableGame(717, roadmap);
+    const g: any = createRecord(717, roadmap);
     preparePracticeRooms(g, roadmap);
     const e: any = g.encounters["question-0"];
     await ensureProblem(g, e, roadmap);

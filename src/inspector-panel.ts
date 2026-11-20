@@ -29,7 +29,7 @@ import { reviewRoadmap } from "./roadmap-review";
 
 interface InspectorHost {
   /** The current record: an import replaces it. */
-  game(): StudyRecord;
+  studyRecord(): StudyRecord;
   roadmap: Roadmap;
   /** Saves the record; false when the save failed. */
   persist(): Promise<boolean>;
@@ -45,9 +45,9 @@ export function createInspector(host: InspectorHost) {
   const { roadmap } = host;
   function eligibleNow() {
     try {
-      return eligible(roadmap, host.game().study);
+      return eligible(roadmap, host.studyRecord().study);
     } catch (err) {
-      host.game().notice = `Curriculum gate: ${String(err)}`;
+      host.studyRecord().notice = `Curriculum gate: ${String(err)}`;
       return undefined;
     }
   }
@@ -55,11 +55,11 @@ export function createInspector(host: InspectorHost) {
     host.renderCareerControls();
     const c = eligibleNow();
     const readiness = (["PY", "PE"] as const)
-      .map((track) => readinessHtml(host.game(), roadmap, track))
+      .map((track) => readinessHtml(host.studyRecord(), roadmap, track))
       .join("");
     // A full rebuild: the sections below are appended to this fresh summary.
     $("#inspector-content").innerHTML = inspectorSummaryHtml(
-      host.game(),
+      host.studyRecord(),
       roadmap,
       c,
       status().detail,
@@ -67,22 +67,23 @@ export function createInspector(host: InspectorHost) {
     $("#inspector-content").insertAdjacentHTML("beforeend", readiness);
     $("#inspector-content").insertAdjacentHTML(
       "beforeend",
-      knowledgeHtml(host.game()),
+      knowledgeHtml(host.studyRecord()),
     );
     renderEnvironmentObservations(
       $("#inspector-content"),
-      host.game(),
+      host.studyRecord(),
       roadmap,
       host.persistOrThrow,
-      host.game().study.profile === "live" &&
+      host.studyRecord().study.profile === "live" &&
         status().capabilities.includes("review-environment")
         ? (id, retry) =>
-            reviewEnvironmentObservation(host.game(), roadmap, id, retry)
+            reviewEnvironmentObservation(host.studyRecord(), roadmap, id, retry)
         : undefined,
       () => {
         for (const track of ["PY", "PE"] as const) {
           const node = document.querySelector(`[data-readiness="${track}"]`);
-          if (node) node.outerHTML = readinessHtml(host.game(), roadmap, track);
+          if (node)
+            node.outerHTML = readinessHtml(host.studyRecord(), roadmap, track);
         }
       },
     );
@@ -96,7 +97,7 @@ export function createInspector(host: InspectorHost) {
     );
     const renderAdoption = (candidate?: string) =>
       renderRoadmapAdoption($("#roadmap-adoption-controls"), {
-        getGame: () => host.game(),
+        getRecord: () => host.studyRecord(),
         r: roadmap,
         candidate,
         provider:
@@ -105,11 +106,11 @@ export function createInspector(host: InspectorHost) {
             : (status().mode as Provider),
         persist: host.persistOrThrow,
         reconcile:
-          host.game().study.profile === "live" &&
+          host.studyRecord().study.profile === "live" &&
           status().capabilities.includes("reconcile-roadmap")
             ? (text, id, captured) =>
                 reconcileUploadedRoadmap(
-                  host.game(),
+                  host.studyRecord(),
                   roadmap,
                   text,
                   id,
@@ -133,7 +134,7 @@ export function createInspector(host: InspectorHost) {
       const file = input.files?.[0];
       if (!file) return;
       const output = $("#roadmap-review-result"),
-        requestGame = host.game();
+        requestRecord = host.studyRecord();
       input.disabled = true;
       output.textContent = "Reviewing a snapshot of current saved progress…";
       try {
@@ -141,7 +142,7 @@ export function createInspector(host: InspectorHost) {
           throw Error("Roadmap exceeds the 2 MB review limit");
         // Export preparation runs on a copy: review never allocates live IDs,
         // advances the export cache or changes an ongoing study session.
-        const study = structuredClone(host.game().study);
+        const study = structuredClone(host.studyRecord().study);
         const local =
           study.profile === "live" && study.learner
             ? (
@@ -154,7 +155,7 @@ export function createInspector(host: InspectorHost) {
             : roadmap.raw;
         const candidate = await file.text();
         const report = await reviewRoadmap(roadmap, local, candidate);
-        if (host.game() !== requestGame)
+        if (host.studyRecord() !== requestRecord)
           throw Error(
             "Run changed during review; reopen the inspector to review current progress",
           );
@@ -183,7 +184,7 @@ export function createInspector(host: InspectorHost) {
           differences.ontoggle = () => {
             if (differences.open)
               presentRoadmapReview(
-                host.game(),
+                host.studyRecord(),
                 `${report.localHash}/${report.candidateHash}/upload-diff`,
                 report.changes
                   .map(
@@ -200,13 +201,14 @@ export function createInspector(host: InspectorHost) {
         input.value = "";
       }
     };
-    const historical = host.game().study.learner?.historicalReviews ?? [];
+    const historical =
+      host.studyRecord().study.learner?.historicalReviews ?? [];
     if (historical.length)
       $("#inspector-content").insertAdjacentHTML(
         "beforeend",
         `<details><summary>Historical facet reconciliations (${historical.length})</summary><p>Original observations retain their original IDs and dates. Reconciliation dates record review activity, not new human demonstrations. Earlier reviews remain in this audit.</p>${historical
           .map((m) => {
-            const def = host.game().study.learner!.scopes[m.scopeId];
+            const def = host.studyRecord().study.learner!.scopes[m.scopeId];
             const observed = def
               ? historicalRecords(roadmap, def.objectiveId, def.depth)
                   .filter((r) => m.evidenceIds.includes(r.id))
@@ -222,18 +224,18 @@ export function createInspector(host: InspectorHost) {
     ))
       button.onclick = () => {
         const a = host
-          .game()
+          .studyRecord()
           .study.assessments.find((a) => a.id === button.dataset.assessment);
         if (!a) return;
         const e = [
-          ...Object.values(host.game().encounters),
-          ...host.game().study.archives,
+          ...Object.values(host.studyRecord().encounters),
+          ...host.studyRecord().study.archives,
         ].find((e) => a.id.startsWith(`assessment-${encounterKey(e)}-`));
         if (!e || button.disabled) return;
         button.disabled = true;
-        const requestGame = host.game(),
+        const requestRecord = host.studyRecord(),
           pending = assess(
-            host.game(),
+            host.studyRecord(),
             e,
             roadmap,
             a.evidenceCutoffSequence,
@@ -247,24 +249,24 @@ export function createInspector(host: InspectorHost) {
           button.disabled = false;
           setNodeText(
             button,
-            requestGame.study.assessments.find((item) => item.id === a.id)
+            requestRecord.study.assessments.find((item) => item.id === a.id)
               ?.status ?? "Saved",
           );
         });
       };
     $("#progress-export").onclick = async () => {
       const button = $<HTMLButtonElement>("#progress-export"),
-        requestGame = host.game();
+        requestRecord = host.studyRecord();
       button.disabled = true;
       try {
         const prepared = await prepareRoadmapExport(
           roadmap,
-          host.game().study.learner!,
-          host.game().study.roadmapExport,
+          host.studyRecord().study.learner!,
+          host.studyRecord().study.roadmapExport,
         );
-        if (host.game() !== requestGame)
+        if (host.studyRecord() !== requestRecord)
           throw Error("Run changed during export; retry from the current run");
-        host.game().study.roadmapExport = prepared;
+        host.studyRecord().study.roadmapExport = prepared;
         await host.persist();
         download(
           "interview_prep_roadmap.md",
@@ -290,7 +292,10 @@ export function createInspector(host: InspectorHost) {
       download(
         "learning-workspace-evidence.json",
         JSON.stringify(
-          { study: host.game().study, encounters: host.game().encounters },
+          {
+            study: host.studyRecord().study,
+            encounters: host.studyRecord().encounters,
+          },
           null,
           2,
         ),

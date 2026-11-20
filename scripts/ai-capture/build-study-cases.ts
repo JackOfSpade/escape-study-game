@@ -27,7 +27,7 @@ import type {
   Roadmap,
   Track,
 } from "../../src/model";
-import { createGame } from "../../tests/helpers/record";
+import { createRecord } from "../../tests/helpers/record";
 
 type StudyOperation = "generate" | "tutor" | "assess";
 export type StudyCase = {
@@ -378,8 +378,8 @@ async function withBridge(handler: Handler, run: () => Promise<void>) {
   }
 }
 
-function gameFor(seed: number, r: Roadmap) {
-  const g = createGame(seed, r, initialStudy(r, "live"));
+function recordFor(seed: number, r: Roadmap) {
+  const g = createRecord(seed, r, initialStudy(r, "live"));
   return g;
 }
 
@@ -502,7 +502,7 @@ async function buildGenerate(
     SCENARIOS.find((s) => s.track === track && s.topic === topic) ??
     SCENARIOS[0];
   const depth = track === "PY" ? [1, 2, 3][Math.floor(variant / 2) % 3] : 1;
-  const g = gameFor(20260900 + variant, r);
+  const g = recordFor(20260900 + variant, r);
   const e = encounterFor(g, 0);
   const contract = contractFor(g, r, scenario, depth, variant);
   seedProbes(g, contract, variant);
@@ -594,7 +594,7 @@ async function buildTutor(
       (variant + Math.floor(variant / STAGES.length)) % SCENARIOS.length
     ];
   const depth = scenario.track === "PY" ? 1 + (variant % 2) : 1;
-  const g = gameFor(20261000 + variant, r);
+  const g = recordFor(20261000 + variant, r);
   const e = encounterFor(g, variant);
   const contract = contractFor(g, r, scenario, depth, variant);
   e.problem = problemFor(scenario, contract, depth);
@@ -636,7 +636,7 @@ async function buildAssess(
   const scenario = SCENARIOS[variant % SCENARIOS.length];
   const kind = EVIDENCE_KINDS[Math.floor(variant / SCENARIOS.length) % 4];
   const depth = scenario.track === "PY" ? 1 + (variant % 2) : 1;
-  const g = gameFor(20261100 + variant, r);
+  const g = recordFor(20261100 + variant, r);
   const e = encounterFor(g, variant);
   const contract = contractFor(g, r, scenario, depth, variant);
   e.problem = problemFor(scenario, contract, depth);
@@ -802,4 +802,4 @@ if (entry === fileURLToPath(import.meta.url)) {
 }
 
 /** Shared with the downstream builder; re-exported without changing behaviour. */
-export { contractFor, encounterFor, gameFor, scenarioFor, withBridge };
+export { contractFor, encounterFor, recordFor, scenarioFor, withBridge };

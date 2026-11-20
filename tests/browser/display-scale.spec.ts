@@ -7,9 +7,9 @@ import {
 
 async function openSettings(page: Page) {
   // Escape is handled only once the saved record has loaded.
-  await page.waitForFunction(() => !!(window as any).__deadAir);
+  await page.waitForFunction(() => !!(window as any).__studyApp);
   await page.keyboard.press("Escape");
-  await expect(page.locator("#pause-menu")).toBeVisible();
+  await expect(page.locator("#menu")).toBeVisible();
   await page.locator("#settings-toggle").click();
   await expect(page.locator("#settings-career-focus")).toBeFocused();
 }
@@ -19,7 +19,9 @@ async function setScale(page: Page, percent: number) {
   await expect(page.locator("#display-scale-value")).toHaveText(`${percent}%`);
   await expect
     .poll(() =>
-      page.evaluate(() => (window as any).__deadAir.game.settings.displayScale),
+      page.evaluate(
+        () => (window as any).__studyApp.record.settings.displayScale,
+      ),
     )
     .toBe(percent / 100);
 }
@@ -69,13 +71,13 @@ test("a saved record without the size preference opens at 100 percent", async ({
   page,
 }) => {
   await page.goto("/");
-  await page.waitForFunction(() => !!(window as any).__deadAir);
+  await page.waitForFunction(() => !!(window as any).__studyApp);
   await page.evaluate(async () => {
     const root = "/src/",
       { save, flushSaves } = await import(
         /* @vite-ignore */ root + "persistence.ts"
       ),
-      g = (window as any).__deadAir.game;
+      g = (window as any).__studyApp.record;
     delete g.settings.displayScale;
     await save(g);
     await flushSaves();

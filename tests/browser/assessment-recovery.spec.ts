@@ -38,7 +38,7 @@ test("retrying an assessment durably captures its pending request before a reply
         { devProblem } = await import(/* @vite-ignore */ fixtures),
         { question } = await import(/* @vite-ignore */ records),
         { save } = await import(root + "persistence.ts"),
-        { game: g, roadmap: r } = (window as any).__deadAir,
+        { record: g, roadmap: r } = (window as any).__studyApp,
         e = (g.encounters["question-0"] = question(g, "question-0"));
       g.study.profile = "live";
       e.problem = devProblem(g, r);
@@ -72,9 +72,9 @@ test("retrying an assessment durably captures its pending request before a reply
     );
     // Reload interrupts the in-flight review while retaining its exact packet.
     await page.reload();
-    await page.waitForFunction(() => !!(window as any).__deadAir);
+    await page.waitForFunction(() => !!(window as any).__studyApp);
     const recovered = await page.evaluate(
-      () => (window as any).__deadAir.game.study.assessments[0],
+      () => (window as any).__studyApp.record.study.assessments[0],
     );
     expect(recovered.status).toBe("review-required");
     expect(recovered.request).toEqual(request);

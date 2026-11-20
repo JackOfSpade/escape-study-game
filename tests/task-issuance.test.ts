@@ -13,7 +13,7 @@ import {
 import type { Assessment, Encounter, StudyRecord, Roadmap } from "../src/model";
 import { decode, encode } from "../src/persistence";
 import { prepareRoadmapExport } from "../src/roadmap-export";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 function question(g: StudyRecord, e: Encounter) {
   const c = eligible(r, g.study);
@@ -37,7 +37,7 @@ function question(g: StudyRecord, e: Encounter) {
   registerScopes(r, g.study.learner!, e);
 }
 function fixture() {
-  const g = createGame(33, r, initialStudy(r, "live")),
+  const g = createRecord(33, r, initialStudy(r, "live")),
     e = g.encounters["question-0"];
   g.study.learner!.reviews = {};
   question(g, e);

@@ -13,8 +13,8 @@ const encounter = (g: StudyRecord, id: string) =>
   [...Object.values(g.encounters), ...g.study.archives].find(
     (e) => key(e) === id,
   );
-// Physical time, NPC thoughts and roadmap presentation do not change the
-// captured human task. Actual edits, reasoning and tutoring do.
+// Legacy clock time, collaborator notes and roadmap presentation do not change
+// the captured human task. Actual edits, reasoning and tutoring do.
 const workText = (e: Encounter) =>
   JSON.stringify({
     problem: e.problem,

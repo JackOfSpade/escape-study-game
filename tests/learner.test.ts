@@ -25,7 +25,7 @@ import {
 import { type Assessment, type Encounter, type Roadmap } from "../src/model";
 import { decode, encode } from "../src/persistence";
 import { replayRetention } from "../src/retention-history";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 import { devProblem } from "./helpers/practice-questions";
 import type { StudyRecord } from "../src/model";
 
@@ -34,7 +34,7 @@ const when = "2026-10-15T16:00:00.000Z";
 function fixture() {
   const l = initialLearner(r, "test");
   l.reviews = {};
-  const g = createGame(10, r),
+  const g = createRecord(10, r),
     e = g.encounters["question-0"],
     c = eligibleLearning(r, l, when);
   const def = {
@@ -164,7 +164,7 @@ test("new actual study allocates S0008 once; development practice allocates no r
   );
   beginLearningAttempt(r, l, e, when);
   assert.equal(l.attempts.length, 1);
-  const g = createGame(4, r);
+  const g = createRecord(4, r);
   const dev = g.encounters["question-0"];
   issueDev(g, dev, r);
   await ensureProblem(g, dev, r);
@@ -318,7 +318,7 @@ test("later catch-up exposure cannot taint earlier independent reasoning", () =>
   applyLearningAssessment(r, l, e, p, when, "test-fixture");
   assert.equal(p.status, "applied");
 });
-test("no NPC, defense, unknown IDs, missing refs, nonexistent execution, or future version can mint credit", () => {
+test("no non-learner message, defense, unknown IDs, missing refs, nonexistent execution, or future version can mint credit", () => {
   for (const change of [
     (_a: Assessment, e: Encounter) => {
       e.history[0].author = "npc-0";
@@ -402,7 +402,7 @@ test("an actual contradiction reopens only its facet and checkpoint, preserving 
   );
   assert.equal(l.evidence.length, 3);
 });
-test("retention uses actual elapsed time and separate practice sequences, never game time or midnight alone", () => {
+test("retention uses actual elapsed time and separate practice sequences, never the legacy record clock or midnight alone", () => {
   assert.equal(localDate("2026-10-16T01:00:00Z"), "2026-10-15");
   const v = {
     objectiveId: "PY:T01.1",
@@ -458,13 +458,13 @@ test("strict per-track gates and cross-track lead limit survive reopening", () =
   assert.ok(l.tracks.PY.suspended.some((s) => s.tier === 3));
 });
 test("run-local terminal names never collide in persistent study visits or archived attempts", async () => {
-  const a = createGame(15, r);
+  const a = createRecord(15, r);
   const e = a.encounters["question-0"];
   issueDev(a, e, r);
   await ensureProblem(a, e, r);
   beginVisit(r, a.study, e);
   finishVisit(r, a.study, e);
-  const b = createGame(15, r, a.study);
+  const b = createRecord(15, r, a.study);
   const other = b.encounters["question-0"];
   issueDev(b, other, r);
   assert.notEqual(encounterKey(e), encounterKey(other));
@@ -487,7 +487,7 @@ test("unfinished learning links a new encounter to scope history without transfe
   );
   interruptLearningAttempt(l, e, when);
   closeLearningSession(l);
-  const g = createGame(21, r),
+  const g = createRecord(21, r),
     next = g.encounters["question-0"];
   next.problem = structuredClone(e.problem);
   next.problem!.contract = eligibleLearning(r, l, when);
@@ -499,7 +499,7 @@ test("unfinished learning links a new encounter to scope history without transfe
   assert.deepEqual(next.problem!.contract.missingFacets, ["boundary"]);
 });
 test("development assessments cannot apply academic evidence; live disconnection never substitutes a development pass", async () => {
-  const g = createGame(2, r);
+  const g = createRecord(2, r);
   const e = g.encounters["question-0"];
   issueDev(g, e, r);
   await ensureProblem(g, e, r);
@@ -522,7 +522,7 @@ test("development assessments cannot apply academic evidence; live disconnection
 
 test("review scheduling extends only after fresh independent whole-scope delayed work", () => {
   const l = initialLearner(r, "test"),
-    g = createGame(31, r),
+    g = createRecord(31, r),
     e = g.encounters["question-0"],
     c = eligibleLearning(r, l, when),
     id = c.objectiveIds[0];
@@ -812,7 +812,7 @@ test("controlled bridge fixture: live snapshot completion awards access before s
   };
   try {
     await ai.checkBridge();
-    const g = createGame(33, r);
+    const g = createRecord(33, r);
     g.study = initialStudy(r, "live");
     const e = g.encounters["question-0"];
     await ai.ensureProblem(g, e, r);
@@ -889,7 +889,7 @@ test("reopened lower gates suspend an unfinished higher task and restore the exa
   l.tracks.PY.phase = "REPAIR_VERIFY";
   l.tracks.PY.queue = ["T11", "T10"];
   l.tracks.PY.lap = 5;
-  const g = createGame(77, r),
+  const g = createRecord(77, r),
     e = g.encounters["question-0"],
     c = eligibleLearning(r, l, when);
   assert.equal(c.depth, 3);
@@ -934,7 +934,7 @@ test("death detaches a suspended higher task so repaired gates resume with a fre
   l.tracks.PY.phase = "REPAIR_VERIFY";
   l.tracks.PY.queue = ["T11", "T10"];
   l.tracks.PY.lap = 5;
-  const g = createGame(77, r),
+  const g = createRecord(77, r),
     e = g.encounters["question-0"],
     c = eligibleLearning(r, l, when);
   g.study.learner = l;
@@ -969,7 +969,7 @@ test("death detaches a suspended higher task so repaired gates resume with a fre
   assert.equal(l.attempts[0].status, "interrupted");
   assert.equal(l.continuations.length, 1);
   const saved = decode(encode(g)),
-    fresh = createGame(78, r, saved.study),
+    fresh = createRecord(78, r, saved.study),
     restored = fresh.study.learner!;
   restored.cells["PE:T01.1"].states[0] = "P";
   reconcileGates(r, restored);
@@ -1035,7 +1035,7 @@ test("matching artifact references without a captured runner receipt cannot inve
   );
 });
 test("non-eligible shared work is saved without stealing the next formal visit", () => {
-  const g = createGame(88, r);
+  const g = createRecord(88, r);
   g.study = initialStudy(r, "live");
   const e = g.encounters["question-0"];
   const c = eligible(r, g.study);
@@ -1061,7 +1061,7 @@ test("non-eligible shared work is saved without stealing the next formal visit",
 });
 
 test("edit evidence records the actual human diff instead of claiming ownership of supplied starter code", async () => {
-  const g = createGame(55, r),
+  const g = createRecord(55, r),
     e = g.encounters["question-0"];
   await ensureProblem(g, e, r);
   const starter = e.workspace;
@@ -1107,7 +1107,7 @@ test("provided problem/starter exposure is persistent, scoped assistance for the
 
 test("long editor histories stay compact and reconstruct exact arbitrary revisions", async () => {
   const { workspaceAt } = await import("../src/workspace-history");
-  const g = createGame(57, r),
+  const g = createRecord(57, r),
     e = g.encounters["question-0"];
   await ensureProblem(g, e, r);
   const base = "Long working draft.\n".repeat(4000);
@@ -1362,7 +1362,7 @@ test("F10 assistance on a later boundary does not erase an earlier independent p
   );
   const restored = decode(
     encode({
-      ...createGame(8, r),
+      ...createRecord(8, r),
       study: { ...initialStudy(r, "live"), learner: l },
     }),
   );

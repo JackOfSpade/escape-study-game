@@ -315,7 +315,7 @@ async function askJudge(completer, messages) {
     try {
       const reply = await completer({
         route: "deepseek-flash",
-        caller: "zombie-ai-judge",
+        caller: "study-ai-judge",
         tag: "judge",
         maxTokens: JUDGE_MAX_TOKENS,
         messages,

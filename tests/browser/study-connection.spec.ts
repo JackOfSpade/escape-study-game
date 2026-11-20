@@ -23,7 +23,7 @@ test("without Claude a question lists the steps to enable it, then unlocks itsel
   expect((await studyState(page, id)).problem).toBeUndefined();
   await page.locator("#chat-input").evaluate(() => {});
   await page.evaluate((id) => {
-    (window as any).__deadAir.game.encounters[id].chatDraft =
+    (window as any).__studyApp.record.encounters[id].chatDraft =
       "Preserved unsent clarification";
   }, id);
 
@@ -39,7 +39,7 @@ test("without Claude a question lists the steps to enable it, then unlocks itsel
   expect(relay.tutorCalls()).toHaveLength(0);
   expect(
     await page.evaluate(
-      (id) => (window as any).__deadAir.game.encounters[id].chatDraft,
+      (id) => (window as any).__studyApp.record.encounters[id].chatDraft,
       id,
     ),
   ).toBe("Preserved unsent clarification");
@@ -59,7 +59,7 @@ test("the Check again button unlocks the question at once with exactly one gener
   );
   expect(relay.calls).toHaveLength(0);
   await page.evaluate((id) => {
-    (window as any).__deadAir.game.encounters[id].chatDraft =
+    (window as any).__studyApp.record.encounters[id].chatDraft =
       "Unsent idea remains local";
   }, id);
   relay.setAvailable(true);
@@ -70,7 +70,7 @@ test("the Check again button unlocks the question at once with exactly one gener
   expect(relay.tutorCalls()).toHaveLength(0);
   expect(
     await page.evaluate(
-      (id) => (window as any).__deadAir.game.encounters[id].chatDraft,
+      (id) => (window as any).__studyApp.record.encounters[id].chatDraft,
       id,
     ),
   ).toBe("Unsent idea remains local");
@@ -83,7 +83,7 @@ test("rechecking the connection from settings restores it without a tutor reques
   const id = await openStudyQuestion(page);
   await expect(page.locator("#terminal-connect")).toBeVisible();
   await page.evaluate((id) => {
-    (window as any).__deadAir.game.encounters[id].chatDraft =
+    (window as any).__studyApp.record.encounters[id].chatDraft =
       "Unsent idea remains local";
   }, id);
   await page.keyboard.press("Escape");
@@ -97,7 +97,7 @@ test("rechecking the connection from settings restores it without a tutor reques
   expect(relay.tutorCalls()).toHaveLength(0);
   expect(
     await page.evaluate(
-      (id) => (window as any).__deadAir.game.encounters[id].chatDraft,
+      (id) => (window as any).__studyApp.record.encounters[id].chatDraft,
       id,
     ),
   ).toBe("Unsent idea remains local");

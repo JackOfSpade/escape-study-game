@@ -114,15 +114,15 @@ export function importedMappingValid(
       throw Error(
         "Imported observation requires an issued, non-invalidated source attempt",
       );
-    const game = c[5] === `GAME_AI_ASSESSED_${m.outcome.toUpperCase()}`;
+    const assessed = c[5] === `GAME_AI_ASSESSED_${m.outcome.toUpperCase()}`;
     if (
       c[5].startsWith("GAME_AI_ASSESSED_") &&
-      (!game || /\/ ([^:]+):/.exec(c[4])?.[1] !== m.facet)
+      (!assessed || /\/ ([^:]+):/.exec(c[4])?.[1] !== m.facet)
     )
       throw Error("Imported evidence outcome or named facet does not match");
     const numeric = /^[0-3](?:$|\s)/.test(c[7]) ? Number(c[7][0]) : undefined;
     if (
-      !game &&
+      !assessed &&
       !["DIAGNOSTIC", "INDEPENDENT", "TRANSFER", "REVIEW", "GUIDED"].includes(
         c[5],
       )

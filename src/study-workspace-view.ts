@@ -13,7 +13,7 @@ import {
 import { latestTopicAssessment } from "./topic-assessment";
 
 interface WorkspaceViewState {
-  game: StudyRecord;
+  studyRecord: StudyRecord;
   starting: boolean;
   saving: boolean;
   saveError: string;
@@ -60,7 +60,7 @@ export function createStudyWorkspaceView(
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // Header height changes only on reflow. Measuring it on each UI tick caused
-  // a read/write layout cycle for every topic even when the world was paused.
+  // a read/write layout cycle for every topic even when nothing had changed.
   const sizes = new ResizeObserver((entries) => {
     for (const entry of entries) {
       const button = entry.target as HTMLElement;
@@ -86,8 +86,8 @@ export function createStudyWorkspaceView(
   }
 
   function renderAssessments() {
-    const { game } = readState();
-    const current = workspaceQuestion(game)?.problem?.contract;
+    const { studyRecord } = readState();
+    const current = workspaceQuestion(studyRecord)?.problem?.contract;
     for (const node of topics) {
       const topicId = node.dataset.topicKey ?? "";
       const tier = Number(node.dataset.tier);
@@ -102,7 +102,7 @@ export function createStudyWorkspaceView(
       panel.hidden = !open;
       if (!open) continue;
       const record = latestTopicAssessment(
-        game.study,
+        studyRecord.study,
         topicId,
         roadmap.sourceHash,
       );
@@ -182,10 +182,11 @@ export function createStudyWorkspaceView(
   });
 
   function render() {
-    const { game, starting, saving, saveError, terminalOpen } = readState();
-    if (!game.studyWorkspace?.enabled) return;
-    const html = workspaceProgressHtml(game, roadmap);
-    const open = workspaceQuestion(game);
+    const { studyRecord, starting, saving, saveError, terminalOpen } =
+      readState();
+    if (!studyRecord.studyWorkspace?.enabled) return;
+    const html = workspaceProgressHtml(studyRecord, roadmap);
+    const open = workspaceQuestion(studyRecord);
     const needBaseline = !!open && baseline?.id !== open.id;
     // Take the baseline from the DOM before any rewrite, so it reflects the
     // state the learner saw when the question began.
@@ -248,9 +249,9 @@ export function createStudyWorkspaceView(
     if (needBaseline && baseline?.id !== open.id)
       baseline = { id: open.id, snapshot: readMapSnapshot(progress) };
 
-    const current = workspaceQuestion(game);
-    const assessment = workspaceAssessment(game);
-    const selected = workspaceSelectedQuestion(game);
+    const current = workspaceQuestion(studyRecord);
+    const assessment = workspaceAssessment(studyRecord);
+    const selected = workspaceSelectedQuestion(studyRecord);
     if (
       baseline &&
       selected?.id === baseline.id &&
@@ -335,7 +336,8 @@ export function createStudyWorkspaceView(
     );
     reviewRetry.hidden = assessment?.status !== "review-required";
     saveRetry.hidden = !saveError;
-    const received = workspaceSelectedQuestion(game)?.state === "consumed";
+    const received =
+      workspaceSelectedQuestion(studyRecord)?.state === "consumed";
     writeText(
       saveStatus,
       saveError ||

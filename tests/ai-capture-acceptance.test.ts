@@ -56,12 +56,12 @@ test("scoring compares each reply with the verdict written beforehand", () => {
 
 test("only the hint button turns the tutor's offer into an unlocked hint", async () => {
   const { checkBridge, offeredHelp, send } = await import("../src/ai");
-  const { contractFor, encounterFor, gameFor, roadmap, withBridge } =
+  const { contractFor, encounterFor, recordFor, roadmap, withBridge } =
     await import("../scripts/ai-capture/build-study-cases");
   const question = TURNS.find((t) => t.id.startsWith("open-recomputes"))!;
   const run = async (acceptHint: boolean) => {
     const r = roadmap();
-    const g = gameFor(20261950, r);
+    const g = recordFor(20261950, r);
     const e = encounterFor(g, 0);
     const contract = contractFor(g, r, question.question as never, 1, 0);
     e.problem = {

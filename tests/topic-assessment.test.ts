@@ -155,7 +155,7 @@ const old = (topicId: string, depth = 1): TopicAssessmentRecord => ({
 import { readFileSync } from "node:fs";
 import { checkBridge, ensureProblem, presentProblem, send } from "../src/ai";
 import { topicAssessmentTopics } from "../scripts/lib/topic-assessment.mjs";
-import { createPlayableGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 import { preparePracticeRooms } from "./helpers/practice-questions";
 
 const liveRoadmap: Roadmap = JSON.parse(
@@ -189,7 +189,7 @@ async function terminalFixture(
   };
   try {
     await checkBridge();
-    const g = createPlayableGame(717, liveRoadmap);
+    const g = createRecord(717, liveRoadmap);
     preparePracticeRooms(g, liveRoadmap);
     const e = g.encounters["question-0"];
     await ensureProblem(g, e, liveRoadmap);

@@ -22,12 +22,12 @@ import {
   readIdentifierCounters,
 } from "../src/roadmap-identifiers";
 import { inspectMergedDocument } from "../src/roadmap-structure";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 for (const outcome of ["independent", "assisted", "contradicted"] as const)
   for (const seekBaselineGap of [false, true])
     test(`a reviewed correction of an actual ${outcome} served attempt preserves history, corrected projection and baseline gap=${seekBaselineGap}`, async () => {
-      const g = createGame(7, r);
+      const g = createRecord(7, r);
       g.study.profile = "live";
       const l = g.study.learner!;
       let e = g.encounters["question-0"],
@@ -39,7 +39,7 @@ for (const outcome of ["independent", "assisted", "contradicted"] as const)
         e = Object.values(g.encounters)[i];
         c = eligibleLearning(r, l, "2026-10-16T16:00:00Z");
         e.problem = {
-          title: "Synthetic graded game study",
+          title: "Synthetic graded app study",
           prompt: "Synthetic source scope only",
           starter: "",
           rubric: [],
@@ -215,7 +215,7 @@ for (const outcome of ["independent", "assisted", "contradicted"] as const)
                 "Use the exact reviewed source correction and derived progress state",
             })),
           rationale:
-            "Synthetic correction of actual persisted game-assessment structure, not real human learning",
+            "Synthetic correction of actual persisted app-assessment structure, not real human learning",
         };
       });
       const job = g.study.roadmapReconciliations!.at(-1)!;

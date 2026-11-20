@@ -8,10 +8,10 @@ import { initialLearner, reconcileGates } from "../src/learner";
 import { type Roadmap } from "../src/model";
 import { decode, encode, recover } from "../src/persistence";
 import { sha256 } from "../src/roadmap-export";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 function fixture() {
-  const g = createGame(0, r);
+  const g = createRecord(0, r);
   g.study = initialStudy(r, "live");
   // Synthetic gate history, confined to a test-mode ledger.
   const l = initialLearner(r, "test");

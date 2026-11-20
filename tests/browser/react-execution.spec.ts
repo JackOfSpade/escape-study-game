@@ -24,8 +24,8 @@ test("container workspace React API: immutable checks and preview survive later 
   try {
     await openApp(page);
     await page.evaluate(async () => {
-      const d = (window as any).__deadAir,
-        g = d.game,
+      const d = (window as any).__studyApp,
+        g = d.record,
         r = d.roadmap,
         root = "/src/";
       const { initialStudy, eligible } = await import(
@@ -68,8 +68,8 @@ test("container workspace React API: immutable checks and preview survive later 
     const code =
       "import {useState} from 'react';export default function App(){const[n,setN]=useState(0);return <button onClick={()=>setN(n+1)}>Count {n}</button>}";
     const before = await page.evaluate(async (code) => {
-      const d = (window as any).__deadAir,
-        g = d.game,
+      const d = (window as any).__studyApp,
+        g = d.record,
         e = g.encounters["question-0"],
         root = "/src/";
       const { edit } = await import(/* @vite-ignore */ root + "ai.ts"),
@@ -83,11 +83,11 @@ test("container workspace React API: immutable checks and preview survive later 
     expect(before.status).toBe("pending");
     const draft = "export default ()=> <p>later draft</p>";
     await page.evaluate(async (draft) => {
-      const d = (window as any).__deadAir,
-        e = d.game.encounters["question-0"],
+      const d = (window as any).__studyApp,
+        e = d.record.encounters["question-0"],
         root = "/src/",
         { edit } = await import(/* @vite-ignore */ root + "ai.ts");
-      edit(d.game, e, draft, e.revision, d.roadmap);
+      edit(d.record, e, draft, e.revision, d.roadmap);
     }, draft);
     await expect(page.locator("#terminal")).toBeHidden();
     await expect
@@ -95,14 +95,14 @@ test("container workspace React API: immutable checks and preview survive later 
         () =>
           page.evaluate(
             () =>
-              (window as any).__deadAir.game.encounters["question-0"]
+              (window as any).__studyApp.record.encounters["question-0"]
                 .executions[0].status,
           ),
         { timeout: 30000 },
       )
       .toBe("finished");
     const result = await page.evaluate(async () => {
-      const g = (window as any).__deadAir.game,
+      const g = (window as any).__studyApp.record,
         e = g.encounters["question-0"],
         job = e.executions[0],
         root = "/src/",
@@ -166,9 +166,9 @@ test("container workspace React API: immutable checks and preview survive later 
     });
     await flushStudySave(page);
     await page.reload();
-    await page.waitForFunction(() => !!(window as any).__deadAir);
+    await page.waitForFunction(() => !!(window as any).__studyApp);
     const saved = await page.evaluate(() => {
-      const e = (window as any).__deadAir.game.encounters["question-0"];
+      const e = (window as any).__studyApp.record.encounters["question-0"];
       return { job: e.executions[0], draft: e.workspace };
     });
     expect(saved.job).toEqual(result.job);
@@ -193,19 +193,20 @@ test("container workspace React API: immutable checks and preview survive later 
       }),
     );
     await page.evaluate(async (code) => {
-      const d = (window as any).__deadAir,
-        e = d.game.encounters["question-0"],
+      const d = (window as any).__studyApp,
+        e = d.record.encounters["question-0"],
         root = "/src/",
         { edit } = await import(/* @vite-ignore */ root + "ai.ts"),
         { runWorkspace } = await import(
           /* @vite-ignore */ root + "execution.ts"
         );
-      edit(d.game, e, code, e.revision, d.roadmap);
-      await runWorkspace(d.game, e, d.roadmap);
+      edit(d.record, e, code, e.revision, d.roadmap);
+      await runWorkspace(d.record, e, d.roadmap);
     }, code);
     const rejected = await page.evaluate(
       () =>
-        (window as any).__deadAir.game.encounters["question-0"].executions[1],
+        (window as any).__studyApp.record.encounters["question-0"]
+          .executions[1],
     );
     expect(rejected.status).toBe("error");
     expect(rejected.error).toContain("Invalid browser preview");

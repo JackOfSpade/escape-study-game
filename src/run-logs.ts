@@ -1,7 +1,10 @@
 import { isRecord } from "./records";
 import type { StudyRecord } from "./model";
-export const LOG_KEY = "recent-game-diagnostics-v1";
-export const LOG_LIMITS = { games: 3, entries: 400, bytesPerGame: 256_000 };
+export const LOG_KEY = "recent-study-diagnostics-v1";
+/** The key earlier builds wrote. It is read only while `LOG_KEY` is absent and
+ * is never written or deleted, so an older build still finds its own copy. */
+export const LEGACY_LOG_KEY = "recent-game-diagnostics-v1";
+export const LOG_LIMITS = { records: 3, entries: 400, bytesPerRecord: 256_000 };
 interface Entry {
   /** Wall-clock time the entry was recorded, ISO 8601. */
   at: string;
@@ -16,6 +19,17 @@ interface RunLog {
 interface LogStorage {
   read(): Promise<string | null>;
   write(value: string): Promise<void>;
+}
+/** Diagnostics storage over a key-value store: reads `LOG_KEY`, falling back
+ * to the legacy key an earlier build wrote, and writes only `LOG_KEY`. */
+export function durableLogStorage(
+  read: (key: string) => Promise<string | null>,
+  write: (key: string, value: string) => Promise<void>,
+): LogStorage {
+  return {
+    read: async () => (await read(LOG_KEY)) ?? (await read(LEGACY_LOG_KEY)),
+    write: (value) => write(LOG_KEY, value),
+  };
 }
 /**
  * Per-run serialization cache. Each retained entry is serialized exactly once
@@ -86,7 +100,7 @@ export class RunLogs {
             retained.delete(run.id);
             retained.set(run.id, run);
           }
-          this.runs = [...retained.values()].slice(-LOG_LIMITS.games);
+          this.runs = [...retained.values()].slice(-LOG_LIMITS.records);
         }
       }
       for (const run of this.runs) this.trim(run);
@@ -139,12 +153,13 @@ export class RunLogs {
       this.drop(run, c, run.entries.length - LOG_LIMITS.entries);
     const header = c.prefixBytes + utf8Length("]}");
     const n = run.entries.length;
-    if (header + c.sum + Math.max(0, n - 1) <= LOG_LIMITS.bytesPerGame) return;
+    if (header + c.sum + Math.max(0, n - 1) <= LOG_LIMITS.bytesPerRecord)
+      return;
     let bytes = header;
     let keep = 0;
     for (let i = n - 1; i >= 0; i--) {
       const size = c.bytes[i] + (keep ? 1 : 0);
-      if (bytes + size > LOG_LIMITS.bytesPerGame) break;
+      if (bytes + size > LOG_LIMITS.bytesPerRecord) break;
       bytes += size;
       keep++;
     }
@@ -174,7 +189,7 @@ export class RunLogs {
     if (!run) {
       run = { id: g.id, started: new Date().toISOString(), entries: [] };
       this.runs.push(run);
-      this.runs = this.runs.slice(-LOG_LIMITS.games);
+      this.runs = this.runs.slice(-LOG_LIMITS.records);
     }
     const c = this.cache(run);
     run.entries.push(entry);
@@ -225,7 +240,7 @@ function restoredRun(value: unknown): RunLog | undefined {
   const entries: Entry[] = [];
   for (const e of value.entries.slice(-LOG_LIMITS.entries))
     // Entries stamped with a number came from the record's old clock: the
-    // removed game's bulky state dumps, and later entries that all carry the
+    // an earlier build's bulky state dumps, and later entries that all carry the
     // same frozen value. They are dropped so they cannot crowd out a report.
     if (
       isRecord(e) &&

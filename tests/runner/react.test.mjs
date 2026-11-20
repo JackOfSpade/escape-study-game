@@ -66,7 +66,7 @@ test("unavailable images, forbidden module access and compilation failures never
   const before = process.env.CODE_RUNNER_REACT_IMAGE;
   try {
     process.env.CODE_RUNNER_REACT_IMAGE =
-      "zombie-escape-missing-test-image:unavailable";
+      "study-missing-test-image:unavailable";
     const r = await executeCode({
       language: "typescript",
       environment: "react",

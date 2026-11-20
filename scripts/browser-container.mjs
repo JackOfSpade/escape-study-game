@@ -9,7 +9,7 @@ export const browserLimits = Object.freeze({
   outputBytes: 262144,
 });
 export function browserContainerOptions(name) {
-  if (!/^zombie-browser-[a-z0-9-]{1,80}$/.test(name))
+  if (!/^study-browser-[a-z0-9-]{1,80}$/.test(name))
     throw Error("Invalid owned browser container name");
   const profile = fileURLToPath(
       new URL("./browser-runner/seccomp-browser.json", import.meta.url),

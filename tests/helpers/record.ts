@@ -28,7 +28,7 @@ export function question(g: Pick<StudyRecord, "id">, id: string): Encounter {
 
 /** A fresh saved record holding twelve unasked questions, `question-0` to
  * `question-11`, for tests that work one of them. */
-export function createGame(
+export function createRecord(
   _seed: number,
   r: Roadmap,
   study?: StudyState,
@@ -38,4 +38,3 @@ export function createGame(
     g.encounters[`question-${i}`] = question(g, `question-${i}`);
   return g;
 }
-export const createPlayableGame = createGame;

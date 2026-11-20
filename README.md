@@ -17,7 +17,7 @@ The menu (Menu or Esc) holds Settings: display scale, the role profile, the Clau
 
 The role profile controls future scheduling only. "Product feature owner (consumer and creative web)" narrows the Product Engineering track to 51 core objectives at depth 3 or less; "Full original curriculum" restores everything. Changing it never rewrites source cells, evidence or reviews. See [question design](docs/QUESTION_DESIGN.md).
 
-The inspector (readiness, recorded knowledge, practical environment observations, roadmap export, roadmap review and adoption) is not part of the learner interface. Coding agents open it with `window.__deadAir.openAgentMenu()` in a synthetic browser context.
+The inspector (readiness, recorded knowledge, practical environment observations, roadmap export, roadmap review and adoption) is not part of the learner interface. Coding agents open it with `window.__studyApp.openAgentMenu()` in a synthetic browser context.
 
 ## Run
 
@@ -33,7 +33,7 @@ Open http://127.0.0.1:5173. `npm run dev` starts Vite and reconnects to, or star
 
 For production, run `npm run build` and then `npm start`. This serves only `dist` on `127.0.0.1:5173` (`PORT` overrides), reconnects the relay and proxies its API at the same origin, so browser saves stay valid. HTML and curriculum bypass caches; `GET /_app-health` reports the running build fingerprint. `npm run preview` is a temporary bundle preview and does not start the relay.
 
-On the owner's macOS workstation a LaunchAgent (`com.jack.zombie-study-escape`) supervises `npm start`. Deploy by building, then terminating the old server process and letting launchd respawn it; never start a second copy.
+On the owner's macOS workstation a LaunchAgent (`com.jack.study-app`) supervises `npm start`. Deploy by building, then terminating the old server process and letting launchd respawn it; never start a second copy.
 
 ## Claude CLI relay
 
@@ -66,7 +66,7 @@ Questions at depth 2 or above can carry a runtime (Python, TypeScript or JavaScr
 docker pull python:3.12-alpine
 docker pull node:22
 # Optional browser/React runtime, pinned base and package lock:
-docker build -t zombie-escape-browser-runtime:0.1.0 scripts/browser-runner
+docker build -t study-browser-runtime:0.1.0 scripts/browser-runner
 node scripts/preflight-browser-runner.mjs
 npm run test:runner
 npm run test:browser:runner

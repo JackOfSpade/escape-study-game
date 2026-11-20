@@ -46,11 +46,11 @@ test("the skill map has one tab stop, arrow navigation and keyboard disclosures"
   await page.keyboard.press("Space");
   await expect(last).toHaveAttribute("aria-expanded", "true");
   await page.evaluate(() => {
-    const d = (window as any).__deadAir;
+    const d = (window as any).__studyApp;
     const o = d.roadmap.tracks.PY.objectives.find(
-      (o: any) => d.game.study.learner.cells[o.id].states[0] !== "P",
+      (o: any) => d.record.study.learner.cells[o.id].states[0] !== "P",
     );
-    d.game.study.learner.cells[o.id].states[0] = "P";
+    d.record.study.learner.cells[o.id].states[0] = "P";
   });
   await expect(page.locator(".study-map-root")).toContainText("8 of 131");
   await expect(last).toBeFocused();

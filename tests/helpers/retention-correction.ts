@@ -13,7 +13,7 @@ import {
   readIdentifierCounters,
 } from "../../src/roadmap-identifiers";
 import { inspectMergedDocument } from "../../src/roadmap-structure";
-import { createGame } from "./record";
+import { createRecord } from "./record";
 import { roadmap as r } from "./baseline-correction";
 import { gradeScheduled, laterId, laterScope } from "./later-baseline-evidence";
 export { laterId, laterScope, r };
@@ -35,7 +35,7 @@ export function recordTargetReview(g: StudyRecord, at: string) {
   throw Error("Fixture never scheduled the target review");
 }
 export function retentionFixture(count = 2) {
-  const g = createGame(73, r);
+  const g = createRecord(73, r);
   g.study.profile = "live";
   const times = [
     "2026-10-17T16:00:00Z",

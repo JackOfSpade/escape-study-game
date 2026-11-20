@@ -1,6 +1,6 @@
 // Isolated real loopback transport with a fake gateway; never the user's bridge.
 // The gateway's answers run through the real operation validators, so a test
-// still proves what the game would accept from the Claude CLI.
+// still proves what the app would accept from the Claude CLI.
 import assert from "node:assert/strict";
 // @ts-expect-error Actual validators are intentionally plain JavaScript.
 import { validateAnswer } from "../../scripts/lib/ai-contracts.mjs";
@@ -51,7 +51,7 @@ export async function localHandoff() {
     get rejected() {
       return rejected.length;
     },
-    /** Register the gateway's answer for requests sent by the game client. */
+    /** Register the gateway's answer for requests sent by the app client. */
     answerWith(reply: (job: Job) => Reply) {
       answer = reply;
     },

@@ -2,14 +2,21 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { setImmediate as settle } from "node:timers/promises";
-import { RunLogs, LOG_LIMITS, utf8Length } from "../src/run-logs";
-import { createGame } from "./helpers/record";
+import {
+  durableLogStorage,
+  LEGACY_LOG_KEY,
+  LOG_KEY,
+  LOG_LIMITS,
+  RunLogs,
+  utf8Length,
+} from "../src/run-logs";
+import { createRecord } from "./helpers/record";
 import type { Roadmap } from "../src/model";
 
 const roadmap: Roadmap = JSON.parse(
   readFileSync("public/curriculum.json", "utf8"),
 );
-const record = () => createGame(11, roadmap);
+const record = () => createRecord(11, roadmap);
 const memory = () => ({ read: async () => null, write: async () => {} });
 function storedLogs() {
   let stored: string | null = null;
@@ -41,7 +48,7 @@ test("the last three records' diagnostics survive reload, prune older ones and b
   );
   for (const run of restored.runs) {
     assert.ok(run.entries.length <= LOG_LIMITS.entries);
-    assert.ok(JSON.stringify(run).length <= LOG_LIMITS.bytesPerGame);
+    assert.ok(JSON.stringify(run).length <= LOG_LIMITS.bytesPerRecord);
   }
   assert.equal(JSON.stringify(g.study), study);
   assert.ok(!(await storage.read())!.includes('"history"'));
@@ -105,10 +112,11 @@ test("diagnostic retention caps UTF-8 bytes, including multibyte data and an ove
   for (let i = 0; i < 150; i++)
     logs.record(g, "unicode", { i, text: "🧪".repeat(1000) });
   assert.ok(
-    Buffer.byteLength(JSON.stringify(logs.runs[0])) <= LOG_LIMITS.bytesPerGame,
+    Buffer.byteLength(JSON.stringify(logs.runs[0])) <=
+      LOG_LIMITS.bytesPerRecord,
   );
   assert.ok(logs.runs[0].entries.length > 1);
-  logs.record(g, "too-big", { text: "🧪".repeat(LOG_LIMITS.bytesPerGame) });
+  logs.record(g, "too-big", { text: "🧪".repeat(LOG_LIMITS.bytesPerRecord) });
   assert.equal(logs.runs[0].entries.length, 0);
   logs.record(g, "new-tail");
   assert.equal(logs.runs[0].entries.length, 1);
@@ -259,4 +267,91 @@ test("entries carry wall-clock time, and old-clock entries from earlier builds a
     [g.id],
   );
   assert.deepEqual(restored.runs[0].entries, fresh.runs[0].entries);
+});
+
+/** A key-value store shaped like `readDurable`/`writeDurable`. */
+function durableMap(initial: Record<string, string> = {}) {
+  const map = new Map(Object.entries(initial));
+  return {
+    map,
+    storage: durableLogStorage(
+      async (key) => map.get(key) ?? null,
+      async (key, value) => {
+        map.set(key, value);
+      },
+    ),
+  };
+}
+const legacyDiagnostics = (id: string, type: string) =>
+  JSON.stringify({
+    version: 1,
+    limits: { games: 3, entries: 400, bytesPerGame: 256_000 },
+    runs: [
+      {
+        id,
+        started: "2026-10-01T09:00:00.000Z",
+        entries: [{ at: "2026-10-01T09:00:01.000Z", type, data: { n: 1 } }],
+      },
+    ],
+  });
+
+test("diagnostics stored by an earlier build under the legacy key load when the new key is absent", async () => {
+  assert.equal(LEGACY_LOG_KEY, "recent-game-diagnostics-v1");
+  assert.notEqual(LOG_KEY, LEGACY_LOG_KEY);
+  const { storage } = durableMap({
+    [LEGACY_LOG_KEY]: legacyDiagnostics("old-run", "legacy-entry"),
+  });
+  const logs = new RunLogs(storage);
+  await logs.load();
+  assert.equal(logs.error, "");
+  assert.deepEqual(
+    logs.runs.map((r) => [r.id, r.entries.map((e) => e.type)]),
+    [["old-run", ["legacy-entry"]]],
+  );
+});
+
+test("the first diagnostics write after a legacy load goes to the new key and leaves the legacy copy unchanged", async () => {
+  const legacy = legacyDiagnostics("old-run", "legacy-entry");
+  const { map, storage } = durableMap({ [LEGACY_LOG_KEY]: legacy });
+  const logs = new RunLogs(storage),
+    g = record();
+  await logs.load();
+  g.id = "new-run";
+  logs.record(g, "new-entry");
+  await logs.flush();
+  assert.equal(map.get(LEGACY_LOG_KEY), legacy);
+  const written = JSON.parse(map.get(LOG_KEY)!);
+  assert.deepEqual(
+    written.runs.map((r: { id: string }) => r.id),
+    ["old-run", "new-run"],
+  );
+  // A reload now reads the new key and still holds the migrated run.
+  const reloaded = new RunLogs(storage);
+  await reloaded.load();
+  assert.deepEqual(
+    reloaded.runs.map((r) => r.id),
+    ["old-run", "new-run"],
+  );
+});
+
+test("when both diagnostics keys exist the new key wins", async () => {
+  const { storage } = durableMap({
+    [LEGACY_LOG_KEY]: legacyDiagnostics("old-run", "legacy-entry"),
+    [LOG_KEY]: legacyDiagnostics("current-run", "current-entry"),
+  });
+  const logs = new RunLogs(storage);
+  await logs.load();
+  assert.deepEqual(
+    logs.runs.map((r) => r.id),
+    ["current-run"],
+  );
+});
+
+test("with neither diagnostics key stored, loading yields no runs and no error", async () => {
+  const { map, storage } = durableMap();
+  const logs = new RunLogs(storage);
+  await logs.load();
+  assert.deepEqual(logs.runs, []);
+  assert.equal(logs.error, "");
+  assert.equal(map.size, 0);
 });

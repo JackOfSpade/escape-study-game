@@ -23,7 +23,7 @@ import {
   gapPracticeQuestion,
   workspaceQuestion,
 } from "../src/study-workspace";
-import { createPlayableGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 
 /** A fake gateway that writes a question on whatever contract it is sent. */
@@ -80,7 +80,7 @@ async function withGateway(run: (payloads: any[]) => Promise<void>) {
 
 test("a gap practice question reuses the gap's contract as practice, leaves the ledger alone and can close the gap", async () => {
   await withGateway(async (payloads) => {
-    const g = createPlayableGame(41, r, initialStudy(r, "live"));
+    const g = createRecord(41, r, initialStudy(r, "live"));
     enterStudyWorkspace(g);
     const first = g.encounters["question-0"];
     await ensureProblem(g, first, r);
@@ -178,7 +178,7 @@ test("a gap practice question reuses the gap's contract as practice, leaves the 
 
 test("a gap whose question is no longer saved cannot seed a practice question", async () => {
   await withGateway(async () => {
-    const g = createPlayableGame(42, r, initialStudy(r, "live"));
+    const g = createRecord(42, r, initialStudy(r, "live"));
     enterStudyWorkspace(g);
     const e = g.encounters["question-0"];
     assert.throws(
@@ -250,7 +250,7 @@ async function withTutorGateway(
 
 /** A finished first question that recorded an open gap on "apex". */
 async function recordedGap(seed: number) {
-  const g = createPlayableGame(seed, r, initialStudy(r, "live"));
+  const g = createRecord(seed, r, initialStudy(r, "live"));
   enterStudyWorkspace(g);
   const first = g.encounters["question-0"];
   await ensureProblem(g, first, r);
@@ -410,7 +410,7 @@ test("seeding a practice question while the bridge is down says so and leaves no
 });
 
 test("gapPracticeQuestion refuses before the workspace is open, while a question is open and while a result is under review", () => {
-  const g = createPlayableGame(48, r, initialStudy(r, "live"));
+  const g = createRecord(48, r, initialStudy(r, "live"));
   assert.throws(
     () => gapPracticeQuestion(g),
     /^Error: Open the study workspace first\.$/,

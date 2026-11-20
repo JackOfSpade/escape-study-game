@@ -246,7 +246,7 @@ export async function mockClaudeStudy(
     return json({ error: "Unexpected synthetic operation" }, 400);
   });
   return {
-    /** Every bridge request body, in the order the game sent it. */
+    /** Every bridge request body, in the order the app sent it. */
     calls,
     tutorCalls: () => calls.filter((call) => call.operation === "tutor"),
     /** The question requests, in order: a practice question is the one whose
@@ -336,19 +336,19 @@ export async function mockClaudeStudy(
  * id is the encounter the learner now has open. */
 export async function openStudyQuestion(page: Page) {
   await page.goto("/");
-  await page.waitForFunction(() => !!(window as any).__deadAir);
+  await page.waitForFunction(() => !!(window as any).__studyApp);
   await page.locator("#study-next").click();
   await expect(page.locator("#terminal")).toBeVisible();
   await expect(page.locator("#problem-title")).not.toHaveText("Connecting…");
   return page.evaluate(
-    () => (window as any).__deadAir.game.lastStudyEncounter as string,
+    () => (window as any).__studyApp.record.lastStudyEncounter as string,
   );
 }
 
 /** The saved facts about one question that specs assert on. */
 export const studyState = (page: Page, id: string) =>
   page.evaluate((encounter) => {
-    const g = (window as any).__deadAir.game,
+    const g = (window as any).__studyApp.record,
       e = g.encounters[encounter];
     return {
       state: e.state,

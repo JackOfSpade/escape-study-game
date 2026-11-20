@@ -27,6 +27,5 @@
   },
   "curriculum_or_evidence_changed": false,
   "study_session_started_by_handoff": false,
-  "verification_scope": "Byte equality and protected-block digests against supplied upload only; no verification of unavailable earlier ancestors or inherited external sources.",
-  "game_implementation_tests_executed": false
+  "verification_scope": "Byte equality and protected-block digests against supplied upload only; no verification of unavailable earlier ancestors or inherited external sources."
 }

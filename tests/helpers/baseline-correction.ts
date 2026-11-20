@@ -96,7 +96,7 @@ export async function baselineFixture(
   const task = observation.split("|")[2].trim();
   g.study.roadmapExport ??= await prepareRoadmapExport(r, l);
   // Model a manually reviewed source file without issuing a new task just
-  // to force a game export. Original evidence, questions and reviews remain.
+  // to force an app export. Original evidence, questions and reviews remain.
   const partial = history.evidenceRows.length > 1;
   let raw = g.study.roadmapExport.content
     .replace(

@@ -73,7 +73,7 @@ try {
     stdin: {
       contents: `import {useState} from 'react';import {createRoot} from 'react-dom/client';function Counter(){const [n,setN]=useState(0);return <button onClick={()=>setN(n+1)}>Count {n}</button>}createRoot(document.getElementById('root')).render(<Counter/>);`,
       loader: "tsx",
-      resolveDir: "/opt/zombie-browser",
+      resolveDir: "/opt/study-browser",
     },
     bundle: true,
     write: false,

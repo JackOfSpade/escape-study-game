@@ -26,7 +26,7 @@ import {
 } from "../src/roadmap-adoption";
 import { prepareRoadmapExport, sha256 } from "../src/roadmap-export";
 import { reviewRoadmap } from "../src/roadmap-review";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 
 async function waitUntil(
   ready: () => boolean,
@@ -42,7 +42,7 @@ async function waitUntil(
 }
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 async function fixture(output = true) {
-  const g = createGame(7, r);
+  const g = createRecord(7, r);
   g.study.profile = "live";
   const o = await recordEnvironmentObservation(g, r, {
     envId: "PE:ENV06",
@@ -93,7 +93,7 @@ for (const transport of ["study-mode", "chatgpt-handoff"] as const)
       judgment(p),
     );
     const source = await prepareRoadmapExport(r, external.l);
-    const g = createGame(7, r);
+    const g = createRecord(7, r);
     g.study.profile = "live";
     const originalCells = structuredClone(g.study.learner!.cells);
     const priorRef = external.l.environmentEvidence![0].id;
@@ -421,7 +421,7 @@ test("mixed academic-attempt exports also include ENV receipts without conflatin
   assert.ok(out.content.includes("Practical environment review receipts"));
 });
 test("a packet captured under development remains raw evidence that a later live native reviewer can inspect", async () => {
-  const g = createGame(7, r);
+  const g = createRecord(7, r);
   const o = await recordEnvironmentObservation(g, r, {
     envId: "PE:ENV06",
     statement: "I wrote and executed tests in my repository.",
@@ -441,7 +441,7 @@ test("a packet captured under development remains raw evidence that a later live
   assert.equal(g.study.learner!.environmentEvidence![0].reviewProfile, "live");
 });
 test("runner-backed practical review uses the captured human source and cutoff assistance, including after archive", async () => {
-  const g = createGame(7, r),
+  const g = createRecord(7, r),
     e = g.encounters["question-0"];
   g.study.profile = "live";
   const help = { seq: ++g.seq };
@@ -801,7 +801,7 @@ test("a later adopted roadmap supersedes an earlier imported ENV status, downwar
     judgment(p),
   );
   const source = await prepareRoadmapExport(r, external.l);
-  const g = createGame(7, r);
+  const g = createRecord(7, r);
   g.study.profile = "live";
   const priorRef = external.l.environmentEvidence![0].id;
   await reconcileRoadmap(g, r, source.content, async (p) => ({

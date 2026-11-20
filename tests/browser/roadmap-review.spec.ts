@@ -63,20 +63,20 @@ test("Claude CLI roadmap review survives reload with exact files and provider, t
         "| Learner | Synthetic administrative review; Mid-level",
       );
     await page.goto("/");
-    // The app exposes __deadAir only after its top-level bridge/log awaits,
+    // The app exposes __studyApp only after its top-level bridge/log awaits,
     // which can finish after the load event that goto waits for.
-    await page.waitForFunction(() => !!(window as any).__deadAir);
+    await page.waitForFunction(() => !!(window as any).__studyApp);
     await page.evaluate(async () => {
       const root = "/src/",
-        { createGame } = await import(
+        { createRecord } = await import(
           /* @vite-ignore */ "/tests/helpers/" + "record.ts"
         ),
         { save } = await import(root + "persistence.ts");
       const r = await (await fetch("/curriculum.json")).json(),
-        g = createGame(7, r);
+        g = createRecord(7, r);
       g.study.profile = "live";
-      Object.assign((window as any).__deadAir.game, g);
-      await save((window as any).__deadAir.game);
+      Object.assign((window as any).__studyApp.record, g);
+      await save((window as any).__studyApp.record);
     });
     await page.reload();
     await openAgentMenu(page);
@@ -108,9 +108,11 @@ test("Claude CLI roadmap review survives reload with exact files and provider, t
         .count(),
     ).toBe(0);
     await openAgentMenu(page);
-    await page.getByRole("button", { name: "Save run", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Save progress", exact: true })
+      .click();
     // The click resolves before the async save; reloading earlier loses it.
-    await expect(page.locator("#pause-save-status")).toContainText(
+    await expect(page.locator("#menu-save-status")).toContainText(
       "Run saved locally",
     );
     await page.reload();
@@ -130,7 +132,7 @@ test("Claude CLI roadmap review survives reload with exact files and provider, t
     expect(
       await page.evaluate(
         () =>
-          (window as any).__deadAir.game.study.learner.roadmapAdoptions
+          (window as any).__studyApp.record.study.learner.roadmapAdoptions
             ?.length ?? 0,
       ),
     ).toBe(0);
@@ -141,9 +143,10 @@ test("Claude CLI roadmap review survives reload with exact files and provider, t
       .poll(() =>
         page.evaluate(
           () =>
-            (window as any).__deadAir.game.study.learner.roadmapAdoptions?.at(
-              -1,
-            )?.provenance,
+            (
+              window as any
+            ).__studyApp.record.study.learner.roadmapAdoptions?.at(-1)
+              ?.provenance,
         ),
       )
       .toBe("claude-cli");
@@ -152,9 +155,9 @@ test("Claude CLI roadmap review survives reload with exact files and provider, t
       "adopted and saved",
     );
     await page.reload();
-    await page.waitForFunction(() => !!(window as any).__deadAir);
+    await page.waitForFunction(() => !!(window as any).__studyApp);
     const saved = await page.evaluate(() => {
-      const s = (window as any).__deadAir.game.study;
+      const s = (window as any).__studyApp.record.study;
       return {
         provider: s.learner.roadmapAdoptions.at(-1).provenance,
         content: s.roadmapExport.content,

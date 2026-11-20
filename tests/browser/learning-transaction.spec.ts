@@ -160,11 +160,11 @@ for (const fixtureKind of ["checkpoint", "transfer", "historical"] as const) {
     await openApp(page);
     await seedQuestions(page);
     await page.waitForFunction(
-      () => (window as any).__deadAir.game.study.profile === "live",
+      () => (window as any).__studyApp.record.study.profile === "live",
     );
     await page.evaluate(
       (flags) => {
-        const g = (window as any).__deadAir.game;
+        const g = (window as any).__studyApp.record;
         if (flags.finalRequirement) {
           g.study.learner.reviews = {};
           g.study.learner.tracks.PY.cleared = 3;
@@ -178,27 +178,27 @@ for (const fixtureKind of ["checkpoint", "transfer", "historical"] as const) {
       { finalRequirement, historical },
     );
     await page.evaluate(async () => {
-      const d = (window as any).__deadAir,
+      const d = (window as any).__studyApp,
         root = "/src/";
       const { ensureProblem, presentProblem, edit, send } = await import(
         root + "ai.ts"
       );
-      const e = d.game.encounters["question-0"];
-      await ensureProblem(d.game, e, d.roadmap);
-      presentProblem(d.game, e, d.roadmap);
+      const e = d.record.encounters["question-0"];
+      await ensureProblem(d.record, e, d.roadmap);
+      presentProblem(d.record, e, d.roadmap);
       edit(
-        d.game,
+        d.record,
         e,
         "Human-authored integration fixture reasoning, covering the defined scope without any asserted runtime execution.",
         e.revision,
         d.roadmap,
       );
-      await send(d.game, e, "My reasoning is in the saved work.", d.roadmap);
+      await send(d.record, e, "My reasoning is in the saved work.", d.roadmap);
     });
     await expect
       .poll(() =>
         page.evaluate(() => {
-          const g = (window as any).__deadAir.game;
+          const g = (window as any).__studyApp.record;
           return {
             evidence: g.study.learner.evidence.length,
             reviews: g.study.assessments
@@ -209,7 +209,7 @@ for (const fixtureKind of ["checkpoint", "transfer", "historical"] as const) {
       )
       .toEqual({ evidence: 1, reviews: [] });
     const result = await page.evaluate(() => {
-      const g = (window as any).__deadAir.game;
+      const g = (window as any).__studyApp.record;
       return {
         profile: g.study.profile,
         attempt: g.study.learner.attempts[0].id,
@@ -228,7 +228,7 @@ for (const fixtureKind of ["checkpoint", "transfer", "historical"] as const) {
     if (finalRequirement) {
       expect(
         await page.evaluate(() => {
-          const l = (window as any).__deadAir.game.study.learner;
+          const l = (window as any).__studyApp.record.study.learner;
           return {
             status: l.finalProgress["PY:T01"].status,
             ordinaryCells: Object.keys(l.cells).length,
@@ -240,7 +240,7 @@ for (const fixtureKind of ["checkpoint", "transfer", "historical"] as const) {
     if (historical)
       expect(
         await page.evaluate(() => {
-          const l = (window as any).__deadAir.game.study.learner;
+          const l = (window as any).__studyApp.record.study.learner;
           return {
             status: l.cells["PY:T07.1"].states[0],
             oldRefs: l.cells["PY:T07.1"].facets["D1:historical"].evidenceIds,
@@ -298,7 +298,7 @@ for (const fixtureKind of ["checkpoint", "transfer", "historical"] as const) {
       "revision 10",
     );
     await page.reload();
-    await page.waitForFunction(() => !!(window as any).__deadAir);
+    await page.waitForFunction(() => !!(window as any).__studyApp);
     await openAgentMenu(page);
     await page.getByRole("button", { name: "Inspect" }).click();
     const secondDownload = page.waitForEvent("download");

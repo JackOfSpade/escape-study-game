@@ -32,7 +32,7 @@ export function messageBubble(kind: string, name: string, text: string) {
 
 interface TerminalPanelHost {
   /** The current record: an import replaces it. */
-  game(): StudyRecord;
+  studyRecord(): StudyRecord;
   roadmap: Roadmap;
   persist(): unknown;
   /** Re-render whichever terminal is open. */
@@ -42,7 +42,7 @@ interface TerminalPanelHost {
 }
 
 /** Where a terminal's question came from and how it relates to earlier work. */
-export function provenanceText(game: StudyRecord, e: Encounter): string {
+export function provenanceText(studyRecord: StudyRecord, e: Encounter): string {
   let text =
     e.problem?.provenance === "claude-cli"
       ? "Claude CLI"
@@ -50,14 +50,14 @@ export function provenanceText(game: StudyRecord, e: Encounter): string {
         ? "ChatGPT handoff · Saved provider provenance"
         : e.problem?.provenance === "study-mode"
           ? "Study bridge · Saved provider provenance"
-          : !e.problem && game.study.profile === "live"
+          : !e.problem && studyRecord.study.profile === "live"
             ? "Live study request · Awaiting a validated problem"
             : "Earlier practice question · No academic credit";
   if (e.problem?.contract.practice)
     text +=
       " · Practice question: what you show here is recorded and can close a gap, but this is not a scheduled visit and gives no credit";
   if (
-    game.study.learner?.attempts.some(
+    studyRecord.study.learner?.attempts.some(
       (a) =>
         a.encounter === encounterKey(e) && a.status === "externally-resolved",
     )
@@ -68,9 +68,9 @@ export function provenanceText(game: StudyRecord, e: Encounter): string {
 }
 
 /** The line above a solo conversation: its outcome, or how the probe stands. */
-export function dialogueStatus(game: StudyRecord, e: Encounter) {
+export function dialogueStatus(studyRecord: StudyRecord, e: Encounter) {
   const probeLine = probeSummary(e);
-  const recorded = encounterGaps(game, e);
+  const recorded = encounterGaps(studyRecord, e);
   const conceded = recorded.filter((r) => !r.resolved);
   const closed = recorded.length - conceded.length;
   const text =
@@ -104,12 +104,12 @@ const COMPLETION_MARKER =
 
 /** The notice under a reply that closed a gap recorded at this question. */
 export function gapClosedMarker(
-  game: StudyRecord,
+  studyRecord: StudyRecord,
   e: Encounter,
   m: Encounter["tutor"][number],
 ): string {
   if (m.kind !== "tutor") return "";
-  const closed = gapsClosedBy(game, e, m.requestId);
+  const closed = gapsClosedBy(studyRecord, e, m.requestId);
   return closed.length
     ? `<div class="message-complete gap-closed"><strong>✓ Gap closed</strong><span>${escape(
         closed.map((r) => r.facet.description).join("; "),
@@ -148,7 +148,7 @@ export function createTerminalPanels(host: TerminalPanelHost) {
     ))
       button.onclick = () => {
         const id = button.dataset.questionRetry!;
-        host.settle(retryTutorRequest(host.game(), e, id, roadmap), e);
+        host.settle(retryTutorRequest(host.studyRecord(), e, id, roadmap), e);
         host.persist();
         host.render();
       };
@@ -171,7 +171,7 @@ export function createTerminalPanels(host: TerminalPanelHost) {
           (m, i) =>
             (i === done ? COMPLETION_MARKER : "") +
             said(m) +
-            gapClosedMarker(host.game(), e, m) +
+            gapClosedMarker(host.studyRecord(), e, m) +
             (parts.get(m.seq) ?? ""),
         )
         .join("") +

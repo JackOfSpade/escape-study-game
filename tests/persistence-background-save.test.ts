@@ -4,7 +4,7 @@ import { setImmediate as settle } from "node:timers/promises";
 import test from "node:test";
 import type { Roadmap } from "../src/model";
 import { decode, save } from "../src/persistence";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 test("a background checkpoint skips the local mirror, reaches IndexedDB and falls back if that fails", async () => {
@@ -48,7 +48,7 @@ test("a background checkpoint skips the local mirror, reaches IndexedDB and fall
       },
     },
   });
-  const g = createGame(729, r);
+  const g = createRecord(729, r);
   const durable = save(g, { background: true });
   await settle();
   assert.equal(setItemCalls, 0, "an autosave must not block on localStorage");

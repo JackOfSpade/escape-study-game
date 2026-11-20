@@ -7,7 +7,7 @@ import { checkBridge, send } from "../src/ai";
 import type { Roadmap } from "../src/model";
 import { save } from "../src/persistence";
 import { watchStudyEvents } from "../src/study-events";
-import { createGame, createPlayableGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 
 type Logged = { type: string; data: Record<string, unknown> };
@@ -39,7 +39,7 @@ test("a reply, a failed reply and a completion are each reported without the lea
         : respond();
     try {
       await checkBridge();
-      const g = createPlayableGame(717, r);
+      const g = createRecord(717, r);
       preparePracticeRooms(g, r);
       const e = g.encounters["question-0"];
       e.mode = "solo";
@@ -108,7 +108,7 @@ test("a save that no longer fits the fallback copy is reported once, and again w
         },
       },
     });
-    const g = createGame(729, r);
+    const g = createRecord(729, r);
     // The fallback copy refuses the save; IndexedDB is down too, so the save
     // itself fails, which is the caller's to report.
     await assert.rejects(save(g));

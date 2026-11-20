@@ -82,7 +82,7 @@ test("source-qualified branch review exposes unresolved history, downloads exact
   await openApp(page);
   const local = await page.evaluate(async (initial) => {
     const root = "/src/",
-      g = (window as any).__deadAir.game,
+      g = (window as any).__studyApp.record,
       r = await (await fetch("/curriculum.json")).json();
     g.study.profile = "live";
     const { reconcileRoadmap, adoptReconciledRoadmap } = await import(
@@ -115,7 +115,7 @@ test("source-qualified branch review exposes unresolved history, downloads exact
       ),
     );
   const before = await page.evaluate(() =>
-    JSON.stringify((window as any).__deadAir.game.study.learner),
+    JSON.stringify((window as any).__studyApp.record.study.learner),
   );
   await openAgentMenu(page);
   await page.locator("#curriculum-button").click();
@@ -145,12 +145,12 @@ test("source-qualified branch review exposes unresolved history, downloads exact
   ).toBeUndefined();
   expect(
     await page.evaluate(() =>
-      JSON.stringify((window as any).__deadAir.game.study.learner),
+      JSON.stringify((window as any).__studyApp.record.study.learner),
     ),
   ).toBe(before);
   const canonical = await page.evaluate(
     () =>
-      (window as any).__deadAir.game.study.roadmapReconciliations.at(-1)
+      (window as any).__studyApp.record.study.roadmapReconciliations.at(-1)
         .proposal.canonical,
   );
   expect(canonical).toContain("<!-- BRANCH_RECORDS ");
@@ -173,9 +173,9 @@ test("source-qualified branch review exposes unresolved history, downloads exact
     "adopted and saved",
   );
   await page.reload();
-  await page.waitForFunction(() => !!(window as any).__deadAir);
+  await page.waitForFunction(() => !!(window as any).__studyApp);
   const result = await page.evaluate(() => {
-    const g = (window as any).__deadAir.game;
+    const g = (window as any).__studyApp.record;
     return {
       raw: g.study.roadmapExport.content,
       evidence: g.study.learner.evidence.length,

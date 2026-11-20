@@ -6,11 +6,11 @@ import { beginLearningAttempt, eligibleLearning } from "../src/learner";
 import type { Roadmap } from "../src/model";
 import { devProblem } from "./helpers/practice-questions";
 import { captureActiveAttempts } from "../src/roadmap-active-work";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 
 test("retained long study histories stay usable for evidence and roadmap capture", async () => {
   const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8")),
-    g = createGame(729, r),
+    g = createRecord(729, r),
     e = g.encounters["question-0"],
     l = g.study.learner!,
     at = "2026-10-20T12:00:00Z";

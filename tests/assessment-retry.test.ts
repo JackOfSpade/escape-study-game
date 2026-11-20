@@ -6,14 +6,14 @@ import { eligible, evidencePacket, initialStudy } from "../src/curriculum";
 import type { Roadmap } from "../src/model";
 import { decode, encode, recover } from "../src/persistence";
 import { watchStudyEvents } from "../src/study-events";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 
 const roadmap: Roadmap = JSON.parse(
   readFileSync("public/curriculum.json", "utf8"),
 );
 function fixture() {
   const r = structuredClone(roadmap),
-    g = createGame(725, r);
+    g = createRecord(725, r);
   g.study = initialStudy(r, "live");
   const e = g.encounters["question-0"],
     contract = eligible(r, g.study);
@@ -271,7 +271,7 @@ test("late archived assessment still applies to the retained shared study state"
   try {
     const pending = assess(g, e, r);
     g.study.archives.push(e);
-    const next = createGame(726, r, g.study);
+    const next = createRecord(726, r, g.study);
     finish(unresolved());
     await pending;
     assert.equal(next.study, g.study);

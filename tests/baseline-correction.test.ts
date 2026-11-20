@@ -13,11 +13,11 @@ import {
 } from "../src/roadmap-adoption";
 import { prepareRoadmapExport } from "../src/roadmap-export";
 import { inspectMergedDocument } from "../src/roadmap-structure";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 import { baselineFixture, roadmap as r } from "./helpers/baseline-correction";
 for (const id of ["PY:T05.2", "PE:T01.2", "PY:T06.1"])
   test(`source-authorized baseline correction reviews complete original history and retains partial knowledge: ${id}`, async () => {
-    const g = createGame(7, r);
+    const g = createRecord(7, r);
     g.study.profile = "live";
     const before = structuredClone(g.study.learner!);
     const fixture = await baselineFixture(g, id);
@@ -182,7 +182,7 @@ test("withdrawn original pass is repaired by real scheduling and fresh proof, wi
     registerScopes,
     applyLearningAssessment,
   } = await import("../src/learner");
-  const g = createGame(17, r);
+  const g = createRecord(17, r);
   g.study.profile = "live";
   const fixture = await baselineFixture(g);
   await reconcileRoadmap(g, r, fixture.raw, async (p) => fixture.proposal(p));
@@ -315,7 +315,7 @@ test("withdrawn original pass is repaired by real scheduling and fresh proof, wi
 });
 
 test("baseline source correction cannot silently replace a later verified retention history", async () => {
-  const g = createGame(7, r);
+  const g = createRecord(7, r);
   g.study.profile = "live";
   g.study.learner!.reviews["PY:T05.2/D1"].stage = 1;
   g.study.learner!.reviews["PY:T05.2/D1"].verifiedReviews = 1;
@@ -335,7 +335,7 @@ test("baseline withdrawal cannot erase a later actually assessed material contra
     beginLearningAttempt,
     applyLearningAssessment,
   } = await import("../src/learner");
-  const g = createGame(31, r);
+  const g = createRecord(31, r);
   g.study.profile = "live";
   const l = g.study.learner!,
     at = "2026-10-17T16:00:00Z",

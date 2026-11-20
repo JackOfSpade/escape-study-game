@@ -10,7 +10,7 @@
   <button id="save-recovery-retry">Retry loading</button>
   <button id="save-recovery-export" class="quiet">Export recovery data</button>
   <label class="file-label"
-    >Restore a run backup
+    >Restore a backup
     <input
       id="save-recovery-import"
       type="file"
@@ -181,10 +181,10 @@
     </div>
   </div>
 </section>
-<dialog id="pause-menu" aria-labelledby="pause-title">
-  <div id="pause-home">
-    <span class="eyebrow" id="pause-eyebrow">LEARNING WORKSPACE</span>
-    <h2 id="pause-title">Menu</h2>
+<dialog id="menu" aria-labelledby="menu-title">
+  <div id="menu-home">
+    <span class="eyebrow" id="menu-eyebrow">LEARNING WORKSPACE</span>
+    <h2 id="menu-title">Menu</h2>
     <button id="menu-close">Close · Esc</button>
     <button
       id="settings-toggle"
@@ -204,16 +204,16 @@
       >
         Inspect ↗
       </button>
-      <button id="save-button" class="quiet">Save run</button>
+      <button id="save-button" class="quiet">Save progress</button>
     </div>
-    <p id="pause-save-status" role="status"></p>
+    <p id="menu-save-status" role="status"></p>
   </div>
-  <div id="pause-panel-header" hidden>
-    <button id="pause-back" class="quiet" aria-label="Back to menu">
+  <div id="menu-panel-header" hidden>
+    <button id="menu-back" class="quiet" aria-label="Back to menu">
       ← Back to menu
     </button>
   </div>
-  <div id="pause-panels" hidden>
+  <div id="menu-panels" hidden>
     <div id="inspector" role="region" aria-labelledby="inspector-title" hidden>
       <div class="inspector-head">
         <h2 id="inspector-title" tabindex="-1">Learning continuity</h2>
@@ -268,9 +268,10 @@
         <button id="reconnect" class="quiet">Recheck study connection</button>
       </details>
       <div class="agent-only">
-        <button id="export" class="quiet">Export full run & evidence</button
+        <button id="export" class="quiet">
+          Export full backup &amp; evidence</button
         ><label class="file-label"
-          >Import run save
+          >Import backup
           <input id="import" type="file" accept="application/json"
         /></label>
         <p id="import-status" class="save-result failed" role="status"></p>

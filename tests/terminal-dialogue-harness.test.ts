@@ -11,7 +11,7 @@ import {
 } from "../src/ai";
 import type { Roadmap } from "../src/model";
 import { decode, encode, recover } from "../src/persistence";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 import { localHandoff } from "./helpers/local-handoff";
 const roadmap: Roadmap = JSON.parse(
   readFileSync("public/curriculum.json", "utf8"),
@@ -29,7 +29,7 @@ test("real bridge and gateway: chat follow-up, malformed correction, interrupted
         capabilities: [],
       });
     await checkBridge();
-    let g = createGame(1, roadmap),
+    let g = createRecord(1, roadmap),
       e = g.encounters["question-0"];
     assert.equal(e.runId, g.id, "encounter sessions must use the record ID");
     preparePracticeRooms(g, roadmap);

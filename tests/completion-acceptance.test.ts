@@ -4,12 +4,12 @@ import test from "node:test";
 import { checkBridge, edit, send } from "../src/ai";
 import { eligible } from "../src/curriculum";
 import type { Roadmap } from "../src/model";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 const roadmap: Roadmap = JSON.parse(
   readFileSync("public/curriculum.json", "utf8"),
 );
 function fixture() {
-  const g = createGame(71, roadmap),
+  const g = createRecord(71, roadmap),
     e = g.encounters["question-0"];
   g.study.profile = "live";
   e.problem = {

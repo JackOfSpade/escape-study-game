@@ -18,7 +18,7 @@ import { createStudyWorkspaceView } from "./study-workspace-view";
 
 interface StudySessionHost {
   /** The current record: an import replaces it. */
-  game(): StudyRecord;
+  studyRecord(): StudyRecord;
   roadmap: Roadmap;
   /** Saves the record; false when the save failed. */
   persist(): Promise<boolean>;
@@ -48,7 +48,7 @@ export function installStudySession(host: StudySessionHost) {
     statusShown = false;
 
   const view = createStudyWorkspaceView($("#study-workspace"), roadmap, () => ({
-    game: host.game(),
+    studyRecord: host.studyRecord(),
     starting,
     saving,
     saveError: host.saveError(),
@@ -57,20 +57,20 @@ export function installStudySession(host: StudySessionHost) {
 
   function renderWorkspace() {
     view.render();
-    const game = host.game();
+    const studyRecord = host.studyRecord();
     // Offered beside the skill map, for the question that is waiting there.
-    const waiting = workspaceQuestion(game);
+    const waiting = workspaceQuestion(studyRecord);
     $("#study-regenerate").hidden = !(
       !starting &&
       waiting &&
-      canRegenerate(game, waiting)
+      canRegenerate(studyRecord, waiting)
     );
   }
 
   /** What the study view says about the question being prepared. It only clears
    * a message it wrote itself, so other notices on the line are left alone. */
   function renderStatus() {
-    if (!host.game().studyWorkspace?.enabled) {
+    if (!host.studyRecord().studyWorkspace?.enabled) {
       statusShown = false;
       return;
     }
@@ -101,15 +101,16 @@ export function installStudySession(host: StudySessionHost) {
   /** Save, showing the workspace's saving indicator until the newest save ends. */
   async function save() {
     const generation = ++saveGeneration;
-    const savedGame = host.game();
-    if (savedGame.studyWorkspace?.enabled) {
+    const savedRecord = host.studyRecord();
+    if (savedRecord.studyWorkspace?.enabled) {
       saving = true;
       renderWorkspace();
     }
     await host.persist();
-    if (generation !== saveGeneration || host.game() !== savedGame) return;
+    if (generation !== saveGeneration || host.studyRecord() !== savedRecord)
+      return;
     saving = false;
-    if (savedGame.studyWorkspace?.enabled) renderWorkspace();
+    if (savedRecord.studyWorkspace?.enabled) renderWorkspace();
   }
 
   /** A question's preparation moved on: show it and keep it. */
@@ -129,9 +130,9 @@ export function installStudySession(host: StudySessionHost) {
   $("#study-save-retry").onclick = () => void save();
   $("#study-next").onclick = async () => {
     if (starting) return;
-    const game = host.game();
+    const studyRecord = host.studyRecord();
     // Reopen an unfinished question rather than starting another.
-    const unfinished = workspaceQuestion(game);
+    const unfinished = workspaceQuestion(studyRecord);
     if (unfinished && !host.terminalOpen()) {
       host.openTerminal(unfinished);
       render();
@@ -141,8 +142,8 @@ export function installStudySession(host: StudySessionHost) {
     setText("#study-message", "");
     statusShown = false;
     try {
-      const e = nextWorkspaceQuestion(game, roadmap);
-      game.studyWorkspace!.encounter = encounterKey(e);
+      const e = nextWorkspaceQuestion(studyRecord, roadmap);
+      studyRecord.studyWorkspace!.encounter = encounterKey(e);
       host.rememberQuestion(e);
       host.openTerminal(e);
       await host.prepareQuestion(e);
@@ -155,17 +156,17 @@ export function installStudySession(host: StudySessionHost) {
     }
   };
   $("#study-review-retry").onclick = async () => {
-    const game = host.game();
-    const a = workspaceAssessment(game);
-    const e = workspaceSelectedQuestion(game);
+    const studyRecord = host.studyRecord();
+    const a = workspaceAssessment(studyRecord);
+    const e = workspaceSelectedQuestion(studyRecord);
     if (!a || !e) return;
-    await assess(game, e, roadmap, a.evidenceCutoffSequence, true);
+    await assess(studyRecord, e, roadmap, a.evidenceCutoffSequence, true);
     questionChanged();
   };
   $("#study-regenerate").onclick = () => {
-    const game = host.game();
-    const e = workspaceQuestion(game);
-    if (!e || starting || !canRegenerate(game, e)) return;
+    const studyRecord = host.studyRecord();
+    const e = workspaceQuestion(studyRecord);
+    if (!e || starting || !canRegenerate(studyRecord, e)) return;
     if (
       e.tutor.some((m) => m.kind === "human") &&
       !confirm(
@@ -174,7 +175,7 @@ export function installStudySession(host: StudySessionHost) {
     )
       return;
     const title = e.problem?.title;
-    if (!regenerateQuestion(game, e, roadmap)) return;
+    if (!regenerateQuestion(studyRecord, e, roadmap)) return;
     host.log("question-regenerated", { encounter: e.id, title });
     // The new question opens as it is written, as a started one does.
     host.openTerminal(e);

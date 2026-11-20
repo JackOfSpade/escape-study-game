@@ -99,7 +99,7 @@ export async function createAppServer({
       return res.end(
         req.method === "HEAD"
           ? undefined
-          : JSON.stringify({ service: "zombie-study-escape", build }),
+          : JSON.stringify({ service: "study-app", build }),
       );
     }
     let file;

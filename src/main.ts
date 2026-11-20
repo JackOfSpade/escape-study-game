@@ -45,7 +45,7 @@ import {
   rejectedCopy,
   save,
 } from "./persistence";
-import { LOG_KEY, RunLogs } from "./run-logs";
+import { durableLogStorage, RunLogs } from "./run-logs";
 import { watchStudyEvents } from "./study-events";
 import { readDurable, writeDurable } from "./storage";
 import { installStudySession } from "./study-session";
@@ -69,7 +69,7 @@ import { emptyRecord } from "./record";
 
 const app = $("#app");
 const roadmap: Roadmap = await fetch("/curriculum.json").then((r) => r.json());
-let game: StudyRecord,
+let studyRecord: StudyRecord,
   saveError = "",
   saveRecoveryError = "",
   /** The encounter open in the terminal, if any. */
@@ -79,9 +79,9 @@ let game: StudyRecord,
   lastQuestion: string | undefined;
 try {
   const saved = await load();
-  game = recover(saved ?? newSave());
+  studyRecord = recover(saved ?? newSave());
 } catch (err) {
-  game = newSave();
+  studyRecord = newSave();
   saveRecoveryError = `Saved progress could not be loaded: ${String(err)}. Existing checkpoints have been protected. Retry loading, or export recovery data before restoring a backup.`;
   saveError = saveRecoveryError;
 }
@@ -100,8 +100,8 @@ function activateRunFocus(study: StudyRecord["study"]) {
     study.careerFocus ?? study.learner?.careerFocus ?? "product-feature-owner",
   );
 }
-moveToLiveStudy(game, roadmap);
-activateRunFocus(game.study);
+moveToLiveStudy(studyRecord, roadmap);
+activateRunFocus(studyRecord.study);
 function latestStudyEncounter(g: StudyRecord): string | undefined {
   const saved = g.lastStudyEncounter && g.encounters[g.lastStudyEncounter];
   if (
@@ -122,17 +122,14 @@ function latestStudyEncounter(g: StudyRecord): string | undefined {
         (b.problemPresentedSequence ?? -1) - (a.problemPresentedSequence ?? -1),
     )[0]?.id;
 }
-lastQuestion = latestStudyEncounter(game);
+lastQuestion = latestStudyEncounter(studyRecord);
 /** Record one diagnostic entry and store it at once: an entry held only in
  * memory is lost when the page reloads, which is when it is most wanted. */
 function logEvent(type: string, data?: unknown) {
-  runLogs.record(game, type, data);
+  runLogs.record(studyRecord, type, data);
   void runLogs.flush();
 }
-const runLogs = new RunLogs({
-  read: () => readDurable(LOG_KEY),
-  write: (value) => writeDurable(LOG_KEY, value),
-});
+const runLogs = new RunLogs(durableLogStorage(readDurable, writeDurable));
 await runLogs.load();
 /** Lessons live in their own database, never in the saved record. A lesson
  * database that cannot be read costs the lessons, not the app. */
@@ -154,7 +151,7 @@ watchStudyEvents(logEvent);
 await checkBridge();
 app.innerHTML = studyShell;
 lessonSurface = createLessonSurface({
-  game: () => game,
+  studyRecord: () => studyRecord,
   roadmap,
   lessons,
   reducedMotion: () =>
@@ -162,7 +159,7 @@ lessonSurface = createLessonSurface({
   log: logEvent,
   testGap: startGapTest,
   canTest: canTestGap,
-  questionOpen: () => !!workspaceQuestion(game),
+  questionOpen: () => !!workspaceQuestion(studyRecord),
 });
 // One stored copy was refused while the other loaded. The first save replaces
 // it, so its bytes are offered for download while they are still in memory.
@@ -174,6 +171,7 @@ if (refusedCopy) {
     download(
       "learning-workspace-rejected-save.json",
       JSON.stringify(
+        // Format name kept from an earlier build: files already downloaded carry it.
         { format: "dead-air-rejected-copy-v1", ...refusedCopy },
         null,
         2,
@@ -194,7 +192,7 @@ async function persist() {
   if (saveRecoveryError) return false;
   const token = ++saveToken;
   try {
-    await save(game);
+    await save(studyRecord);
     if (token === saveToken) saveError = "";
     return true;
   } catch (err) {
@@ -211,7 +209,7 @@ async function persistOrThrow(context = "Local save failed") {
 
 /** The question being prepared for the learner, if any. */
 function pendingQuestion() {
-  const last = lastQuestion && game.encounters[lastQuestion];
+  const last = lastQuestion && studyRecord.encounters[lastQuestion];
   return last &&
     last.state !== "consumed" &&
     (last.pendingGeneration || last.generation)
@@ -219,14 +217,14 @@ function pendingQuestion() {
     : undefined;
 }
 function displayedQuestion() {
-  return game.studyWorkspace?.enabled
-    ? (workspaceQuestion(game) ?? workspaceSelectedQuestion(game))
+  return studyRecord.studyWorkspace?.enabled
+    ? (workspaceQuestion(studyRecord) ?? workspaceSelectedQuestion(studyRecord))
     : (pendingQuestion() ??
-        (lastQuestion ? game.encounters[lastQuestion] : undefined));
+        (lastQuestion ? studyRecord.encounters[lastQuestion] : undefined));
 }
 function resumeQuestions() {
-  releaseRetiredChatRequests(game);
-  const e = lastQuestion ? game.encounters[lastQuestion] : undefined;
+  releaseRetiredChatRequests(studyRecord);
+  const e = lastQuestion ? studyRecord.encounters[lastQuestion] : undefined;
   if (
     e &&
     e.state !== "consumed" &&
@@ -242,13 +240,14 @@ const questionPreparations = new WeakMap<Encounter, Promise<void>>();
 function prepareQuestion(e: Encounter): Promise<void> {
   const pending = questionPreparations.get(e);
   if (pending) return pending;
-  const requestGame = game;
+  const requestRecord = studyRecord;
   const operation = (async () => {
     try {
-      const generated = ensureProblem(requestGame, e, roadmap);
+      const generated = ensureProblem(requestRecord, e, roadmap);
       studySession.questionChanged();
       await generated;
-      if (game !== requestGame || game.encounters[e.id] !== e) return;
+      if (studyRecord !== requestRecord || studyRecord.encounters[e.id] !== e)
+        return;
       if (e.problem) showTerminal(e);
       else {
         studySession.questionChanged();
@@ -256,7 +255,7 @@ function prepareQuestion(e: Encounter): Promise<void> {
         if (active === e.id) await recheckConnection();
       }
     } catch (error) {
-      if (game !== requestGame) return;
+      if (studyRecord !== requestRecord) return;
       e.error = String(error);
       studySession.questionChanged();
     }
@@ -279,41 +278,41 @@ function showMenuHome(focus?: HTMLElement) {
     panelToggle(id).setAttribute("aria-expanded", "false");
   }
   menuPanel = undefined;
-  $("#pause-home").hidden = false;
-  $("#pause-panels").hidden = true;
-  $("#pause-panel-header").hidden = true;
-  const menu = $<HTMLDialogElement>("#pause-menu");
+  $("#menu-home").hidden = false;
+  $("#menu-panels").hidden = true;
+  $("#menu-panel-header").hidden = true;
+  const menu = $<HTMLDialogElement>("#menu");
   delete menu.dataset.panel;
-  menu.setAttribute("aria-labelledby", "pause-title");
+  menu.setAttribute("aria-labelledby", "menu-title");
   if (menu.open && focus) focus.focus();
 }
 function openPanel(id: string, focus: string) {
-  if (!$<HTMLDialogElement>("#pause-menu").open) studyMenu(true);
+  if (!$<HTMLDialogElement>("#menu").open) studyMenu(true);
   showMenuHome();
   menuPanel = id;
-  $("#pause-home").hidden = true;
-  $("#pause-panels").hidden = false;
-  $("#pause-panel-header").hidden = false;
+  $("#menu-home").hidden = true;
+  $("#menu-panels").hidden = false;
+  $("#menu-panel-header").hidden = false;
   $(`#${id}`).hidden = false;
   if (id === "settings") renderCareerControls();
   panelToggle(id).setAttribute("aria-expanded", "true");
-  const menu = $<HTMLDialogElement>("#pause-menu");
+  const menu = $<HTMLDialogElement>("#menu");
   menu.dataset.panel = id;
   menu.setAttribute("aria-labelledby", `${id}-title`);
-  $("#pause-panels").scrollTop = 0;
+  $("#menu-panels").scrollTop = 0;
   $(focus).focus();
 }
 function closePanel(id: string) {
   if (menuPanel === id) showMenuHome(panelToggle(id));
 }
-$("#pause-back").onclick = () => {
+$("#menu-back").onclick = () => {
   if (menuPanel) closePanel(menuPanel);
 };
 /** When the menu last closed: the Escape that closed it through the dialog's
  * own cancel event must not open it again as a keydown. */
 let studyMenuClosedAt = -Infinity;
 function studyMenu(open: boolean) {
-  const menu = $<HTMLDialogElement>("#pause-menu");
+  const menu = $<HTMLDialogElement>("#menu");
   showMenuHome();
   if (!open) {
     if (menu.open) menu.close();
@@ -325,7 +324,7 @@ function studyMenu(open: boolean) {
 }
 $("#study-menu").onclick = () => studyMenu(true);
 $("#menu-close").onclick = () => studyMenu(false);
-$("#pause-menu").addEventListener("cancel", (event) => {
+$("#menu").addEventListener("cancel", (event) => {
   event.preventDefault();
   if (menuPanel) closePanel(menuPanel);
   else studyMenu(false);
@@ -344,10 +343,10 @@ window.addEventListener("keydown", (ev) => {
   }
   // Escape opens the menu; the dialog's cancel event closes it again.
   if (
-    game.studyWorkspace?.enabled &&
+    studyRecord.studyWorkspace?.enabled &&
     ev.code === "Escape" &&
     !ev.repeat &&
-    !$<HTMLDialogElement>("#pause-menu").open &&
+    !$<HTMLDialogElement>("#menu").open &&
     performance.now() - studyMenuClosedAt > 200
   ) {
     ev.preventDefault();
@@ -356,13 +355,13 @@ window.addEventListener("keydown", (ev) => {
 });
 $("#save-button").onclick = async () => {
   await persist();
-  game.notice =
+  studyRecord.notice =
     saveError ||
     "Run saved locally. Export a backup from Settings to move between browsers.";
-  $("#pause-save-status").textContent = game.notice;
+  $("#menu-save-status").textContent = studyRecord.notice;
 };
 function renderCareerControls() {
-  const profile = careerProfileSummary(roadmap, game.study);
+  const profile = careerProfileSummary(roadmap, studyRecord.study);
   for (const id of ["career-focus", "settings-career-focus"])
     $<HTMLSelectElement>(`#${id}`).value = profile.focus;
   const text = `${profile.label}: ${profile.active.passed}/${profile.active.required} required depth checkpoints. Full original scope: ${profile.full.passed}/${profile.full.required}. The role profile requires ${profile.core} core PE objectives through D3; reference and optional topics do not gate advancement. Python interview fundamentals stay unchanged. Existing questions and learning evidence are preserved.`;
@@ -373,16 +372,16 @@ for (const id of ["career-focus", "settings-career-focus"])
   $(`#${id}`).onchange = () => {
     activateCareerFocus(
       roadmap,
-      game.study,
+      studyRecord.study,
       $<HTMLSelectElement>(`#${id}`).value as CareerFocus,
     );
-    syncLearningView(game.study);
+    syncLearningView(studyRecord.study);
     renderCareerControls();
     void persist();
     if (!$("#inspector").hidden) renderInspector();
   };
 const renderInspector = createInspector({
-  game: () => game,
+  studyRecord: () => studyRecord,
   roadmap,
   persist,
   persistOrThrow,
@@ -395,7 +394,7 @@ $("#curriculum-button").onclick = () => {
 };
 $("#close-inspector").onclick = () => closePanel("inspector");
 function syncDisplayScale() {
-  const scale = displayScale(game.settings.displayScale),
+  const scale = displayScale(studyRecord.settings.displayScale),
     percent = String(Math.round(scale * 100));
   document.documentElement.style.setProperty("--display-scale", String(scale));
   $<HTMLInputElement>("#display-scale").value = percent;
@@ -403,7 +402,7 @@ function syncDisplayScale() {
   $("#display-scale").setAttribute("aria-valuetext", `${percent}%`);
 }
 $("#display-scale").oninput = () => {
-  game.settings.displayScale = displayScale(
+  studyRecord.settings.displayScale = displayScale(
     Number($<HTMLInputElement>("#display-scale").value) / 100,
   );
   syncDisplayScale();
@@ -432,7 +431,7 @@ $("#reconnect").onclick = () => {
 // ---- Backups and recovery --------------------------------------------------
 
 $("#export").onclick = () =>
-  download("learning-workspace-backup.json", encode(game));
+  download("learning-workspace-backup.json", encode(studyRecord));
 $("#import").onchange = async () => {
   const file = $<HTMLInputElement>("#import").files?.[0];
   if (file) await restoreRunBackup(file);
@@ -461,31 +460,34 @@ async function restoreRunBackup(file: File) {
     activateRunFocus(next.study);
     lessonSurface.close();
     closeTerminal();
-    game = next;
+    studyRecord = next;
     saveRecoveryError = "";
-    lastQuestion = latestStudyEncounter(game);
+    lastQuestion = latestStudyEncounter(studyRecord);
     resumeQuestions();
     syncDisplayScale();
     if (!(await persist())) {
-      game.notice =
-        "Import opened in this tab but could not be saved. Export a full run backup before leaving, then retry the import when storage works.";
-      const message = `${game.notice} ${saveError}`;
+      studyRecord.notice =
+        "Import opened in this tab but could not be saved. Export a full backup before leaving, then retry the import when storage works.";
+      const message = `${studyRecord.notice} ${saveError}`;
       setText("#import-status", message);
       setText("#save-recovery-status", message);
     }
     showStudy();
   } catch (err) {
-    game.notice = `Import rejected: ${String(err)}`;
-    setText("#import-status", game.notice);
+    studyRecord.notice = `Import rejected: ${String(err)}`;
+    setText("#import-status", studyRecord.notice);
     if (saveRecoveryError)
-      setText("#save-recovery-status", `${saveRecoveryError} ${game.notice}`);
+      setText(
+        "#save-recovery-status",
+        `${saveRecoveryError} ${studyRecord.notice}`,
+      );
   }
 }
 
 // ---- The workspace ---------------------------------------------------------
 
 const studySession = installStudySession({
-  game: () => game,
+  studyRecord: () => studyRecord,
   roadmap,
   persist,
   saveError: () => saveError,
@@ -493,7 +495,7 @@ const studySession = installStudySession({
   displayedQuestion,
   rememberQuestion: (e) => {
     lastQuestion = e.id;
-    game.lastStudyEncounter = e.id;
+    studyRecord.lastStudyEncounter = e.id;
   },
   openTerminal: openStudyTerminal,
   prepareQuestion,
@@ -509,17 +511,19 @@ function showStudy() {
     return;
   }
   closeTerminal();
-  enterStudyWorkspace(game);
-  const current = workspaceQuestion(game);
+  enterStudyWorkspace(studyRecord);
+  const current = workspaceQuestion(studyRecord);
   if (current) {
-    game.studyWorkspace!.encounter = encounterKey(current);
+    studyRecord.studyWorkspace!.encounter = encounterKey(current);
     lastQuestion = current.id;
   }
-  $<HTMLDialogElement>("#pause-menu").close();
+  $<HTMLDialogElement>("#menu").close();
   $("#study-workspace").hidden = false;
   if (current) openStudyTerminal(current);
   studySession.render();
-  $(workspaceQuestion(game) ? "#study-session-title" : "#study-next").focus({
+  $(
+    workspaceQuestion(studyRecord) ? "#study-session-title" : "#study-next",
+  ).focus({
     preventScroll: true,
   });
   void persist();
@@ -528,8 +532,8 @@ mountBugReport({
   log: logEvent,
   async collect() {
     const e =
-      (active ? game.encounters[active] : undefined) ??
-      workspaceSelectedQuestion(game);
+      (active ? studyRecord.encounters[active] : undefined) ??
+      workspaceSelectedQuestion(studyRecord);
     const shown = (selector: string) => {
       const node = document.querySelector<HTMLElement>(selector);
       return node && !node.hidden ? (node.textContent ?? "").trim() : "";
@@ -611,7 +615,7 @@ window.addEventListener("unhandledrejection", (event) => {
 
 function closeTerminal() {
   if (active) {
-    const e = game.encounters[active];
+    const e = studyRecord.encounters[active];
     if (e) e.chatOpen = false;
   }
   active = undefined;
@@ -624,20 +628,21 @@ function openStudyTerminal(e: Encounter) {
   lessonSurface.close();
   if (active && active !== e.id) closeTerminal();
   lastQuestion = e.id;
-  game.lastStudyEncounter = e.id;
+  studyRecord.lastStudyEncounter = e.id;
   active = e.id;
   showTerminal(e);
 }
 /** The question that recorded a gap, if it is still saved. */
 const gapSource = (gap: KnowledgeGapRecord) =>
-  [...Object.values(game.encounters), ...game.study.archives].find(
-    (x) => encounterKey(x) === gap.encounter,
-  );
+  [
+    ...Object.values(studyRecord.encounters),
+    ...studyRecord.study.archives,
+  ].find((x) => encounterKey(x) === gap.encounter);
 /** Why "Test me on this" cannot work now, or nothing when it can. */
 function canTestGap(gap: KnowledgeGapRecord): string | undefined {
   if (status().mode !== "claude-cli")
     return "Claude is not connected, so this gap cannot be tested now.";
-  const assessment = workspaceAssessment(game);
+  const assessment = workspaceAssessment(studyRecord);
   if (assessment && assessment.status !== "applied")
     return "Finish reviewing your previous learning result first.";
   if (!gapSource(gap)?.problem?.contract)
@@ -651,16 +656,17 @@ function canTestGap(gap: KnowledgeGapRecord): string | undefined {
 function startGapTest(gap: KnowledgeGapRecord): string | undefined {
   const refused = canTestGap(gap);
   if (refused) return refused;
-  const selected = game.studyWorkspace?.encounter;
+  const selected = studyRecord.studyWorkspace?.encounter;
   let e: Encounter | undefined;
   try {
-    e = gapPracticeQuestion(game);
-    seedGapPractice(game, roadmap, e, gap);
+    e = gapPracticeQuestion(studyRecord);
+    seedGapPractice(studyRecord, roadmap, e, gap);
   } catch (error) {
     // Nothing was asked for: leave no empty question behind.
     if (e) {
-      delete game.encounters[e.id];
-      if (game.studyWorkspace) game.studyWorkspace.encounter = selected;
+      delete studyRecord.encounters[e.id];
+      if (studyRecord.studyWorkspace)
+        studyRecord.studyWorkspace.encounter = selected;
     }
     return String(error instanceof Error ? error.message : error).replace(
       /^Error: /,
@@ -682,7 +688,7 @@ function startGapTest(gap: KnowledgeGapRecord): string | undefined {
 const connectionLocked = (e: Encounter) =>
   status().mode !== "claude-cli" && e.state !== "consumed";
 const terminalConnectionLocked = () => {
-  const e = active ? game.encounters[active] : undefined;
+  const e = active ? studyRecord.encounters[active] : undefined;
   return !!e && connectionLocked(e);
 };
 const LOCKED_CONNECTION_POLL_MS = 2500;
@@ -695,7 +701,7 @@ function recheckConnection() {
     await checkBridge();
     connectionCheckedAt = performance.now();
     connectionChecking = undefined;
-    const e = active ? game.encounters[active] : undefined;
+    const e = active ? studyRecord.encounters[active] : undefined;
     if (!e) return;
     if (lockedId === e.id && !connectionLocked(e))
       void startConnectedQuestion(e);
@@ -775,7 +781,7 @@ function generationHtml(e: Encounter) {
   return `<div class="generation-progress" role="status"><div class="generation-bar" aria-hidden="true"><span></span></div><ol class="generation-steps">${steps}</ol><p class="generation-elapsed">Elapsed <strong>${clock}</strong>${seconds >= 60 ? " · Still working: a validated problem can take a few minutes." : ""}</p><p class="generation-note">You can leave immediately; the request is saved.</p></div>`;
 }
 const terminalPanels = createTerminalPanels({
-  game: () => game,
+  studyRecord: () => studyRecord,
   roadmap,
   persist,
   render: () => renderTerminal(),
@@ -784,7 +790,7 @@ const terminalPanels = createTerminalPanels({
 watchStreamingReplies(() => renderTerminal());
 function renderTerminal(force = false) {
   if (!active || $("#terminal").hidden) return;
-  const e = game.encounters[active];
+  const e = studyRecord.encounters[active];
   // A replaced record may no longer hold the question that was open.
   if (!e) return;
   const locked = connectionLocked(e);
@@ -799,7 +805,7 @@ function renderTerminal(force = false) {
   }
   renderHeading(e);
   renderAnswer(e, force);
-  presentMessages(game, e);
+  presentMessages(studyRecord, e);
   terminalPanels.requestStatus(e);
   terminalPanels.messages(e);
   $("#help-choice").hidden = !offeredHelp(e).length;
@@ -810,12 +816,12 @@ function renderHeading(e: Encounter) {
   // The panel is titled "Answer" and needs no further instruction.
   $("#conversation-context").hidden = true;
   setText("#conversation-context", "");
-  const progress = dialogueStatus(game, e);
+  const progress = dialogueStatus(studyRecord, e);
   $("#dialogue-status").hidden = progress.hidden;
   setText("#dialogue-status", progress.text);
   $("#saved-answer").hidden = !e.workspace;
   setText("#saved-answer-text", e.workspace);
-  presentProblem(game, e, roadmap);
+  presentProblem(studyRecord, e, roadmap);
   setText("#terminal-type", "QUESTION");
   setText(
     "#problem-title",
@@ -827,7 +833,7 @@ function renderHeading(e: Encounter) {
           : "Connecting…"),
   );
   // One write: appending to the line would replace its text on every tick.
-  setText("#terminal-provenance", provenanceText(game, e));
+  setText("#terminal-provenance", provenanceText(studyRecord, e));
   renderQuestion(e);
 }
 /** The part of the open question on screen, and a swap to the next under way. */
@@ -932,7 +938,7 @@ function settleTerminalRequest(pending: Promise<unknown>, e: Encounter) {
 }
 /** Start a request for the open question, then save and show its pending state. */
 function startTerminalRequest(start: (e: Encounter) => Promise<unknown>) {
-  const e = active ? game.encounters[active] : undefined;
+  const e = active ? studyRecord.encounters[active] : undefined;
   if (!e) return;
   settleTerminalRequest(start(e), e);
   renderTerminal();
@@ -942,21 +948,23 @@ $("#terminal-connect-retry").onclick = () => void recheckConnection();
 // Answers to the tutor's one warning. Only the accept button unlocks a hint;
 // a typed reply is judged as a new attempt.
 $("#help-accept").onclick = () => {
-  const e = active ? game.encounters[active] : undefined;
+  const e = active ? studyRecord.encounters[active] : undefined;
   if (!e || !offeredHelp(e).length) return;
   startTerminalRequest(() =>
-    send(game, e, "Yes, give me a hint.", roadmap, true),
+    send(studyRecord, e, "Yes, give me a hint.", roadmap, true),
   );
 };
 $("#help-retry").onclick = () => $<HTMLTextAreaElement>("#chat-input").focus();
 $("#help-skip").onclick = () => {
-  const e = active ? game.encounters[active] : undefined;
+  const e = active ? studyRecord.encounters[active] : undefined;
   if (!e || !offeredHelp(e).length) return;
-  startTerminalRequest(() => send(game, e, "I want to move on.", roadmap));
+  startTerminalRequest(() =>
+    send(studyRecord, e, "I want to move on.", roadmap),
+  );
 };
 $("#chat-input").addEventListener("input", () => {
   if (!active) return;
-  game.encounters[active].chatDraft =
+  studyRecord.encounters[active].chatDraft =
     $<HTMLTextAreaElement>("#chat-input").value;
   void persist();
 });
@@ -969,7 +977,7 @@ $("#chat-input").addEventListener("keydown", (ev) => {
 $("#chat-form").onsubmit = (ev) => {
   ev.preventDefault();
   if (!active) return;
-  const e = game.encounters[active],
+  const e = studyRecord.encounters[active],
     input = $<HTMLTextAreaElement>("#chat-input"),
     text = input.value;
   if (!text.trim() || e.tutorRequests?.some((j) => j.state === "pending")) {
@@ -981,7 +989,7 @@ $("#chat-form").onsubmit = (ev) => {
   input.value = "";
   e.chatDraft = "";
   logEvent("terminal-message", { chars: text.length });
-  startTerminalRequest(() => send(game, e, text, roadmap));
+  startTerminalRequest(() => send(studyRecord, e, text, roadmap));
 };
 
 // ---- Page lifecycle ---------------------------------------------------------
@@ -1007,14 +1015,16 @@ function ui() {
   $("#log-status").textContent =
     runLogs.error ||
     "Logs stay on this browser: newest 3 records, at most 256 KB each. Older diagnostics are deleted automatically; learning is retained.";
-  syncLearningView(game.study);
+  syncLearningView(studyRecord.study);
   studySession.renderStatus();
   studySession.renderWorkspace();
   if (active) watchTerminalConnection();
   renderTerminal();
   lessonSurface.render();
   lessonSurface.renderGapList();
-  lessonSurface.renderOffers(active ? game.encounters[active] : undefined);
+  lessonSurface.renderOffers(
+    active ? studyRecord.encounters[active] : undefined,
+  );
 }
 function tick(time: number) {
   if (time - lastUI > 200) {
@@ -1026,14 +1036,14 @@ function tick(time: number) {
 // Agent diagnostics stay out of the learner's menu. Browser acceptance
 // fixtures use these hooks in synthetic browser contexts.
 Object.assign(window, {
-  __deadAir: {
-    get game() {
-      return game;
+  __studyApp: {
+    get record() {
+      return studyRecord;
     },
     roadmap,
     /** Agent-only entry: diagnostics have no control in the interface. */
     openAgentMenu() {
-      const open = $<HTMLDialogElement>("#pause-menu").open;
+      const open = $<HTMLDialogElement>("#menu").open;
       if (open) showMenuHome();
       else studyMenu(true);
       document.body.classList.add("agent-tools");

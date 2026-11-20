@@ -7,14 +7,14 @@ import { connectionSteps } from "../src/connection-steps";
 import { initialStudy } from "../src/curriculum";
 import { moveToLiveStudy } from "../src/live-study";
 import type { Roadmap } from "../src/model";
-import { createPlayableGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 import { devProblem, preparePracticeRooms } from "./helpers/practice-questions";
 
 const roadmap: Roadmap = JSON.parse(
   readFileSync("public/curriculum.json", "utf8"),
 );
 const statusReply = (body: unknown) => async () => Response.json(body);
-const questions = (g: ReturnType<typeof createPlayableGame>) =>
+const questions = (g: ReturnType<typeof createRecord>) =>
   Object.values(g.encounters);
 
 test("app source has no local questions to fall back on", () => {
@@ -28,7 +28,7 @@ test("app source has no local questions to fall back on", () => {
 });
 
 test("a new live record holds no question until Claude writes one", () => {
-  const g = createPlayableGame(42, roadmap, initialStudy(roadmap, "live"));
+  const g = createRecord(42, roadmap, initialStudy(roadmap, "live"));
   assert.ok(questions(g).length > 0);
   for (const e of questions(g)) assert.equal(e.problem, undefined);
 });
@@ -51,7 +51,7 @@ test("without Claude, opening a question asks nothing and invents no question", 
     requests++;
     throw Error("no request expected");
   }) as typeof fetch;
-  const g = createPlayableGame(42, roadmap, initialStudy(roadmap, "live"));
+  const g = createRecord(42, roadmap, initialStudy(roadmap, "live"));
   const e = questions(g)[0];
   await ensureProblem(g, e, roadmap);
   assert.equal(e.problem, undefined);
@@ -60,7 +60,7 @@ test("without Claude, opening a question asks nothing and invents no question", 
 });
 
 test("a saved practice record moves to live and keeps its learning", () => {
-  const g = createPlayableGame(42, roadmap);
+  const g = createRecord(42, roadmap);
   preparePracticeRooms(g, roadmap);
   const learner = g.study.learner;
   const assessments = g.study.assessments;
@@ -89,7 +89,7 @@ test("a saved practice record moves to live and keeps its learning", () => {
 });
 
 test("moving to live keeps knowledge records and never keeps an old practice question", async (t) => {
-  const g = createPlayableGame(42, roadmap);
+  const g = createRecord(42, roadmap);
   preparePracticeRooms(g, roadmap);
   g.study.version = 9;
   g.study.knowledgeGaps = [{ id: "gap" } as never];
@@ -120,7 +120,7 @@ test("moving to live keeps knowledge records and never keeps an old practice que
 });
 
 test("moving to live leaves questions Claude already wrote alone", () => {
-  const g = createPlayableGame(42, roadmap);
+  const g = createRecord(42, roadmap);
   const e = questions(g)[0];
   e.problem = { ...devProblem(g, roadmap), provenance: "claude-cli" };
   e.state = "in-progress";

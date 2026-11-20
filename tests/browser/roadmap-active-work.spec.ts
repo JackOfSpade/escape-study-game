@@ -4,9 +4,9 @@ import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { reviewRoadmap } from "../../src/roadmap-review";
 
-// The editor was removed from normal gameplay. These scoped API fixtures keep
+// The editor was removed from the workspace. These scoped API fixtures keep
 // reconciliation's captured-work transaction covered through the actual browser
-// module/transport boundary; embedded-terminal.spec.ts covers the player conversation.
+// module/transport boundary; embedded-terminal.spec.ts covers the learner conversation.
 async function capturedWork(
   page: import("@playwright/test").Page,
   text: string,
@@ -14,22 +14,22 @@ async function capturedWork(
 ) {
   await page.evaluate(
     async ({ text, id }) => {
-      const d = (window as any).__deadAir,
+      const d = (window as any).__studyApp,
         root = "/src/";
       const { ensureProblem, presentProblem, edit } = await import(
         root + "ai.ts"
       );
-      const e = d.game.encounters[id];
-      await ensureProblem(d.game, e, d.roadmap);
-      presentProblem(d.game, e, d.roadmap);
-      edit(d.game, e, text, e.revision, d.roadmap);
+      const e = d.record.encounters[id];
+      await ensureProblem(d.record, e, d.roadmap);
+      presentProblem(d.record, e, d.roadmap);
+      edit(d.record, e, text, e.revision, d.roadmap);
     },
     { text, id },
   );
 }
 const workspace = (page: import("@playwright/test").Page) =>
   page.evaluate(
-    () => (window as any).__deadAir.game.encounters["question-0"].workspace,
+    () => (window as any).__studyApp.record.encounters["question-0"].workspace,
   );
 
 for (const scenario of ["unchanged", "stale", "new-work"])
@@ -125,7 +125,7 @@ for (const scenario of ["unchanged", "stale", "new-work"])
                 rationale: "Synthetic explicit continued source state",
               })),
             rationale:
-              "Synthetic current-work resolution; the gameplay puzzle remains unfinished",
+              "Synthetic current-work resolution; the open question remains unfinished",
           },
         });
         return;
@@ -181,14 +181,14 @@ for (const scenario of ["unchanged", "stale", "new-work"])
     await openApp(page);
     await seedQuestions(page);
     await page.evaluate(() => {
-      const g = (window as any).__deadAir.game;
+      const g = (window as any).__studyApp.record;
       g.study.profile = "live";
     });
     await capturedWork(page, "PRIVATE_ACTIVE_BROWSER_DRAFT");
     await expect(page.locator("#terminal")).toBeHidden();
     const source = await page.evaluate(async () => {
-      const d = (window as any).__deadAir,
-        g = d.game,
+      const d = (window as any).__studyApp,
+        g = d.record,
         r = d.roadmap,
         e = g.encounters["question-0"],
         root = "/src/";
@@ -264,7 +264,8 @@ for (const scenario of ["unchanged", "stale", "new-work"])
       ).toHaveCount(0);
       expect(
         await page.evaluate(
-          () => (window as any).__deadAir.game.study.learner.attempts[0].status,
+          () =>
+            (window as any).__studyApp.record.study.learner.attempts[0].status,
         ),
       ).toBe("in-progress");
       await page.locator("#close-inspector").click();
@@ -295,13 +296,14 @@ for (const scenario of ["unchanged", "stale", "new-work"])
     expect(await workspace(page)).toBe("PRIVATE_ACTIVE_BROWSER_DRAFT");
     expect(
       await page.evaluate(
-        () => (window as any).__deadAir.game.study.learner.attempts[0].status,
+        () =>
+          (window as any).__studyApp.record.study.learner.attempts[0].status,
       ),
     ).toBe("externally-resolved");
     await expect(page.locator("#terminal")).toBeHidden();
     expect(
       await page.evaluate(() =>
-        (window as any).__deadAir.game.encounters["question-0"].history.some(
+        (window as any).__studyApp.record.encounters["question-0"].history.some(
           (h: any) => h.kind === "source-view",
         ),
       ),
@@ -309,13 +311,13 @@ for (const scenario of ["unchanged", "stale", "new-work"])
     expect(
       await page.evaluate(() =>
         JSON.stringify(
-          (window as any).__deadAir.game.encounters["question-0"].problem,
+          (window as any).__studyApp.record.encounters["question-0"].problem,
         ),
       ),
     ).toBe(source.problem);
     expect(
       await page.evaluate(
-        () => (window as any).__deadAir.game.encounters["question-0"].state,
+        () => (window as any).__studyApp.record.encounters["question-0"].state,
       ),
     ).toBe("in-progress");
     const retainedDraft =
@@ -327,23 +329,23 @@ for (const scenario of ["unchanged", "stale", "new-work"])
       path: `test-results/active-roadmap-world-task-${scenario}.png`,
     });
     await page.evaluate(async () => {
-      const d = (window as any).__deadAir,
+      const d = (window as any).__studyApp,
         root = "/src/";
       // A fixed verdict on the saved draft: answering in the conversation
       // would itself count as new work after the import.
       const { applyCompletion } = await import(root + "ai.ts");
-      const e = d.game.encounters["question-0"];
+      const e = d.record.encounters["question-0"];
       const submission = {
         id: "fixture-completion",
         revision: e.revision,
         author: "human",
         content: e.workspace,
-        seq: ++d.game.seq,
+        seq: ++d.record.seq,
         status: "pending",
         feedback: "",
       };
       e.submissions.push(submission);
-      applyCompletion(d.game, e, d.roadmap, submission, {
+      applyCompletion(d.record, e, d.roadmap, submission, {
         complete: true,
         feedback: "Synthetic world completion only",
         qualified: ["human"],
@@ -352,7 +354,8 @@ for (const scenario of ["unchanged", "stale", "new-work"])
     await expect
       .poll(() =>
         page.evaluate(
-          () => (window as any).__deadAir.game.encounters["question-0"].state,
+          () =>
+            (window as any).__studyApp.record.encounters["question-0"].state,
         ),
       )
       .toBe("consumed");
@@ -362,13 +365,14 @@ for (const scenario of ["unchanged", "stale", "new-work"])
         .poll(() =>
           page.evaluate(
             () =>
-              (window as any).__deadAir.game.study.assessments.at(-1)?.status,
+              (window as any).__studyApp.record.study.assessments.at(-1)
+                ?.status,
           ),
         )
         .toBe("review-required");
     expect(
       await page.evaluate(() => {
-        const s = (window as any).__deadAir.game.study;
+        const s = (window as any).__studyApp.record.study;
         return [
           s.learner.cycle,
           s.visits.length,
@@ -378,17 +382,19 @@ for (const scenario of ["unchanged", "stale", "new-work"])
       }),
     ).toEqual([0, 0, 0, 1]);
     await openAgentMenu(page);
-    await page.getByRole("button", { name: "Save run", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Save progress", exact: true })
+      .click();
     // The click resolves before the async save; reloading earlier loses it.
-    await expect(page.locator("#pause-save-status")).toContainText(
+    await expect(page.locator("#menu-save-status")).toContainText(
       "Run saved locally",
     );
     await page.locator("#menu-close").click();
     await page.reload();
-    await page.waitForFunction(() => !!(window as any).__deadAir);
+    await page.waitForFunction(() => !!(window as any).__studyApp);
     expect(
       await page.evaluate(() => {
-        const g = (window as any).__deadAir.game;
+        const g = (window as any).__studyApp.record;
         return {
           status: g.study.learner.attempts[0].status,
           draft: g.encounters["question-0"].workspace,
@@ -410,14 +416,14 @@ for (const scenario of ["unchanged", "stale", "new-work"])
     expect(
       await page.evaluate(
         () =>
-          (window as any).__deadAir.game.encounters["question-3"].problem
+          (window as any).__studyApp.record.encounters["question-3"].problem
             .prompt,
       ),
     ).toContain("Synthetic task for question-3");
     await expect(page.locator("#terminal")).toBeHidden();
     expect(
       await page.evaluate(() => {
-        const s = (window as any).__deadAir.game.study;
+        const s = (window as any).__studyApp.record.study;
         return [
           s.learner.currentSession,
           s.learner.attempts.at(-1).id,

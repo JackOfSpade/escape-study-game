@@ -46,7 +46,7 @@ export function devProblem(
         .map((_, i) => values.slice(i, i + size).reduce((a, b) => a + b, 0));
     return {
       title: "Signal window / prediction",
-      // Player-facing text only: the scheduled scope stays in the contract.
+      // Learner-facing text only: the scheduled scope stays in the contract.
       prompt: `An intake monitor reads ${JSON.stringify(values)}. A window of ${size} consecutive readings slides one position at a time.\n\nPredict the largest window total. Explain what changes and what stays the same each time the window slides, and name one edge case worth checking. No code is needed.${gapLine(g, contract)}`,
       rubric: [
         "Correct predicted total",

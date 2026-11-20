@@ -5,7 +5,7 @@ import { checkBridge, ensureProblem } from "../src/ai";
 import { historicalScope } from "../src/historical-scope";
 import { eligibleLearning, initialLearner } from "../src/learner";
 import type { Roadmap } from "../src/model";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 
 const r = JSON.parse(readFileSync("public/curriculum.json", "utf8")) as Roadmap;
 
@@ -83,7 +83,7 @@ test("generated questions cannot replace scheduler review/version or strip histo
     await checkBridge();
     for (const mode of ["strip", "review", "version"] as const) {
       alteration = mode;
-      const g = createGame(1, r);
+      const g = createRecord(1, r);
       g.study.profile = "live";
       g.study.learner = initialLearner(r, "test");
       const e = g.encounters["question-0"];

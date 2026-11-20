@@ -22,7 +22,7 @@ import type { Message, Problem, Track } from "../../src/model";
 import {
   contractFor,
   encounterFor,
-  gameFor,
+  recordFor,
   roadmap,
   withBridge,
   type StudyCase,
@@ -165,7 +165,7 @@ export const TURNS: Turn[] = [
 async function payloadFor(turn: Turn, seed: number) {
   const r = roadmap();
   const q = turn.question;
-  const g = gameFor(20261900 + seed, r);
+  const g = recordFor(20261900 + seed, r);
   const e = encounterFor(g, seed);
   const contract = contractFor(g, r, q as never, 1, seed);
   const objectiveId = contract.objectiveIds[0];

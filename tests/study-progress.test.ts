@@ -200,7 +200,7 @@ test("terminal observations never silently withdraw previously verified credit",
   assert.equal(studyTrackProgress(r, s, "PE").passed, 5);
 });
 
-test("compact HUD summaries match the detailed map across profiles, depths and evidence", async () => {
+test("compact progress summaries match the detailed map across profiles, depths and evidence", async () => {
   const { studyTrackSummary } = await import("../src/study-progress");
   for (const profile of ["live", "development"] as const) {
     const s = initialStudy(r, profile);

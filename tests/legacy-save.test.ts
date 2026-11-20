@@ -5,11 +5,11 @@ import { decode, encode, load, recover } from "../src/persistence";
 
 /**
  * `tests/fixtures/legacy-save/save.json` is a synthetic save written by the
- * last build that still ran the escape game: a full game record (building,
- * survivors, zombies, run design, escape state) with a non-trivial learning
- * record inside it. `learning-record.json` is what that build's own loader
- * returned for it. The learning record must load identically here, and the
- * game fields must come back out of a save byte for byte.
+ * earlier escape-game build: its full record (building, survivors, zombies,
+ * run design, escape state) with a non-trivial learning record inside it.
+ * `learning-record.json` is what that build's own loader returned for it. The
+ * learning record must load identically here, and the legacy fields must come
+ * back out of a save byte for byte.
  */
 const stored = readFileSync("tests/fixtures/legacy-save/save.json", "utf8");
 const expected = JSON.parse(
@@ -31,7 +31,7 @@ const STUDY_FIELDS = [
 const stripEnvelope = (data: string) =>
   JSON.parse(JSON.parse(data).payload) as Record<string, unknown>;
 
-test("a save written by the game loads with its learning record intact", () => {
+test("a save written by the earlier escape-game build loads with its learning record intact", () => {
   const g = recover(decode(JSON.parse(stored).data));
   for (const key of Object.keys(expected))
     assert.deepEqual(
@@ -39,7 +39,7 @@ test("a save written by the game loads with its learning record intact", () => {
         JSON.stringify((g as unknown as Record<string, unknown>)[key]),
       ),
       expected[key],
-      `${key} differs from what the game build loaded`,
+      `${key} differs from what the earlier build loaded`,
     );
   // The record is substantial: questions, conversations, evidence, retention.
   assert.ok(Object.keys(g.encounters).length >= 5);
@@ -51,7 +51,7 @@ test("a save written by the game loads with its learning record intact", () => {
   assert.ok(g.study.environmentObservations!.length >= 1);
 });
 
-test("saving again writes every game field back unchanged", () => {
+test("saving again writes every legacy field back unchanged", () => {
   const original = stripEnvelope(JSON.parse(stored).data);
   const g = recover(decode(JSON.parse(stored).data));
   const written = stripEnvelope(encode(g));

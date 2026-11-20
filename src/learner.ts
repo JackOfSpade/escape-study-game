@@ -1012,7 +1012,7 @@ export function applyLearningAssessment(
     throw Error("No human technical attempt exists");
   if (a.historicalMappings?.length && !technical)
     throw Error(
-      "Historical reconciliation needs a real human technical attempt; NPC completion cannot create one",
+      "Historical reconciliation needs a real human technical attempt; another participant's completion cannot create one",
     );
   if (!technical && (a.visitOutcome === "usable" || a.scopeReviews?.length))
     throw Error(

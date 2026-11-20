@@ -15,7 +15,7 @@ import { curriculumReadiness } from "../src/final-requirements";
 import { eligibleLearning, reconcileGates } from "../src/learner";
 import { parseProbeReply, probeContract } from "../src/knowledge-probe";
 import type { Roadmap } from "../src/model";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 const at = "2026-10-22T16:00:00Z";
 
@@ -78,7 +78,7 @@ test("future development and live questions use only core objectives", () => {
     );
   }
   const s = initialStudy(r, "live");
-  const g = createGame(12, r, s);
+  const g = createRecord(12, r, s);
   const e = Object.values(g.encounters)[0];
   const contract = eligibleLearning(r, s.learner!, at);
   e.problem = {

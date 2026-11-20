@@ -102,7 +102,7 @@ test("reviewed source invalidation withdraws a prior imported pass without learn
   const local = await page.evaluate(
     async ({ initial, excerpt, scope }) => {
       const root = "/src/",
-        g = (window as any).__deadAir.game,
+        g = (window as any).__studyApp.record,
         r = await (await fetch("/curriculum.json")).json();
       g.study.profile = "live";
       const { reconcileRoadmap, adoptReconciledRoadmap } = await import(
@@ -179,7 +179,7 @@ test("reviewed source invalidation withdraws a prior imported pass without learn
       ) +
     candidate.slice(pyEnd);
   const before = await page.evaluate(() =>
-    JSON.stringify((window as any).__deadAir.game.study.learner),
+    JSON.stringify((window as any).__studyApp.record.study.learner),
   );
   await openAgentMenu(page);
   await page.locator("#curriculum-button").click();
@@ -200,12 +200,12 @@ test("reviewed source invalidation withdraws a prior imported pass without learn
   );
   expect(
     await page.evaluate(() =>
-      JSON.stringify((window as any).__deadAir.game.study.learner),
+      JSON.stringify((window as any).__studyApp.record.study.learner),
     ),
   ).toBe(before);
   const canonical = await page.evaluate(
     () =>
-      (window as any).__deadAir.game.study.roadmapReconciliations.at(-1)
+      (window as any).__studyApp.record.study.roadmapReconciliations.at(-1)
         .proposal.canonical,
   );
   expect(canonical).toContain("<!-- ATTEMPT_UPDATE ");
@@ -228,9 +228,9 @@ test("reviewed source invalidation withdraws a prior imported pass without learn
     "adopted and saved",
   );
   await page.reload();
-  await page.waitForFunction(() => !!(window as any).__deadAir);
+  await page.waitForFunction(() => !!(window as any).__studyApp);
   const result = await page.evaluate(() => {
-    const g = (window as any).__deadAir.game;
+    const g = (window as any).__studyApp.record;
     return {
       raw: g.study.roadmapExport.content,
       evidence: g.study.learner.evidence.length,

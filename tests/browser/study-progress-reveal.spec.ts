@@ -5,9 +5,9 @@ async function openStudyQuestion(page: Page) {
   await mockClaudeStudy(page);
   await page.goto("/");
   // The hook appears only after the saved record has loaded.
-  await page.waitForFunction(() => !!(window as any).__deadAir);
+  await page.waitForFunction(() => !!(window as any).__studyApp);
   await page.evaluate(() => {
-    (window as any).__deadAir.game.study.profile = "live";
+    (window as any).__studyApp.record.study.profile = "live";
   });
   await expect(page.locator("#study-workspace")).toBeVisible();
   await page.locator("#study-next").click();
@@ -145,9 +145,9 @@ test("a finished question stays open with a marker in chat, and the map reveal w
   });
   await page.goto("/");
   // The hook appears only after the saved record has loaded.
-  await page.waitForFunction(() => !!(window as any).__deadAir);
+  await page.waitForFunction(() => !!(window as any).__studyApp);
   await page.evaluate(() => {
-    (window as any).__deadAir.game.study.profile = "live";
+    (window as any).__studyApp.record.study.profile = "live";
   });
   await page.locator("#study-next").click();
   await expect(page.locator("#study-terminal-slot #problem")).not.toBeEmpty();

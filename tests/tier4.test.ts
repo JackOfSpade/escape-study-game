@@ -16,7 +16,7 @@ import { scopeKey } from "../src/learning-model";
 import type { Assessment, Encounter, Roadmap } from "../src/model";
 import { decode, encode } from "../src/persistence";
 import { prepareRoadmapExport } from "../src/roadmap-export";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 import { tier4RoadmapFixture } from "./fixtures/tier4-roadmap";
 
 const original: Roadmap = JSON.parse(
@@ -30,7 +30,7 @@ const at = "2026-10-16T16:00:00.000Z";
 function fixture(mode: "test" | "live" = "test") {
   const r = tier4RoadmapFixture(original),
     l = initialLearner(r, mode),
-    g = createGame(7, r);
+    g = createRecord(7, r);
   l.reviews = {};
   for (const t of ["PY", "PE"] as const) l.tracks[t].cleared = 3;
   let serial = 0;

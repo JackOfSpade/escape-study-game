@@ -223,7 +223,7 @@ test("a temporary output directory is refused unless the run is ephemeral", asyn
   assert.match(unsafeOutReason("/var/data/scratchpad/run"), /scratchpad/);
   assert.equal(
     unsafeOutReason(
-      "/Users/example/Library/Application Support/zombie-escape-study-game/ai-test-runs/compare",
+      "/Users/example/Library/Application Support/study-app/ai-test-runs/compare",
     ),
     null,
   );

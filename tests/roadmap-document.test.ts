@@ -12,7 +12,7 @@ import type { Roadmap } from "../src/model";
 import { parseRoadmapDocument } from "../src/roadmap-document";
 import { prepareRoadmapExport, sha256 } from "../src/roadmap-export";
 import { reviewRoadmap } from "../src/roadmap-review";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 const at = "2026-10-16T16:00:00.000Z";
 function next(raw: string) {
@@ -26,7 +26,7 @@ function next(raw: string) {
 }
 function fixture() {
   const l = initialLearner(r),
-    g = createGame(7, r),
+    g = createRecord(7, r),
     e = g.encounters["question-0"],
     contract = eligibleLearning(r, l, at);
   e.problem = {
@@ -373,7 +373,7 @@ test("legacy saved counters preserve PE position only with a verified source off
     await assert.rejects(parseRoadmapDocument(raw, r), /ratio/);
   }
 });
-test("legacy game supplements without exact retention and suspended metadata remain reviewable but cannot silently reset those fields", async () => {
+test("legacy exported supplements without exact retention and suspended metadata remain reviewable but cannot silently reset those fields", async () => {
   const text =
     "\n### 0.12 Game semantic scope and continuation state\n\nLegacy partial source claims, no complete metadata.\n";
   const raw = next(
@@ -384,12 +384,14 @@ test("legacy game supplements without exact retention and suspended metadata rem
   );
   const parsed = await parseRoadmapDocument(raw, r);
   assert.ok(
-    parsed.resume!.issues.some((i) => i.includes("legacy game progress")),
+    parsed.resume!.issues.some((i) => i.includes("legacy exported progress")),
   );
   assert.throws(() => initialLearner(parsed), /needs reconciliation/);
   const report = await reviewRoadmap(r, r.raw, raw);
   assert.equal(report.issues.filter((i) => i.severity === "invalid").length, 0);
-  assert.ok(report.issues.some((i) => /legacy game progress/.test(i.detail)));
+  assert.ok(
+    report.issues.some((i) => /legacy exported progress/.test(i.detail)),
+  );
 });
 test("evidence must cite an assessment task issued on its own track", async () => {
   const row = "| S0004-EV03 | S0004-A02 |";

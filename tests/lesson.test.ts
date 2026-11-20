@@ -15,7 +15,7 @@ import { lessonTree } from "../src/lesson-render";
 import type { LessonStore } from "../src/lesson-store";
 import type { Roadmap, StudyRecord } from "../src/model";
 import { devProblem } from "./helpers/practice-questions";
-import { createPlayableGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 
@@ -54,7 +54,7 @@ const OTHER = { ...LESSON, title: "A different angle" };
 
 /** A study record with an unasked question to hang a problem on. */
 function fixture() {
-  const g = createPlayableGame(1, r, initialStudy(r, "live"));
+  const g = createRecord(1, r, initialStudy(r, "live"));
   const contract = eligible(r, g.study);
   const e = g.encounters["question-0"];
   e.problem = devProblem(Object.assign({ rng: 3 }, g), r, contract);
@@ -263,7 +263,7 @@ test("open gaps are newest first, unresolved only and de-duplicated by facet, de
     openLessonGaps(g).map((x) => x.id),
     ["new", "other", "deeper"],
   );
-  assert.deepEqual(openLessonGaps(createPlayableGame(2, r)), []);
+  assert.deepEqual(openLessonGaps(createRecord(2, r)), []);
 });
 
 test("the lesson payload carries the gap and its source question and nothing private", () => {

@@ -25,7 +25,7 @@ interface StudyCheckpoint {
   sourceRefs: string;
 }
 
-/** Shared requirements for the compact HUD and the detailed workspace map. */
+/** Shared requirements for the compact progress summary and the detailed workspace map. */
 function trackRequirements(
   r: Roadmap,
   s: StudyState,
@@ -42,7 +42,7 @@ function trackRequirements(
   return { live, state, tier, objectives };
 }
 
-/** The HUD needs counts, not a reconstruction of every facet and evidence row. */
+/** The progress summary needs counts, not a reconstruction of every facet and evidence row. */
 export function studyTrackSummary(r: Roadmap, s: StudyState, track: Track) {
   const { live, state, tier, objectives } = trackRequirements(r, s, track);
   return {

@@ -10,16 +10,17 @@ import {
 } from "./run-learning";
 import { readDurable, writeDurable } from "./storage";
 import { briefError, studyEvent } from "./study-events";
+// Storage name kept from an earlier build; renaming it needs a migration
+// (see AGENTS.md).
 const KEY = "dead-air-save-v1";
 interface Envelope {
   schema: 1;
   payload: string;
   checksum: number;
 }
-/** Saves written by the retired game hold more fields than `StudyRecord` declares
- * (floors, survivors, the run design and the rest). They are neither read nor
- * validated: they stay in the parsed object and are written back unchanged,
- * so a save written here still loads in the old build. */
+/** Saves written by earlier builds hold more fields than `StudyRecord` declares
+ * (legacy simulation state). They are neither read nor validated and are
+ * written back unchanged. */
 export function encode(g: StudyRecord) {
   const payload = JSON.stringify(g);
   return JSON.stringify({
@@ -92,7 +93,7 @@ function unpack(raw: string) {
     typeof stored.data !== "string"
   )
     throw Error("Invalid saved checkpoint");
-  return { serial: stored.serial, game: decode(stored.data) };
+  return { serial: stored.serial, record: decode(stored.data) };
 }
 /** Whether the last full save reached the localStorage fallback copy. */
 let mirrorCurrent = true;
@@ -148,6 +149,8 @@ async function storedCopies() {
 /** Preserve the original stored bytes, including a damaged or unreadable copy. */
 export async function exportRecoveryBackup() {
   return JSON.stringify(
+    // The "dead-air-" format name is kept from an earlier build: files already
+    // downloaded carry it.
     { format: "dead-air-recovery-v1", key: KEY, ...(await storedCopies()) },
     null,
     2,
@@ -172,9 +175,9 @@ export async function load() {
   // Starting from that older copy would overwrite unseen learning on save.
   if (durableError || localError)
     throw Error(
-      "Saved checkpoints could not be read. Reload to retry storage access, or export a recovery backup before importing another run.",
+      "Saved checkpoints could not be read. Reload to retry storage access, or export a recovery backup before importing a backup.",
     );
-  const valid: { serial: number; game: StudyRecord }[] = [];
+  const valid: { serial: number; record: StudyRecord }[] = [];
   const refused: RejectedCopy[] = [];
   for (const [store, raw] of [
     ["durable", durable],
@@ -192,13 +195,13 @@ export async function load() {
   if (!valid.length) {
     if (durable !== null || local !== null)
       throw Error(
-        "Saved checkpoints failed integrity checks. Export a recovery backup before starting another run.",
+        "Saved checkpoints failed integrity checks. Export a recovery backup before starting over.",
       );
     return null;
   }
   valid.sort((a, b) => b.serial - a.serial);
   serial = valid[0].serial;
-  return valid[0].game;
+  return valid[0].record;
 }
 export function flushSaves() {
   return checkpoints.flush();

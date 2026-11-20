@@ -18,7 +18,7 @@ test(
   "restart reclaims an owned abandoned socket after an abrupt synthetic child exit",
   { skip: process.platform === "win32" },
   async () => {
-    const dir = mkdtempSync(join(tmpdir(), "game-socket-")),
+    const dir = mkdtempSync(join(tmpdir(), "study-socket-")),
       path = join(dir, "b.sock");
     try {
       const child = spawnSync(process.execPath, [
@@ -42,7 +42,7 @@ test(
   "restart preserves an active socket, ordinary files and symlinks",
   { skip: process.platform === "win32" },
   async () => {
-    const dir = mkdtempSync(join(tmpdir(), "game-socket-")),
+    const dir = mkdtempSync(join(tmpdir(), "study-socket-")),
       path = join(dir, "b.sock");
     const server = createServer((socket) => socket.end());
     try {

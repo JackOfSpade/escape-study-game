@@ -4,7 +4,7 @@ import test from "node:test";
 import { checkBridge, edit, ensureProblem, send } from "../src/ai";
 import { completionVerdict } from "../src/completion-verdict";
 import type { Roadmap } from "../src/model";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 import { devProblem } from "./helpers/practice-questions";
 import { eligible } from "../src/curriculum";
 import type { Encounter, StudyRecord } from "../src/model";
@@ -54,7 +54,7 @@ function issueDev(g: StudyRecord, e: Encounter, roadmap: Roadmap) {
   e.state = "in-progress";
 }
 async function fixture() {
-  const g = createGame(701, roadmap);
+  const g = createRecord(701, roadmap);
   const e = g.encounters["question-0"];
   issueDev(g, e, roadmap);
   await ensureProblem(g, e, roadmap);

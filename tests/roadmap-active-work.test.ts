@@ -20,11 +20,11 @@ import {
 import type { RoadmapReconciliationPayload } from "../src/roadmap-adoption-types";
 import { prepareRoadmapExport } from "../src/roadmap-export";
 import { reviewRoadmap } from "../src/roadmap-review";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 const at = "2026-10-16T16:00:00Z";
 async function fixture(otherUnfinished = false, leaveSourceOpen = false) {
-  const g = createGame(7, r),
+  const g = createRecord(7, r),
     l = g.study.learner!,
     e = g.encounters["question-0"];
   g.study.profile = "live";
@@ -121,12 +121,12 @@ async function fixture(otherUnfinished = false, leaveSourceOpen = false) {
       },
     ],
     rationale:
-      "Synthetic externally completed same-task assessment; preserve the gameplay puzzle",
+      "Synthetic externally completed same-task assessment; preserve the open question",
   });
   return { g, l, e, c, attempt, source, reply, assessment };
 }
 for (const transport of ["study-mode", "chatgpt-handoff"] as const)
-  test(`explicit external resolution through ${transport} preserves the exact playable puzzle and draft, closes only the settled session and imports no duplicate game visit`, async () => {
+  test(`explicit external resolution through ${transport} preserves the exact open question and draft, closes only the settled session and imports no duplicate app visit`, async () => {
     const f = await fixture(),
       before = JSON.stringify(f.e);
     await reconcileRoadmap(

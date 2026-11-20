@@ -36,7 +36,11 @@ export interface EnvironmentObservation {
     receipt: ExecutionReceipt;
     humanArtifactReferences: number[];
     historyReferences: Pick<Artifact, "seq" | "author" | "kind" | "revision">[];
-    authorshipAndAssistance: "unassessed; full attributed work and tutor history remain in the game backup";
+    /** New captures write the first form; observations captured by earlier
+     * builds carry the second, and stored observations are never rewritten. */
+    authorshipAndAssistance:
+      | "unassessed; full attributed work and tutor history remain in the full backup"
+      | "unassessed; full attributed work and tutor history remain in the game backup";
   };
 }
 interface EnvironmentObservationInput {
@@ -187,7 +191,7 @@ export async function recordEnvironmentObservation(
       humanArtifactReferences: [...job.artifactSequences],
       historyReferences,
       authorshipAndAssistance:
-        "unassessed; full attributed work and tutor history remain in the game backup",
+        "unassessed; full attributed work and tutor history remain in the full backup",
     };
   }
   const suppliedOutput = value.suppliedOutput

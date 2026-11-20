@@ -72,7 +72,7 @@ for (const scenario of [
       at = block.indexOf("### 0.6 Facet gaps");
       block =
         block.slice(0, at) +
-        "| S0007-A98 | S0007 / 2026-10-16 | T01 changed-context assessment | COMPLETED; source-recorded independent transfer | S0007-EV98 | Synthetic task, not a game visit |\n\n" +
+        "| S0007-A98 | S0007 / 2026-10-16 | T01 changed-context assessment | COMPLETED; source-recorded independent transfer | S0007-EV98 | Synthetic task, not an app visit |\n\n" +
         block.slice(at);
       block = block.replace(
         "| T01 | U | — | U | — |",
@@ -181,7 +181,7 @@ for (const scenario of [
     await seedQuestions(page);
     // Roadmap menus are view-independent; headless WebGL is software-rendered.
     const before = await page.evaluate(() => {
-      const g = (window as any).__deadAir.game;
+      const g = (window as any).__studyApp.record;
       g.study.profile = "live";
       g.encounters["question-0"].code = "private draft must survive adoption";
       return JSON.stringify(g.study.learner);
@@ -206,7 +206,7 @@ for (const scenario of [
       ).toBeVisible();
       expect(calls).toBe(1);
       await page.reload();
-      await page.waitForFunction(() => !!(window as any).__deadAir);
+      await page.waitForFunction(() => !!(window as any).__studyApp);
       await openAgentMenu(page);
       await page.locator("#curriculum-button").click();
       await page
@@ -217,7 +217,7 @@ for (const scenario of [
     if (scenario === "interrupted") {
       const interruptedRelease = release;
       await page.reload();
-      await page.waitForFunction(() => !!(window as any).__deadAir);
+      await page.waitForFunction(() => !!(window as any).__studyApp);
       interruptedRelease();
       await openAgentMenu(page);
       await page.locator("#curriculum-button").click();
@@ -259,7 +259,7 @@ for (const scenario of [
     ).toBeVisible();
     const expectedCanonical = await page.evaluate(
       () =>
-        (window as any).__deadAir.game.study.roadmapReconciliations.at(-1)
+        (window as any).__studyApp.record.study.roadmapReconciliations.at(-1)
           .proposal.canonical,
     );
     if (scenario === "historical update") {
@@ -272,7 +272,7 @@ for (const scenario of [
       expect(payloads[1]).toEqual(payloads[0]);
     expect(
       await page.evaluate(() =>
-        JSON.stringify((window as any).__deadAir.game.study.learner),
+        JSON.stringify((window as any).__studyApp.record.study.learner),
       ),
     ).toBe(before);
     await expect(page.locator("#roadmap-adoption-controls img")).toHaveCount(0);
@@ -301,10 +301,10 @@ for (const scenario of [
     ).toBe(expectedCanonical);
     if (scenario === "stale") {
       await page.evaluate(() => {
-        (window as any).__deadAir.game.study.learner.version++;
+        (window as any).__studyApp.record.study.learner.version++;
       });
       const changed = await page.evaluate(() =>
-        JSON.stringify((window as any).__deadAir.game.study.learner),
+        JSON.stringify((window as any).__studyApp.record.study.learner),
       );
       await page
         .getByRole("button", { name: "Adopt reviewed roadmap", exact: true })
@@ -314,13 +314,13 @@ for (const scenario of [
       );
       expect(
         await page.evaluate(() =>
-          JSON.stringify((window as any).__deadAir.game.study.learner),
+          JSON.stringify((window as any).__studyApp.record.study.learner),
         ),
       ).toBe(changed);
       expect(
         await page.evaluate(
           () =>
-            (window as any).__deadAir.game.study.roadmapAdoptionBackups
+            (window as any).__studyApp.record.study.roadmapAdoptionBackups
               ?.length ?? 0,
         ),
       ).toBe(0);
@@ -358,7 +358,7 @@ for (const scenario of [
         : "local save failed",
     );
     const result = await page.evaluate(() => {
-      const g = (window as any).__deadAir.game;
+      const g = (window as any).__studyApp.record;
       return {
         content: g.study.roadmapExport.content,
         backups: g.study.roadmapAdoptionBackups.length,
@@ -376,29 +376,30 @@ for (const scenario of [
     });
     if (scenario === "storage failure") {
       await expect(page.locator("#roadmap-adoption-status")).toContainText(
-        "full evidence/run backup",
+        "full evidence backup",
       );
       await page.evaluate(async () => {
         (window as any).restoreAdoptionStorage();
         const root = "/src/";
         await (
           await import(root + "persistence.ts")
-        ).save((window as any).__deadAir.game);
+        ).save((window as any).__studyApp.record);
       });
     }
     await page.reload();
-    await page.waitForFunction(() => !!(window as any).__deadAir);
+    await page.waitForFunction(() => !!(window as any).__studyApp);
     expect(
       await page.evaluate(
-        () => (window as any).__deadAir.game.study.roadmapExport.content,
+        () => (window as any).__studyApp.record.study.roadmapExport.content,
       ),
     ).toBe(expectedCanonical);
     if (scenario === "manual transfer")
       expect(
         await page.evaluate(
           () =>
-            (window as any).__deadAir.game.study.learner.finalProgress["PY:T01"]
-              .status,
+            (window as any).__studyApp.record.study.learner.finalProgress[
+              "PY:T01"
+            ].status,
         ),
       ).toBe("P");
     await openAgentMenu(page);

@@ -57,9 +57,8 @@ for (const removed of [0, 1])
     await page.evaluate(async (saved) => {
       const root = "/src/",
         { decode, save } = await import(root + "persistence.ts");
-      const current = (window as any).__deadAir.game;
+      const current = (window as any).__studyApp.record;
       Object.assign(current, decode(saved));
-      current.status = "playing";
       await save(current);
     }, encode(g));
     await page.reload();
@@ -86,14 +85,14 @@ for (const removed of [0, 1])
     expect(
       await page.evaluate(
         (scope) =>
-          (window as any).__deadAir.game.study.learner.reviews[scope]
+          (window as any).__studyApp.record.study.learner.reviews[scope]
             .verifiedReviews,
         laterScope,
       ),
     ).toBe(2);
     const proposed = await page.evaluate(
       () =>
-        (window as any).__deadAir.game.study.roadmapReconciliations.at(-1)
+        (window as any).__studyApp.record.study.roadmapReconciliations.at(-1)
           .proposal.canonical,
     );
     const downloaded = page.waitForEvent("download");
@@ -110,7 +109,7 @@ for (const removed of [0, 1])
       .poll(() =>
         page.evaluate(
           (scope) =>
-            (window as any).__deadAir.game.study.learner.reviews[scope]
+            (window as any).__studyApp.record.study.learner.reviews[scope]
               .verifiedReviews,
           laterScope,
         ),
@@ -120,9 +119,9 @@ for (const removed of [0, 1])
       "adopted and saved",
     );
     await page.reload();
-    await page.waitForFunction(() => !!(window as any).__deadAir);
+    await page.waitForFunction(() => !!(window as any).__studyApp);
     const saved = await page.evaluate((scope) => {
-      const s = (window as any).__deadAir.game.study;
+      const s = (window as any).__studyApp.record.study;
       return {
         review: s.learner.reviews[scope],
         history: s.learner.retentionHistory.filter(

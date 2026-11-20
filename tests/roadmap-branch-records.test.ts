@@ -19,7 +19,7 @@ import {
   readIdentifierCounters,
 } from "../src/roadmap-identifiers";
 import { inspectMergedDocument } from "../src/roadmap-structure";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 const attempt =
   "| S0007-A98 | S0007 / 2026-10-16 | T02.1 D1 branch-local task | PENDING; no inference | — | Synthetic allocated task, not a visit |";
@@ -60,7 +60,7 @@ function reply(p: RoadmapReconciliationPayload): RoadmapReconciliation {
   };
 }
 async function setup() {
-  const g = createGame(7, r);
+  const g = createRecord(7, r);
   g.study.profile = "live";
   let raw = revision(r.raw, r.sourceHash, 10);
   const start = raw.indexOf("<!-- BEGIN PE_PROGRESS -->"),
@@ -82,7 +82,7 @@ async function setup() {
   return g;
 }
 async function branch(
-  g: ReturnType<typeof createGame>,
+  g: ReturnType<typeof createRecord>,
   mutate?: (
     p: RoadmapReconciliation,
     ctx: RoadmapReconciliationPayload,

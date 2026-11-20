@@ -6,7 +6,7 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      input: { game: "index.html" },
+      input: { main: "index.html" },
       output: {
         // Cache dependencies separately from frequently changed app code.
         manualChunks: (id) =>

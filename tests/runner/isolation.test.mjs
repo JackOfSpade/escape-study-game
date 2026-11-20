@@ -147,7 +147,7 @@ test("a missing configured image stays unavailable and never executes on the hos
     {
       env: {
         ...process.env,
-        CODE_RUNNER_NODE_IMAGE: `dead-air-nonexistent-${randomUUID()}:fixture`,
+        CODE_RUNNER_NODE_IMAGE: `study-nonexistent-${randomUUID()}:fixture`,
       },
       timeout: 10000,
     },

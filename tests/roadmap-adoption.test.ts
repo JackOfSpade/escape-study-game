@@ -23,10 +23,10 @@ import type {
 } from "../src/roadmap-adoption-types";
 import { prepareRoadmapExport, sha256 } from "../src/roadmap-export";
 import { presentRoadmapReview } from "../src/roadmap-exposure";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 function fixture() {
-  const g = createGame(7, r);
+  const g = createRecord(7, r);
   g.study.profile = "live";
   return { g, l: g.study.learner! };
 }
@@ -560,7 +560,7 @@ for (const provider of ["study-mode", "chatgpt-handoff"] as const)
       e = restored.encounters["question-0"],
       c = eligibleLearning(r, ledger, "2026-10-16T16:00:00Z");
     e.problem = {
-      title: "Synthetic new actual game study",
+      title: "Synthetic new actual app study",
       prompt: "Fixture",
       rubric: [],
       starter: "",

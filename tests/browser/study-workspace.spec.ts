@@ -26,9 +26,9 @@ test("tier skill map shows connected topic nodes vertically and marks the curren
   const requiredTopicKeys = await page.evaluate(async () => {
     const source = "/src/study-progress.ts";
     const { studyTrackProgress } = await import(/* @vite-ignore */ source);
-    const d = (window as any).__deadAir;
+    const d = (window as any).__studyApp;
     return (["PY", "PE"] as const).flatMap((track) =>
-      studyTrackProgress(d.roadmap, d.game.study, track).topics.map(
+      studyTrackProgress(d.roadmap, d.record.study, track).topics.map(
         (topic: { id: string }) => `${track}:${topic.id}`,
       ),
     );
@@ -154,11 +154,11 @@ test("tier skill map shows connected topic nodes vertically and marks the curren
   // verified credit in the live learner ledger, not an assessment or a real
   // learner save.
   await page.evaluate(() => {
-    const d = (window as any).__deadAir;
+    const d = (window as any).__studyApp;
     const objective = d.roadmap.tracks.PY.objectives.find(
-      (o: any) => d.game.study.learner.cells[o.id].states[0] !== "P",
+      (o: any) => d.record.study.learner.cells[o.id].states[0] !== "P",
     );
-    d.game.study.learner.cells[objective.id].states[0] = "P";
+    d.record.study.learner.cells[objective.id].states[0] = "P";
   });
   await expect(root).toContainText("8 of 131");
   await expect.poll(() => scroll.evaluate((el) => el.scrollTop)).toBe(120);
@@ -200,7 +200,7 @@ test("the study terminal takes the wide workspace while the map keeps its readin
   await page.goto("/");
   await page.setViewportSize({ width: 2000, height: 1100 });
   await page.evaluate(() => {
-    (window as any).__deadAir.game.study.profile = "live";
+    (window as any).__studyApp.record.study.profile = "live";
   });
   // The map gives way to the open question, so it is measured first.
   const map = await page.locator(".study-skill-map").boundingBox();

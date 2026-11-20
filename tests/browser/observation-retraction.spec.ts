@@ -67,15 +67,14 @@ for (const outcome of ["assisted", "contradicted"] as const) {
     await page.evaluate(async (saved) => {
       const root = "/src/",
         { save, decode } = await import(root + "persistence.ts");
-      const current = (window as any).__deadAir.game;
+      const current = (window as any).__studyApp.record;
       Object.assign(current, decode(saved));
-      current.status = "playing";
       await save(current);
     }, encode(g));
     await page.reload();
-    await page.waitForFunction(() => !!(window as any).__deadAir);
+    await page.waitForFunction(() => !!(window as any).__studyApp);
     const before = await page.evaluate(() =>
-      JSON.stringify((window as any).__deadAir.game.study.learner),
+      JSON.stringify((window as any).__studyApp.record.study.learner),
     );
     await openAgentMenu(page);
     await page.locator("#curriculum-button").click();
@@ -99,12 +98,12 @@ for (const outcome of ["assisted", "contradicted"] as const) {
     );
     expect(
       await page.evaluate(() =>
-        JSON.stringify((window as any).__deadAir.game.study.learner),
+        JSON.stringify((window as any).__studyApp.record.study.learner),
       ),
     ).toBe(before);
     const canonical = await page.evaluate(
       () =>
-        (window as any).__deadAir.game.study.roadmapReconciliations.at(-1)
+        (window as any).__studyApp.record.study.roadmapReconciliations.at(-1)
           .proposal.canonical,
     );
     const download = page.waitForEvent("download");
@@ -127,9 +126,9 @@ for (const outcome of ["assisted", "contradicted"] as const) {
       "adopted and saved",
     );
     await page.reload();
-    await page.waitForFunction(() => !!(window as any).__deadAir);
+    await page.waitForFunction(() => !!(window as any).__studyApp);
     const result = await page.evaluate(() => {
-      const g = (window as any).__deadAir.game,
+      const g = (window as any).__studyApp.record,
         l = g.study.learner;
       return {
         status: l.finalProgress["PY:T01"].status,

@@ -1,4 +1,4 @@
-/** One display preference for the interface and the canvas camera. Old saves
+/** One display preference for the interface. Old saves
  * have no value; imported preferences must stay within the slider's bounds. */
 export function displayScale(value: unknown) {
   return typeof value === "number" && Number.isFinite(value)

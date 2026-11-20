@@ -10,7 +10,7 @@ import {
 } from "../src/roadmap-adoption";
 import { prepareRoadmapExport, sha256 } from "../src/roadmap-export";
 import { inspectMergedDocument } from "../src/roadmap-structure";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 import {
   baselineFixture,
   setCheckpointStatus,
@@ -27,7 +27,7 @@ import {
 
 for (const observedAt of ["2026-10-17T08:00:00Z", "2026-10-17T17:00:00Z", null])
   test(`delayed grading uses actual observation time rather than response arrival: ${observedAt}`, () => {
-    const g = createGame(73, r);
+    const g = createRecord(73, r);
     g.study.profile = "live";
     const l = g.study.learner!,
       review = l.reviews[laterScope];

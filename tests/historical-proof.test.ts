@@ -16,13 +16,13 @@ import {
 import type { Assessment, Roadmap } from "../src/model";
 import { decode, encode } from "../src/persistence";
 import { prepareRoadmapExport } from "../src/roadmap-export";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 const at = "2026-10-16T16:00:00.000Z";
 function fixture(id = "PY:T07.1", mode: "test" | "live" = "test") {
   const l = initialLearner(r, mode),
-    g = createGame(7, r);
+    g = createRecord(7, r);
   const track = id.startsWith("PY:") ? "PY" : "PE",
     topic = id.split(":")[1].split(".")[0];
   const priorReview = l.reviews[`${id}/D1`];
@@ -305,7 +305,7 @@ test("reconstructing an omitted source review keeps its original date instead of
   assert.equal(f.l.evidence.length, 0);
 });
 
-test("NPC-only completion cannot create a human attempt to authorize historical reconciliation", () => {
+test("Non-learner-only completion cannot create a human attempt to authorize historical reconciliation", () => {
   const f = fixture(),
     e = f.issue();
   f.l.attempts = [];

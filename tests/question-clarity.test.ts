@@ -12,7 +12,7 @@ import {
   TERMINAL_DIALOGUE_INSTRUCTION,
 } from "../src/knowledge-probe";
 import type { Problem, Roadmap } from "../src/model";
-import { createPlayableGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 import { QUESTION_ADAPTATION_GUIDANCE } from "../scripts/lib/study-question-policy.mjs";
 
 const roadmap: Roadmap = JSON.parse(
@@ -50,7 +50,7 @@ test("a clarification-only terminal turn receives the clarity policy and preserv
   };
   try {
     await checkBridge();
-    const g = createPlayableGame(20261020, roadmap);
+    const g = createRecord(20261020, roadmap);
     const e = g.encounters["question-0"];
     e.mode = "solo";
     e.owner = "human";

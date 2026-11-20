@@ -315,7 +315,7 @@ test("reading, answering and chatting leave the saved record untouched and live 
   expect(await savedRecord(page)).toBe(before);
   // The gap is still open: nothing here closes it.
   const open = await page.evaluate(() =>
-    (window as any).__deadAir.game.study.knowledgeGaps.filter(
+    (window as any).__studyApp.record.study.knowledgeGaps.filter(
       (g: any) => !g.resolved,
     ),
   );
@@ -418,7 +418,7 @@ test("Escape and Back close the lesson and return to the question", async ({
   await expect(page.locator("#study-lesson-slot")).toBeHidden();
   await expect(page.locator("#terminal")).toBeVisible();
   // The menu did not open in its place.
-  await expect(page.locator("#pause-menu")).not.toHaveAttribute("open", "");
+  await expect(page.locator("#menu")).not.toHaveAttribute("open", "");
   await expect(page.locator("#lesson-offers button")).toBeFocused();
   await page.locator("#lesson-offers button").click();
   await expect(page.locator("#study-lesson-slot")).toBeVisible();
@@ -427,7 +427,7 @@ test("Escape and Back close the lesson and return to the question", async ({
   await expect(page.locator("#terminal")).toBeVisible();
   // With no lesson open, Escape opens the menu as before.
   await page.keyboard.press("Escape");
-  await expect(page.locator("#pause-menu")).toHaveAttribute("open", "");
+  await expect(page.locator("#menu")).toHaveAttribute("open", "");
 });
 
 test("after a reload the lesson is still there, read from its own database", async ({
@@ -445,7 +445,7 @@ test("after a reload the lesson is still there, read from its own database", asy
   await page.locator("#lesson-close").click();
   await flushStudySave(page);
   await page.reload();
-  await page.waitForFunction(() => !!(window as any).__deadAir);
+  await page.waitForFunction(() => !!(window as any).__studyApp);
   const list = page.locator("#study-gaps");
   await expect(list).toBeVisible();
   await expect(list.locator("summary")).toContainText("Gaps to study (1)");
@@ -465,8 +465,8 @@ test("after a reload the lesson is still there, read from its own database", asy
 });
 
 /** Reads a value from the live record in the page. */
-const gameState = <T>(page: Page, fn: (game: any) => T) =>
-  page.evaluate(`(${fn.toString()})(window.__deadAir.game)`) as Promise<T>;
+const recordState = <T>(page: Page, fn: (record: any) => T) =>
+  page.evaluate(`(${fn.toString()})(window.__studyApp.record)`) as Promise<T>;
 
 /** Ask the app to look at the bridge now instead of at its next poll. */
 const recheckBridge = (page: Page) =>
@@ -487,9 +487,9 @@ test("Test me on this closes the lesson and opens a practice question on the gap
   await page.locator("#lesson-test").click();
   await expect(page.locator("#study-lesson-slot")).toBeHidden();
   await expect(page.locator("#terminal")).toBeVisible();
-  const practice = await gameState(
+  const practice = await recordState(
     page,
-    (game) => game.lastStudyEncounter as string,
+    (record) => record.lastStudyEncounter as string,
   );
   expect(practice).not.toBe(first);
   await expect.poll(() => study.generateCalls().length).toBe(2);
@@ -514,15 +514,15 @@ test("a practice question survives a reload as the open question", async ({
   await page.locator("#lesson-offers button").click();
   await expect(page.locator("#lesson-body .lesson-section")).not.toHaveCount(0);
   await page.locator("#lesson-test").click();
-  const practice = await gameState(
+  const practice = await recordState(
     page,
-    (game) => game.lastStudyEncounter as string,
+    (record) => record.lastStudyEncounter as string,
   );
   // Generated, then saved.
   await expect
     .poll(() =>
       page.evaluate(
-        (id) => !!(window as any).__deadAir.game.encounters[id].problem,
+        (id) => !!(window as any).__studyApp.record.encounters[id].problem,
         practice,
       ),
     )
@@ -551,13 +551,13 @@ test("a practice question survives a reload as the open question", async ({
     .toBe(true);
   const generated = study.generateCalls().length;
   await page.reload();
-  await page.waitForFunction(() => !!(window as any).__deadAir);
+  await page.waitForFunction(() => !!(window as any).__studyApp);
   await expect(page.locator("#terminal")).toBeVisible();
   await expect(page.locator("#terminal-provenance")).toContainText(
     "Practice question",
   );
   expect(
-    await gameState(page, (game) => game.lastStudyEncounter as string),
+    await recordState(page, (record) => record.lastStudyEncounter as string),
   ).toBe(practice);
   expect(study.generateCalls()).toHaveLength(generated);
 });
@@ -595,14 +595,14 @@ test("a lesson on a topic with an unfinished question is blocked and asks for no
   // A second, unfinished question on the same objectives, added to the live
   // record the way a learner would have one after another visit began.
   await page.evaluate(() => {
-    const game = (window as any).__deadAir.game;
-    const done = Object.values<any>(game.encounters).find(
+    const record = (window as any).__studyApp.record;
+    const done = Object.values<any>(record.encounters).find(
       (e) => e.state === "consumed",
     );
     const other = structuredClone(done);
     other.id = "study-unfinished";
     other.state = "in-progress";
-    game.encounters[other.id] = other;
+    record.encounters[other.id] = other;
   });
   const before = study.lessonCalls().length;
   await page.locator("#study-map-peek").click();
@@ -659,9 +659,9 @@ test("the chat draft belongs to its gap", async ({ page }) => {
   await finishWithGap(page, study);
   // A second gap recorded by the same question.
   await page.evaluate(() => {
-    const game = (window as any).__deadAir.game;
-    const first = game.study.knowledgeGaps[0];
-    game.study.knowledgeGaps.push({
+    const record = (window as any).__studyApp.record;
+    const first = record.study.knowledgeGaps[0];
+    record.study.knowledgeGaps.push({
       ...structuredClone(first),
       id: `${first.id}-second`,
       facet: { id: "other", description: "A second idea" },
@@ -717,7 +717,7 @@ test("closing a lesson opened from the map's list returns focus to that gap's bu
   await page.locator("#lesson-close").click();
   await flushStudySave(page);
   await page.reload();
-  await page.waitForFunction(() => !!(window as any).__deadAir);
+  await page.waitForFunction(() => !!(window as any).__studyApp);
   const list = page.locator("#study-gaps");
   await list.locator("summary").click();
   await list.locator("button").click();

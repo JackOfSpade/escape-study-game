@@ -35,8 +35,8 @@ export async function executeCode(input) {
   if (active) throw Error("Runner busy; retry when the current run finishes");
   active = true;
   const id = randomUUID(),
-    name = `dead-air-code-${id}`,
-    marker = `DEAD_AIR_INTERPRETER_${id}`;
+    name = `study-code-${id}`,
+    marker = `STUDY_INTERPRETER_${id}`;
   const startedAt = new Date().toISOString(),
     start = performance.now();
   let imageId;

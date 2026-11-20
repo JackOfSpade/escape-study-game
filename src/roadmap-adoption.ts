@@ -1106,7 +1106,7 @@ export function reconcileRoadmap(
   return task;
 }
 /** Synchronous publication after optimistic revalidation. Storage writes the
- * complete game snapshot atomically; a storage failure leaves an explicit,
+ * complete study record snapshot atomically; a storage failure leaves an explicit,
  * downloadable in-memory adoption rather than reverting later human work. */
 export async function adoptReconciledRoadmap(
   g: StudyRecord,

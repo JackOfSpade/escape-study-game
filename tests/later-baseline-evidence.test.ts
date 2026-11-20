@@ -12,7 +12,7 @@ import {
   reconcileRoadmap,
 } from "../src/roadmap-adoption";
 import { prepareRoadmapExport } from "../src/roadmap-export";
-import { createGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 import {
   baselineFixture,
   roadmap as r,
@@ -104,7 +104,7 @@ for (const outcome of ["independent", "contradicted", "assisted"] as const)
   });
 
 test("an older baseline correction preserves both a verified retention pass and a subsequently observed failure", async () => {
-  const g = createGame(92, r);
+  const g = createRecord(92, r);
   g.study.profile = "live";
   gradeScheduled(g, "independent", laterAt, 0);
   const l = g.study.learner!;

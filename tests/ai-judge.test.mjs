@@ -186,7 +186,7 @@ test("invalid rows are recorded without calling the judge", async (t) => {
   );
   const request = completer.calls[0];
   assert.equal(request.route, "deepseek-flash");
-  assert.equal(request.caller, "zombie-ai-judge");
+  assert.equal(request.caller, "study-ai-judge");
   assert.equal(request.tag, "judge");
   assert.equal(typeof request.maxTokens, "number");
   assert.equal(request.messages[0].content, JUDGE_SYSTEM);

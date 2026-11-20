@@ -36,15 +36,12 @@ test("correcting an older original score retains an actually recorded later pass
   await page.evaluate(async (raw) => {
     const root = "/src/",
       { decode, save } = await import(root + "persistence.ts"),
-      current = (window as any).__deadAir.game;
+      current = (window as any).__studyApp.record;
     Object.assign(current, decode(raw));
-    current.status = "playing";
-    current.nextSpawn = Number.MAX_SAFE_INTEGER;
-    current.zombies = [];
     await save(current);
   }, encode(g));
   await page.reload();
-  await page.waitForFunction(() => !!(window as any).__deadAir);
+  await page.waitForFunction(() => !!(window as any).__studyApp);
   await openAgentMenu(page);
   await page.locator("#curriculum-button").click();
   await page.getByText("Review an updated roadmap", { exact: true }).click();
@@ -65,7 +62,7 @@ test("correcting an older original score retains an actually recorded later pass
   expect(
     await page.evaluate(
       () =>
-        (window as any).__deadAir.game.study.learner.reviews["PY:T05.2/D1"]
+        (window as any).__studyApp.record.study.learner.reviews["PY:T05.2/D1"]
           .verifiedReviews,
     ),
   ).toBe(1);
@@ -78,9 +75,9 @@ test("correcting an older original score retains an actually recorded later pass
     "adopted and saved",
   );
   await page.reload();
-  await page.waitForFunction(() => !!(window as any).__deadAir);
+  await page.waitForFunction(() => !!(window as any).__studyApp);
   const after = await page.evaluate(() => {
-    const l = (window as any).__deadAir.game.study.learner;
+    const l = (window as any).__studyApp.record.study.learner;
     return {
       state: l.cells["PY:T05.2"].states[0],
       reviews: l.reviews,

@@ -20,7 +20,7 @@ import {
 } from "../src/learner";
 import type { Assessment, Encounter, Roadmap } from "../src/model";
 import { decode, encode, recover } from "../src/persistence";
-import { createPlayableGame } from "./helpers/record";
+import { createRecord } from "./helpers/record";
 import { devProblem, preparePracticeRooms } from "./helpers/practice-questions";
 import {
   enterStudyWorkspace,
@@ -34,7 +34,7 @@ import {
 const r: Roadmap = JSON.parse(readFileSync("public/curriculum.json", "utf8"));
 
 test("entering the study workspace marks it enabled once and keeps what the save held", () => {
-  const g = createPlayableGame(121, r);
+  const g = createRecord(121, r);
   g.studyWorkspace = { enabled: false, encounter: "question-0" };
   enterStudyWorkspace(g);
   assert.deepEqual(g.studyWorkspace, {
@@ -47,7 +47,7 @@ test("entering the study workspace marks it enabled once and keeps what the save
 });
 
 test("standalone questions use the formal scheduler and complete once", async () => {
-  const g = createPlayableGame(122, r);
+  const g = createRecord(122, r);
   preparePracticeRooms(g, r);
   const contract = eligible(r, g.study);
   enterStudyWorkspace(g);
@@ -73,14 +73,14 @@ test("standalone questions use the formal scheduler and complete once", async ()
 });
 
 test("workspace reuses an issued question and ignores work owned by someone else", () => {
-  const g = createPlayableGame(123, r);
+  const g = createRecord(123, r);
   preparePracticeRooms(g, r);
-  const npc = Object.values(g.encounters)[0];
-  npc.owner = "someone-else";
-  npc.pendingGeneration = { requestId: "npc-only", payload: {} };
+  const foreign = Object.values(g.encounters)[0];
+  foreign.owner = "someone-else";
+  foreign.pendingGeneration = { requestId: "foreign-only", payload: {} };
   enterStudyWorkspace(g);
   const e = nextWorkspaceQuestion(g, r);
-  assert.notEqual(e, npc);
+  assert.notEqual(e, foreign);
   e.state = "consumed";
   const issued = Object.values(g.encounters)[1];
   issued.problemPresentedSequence = 17;
@@ -102,7 +102,7 @@ test("workspace reuses an issued question and ignores work owned by someone else
 });
 
 test("workspace keeps the selected human question when other displayed tasks precede it", () => {
-  const g = createPlayableGame(127, r);
+  const g = createRecord(127, r);
   preparePracticeRooms(g, r);
   enterStudyWorkspace(g);
   const [earlier, selected] = Object.values(g.encounters);
@@ -115,19 +115,19 @@ test("workspace keeps the selected human question when other displayed tasks pre
 });
 
 test("consumed generation and displayed work owned by someone else cannot block a new study question", () => {
-  const g = createPlayableGame(128, r);
+  const g = createRecord(128, r);
   preparePracticeRooms(g, r);
   enterStudyWorkspace(g);
   const consumed = nextWorkspaceQuestion(g, r);
   consumed.state = "consumed";
   consumed.pendingGeneration = { requestId: "stale-generation", payload: {} };
-  const npc = Object.values(g.encounters).find((e) => !e.studyOnly)!;
-  npc.owner = "npc-only";
-  npc.problemPresentedSequence = 1;
+  const foreign = Object.values(g.encounters).find((e) => !e.studyOnly)!;
+  foreign.owner = "someone-else";
+  foreign.problemPresentedSequence = 1;
   assert.equal(workspaceQuestion(g), undefined);
   const next = nextWorkspaceQuestion(g, r);
   assert.notEqual(next, consumed);
-  assert.notEqual(next, npc);
+  assert.notEqual(next, foreign);
 });
 
 test("live study-only generation receives the exact formal contract", async () => {
@@ -165,7 +165,7 @@ test("live study-only generation receives the exact formal contract", async () =
   };
   try {
     await checkBridge();
-    const g = createPlayableGame(126, r, initialStudy(r, "live"));
+    const g = createRecord(126, r, initialStudy(r, "live"));
     enterStudyWorkspace(g);
     const formal = eligible(r, g.study);
     const e = nextWorkspaceQuestion(g, r);
@@ -183,7 +183,7 @@ test("live study-only generation receives the exact formal contract", async () =
 });
 
 test("next live question waits for its source-bound progress review, while unrelated historical reviews do not block it", () => {
-  const g = createPlayableGame(124, r, initialStudy(r, "live"));
+  const g = createRecord(124, r, initialStudy(r, "live"));
   enterStudyWorkspace(g);
   const e = nextWorkspaceQuestion(g, r);
   e.state = "consumed";
@@ -213,7 +213,7 @@ test("next live question waits for its source-bound progress review, while unrel
 });
 
 test("workspace reviews stay bound to their record when question IDs are reused", () => {
-  const g = createPlayableGame(129, r, initialStudy(r, "live"));
+  const g = createRecord(129, r, initialStudy(r, "live"));
   enterStudyWorkspace(g);
   const current = nextWorkspaceQuestion(g, r);
   current.state = "consumed";
@@ -244,7 +244,7 @@ test("workspace reviews stay bound to their record when question IDs are reused"
 });
 
 test("a completed unresolved visit becomes a linked continuation without blocking the owed track", () => {
-  const g = createPlayableGame(131, r, initialStudy(r, "live"));
+  const g = createRecord(131, r, initialStudy(r, "live"));
   g.study.learner!.reviews = {};
   g.study.learner!.studyTurnPosition = 0;
   enterStudyWorkspace(g);
@@ -342,7 +342,7 @@ test("a completed unresolved visit becomes a linked continuation without blockin
 });
 
 test("skill map stays stable across an unissued question and escapes learner-facing content", () => {
-  const g = createPlayableGame(125, r);
+  const g = createRecord(125, r);
   preparePracticeRooms(g, r);
   const before = workspaceProgressHtml(g, r);
   enterStudyWorkspace(g);
@@ -359,7 +359,7 @@ test("skill map stays stable across an unissued question and escapes learner-fac
 });
 
 test("regenerating a workspace question keeps its topic and leaves progress untouched", () => {
-  const g = createPlayableGame(124, r);
+  const g = createRecord(124, r);
   g.study.learner ??= initialLearner(r);
   const contract = eligible(r, g.study);
   enterStudyWorkspace(g);

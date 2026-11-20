@@ -2,13 +2,13 @@ import { openAgentMenu, openApp } from "./helpers/agent-menu";
 // Actual UI, controlled source judgment; no real learner data is corrected.
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
-import { createGame } from "../helpers/record";
+import { createRecord } from "../helpers/record";
 import { baselineFixture, roadmap as r } from "../helpers/baseline-correction";
 
 test("original checkpoint correction exposes complete historical review before adoption and survives reload", async ({
   page,
 }) => {
-  const synthetic = createGame(7, r);
+  const synthetic = createRecord(7, r);
   synthetic.study.profile = "live";
   const fixture = await baselineFixture(synthetic);
   await page.route("**/api/status", (route) =>
@@ -42,11 +42,11 @@ test("original checkpoint correction exposes complete historical review before a
   await page.goto("/");
   await openApp(page);
   await page.evaluate(() => {
-    const g = (window as any).__deadAir.game;
+    const g = (window as any).__studyApp.record;
     g.study.profile = "live";
   });
   const before = await page.evaluate(() =>
-    JSON.stringify((window as any).__deadAir.game.study.learner),
+    JSON.stringify((window as any).__studyApp.record.study.learner),
   );
   await openAgentMenu(page);
   await page.locator("#curriculum-button").click();
@@ -68,7 +68,7 @@ test("original checkpoint correction exposes complete historical review before a
   ).toHaveCount(0);
   expect(
     await page.evaluate(() =>
-      JSON.stringify((window as any).__deadAir.game.study.learner),
+      JSON.stringify((window as any).__studyApp.record.study.learner),
     ),
   ).toBe(before);
   await page
@@ -87,13 +87,13 @@ test("original checkpoint correction exposes complete historical review before a
   await expect(controls).toContainText(fixture.decisionId);
   expect(
     await page.evaluate(() =>
-      JSON.stringify((window as any).__deadAir.game.study.learner),
+      JSON.stringify((window as any).__studyApp.record.study.learner),
     ),
   ).toBe(before);
   expect(requests).toBe(2);
   const canonical = await page.evaluate(
     () =>
-      (window as any).__deadAir.game.study.roadmapReconciliations.at(-1)
+      (window as any).__studyApp.record.study.roadmapReconciliations.at(-1)
         .proposal.canonical,
   );
   expect(canonical).toContain(fixture.history.evidenceRows[0]);
@@ -115,9 +115,9 @@ test("original checkpoint correction exposes complete historical review before a
     "adopted and saved",
   );
   await page.reload();
-  await page.waitForFunction(() => !!(window as any).__deadAir);
+  await page.waitForFunction(() => !!(window as any).__studyApp);
   const result = await page.evaluate(() => {
-    const g = (window as any).__deadAir.game,
+    const g = (window as any).__studyApp.record,
       l = g.study.learner;
     return {
       state: l.cells["PY:T05.2"].states[0],

@@ -1,6 +1,6 @@
 # Local diagnostics and bug reports
 
-Diagnostics stay in this browser under `recent-game-diagnostics-v1` (in the durable store `dead-air-durable-state`), separate from the learning save. They are for agents and bug reports, not for download from the interface: read them with `window.__deadAir.logs()` on the page. No upload or model request is involved. The key name is historical and is kept so existing diagnostics stay readable.
+Diagnostics stay in this browser under `recent-study-diagnostics-v1` (in the durable store `dead-air-durable-state`, a name kept from an earlier build), separate from the learning save. They are for agents and bug reports, not for download from the interface: read them with `window.__studyApp.logs()` on the page. No upload or model request is involved. Earlier builds wrote `recent-game-diagnostics-v1`; when the new key is absent the app reads that one, and every write goes to the new key. The old entry is never deleted.
 
 ## What is recorded
 
@@ -15,7 +15,7 @@ Diagnostics never hold drafts, conversations, question text or curriculum.
 
 ## Hard limits
 
-- Entries are grouped by the record id (`Game.id`) that was open when they were written. Only the newest three records are kept; older ones are removed.
+- Entries are grouped by the record id (`StudyRecord.id`) that was open when they were written. Only the newest three records are kept; older ones are removed.
 - At most 400 entries per record, oldest dropped first.
 - Each serialized record is at most **256,000 UTF-8 bytes**; the oldest entries are dropped to fit.
 - Each entry is serialized once when recorded, so retention and writes never re-serialize a whole record. Writes are ordered, and a slower older write cannot replace a newer one. If a write fails, the status line says diagnostics could not be saved.
