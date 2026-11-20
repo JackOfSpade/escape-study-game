@@ -90,13 +90,16 @@ test("a question with several asks is shown and answered one part at a time", as
   await page.reload();
   await expect(open).toContainText("FIRST ask");
 
-  // Moving on shows the next part and clears the conversation.
+  // Moving on shows the next part and keeps the conversation on screen.
   await next.click();
   await expect(open).toContainText("Part 2 of 2");
   await expect(open).toContainText("SECOND ask");
   await expect(open).not.toContainText("FIRST ask");
   await expect(problem).toContainText("SHARED scenario");
-  await expect(page.locator("#messages .message")).toHaveCount(0);
+  await expect(page.locator("#messages")).toContainText("A first attempt");
+  await expect(page.locator("#messages .message-part")).toContainText(
+    "Part 1 of 2 answered",
+  );
   await expect(next).toHaveCount(0);
   await expect(page.locator("#chat-input")).toBeFocused();
   // The finished part is kept out of the way, one click from view.
@@ -105,11 +108,11 @@ test("a question with several asks is shown and answered one part at a time", as
   await earlier.locator("summary").click();
   await expect(earlier).toContainText("FIRST ask");
 
-  // The open part and the cleared conversation survive a reload.
+  // The open part and the conversation survive a reload.
   await flushStudySave(page);
   await page.reload();
   await expect(open).toContainText("Part 2 of 2");
-  await expect(page.locator("#messages .message")).toHaveCount(0);
+  await expect(page.locator("#messages")).toContainText("A first attempt");
 
   // The learner answers the new part without restating it: the tutor is told
   // which part is open and where its messages start, and still receives the
@@ -128,7 +131,7 @@ test("a question with several asks is shown and answered one part at a time", as
   const before = last.messages.filter((m: any) => m.seq <= last.stage.since);
   expect(before.map((m: any) => m.text)).toContain("A first attempt");
   expect(last.messages.at(-1).seq).toBeGreaterThan(last.stage.since);
-  // A finished question shows the whole conversation again.
+  // A finished question still shows the whole conversation.
   await expect(page.locator("#messages")).toContainText("FOLLOW-UP");
   await expect(page.locator("#messages .message-part")).toContainText(
     "Part 1 of 2 answered",

@@ -5,27 +5,25 @@ import { isRecord as object } from "./is-record.mjs";
  * material as `prompt` and each ask as an entry of `parts`; the learner sees
  * the shared material with one part. Once the tutor confirms it
  * (`partComplete`) the learner is offered the next part, which replaces it
- * when they ask for it. It stays one question: one conversation, one
+ * when they ask for it, while the conversation stays on screen. It stays one question: one conversation, one
  * completion and one assessment.
  */
-export const MAX_PARTS = 5;
-/** What a newly generated question may have; stored questions keep MAX_PARTS. */
-export const MAX_GENERATED_PARTS = 3;
+// The number of parts has no limit: a cap pushes the writer to pack two asks
+// into one part. The question's size is bounded by its solve time instead.
 const MAX_PART_CHARS = 6000;
 
-export const PARTS_GENERATION_GUIDANCE = `One part at a time: the learner works a question one ask at a time, so also return parts, an array of 1 to ${MAX_GENERATED_PARTS} strings, usually one, and keep prompt for the shared material only. Wherever these instructions say the question or the prompt must supply or show something, that means prompt and the part on screen read together. prompt holds the scenario, code, data, interfaces and fixed facts that two or more parts need, or all of the material when there is one part, and asks nothing itself: no numbered questions and no 'answer the following'. Each entry of parts is one complete ask, in the order to be worked, worded as it should appear on screen and without a number or a 'Part' label, which the app adds. The learner first sees prompt with parts[0] only; each later part replaces the one before it after the tutor confirms that one, and prompt stays on screen throughout. So every part must be answerable from prompt and its own text: a fact two or more parts need goes in prompt; a fact only one part needs goes in that part's own text, so the learner does not read material up front that the open part never uses; a fact a later part needs must never appear only in an earlier part. A later part may build on what an earlier part concluded but must not depend on its exact wording. prompt and each part must not give away the answer to that part or to a later one. Split by distinct ask: a follow-up that tests something the main question does not is a separate part, while several items worked the same way stay together in one part. An ask that has the learner review their own answer once it is given (for example naming the claim in it most open to challenge) tests something the answer itself does not: when the question keeps it, it is always the last part, never a closing sentence of another part. A question with a single ask has one part, and a part is never added to pad.`;
+export const PARTS_GENERATION_GUIDANCE = `One part at a time: the learner works a question one ask at a time, so also return parts, an array of one or more strings, one per thing the learner is asked for, and keep prompt for the shared material only. Wherever these instructions say the question or the prompt must supply or show something, that means prompt and the part on screen read together. prompt holds the scenario, code, data, interfaces and fixed facts that two or more parts need, or all of the material when there is one part, and asks nothing itself: no numbered questions and no 'answer the following'. Each entry of parts is one complete ask, in the order to be worked, worded as it should appear on screen and without a number or a 'Part' label, which the app adds. The learner first sees prompt with parts[0] only; each later part replaces the one before it after the tutor confirms that one, and prompt stays on screen throughout. So every part must be answerable from prompt and its own text: a fact two or more parts need goes in prompt; a fact only one part needs goes in that part's own text, so the learner does not read material up front that the open part never uses; a fact a later part needs must never appear only in an earlier part. A later part may build on what an earlier part concluded but must not depend on its exact wording. prompt and each part must not give away the answer to that part or to a later one. One thing per part: a part asks for exactly one answer about one subject, so the learner never faces two requests at once. One operation, one case, one implementation, one decision or one value is one part. A part that joins two requests with 'and', asks about two subjects (the cost of one operation and of another), says 'do the same for' or 'for each', or follows its ask with a second instruction about how to lay the answer out, is several asks: give each its own part, or cut the ones the skill does not need. Prefer cutting. The number of asks is still the fewest that prove the skill, and several short parts beat one crowded part; never merge asks to lower the part count, which has no limit. Check each part before returning: it holds one question or one instruction, never one of each and never two. 'Which would you use, and why? Give its cost.' is two parts, the choice with its reason and then the cost; 'state the time and the space' asks for two values, so ask for the one the skill turns on or give each a part. A part's ask is one short sentence where it can be; a part may ask for the reason behind its one answer in a few words such as 'and why' when the objective assesses that reasoning, and for nothing else beside it. Facts only that part needs come before the ask in the same part, kept as short as the facts allow. A follow-up that tests something the main question does not is likewise a separate part. An ask that has the learner review their own answer once it is given (for example naming the claim in it most open to challenge) tests something the answer itself does not: when the question keeps it, it is always the last part, never a closing sentence of another part. A question that asks for one thing has one part, and a part is never added to pad.`;
 
 export const PARTS_TUTOR_GUIDANCE =
-  "One part at a time (whenever payload.stage is present): the learner is shown this question in parts. They see problem.staged.shared and only part payload.stage.part of payload.stage.of, whose text is payload.stage.question; earlier parts are finished and later parts are hidden from them. Work only on the current part: judge the answers against what this part asks, and never mention, quote, preview or ask about a later part, or ask for anything that only a later part asks. Add partComplete (true or false) to every reply. Return partComplete:true with complete:false when everything this part asks has been answered and accepted, or when the learner says they do not know what remains of it or wants to move on from it (then record each facet they gave up as a gap in knowledge.facets). In that reply text confirms in one or two sentences what was accepted, and what was left open if anything was; it asks no question and does not introduce the next part, because the app then shows the learner a button that opens the next part. Until they press it the same part stays open and payload.stage.confirmed is true: the learner may ask more about this part, so answer what they ask, keep partComplete:true and still do not introduce the next part. When they press it the app shows the next part and clears the conversation from their screen. payload.stage.since, when present, is the seq of the last message before the current part opened: messages up to that seq belong to earlier parts and the learner can no longer see them, while later messages were written with the current part on screen. The learner usually answers a new part straight away without restating it, so read every learner message after payload.stage.since as an answer to payload.stage.question, never as a late answer to an earlier part, and never ask them to repeat or paste the question. Do not refer to an earlier message as if it were still visible; restate what you need from it. Otherwise return partComplete:false and follow up on this part only. While payload.stage.part is less than payload.stage.of never return complete:true: the app rejects it, because the learner has not seen the remaining parts. On the last part partComplete stays false and complete:true finishes the whole question as usual, judged over every part.";
+  "One part at a time (whenever payload.stage is present): the learner is shown this question in parts. They see problem.staged.shared and only part payload.stage.part of payload.stage.of, whose text is payload.stage.question; earlier parts are finished and later parts are hidden from them. Work only on the current part: judge the answers against what this part asks, and never mention, quote, preview or ask about a later part, or ask for anything that only a later part asks. Add partComplete (true or false) to every reply. Return partComplete:true with complete:false when everything this part asks has been answered and accepted, or when the learner says they do not know what remains of it or wants to move on from it (then record each facet they gave up as a gap in knowledge.facets). In that reply text confirms in one or two sentences what was accepted, and what was left open if anything was; it asks no question and does not introduce the next part, because the app then shows the learner a button that opens the next part. Until they press it the same part stays open and payload.stage.confirmed is true: the learner may ask more about this part, so answer what they ask, keep partComplete:true and still do not introduce the next part. When they press it the app shows the next part in place of this one; the conversation stays on their screen, with a marker where the part ended. payload.stage.since, when present, is the seq of the last message before the current part opened: messages up to that seq belong to earlier parts, while later messages were written with the current part on screen. The learner usually answers a new part straight away without restating it, so read every learner message after payload.stage.since as an answer to payload.stage.question, never as a late answer to an earlier part, and never ask them to repeat or paste the question. The learner can still scroll back to earlier messages, but the text of an earlier part is folded away, so when you rely on something from an earlier part say what it was. Otherwise return partComplete:false and follow up on this part only. While payload.stage.part is less than payload.stage.of never return complete:true: the app rejects it, because the learner has not seen the remaining parts. On the last part partComplete stays false and complete:true finishes the whole question as usual, judged over every part.";
 
 /** Why `parts` on a generated problem is malformed, or undefined when it is
  * absent (a question shown whole) or well formed. */
-export function partsProblem(parts, max = MAX_PARTS) {
+export function partsProblem(parts) {
   if (parts === undefined) return undefined;
   if (
     !Array.isArray(parts) ||
     !parts.length ||
-    parts.length > max ||
     !parts.every(
       (part) =>
         typeof part === "string" &&
@@ -33,7 +31,51 @@ export function partsProblem(parts, max = MAX_PARTS) {
         part.length <= MAX_PART_CHARS,
     )
   )
-    return `parts must be an array of 1 to ${max} nonempty strings, one per ask`;
+    return "parts must be an array of one or more nonempty strings, one per ask";
+  return undefined;
+}
+
+const ASK_VERBS =
+  "give|name|state|explain|list|describe|say|propose|identify|show|justify|compare|estimate|calculate|compute|pick|choose|write|implement|define|derive|trace|predict|rank|outline|suggest";
+// An instruction to the learner: an ask verb opening the sentence, or coming
+// straight after a short lead-in clause ("For A, give ..."), unless the word
+// is a noun there ("State is kept in Redis.", "List `a` holds ...").
+const INSTRUCTION = new RegExp(
+  `^(?:[^,.?]{0,60}, )?(?:then |also |next |finally |now )?(?:${ASK_VERBS})\\b(?! (?:is|are|was|were|has|have|holds?|of|\\w+s? (?:is|are|holds?))\\b)`,
+  "i",
+);
+// A bare request for the reason belongs to the ask before it.
+const BARE_REASON =
+  /^(?:and )?(?:why(?: not| so)?|explain why|justify (?:it|your (?:answer|choice)))[.?]?$/i;
+
+/** The sentences of one part that each request something from the learner. */
+export function partRequests(part) {
+  return String(part)
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/`[^`\n]*`/g, "x")
+    .split(/(?<=[.?!:])\s+|\n+/)
+    .map((sentence) => sentence.replace(/^[\s>*\-\d.)]+/, "").trim())
+    .filter(
+      (sentence) =>
+        sentence &&
+        !BARE_REASON.test(sentence) &&
+        (sentence.endsWith("?") || INSTRUCTION.test(sentence)),
+    );
+}
+
+/** Why a generated part asks for more than one thing, or undefined. This is
+ * a reading of prose, so the caller treats it as advice for one correction,
+ * never as grounds to refuse a question outright. */
+export function compoundPartProblem(parts) {
+  if (!Array.isArray(parts)) return undefined;
+  for (const [index, part] of parts.entries()) {
+    if (typeof part !== "string") continue;
+    const requests = partRequests(part);
+    const same = /\bdo the same\b/i.test(part);
+    if (requests.length < 2 && !same) continue;
+    const quoted = requests.map((r) => `"${r.slice(0, 90)}"`).join(", ");
+    return `parts[${index}] asks for more than one thing${quoted ? ` (${quoted})` : ""}. Each part asks for exactly one answer about one subject, and the learner must never face two requests at once. Keep one request in that part and give each other request its own part, in the order to be worked, or cut a request the skill does not need. Do not join the requests into one sentence with 'and', and do not add 'do the same for'. Check every other part the same way, and keep prompt, rubric and scopeDefinitions consistent with the result.`;
+  }
   return undefined;
 }
 

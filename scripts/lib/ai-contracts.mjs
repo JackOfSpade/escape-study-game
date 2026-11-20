@@ -11,10 +11,10 @@ import { validProbeKnowledge, validProbeOutcome } from "./probe-reply.mjs";
 import { HELP_GATE_GUIDANCE, helpGateProblem } from "./help-gate.mjs";
 import { isRecord as object } from "./is-record.mjs";
 import {
-  MAX_GENERATED_PARTS,
   PARTS_GENERATION_GUIDANCE,
   PARTS_TUTOR_GUIDANCE,
   partReplyProblem,
+  compoundPartProblem,
   partsProblem,
 } from "./question-parts.mjs";
 import {
@@ -92,7 +92,9 @@ export function taskInstructions(operation, payload) {
     contracts[operation]
   );
 }
-export function validateAnswer(job, answer) {
+/** `final` marks the last attempt, when checks that only read style are
+ * waived so a question is never refused over them. */
+export function validateAnswer(job, answer, { final = false } = {}) {
   if (!object(answer) || Buffer.byteLength(JSON.stringify(answer)) > 6_000_000)
     throw Error("Answer must be a bounded JSON object");
   const fail = (note) => {
@@ -289,7 +291,9 @@ export function validateAnswer(job, answer) {
       )
         fail("Copy the exact eligible contract without alterations");
       {
-        const parts = partsProblem(answer.parts, MAX_GENERATED_PARTS);
+        const parts =
+          partsProblem(answer.parts) ??
+          (final ? undefined : compoundPartProblem(answer.parts));
         if (parts) fail(parts);
       }
       break;

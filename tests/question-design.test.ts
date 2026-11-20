@@ -181,10 +181,14 @@ test("every generated question fits one sitting", () => {
   });
   assert.doesNotThrow(() => validateAnswer(job, answer(900)));
   assert.throws(() => validateAnswer(job, answer(901)), /30 to 900/);
-  // A newly generated question has at most three parts.
+  // The number of parts has no limit.
   const parts = (n: number) => ({ ...answer(60), parts: Array(n).fill("ask") });
-  assert.doesNotThrow(() => validateAnswer(job, parts(3)));
-  assert.throws(() => validateAnswer(job, parts(4)), /1 to 3 nonempty/);
+  assert.doesNotThrow(() => validateAnswer(job, parts(12)));
+  assert.throws(() => validateAnswer(job, parts(0)), /one or more nonempty/);
+  // A part with two requests is sent back once, never refused on the last try.
+  const two = { ...answer(60), parts: ["Which would you use? Give its cost."] };
+  assert.throws(() => validateAnswer(job, two), /more than one thing/);
+  assert.doesNotThrow(() => validateAnswer(job, two, { final: true }));
   const instructions = taskInstructions("generate", { contract }) as string;
   assert.match(instructions, /one sitting of at most 15 minutes/);
   for (const op of ["generate", "tutor", "assess"])
@@ -519,8 +523,15 @@ test("minimum evidence leads generation and tutoring, and the shape rules come l
   assert.match(generate, /ask for one of each kind and no more/);
   assert.match(
     generate,
-    /Add a part only when it tests something the first does not/,
+    /Add an ask only when it tests something the first does not/,
   );
+  // Each part asks for one thing, so a compound ask is split or cut.
+  assert.match(
+    generate,
+    /a part asks for exactly one answer about one subject/,
+  );
+  assert.match(generate, /never merge asks to lower the part count/);
+  assert.match(generate, /if it requests more than one answer/);
   assert.match(generate, /pick a real project of their own/);
   assert.match(generate, /at most four one-line facts/);
   assert.match(generate, /a learner who already has this skill needs/);

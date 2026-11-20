@@ -801,7 +801,7 @@ export function createClaudeGateway({
               `Tutor reply (attempt ${attempt}) omitted complete; read as complete:false`,
             );
           }
-          validate(job, answer);
+          validate(job, answer, { final: attempt === attempts - 1 });
           logCall(call, measured, "accepted", replyShape(job, answer));
           answered = answer;
           return answer;

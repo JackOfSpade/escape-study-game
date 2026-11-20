@@ -13,12 +13,7 @@ import { escapeHtml as escape } from "./html";
 import { encounterGaps, gapsClosedBy, probeSummary } from "./knowledge-probe";
 import { encounterKey } from "./learner";
 import { markdownToHtml } from "./markdown";
-import {
-  advancePart,
-  clearedThrough,
-  nextPartOffer,
-  partMarkers,
-} from "./question-parts";
+import { advancePart, nextPartOffer, partMarkers } from "./question-parts";
 import { settleTutorRequest } from "./run-learning";
 import type { Encounter, StudyRecord, Roadmap } from "./model";
 
@@ -169,18 +164,15 @@ export function createTerminalPanels(host: TerminalPanelHost) {
       );
     const done = completionMarkerIndex(e);
     const parts = partMarkers(e);
-    // Earlier parts' messages left the screen when their part was left.
-    const cleared = clearedThrough(e) ?? -Infinity;
     const pending = (e.tutorRequests ?? []).some((j) => j.state === "pending");
     const html =
       e.tutor
-        .map((m, i) =>
-          m.seq <= cleared
-            ? ""
-            : (i === done ? COMPLETION_MARKER : "") +
-              said(m) +
-              gapClosedMarker(host.game(), e, m) +
-              (parts.get(m.seq) ?? ""),
+        .map(
+          (m, i) =>
+            (i === done ? COMPLETION_MARKER : "") +
+            said(m) +
+            gapClosedMarker(host.game(), e, m) +
+            (parts.get(m.seq) ?? ""),
         )
         .join("") +
       (pending ? "" : nextPartOffer(e)) +

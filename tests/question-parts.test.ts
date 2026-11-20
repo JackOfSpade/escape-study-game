@@ -7,7 +7,8 @@ import {
   closesPart,
   composePrompt,
   partReplyProblem,
-  MAX_GENERATED_PARTS,
+  compoundPartProblem,
+  partRequests,
   partsProblem,
   stagedParts,
 } from "../scripts/lib/question-parts.mjs";
@@ -22,7 +23,7 @@ import { probeFacets } from "../src/knowledge-probe";
 import type { Encounter, Roadmap } from "../src/model";
 import {
   advancePart,
-  clearedThrough,
+  openPartSince,
   nextPartOffer,
   openPart,
   partMarkers,
@@ -53,12 +54,10 @@ const staged = (
 test("generated parts are validated and composed into one whole prompt", () => {
   assert.equal(partsProblem(undefined), undefined);
   assert.equal(partsProblem(["One ask"]), undefined);
-  for (const bad of [[], "one", [""], ["a", 2], Array(6).fill("ask")])
+  for (const bad of [[], "one", [""], ["a", 2]])
     assert.match(partsProblem(bad) ?? "", /parts must be an array/);
-  // A newly generated question is held to three parts; stored ones to five.
-  assert.equal(partsProblem(Array(5).fill("ask")), undefined);
-  assert.equal(partsProblem(Array(3).fill("ask"), MAX_GENERATED_PARTS), undefined); // prettier-ignore
-  assert.match(partsProblem(Array(4).fill("ask"), MAX_GENERATED_PARTS) ?? "", /1 to 3 nonempty/); // prettier-ignore
+  // The number of parts has no limit.
+  assert.equal(partsProblem(Array(12).fill("ask")), undefined);
   assert.equal(composePrompt("Scenario.", ["Why?"]), "Scenario.\n\nWhy?");
   assert.equal(
     composePrompt("Scenario.", ["Why?", "What next?"]),
@@ -135,7 +134,7 @@ test("the question pane shows the shared material with the open part only", () =
   assert.equal(partMarkers(staged()).size, 0);
 });
 
-test("a confirmed part waits for the learner, then clears the conversation", () => {
+test("a confirmed part waits for the learner, then the next one opens", () => {
   const e = staged();
   e.tutor = [{ seq: 4 }, { seq: 5 }] as Encounter["tutor"];
   // Nothing is offered until the tutor confirms the part.
@@ -143,22 +142,22 @@ test("a confirmed part waits for the learner, then clears the conversation", () 
   assert.equal(advancePart(e), false);
   e.partReady = 5;
   assert.match(nextPartOffer(e), /Part 1 of 2 answered[^]*data-next-part/);
+  assert.doesNotMatch(nextPartOffer(e), /clears/);
   assert.deepEqual(requestStage(e), { part: 1, of: 2, question: "FIRST ask", confirmed: true }); // prettier-ignore
-  assert.equal(clearedThrough(e), undefined);
-  // A follow-up on the confirmed part is cleared with the rest of it.
+  assert.equal(openPartSince(e), undefined);
+  // A follow-up on the confirmed part belongs to that part.
   e.tutor.push(...([{ seq: 6 }, { seq: 7 }] as Encounter["tutor"]));
   assert.equal(advancePart(e), true);
   assert.deepEqual(e.partsDone, [7]);
   assert.equal(e.partReady, undefined);
-  assert.equal(clearedThrough(e), 7);
+  assert.equal(openPartSince(e), 7);
   assert.equal(nextPartOffer(e), "");
   // The tutor is told which messages belong to the part now open.
   assert.deepEqual(requestStage(e), { part: 2, of: 2, question: "SECOND ask", since: 7 }); // prettier-ignore
-  // The last part has nothing after it, and a finished question shows all.
+  // The last part has nothing after it.
   e.partReady = 9;
   assert.equal(nextPartOffer(e), "");
   assert.equal(advancePart(e), false);
-  assert.equal(clearedThrough({ ...e, state: "consumed" }), undefined);
   assert.equal(requestStage({ problem: { prompt: "plain" } } as Encounter), undefined); // prettier-ignore
 });
 
@@ -307,4 +306,33 @@ test("a generated reply's parts become the stored staged question", async () => 
     await checkBridge();
     globalThis.fetch = original;
   }
+});
+
+test("a part that asks for more than one thing is sent back, a single ask is not", () => {
+  const single = [
+    "For `TimerQueueA`, give the worst-case cost of one `schedule` in terms of the current size `k`.",
+    "State is kept in Redis. Which key expires first, and why?",
+    "Which would you use? Why?",
+    "Implement `largest_group(latencies, k)` in Python.",
+    "A teammate proposes removing the check. Is this a good design, and why?",
+  ];
+  for (const part of single) assert.equal(partRequests(part).length, 1, part);
+  assert.equal(compoundPartProblem(single), undefined);
+  assert.equal(compoundPartProblem(undefined), undefined);
+  const compound = [
+    "Which approach would you use, and why? Give its total time cost.",
+    "For A, give the cost of one `schedule`. Do the same for B.",
+    "Propose one guardrail metric. Say what harm it would catch.",
+  ];
+  for (const part of compound)
+    assert.match(
+      compoundPartProblem(["Which is faster, and why?", part]) ?? "",
+      /^parts\[1\] asks for more than one thing/,
+      part,
+    );
+  // Code is material, never a request.
+  assert.equal(
+    partRequests("```py\n# Give x? List y.\n```\nWhat does it print?").length,
+    1,
+  );
 });
