@@ -14,6 +14,8 @@
  */
 import { lessonBlockKey } from "../scripts/lib/lesson-schema.mjs";
 import {
+  codeRuns,
+  rich,
   codePanel,
   diagramSvg,
   diagramTextVersion,
@@ -239,7 +241,7 @@ function predictNode(
         ...(answered ? { "aria-disabled": "true" } : {}),
         "data-option": String(i),
       },
-      { text: option.text, on: "predict-choose" },
+      { ...rich(option.text), on: "predict-choose" },
     );
   });
   return n(
@@ -251,7 +253,7 @@ function predictNode(
     },
     {
       children: [
-        n("p", { class: "lesson-prompt" }, { text: block.prompt }),
+        n("p", { class: "lesson-prompt" }, rich(block.prompt)),
         n(
           "div",
           { class: "lesson-options", role: "group" },
@@ -288,7 +290,7 @@ function recallNode(block: Of<"recall">, at: Place, saved: string): LessonNode {
     },
     {
       children: [
-        n("p", { class: "lesson-prompt" }, { text: block.prompt }),
+        n("p", { class: "lesson-prompt" }, rich(block.prompt)),
         n(
           "label",
           { class: "lesson-recall-label", for: `${uid}-input` },
@@ -364,7 +366,7 @@ function recallNode(block: Of<"recall">, at: Place, saved: string): LessonNode {
                     n(
                       "p",
                       { class: "lesson-compare-text" },
-                      { text: block.exemplar },
+                      rich(block.exemplar),
                     ),
                   ],
                 },
@@ -421,8 +423,7 @@ function blockNode(
           { children: [codePanel(block.code, block.highlight ?? [])] },
         ),
       ];
-      if (block.caption)
-        kids.push(n("figcaption", {}, { text: block.caption }));
+      if (block.caption) kids.push(n("figcaption", {}, rich(block.caption)));
       const lang = LANGUAGES.has(block.language) ? block.language : "text";
       return n(
         "figure",
@@ -441,7 +442,7 @@ function blockNode(
               {},
               {
                 children: block.columns.map((c) =>
-                  n("th", { scope: "col" }, { text: c }),
+                  n("th", { scope: "col" }, rich(c)),
                 ),
               },
             ),
@@ -456,7 +457,7 @@ function blockNode(
             n(
               "tr",
               {},
-              { children: row.map((cell) => n("td", {}, { text: cell })) },
+              { children: row.map((cell) => n("td", {}, rich(cell))) },
             ),
           ),
         },
@@ -472,8 +473,7 @@ function blockNode(
           },
         ),
       ];
-      if (block.caption)
-        kids.push(n("figcaption", {}, { text: block.caption }));
+      if (block.caption) kids.push(n("figcaption", {}, rich(block.caption)));
       return n(
         "figure",
         { class: "lesson-figure lesson-table-figure" },
@@ -491,7 +491,7 @@ function blockNode(
               { class: "lesson-figure-body", tabindex: "0" },
               { children: [diagramSvg(block, uid)] },
             ),
-            n("figcaption", {}, { text: block.caption || block.alt }),
+            n("figcaption", {}, rich(block.caption || block.alt)),
             diagramTextVersion(block),
           ],
         },
@@ -566,7 +566,7 @@ export function lessonTree(
           {
             children: [
               n("h2", { class: "lesson-title" }, { text: lesson.title }),
-              n("p", { class: "lesson-summary" }, { text: lesson.summary }),
+              n("p", { class: "lesson-summary" }, rich(lesson.summary)),
               n(
                 "p",
                 { class: "lesson-minutes" },
@@ -633,6 +633,20 @@ const setText = (el: Element | null | undefined, text: string) => {
   if (el && el.textContent !== text) el.textContent = text;
 };
 
+/** setText for a plain-text field that may hold `code` spans (see rich). */
+const setRich = (el: Element | null | undefined, text: string) => {
+  const runs = codeRuns(text);
+  if (!el || el.textContent === runs.join("")) return;
+  el.replaceChildren(
+    ...runs.flatMap((run, i) => {
+      if (run === "") return [];
+      const part = document.createElement(i % 2 ? "code" : "span");
+      part.textContent = run;
+      return [part];
+    }),
+  );
+};
+
 /** Steps one figure through its frames by changing the nodes it already has. */
 class StepsView {
   private frame = 0;
@@ -687,7 +701,7 @@ class StepsView {
       setText(name, v ? v.name : "");
       setText(value, v ? v.value : "");
     });
-    setText(this.caption, frame.caption);
+    setRich(this.caption, frame.caption);
     setText(this.count, stepCount(this.frame, this.steps.frames.length));
     this.prev?.setAttribute("aria-disabled", String(this.frame === 0));
     this.next?.setAttribute("aria-disabled", String(this.frame === last));

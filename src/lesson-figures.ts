@@ -32,6 +32,24 @@ export const n = (
   rest: Rest = {},
 ): LessonNode => ({ tag, attrs, ...rest });
 
+/** Plain text cut at its `code` spans: [text, code, text, ...]. */
+export const codeRuns = (text: string) => text.split(/`([^`\n]+)`/);
+
+/**
+ * The content of a plain-text field (a prompt, an option, a caption, a table
+ * cell). These fields are not markdown, but a model still writes `names` in
+ * backticks there, so those become code nodes instead of showing the ticks.
+ */
+export const rich = (text: string): Rest => {
+  const runs = codeRuns(text);
+  if (runs.length === 1) return { text };
+  return {
+    children: runs.flatMap((run, i) =>
+      run === "" ? [] : [n(i % 2 ? "code" : "span", {}, { text: run })],
+    ),
+  };
+};
+
 /** An SVG node. */
 export const s = (
   tag: string,
@@ -648,7 +666,7 @@ export function stepsFigure(
     n(
       "p",
       { class: "lesson-steps-caption", "aria-live": "polite" },
-      { text: first.caption },
+      rich(first.caption),
     ),
     n(
       "div",
@@ -674,8 +692,7 @@ export function stepsFigure(
   const figureKids: LessonNode[] = [
     n("div", { class: "lesson-figure-body" }, { children: kids }),
   ];
-  if (block.caption)
-    figureKids.push(n("figcaption", {}, { text: block.caption }));
+  if (block.caption) figureKids.push(n("figcaption", {}, rich(block.caption)));
   return {
     steps,
     node: n(
