@@ -45,6 +45,18 @@ The learner cannot see the rubric, so it is not the pass bar. The tutor's copy o
 
 This came from a real question on 2026-11-19 whose rubric line required both completion rates and both measurement windows while the ask requested neither: the tutor held a truthful rewrite open over "increased by 7%" (61% to 68%), gave two different reasons for it, and delivered a credit-costing hint the learner had not asked for. The assessment still reads the full rubric.
 
+`TUTOR_JUDGEMENT_GUIDANCE` (in `scripts/lib/study-question-policy.mjs`), sent with both the open-question and the after-completion instruction, carries the same idea into the argument that follows:
+
+- the example lines are one route to a full answer; any correct, sound argument that answers the ask is accepted, and the tutor never steers back to an example's wording or calls an example's point the "real" reason once the learner's argument already answers the question;
+- a point that only explains another accepted point (for example why two costs come out equal) is not an extra requirement;
+- a challenge is weighed on its merits: a concession, once made, holds in every later reply, and a wrong objection gets the specific fact or step that fails;
+- a supporting fact the learner says they do not know, and no facet assesses (a definition, or the cost of a standard operation), is stated in one line as clarification; while the question is open, a fact a facet assesses still goes up the hint ladder;
+- "one question at a time" means one question per reply, and internal field names such as `review.openGaps` never appear in text.
+
+After completion the tutor says the saved result is final only when the learner asks to change, reopen or re-grade it, or whether the discussion changes it, not as a footer on every reply.
+
+This came from a real question on 2026-11-20 (heap versus one sort for an end-of-day report). The learner's final answer, equal O(n log n) cost so the simpler sort wins, was sound, yet the tutor kept naming the rubric's "no interleaved arrivals" as the deciding reason after conceding that unused capability was not a reason. It also never said that building a heap is O(n) when the learner twice said they did not know, and it ended every post-completion reply with the same finality line, once quoting `review.openGaps`.
+
 `node --import tsx scripts/ai-capture/build-acceptance-cases.ts --out <file>` builds nine tutor cases for this rule, with no network use: one question whose rubric line is deliberately more specific than its ask, and one learner answer each. A case id starts with the verdict written down beforehand, `accept-` or `open-`; the `open-` cases (an unmeasured figure, an unhedged cause, a teammate's work claimed, a solution that ignores a named requirement) guard against over-leniency. Replay them with `npm run ai:ladder -- run --cases <file> --settings sonnet:low --reps 3 --name <name>`, which prints where it wrote `results.jsonl`; then `node --import tsx scripts/ai-capture/build-acceptance-cases.ts --score <results.jsonl>` prints how many replies per case gave the expected verdict. Results are in [AI model and effort selection](AI_MODEL_SELECTION.md).
 
 The tutor and the assessor follow the same rule: one general statement, or the point worked for one item, establishes facets of the same kind; a correct answer is not kept open for elaboration; and a short correct answer is never marked down.

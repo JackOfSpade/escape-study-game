@@ -5,3 +5,4 @@ export const ASSESSMENT_HELP_GUIDANCE: string;
 export const MINIMUM_EVIDENCE_GUIDANCE: string;
 export const QUESTION_SHAPE_GUIDANCE: string;
 export const CODE_IN_PROSE_GUIDANCE: string;
+export const TUTOR_JUDGEMENT_GUIDANCE: string;

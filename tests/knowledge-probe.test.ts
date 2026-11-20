@@ -26,7 +26,9 @@ import {
   SUB_FACET_DEPTH,
   SUB_FACETS_PER_REPLY,
   TERMINAL_DIALOGUE_INSTRUCTION,
+  TERMINAL_REVIEW_INSTRUCTION,
 } from "../src/knowledge-probe";
+import { TUTOR_JUDGEMENT_GUIDANCE } from "../scripts/lib/study-question-policy.mjs";
 import type { Roadmap } from "../src/model";
 import { decode, encode, recover } from "../src/persistence";
 import { createPlayableGame } from "./helpers/record";
@@ -1867,5 +1869,25 @@ test("generator records only let a gap seed the generated contract's scope when 
   assert.match(
     records.note,
     /Never rewrite an existing stable scope definition/,
+  );
+});
+
+test("both tutor modes judge reasoning on its merits, not by the examples' wording", () => {
+  for (const text of [
+    TERMINAL_DIALOGUE_INSTRUCTION,
+    TERMINAL_REVIEW_INSTRUCTION,
+  ])
+    assert.ok(text.includes(TUTOR_JUDGEMENT_GUIDANCE));
+  assert.match(TUTOR_JUDGEMENT_GUIDANCE, /evidenceExamples show one way/);
+  assert.match(TUTOR_JUDGEMENT_GUIDANCE, /keep that concession/);
+  assert.match(TUTOR_JUDGEMENT_GUIDANCE, /Never write internal field/);
+  // The finality notice answers a request to change the result; it is not a footer.
+  assert.match(
+    TERMINAL_REVIEW_INSTRUCTION,
+    /asks to change, reopen or re-grade the result[^.]*saved result is final; otherwise do not mention/,
+  );
+  assert.doesNotMatch(
+    TERMINAL_REVIEW_INSTRUCTION,
+    /when review\.openGaps is empty/,
   );
 });
