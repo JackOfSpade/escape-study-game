@@ -2,6 +2,7 @@ import { fork } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import {
   closeSync,
+  existsSync,
   lstatSync,
   openSync,
   readFileSync,
@@ -51,7 +52,8 @@ function record(options) {
 }
 function optionsFor(options) {
   const o = { ...defaults, ...options };
-  o.root = sha256(realpathSync(o.root));
+  o.rootPath = realpathSync(o.root);
+  o.root = sha256(o.rootPath);
   if (!Number.isInteger(o.port) || o.port < 1 || o.port > 65535)
     throw Error("Invalid bridge port");
   return o;
@@ -109,7 +111,35 @@ function verifyRecord(o, owner) {
       typeof owner.token !== "string" ||
       !/^[a-f0-9]{64}$/.test(owner.token))
   )
-    throw Error("Bridge ownership record belongs to another service");
+    throw Error(
+      "Bridge ownership record belongs to another service. If this project was moved by an older version, stop its old relay and remove .local/bridge-service/service.json",
+    );
+}
+/** True when the record was written by this project's relay before the project folder was moved
+ * or renamed: the record lives in this project's own private runtime directory, it names the
+ * project's former real path, that path matches the recorded hash, and nothing exists there any
+ * more. A different project pointed at this directory (its path still exists) is not adopted. */
+function movedRecord(o, owner) {
+  return Boolean(
+    owner &&
+    owner.root !== o.root &&
+    typeof owner.rootPath === "string" &&
+    sha256(owner.rootPath) === owner.root &&
+    !existsSync(owner.rootPath),
+  );
+}
+/** Retire a moved project's record: if its relay is still running (proved by the record's
+ * control token), ask it to shut down through the authenticated endpoint, then drop the record
+ * so a fresh relay starts for the new location. An unverified listener is still refused. */
+async function retireMovedRecord(o, owner) {
+  const previous = { ...o, root: owner.root };
+  verifyRecord(previous, owner);
+  await stopVerified(previous, owner);
+  try {
+    unlinkSync(join(o.directory, "service.json"));
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
 }
 /** Start once, or reconnect to this project's already-authenticated service.
  * No sharing, OAuth or worker-session setting is changed by this operation. */
@@ -122,6 +152,10 @@ export async function ensureBridge(options = {}) {
   const lockDeadline = Date.now() + STARTUP_TIMEOUT_MS + 5000;
   while (Date.now() < lockDeadline) {
     const owner = record(o);
+    if (movedRecord(o, owner)) {
+      await retireMovedRecord(o, owner);
+      continue;
+    }
     verifyRecord(o, owner);
     const live = await request(o, owner);
     if (live) return { ...live, reused: true };
@@ -216,6 +250,7 @@ export async function ensureBridge(options = {}) {
         version: 1,
         directory: o.directory,
         root: o.root,
+        rootPath: o.rootPath,
         port: o.port,
         token: randomBytes(32).toString("hex"),
         instance: randomBytes(16).toString("hex"),
@@ -248,7 +283,14 @@ export async function bridgeStatus(options = {}) {
 export async function stopBridge(options = {}) {
   const o = optionsFor(options),
     owner = record(o);
+  if (movedRecord(o, owner)) {
+    await retireMovedRecord(o, owner);
+    return { running: false };
+  }
   verifyRecord(o, owner);
+  return stopVerified(o, owner);
+}
+async function stopVerified(o, owner) {
   const live = await request(o, owner);
   if (!live) return { running: false };
   if (!(await request(o, owner, "POST"))) return { running: false };

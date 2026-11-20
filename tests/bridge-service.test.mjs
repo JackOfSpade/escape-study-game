@@ -6,6 +6,7 @@ import {
   mkdirSync,
   readFileSync,
   realpathSync,
+  renameSync,
   rmSync,
   writeFileSync,
   utimesSync,
@@ -281,6 +282,56 @@ test("concurrent starters reuse one bridge; management rejects browser origins a
   }
 });
 
+test("moving the project folder retires the old relay and starts a fresh one", async () => {
+  const f = await fixture();
+  const moved = `${f.root}-moved`;
+  const movedOptions = {
+    ...f.options,
+    root: moved,
+    entry: join(moved, "relay.mjs"),
+    directory: join(moved, "runtime"),
+  };
+  try {
+    const first = await ensureBridge(f.options);
+    const owner = JSON.parse(
+      readFileSync(join(f.options.directory, "service.json"), "utf8"),
+    );
+    assert.equal(owner.rootPath, realpathSync(f.root));
+    // The relay keeps running from the old location while the folder is renamed.
+    renameSync(f.root, moved);
+    writeFileSync(
+      movedOptions.entry,
+      readFileSync(movedOptions.entry, "utf8").replaceAll(f.root, moved),
+    );
+    const second = await ensureBridge(movedOptions);
+    assert.equal(second.reused, false);
+    assert.notEqual(second.pid, first.pid);
+    // The old relay was asked to shut down through its authenticated endpoint.
+    assert.throws(() => process.kill(first.pid, 0), { code: "ESRCH" });
+    assert.equal((await bridgeStatus(movedOptions)).running, true);
+  } finally {
+    await stopBridge(movedOptions).catch(() => {});
+    rmSync(moved, { recursive: true, force: true });
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test("a record from a project path that still exists is never adopted", async () => {
+  const f = await fixture();
+  const other = mkdtempSync(join(tmpdir(), "bridge-other-"));
+  try {
+    await ensureBridge(f.options);
+    await assert.rejects(
+      ensureBridge({ ...f.options, root: other }),
+      /another service/,
+    );
+    assert.equal((await bridgeStatus(f.options)).running, true);
+  } finally {
+    rmSync(other, { recursive: true, force: true });
+    await f.close();
+  }
+});
+
 test("an unrelated listener is neither adopted nor stopped", async () => {
   const f = await fixture();
   const unrelated = createServer((_req, res) => {
@@ -322,7 +373,7 @@ test("the actual dev-launcher shutdown stops its app child and leaves the bridge
     await new Promise((resolve, reject) => {
       let text = "";
       const timer = setTimeout(
-        () => reject(Error("Synthetic game did not start")),
+        () => reject(Error("Synthetic relay did not start")),
         10000,
       );
       current.stdout.on("data", (part) => {
