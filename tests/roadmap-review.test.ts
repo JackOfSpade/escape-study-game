@@ -136,6 +136,7 @@ test("roadmap review surfaces historical evidence modification for review", asyn
 });
 
 test("roadmap review keeps multiple facets and successive historical receipts distinct", async () => {
+  // The legacy 0.12 heading on purpose: files saved by earlier builds carry it.
   const supplement = `\n### 0.12 Game semantic scope and continuation state\n\n| Scope | Facet | Semantic criterion |\n|---|---|---|\n| PY:T01.1/D1 | purpose | Purpose |\n| PY:T01.1/D1 | boundary | Boundary |\n\n| Scope | Facet | Assessment receipt |\n|---|---|---|\n| PY:T01.1/D1 | purpose | first |\n| PY:T01.1/D1 | purpose | corrected |\n\n`;
   const candidate = revision(
     r.raw.replace(

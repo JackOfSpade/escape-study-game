@@ -45,6 +45,7 @@ for (const id of ["PY:T05.2", "PE:T01.2", "PY:T06.1"])
     }
     const inventedReview = structuredClone(job);
     const trackForReview = id.startsWith("PY:") ? "PY" : "PE";
+    // The legacy 0.12 heading on purpose: files saved by earlier builds carry it.
     const metadata = `\n\n### 0.12 Game semantic scope and continuation state\n\n| Review scope | Stage | Due | Last independent at | Last independent date | Sequence | Verified reviews |\n|---|---|---|---|---|---|---|\n| ${fixture.scope} | 2 | 2030-01-01 | — | 2026-09-15 | S0004 | 10 |\n\n| Suspended state | Tier | Phase | Lap | Queue |\n|---|---|---|---|---|\n\n`;
     inventedReview.proposal!.canonical =
       inventedReview.proposal!.canonical.replace(

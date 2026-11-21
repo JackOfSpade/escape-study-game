@@ -13,14 +13,16 @@ value `chatgpt-handoff` stays because saved records carry it.
   through untouched;
   `tests/legacy-save.test.ts` with `tests/fixtures/legacy-save/` guards this. Never change the save envelope,
   encoding or integrity scheme without an explicit migration.
-- Persisted storage names. Some keep names from the earlier build (`dead-air-save-v1`, the IndexedDB databases
-  `dead-air-durable-state` and `dead-air-lessons`, the `dead-air-recovery-v1` / `dead-air-rejected-copy-v1`
-  export kinds, the `GAME_AI_ASSESSED_*` tokens, section 0.12 of the roadmap export and the fixed export prose in
-  `src/roadmap-export.ts` such as "game backup" and "game progress save", which keeps unchanged exports
-  byte-identical). They are kept on purpose and are not leftover wording;
-  renaming one needs a backward-compatible migration that keeps reading the old name, with tests. Recent
-  diagnostics moved from `recent-game-diagnostics-v1` to `recent-study-diagnostics-v1`; `src/run-logs.ts` still
-  reads the old key when the new one is absent.
+- Persisted storage names and their legacy readers. The earlier build's names were migrated on 2026-11-20, and
+  the old names must keep being read: the save key `dead-air-save-v1` (now `study-save-v1`), the IndexedDB
+  databases `dead-air-durable-state` and `dead-air-lessons` (now `study-durable-state` and `study-lessons`; a
+  legacy copy is read, carried over, and deleted only after the new copy is written), the roadmap export's
+  `GAME_AI_ASSESSED_*` tokens and its "0.12 Game semantic scope and continuation state" heading (now
+  `STUDY_AI_ASSESSED_*` and "0.12 Study semantic scope ..."; files exported or uploaded earlier still carry the
+  old ones), and the diagnostics key `recent-game-diagnostics-v1` (now `recent-study-diagnostics-v1`). Never
+  remove a legacy reader, and give any further rename the same backward-compatible migration, with tests. An
+  unchanged re-export stays byte-identical because the saved export is reused while the semantic fingerprint is
+  unchanged, so export prose may be reworded.
 - The curriculum files in the repo root (`interview_prep_roadmap.md`, the hash fields of `SOURCE_INTEGRITY.json`,
   and `MANIFEST.sha256`) are integrity-pinned. Do not edit them. MANIFEST.sha256 is regenerated with
   `shasum -a 256 SOURCE_INTEGRITY.json interview_prep_roadmap.md > MANIFEST.sha256` if SOURCE_INTEGRITY.json's

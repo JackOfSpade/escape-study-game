@@ -10,6 +10,7 @@ import type {
   ImportedFacetMapping,
   RoadmapAdoptionReceipt,
 } from "./roadmap-adoption-types";
+import { isAssessedToken, isAssessedTokenFor } from "./roadmap-export-names";
 import { receiptRows } from "./roadmap-structure";
 import { CELL_SEPARATOR } from "./table-row";
 /** Manual merged roadmaps may bind final evidence in the authoritative final
@@ -114,9 +115,9 @@ export function importedMappingValid(
       throw Error(
         "Imported observation requires an issued, non-invalidated source attempt",
       );
-    const assessed = c[5] === `GAME_AI_ASSESSED_${m.outcome.toUpperCase()}`;
+    const assessed = isAssessedTokenFor(c[5], m.outcome);
     if (
-      c[5].startsWith("GAME_AI_ASSESSED_") &&
+      isAssessedToken(c[5]) &&
       (!assessed || /\/ ([^:]+):/.exec(c[4])?.[1] !== m.facet)
     )
       throw Error("Imported evidence outcome or named facet does not match");

@@ -171,8 +171,9 @@ if (refusedCopy) {
     download(
       "learning-workspace-rejected-save.json",
       JSON.stringify(
-        // Format name kept from an earlier build: files already downloaded carry it.
-        { format: "dead-air-rejected-copy-v1", ...refusedCopy },
+        // Nothing in the app reads this file back, so the earlier
+        // "dead-air-rejected-copy-v1" name needs no reader.
+        { format: "study-rejected-copy-v1", ...refusedCopy },
         null,
         2,
       ),

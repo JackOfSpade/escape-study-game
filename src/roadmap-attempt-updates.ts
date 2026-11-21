@@ -2,6 +2,7 @@ import type {
   RoadmapReconciliation,
   RoadmapReconciliationPayload,
 } from "./roadmap-adoption-types";
+import { isAssessedToken } from "./roadmap-export-names";
 import { inspectMergedDocument } from "./roadmap-structure";
 import { CELL_SEPARATOR } from "./table-row";
 
@@ -259,7 +260,7 @@ export function normalizeAttemptUpdates(
                       []) as string[]
                   ).includes(id),
                 ) &&
-                cells(row)[5].startsWith("GAME_AI_ASSESSED_"),
+                isAssessedToken(cells(row)[5]),
             )
             .flatMap(([, row]) =>
               (

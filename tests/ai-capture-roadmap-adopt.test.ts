@@ -473,8 +473,8 @@ test("progress adopt cases carry only realistic study text and real app evidence
       `${item.id} payload still contains placeholder text`,
     );
     assert.ok(
-      item.payload.candidate.includes("GAME_AI_ASSESSED_INDEPENDENT"),
-      `${item.id} candidate carries no GAME_AI_ASSESSED_INDEPENDENT evidence row`,
+      item.payload.candidate.includes("STUDY_AI_ASSESSED_INDEPENDENT"),
+      `${item.id} candidate carries no STUDY_AI_ASSESSED_INDEPENDENT evidence row`,
     );
   }
 });

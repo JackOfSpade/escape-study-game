@@ -60,6 +60,8 @@ const db = {
 Object.defineProperty(globalThis, "indexedDB", {
   configurable: true,
   value: {
+    // Only the current database exists; the earlier build's is absent.
+    databases: async () => [{ name: "study-durable-state", version: 1 }],
     open() {
       const request = { result: db } as unknown as IDBOpenDBRequest;
       queueMicrotask(() =>
@@ -72,14 +74,16 @@ Object.defineProperty(globalThis, "indexedDB", {
 Object.defineProperty(globalThis, "localStorage", {
   configurable: true,
   value: {
-    getItem() {
+    getItem(key: string) {
       if (copies.localError)
         throw new DOMException("Synthetic policy denial", "SecurityError");
-      return copies.local;
+      return key === "study-save-v1" ? copies.local : null;
     },
-    setItem(_key: string, value: string) {
+    setItem(key: string, value: string) {
+      assert.equal(key, "study-save-v1");
       copies.local = value;
     },
+    removeItem() {},
   },
 });
 
@@ -123,7 +127,9 @@ test("recovery export preserves damaged bytes and reports unreadable copies", as
   copies.durable = "synthetic damaged durable save";
   await assert.rejects(load(), /integrity checks/);
   const backup = JSON.parse(await exportRecoveryBackup());
-  assert.equal(backup.format, "dead-air-recovery-v1");
+  assert.equal(backup.format, "study-recovery-v1");
+  assert.equal(backup.key, "study-save-v1");
+  assert.equal(backup.legacyKey, "dead-air-save-v1");
   assert.equal(backup.local, copies.local);
   assert.equal(backup.durable, copies.durable);
   copies.durableError = true;

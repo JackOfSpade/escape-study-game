@@ -128,7 +128,7 @@ test("an unreadable save shows the recovery card and a restored backup opens the
   await mockClaudeStudy(page);
   await page.addInitScript(() => {
     if (!sessionStorage.getItem("synthetic-corrupt-save-seeded")) {
-      localStorage.setItem("dead-air-save-v1", "synthetic damaged checkpoint");
+      localStorage.setItem("study-save-v1", "synthetic damaged checkpoint");
       sessionStorage.setItem("synthetic-corrupt-save-seeded", "1");
     }
   });
@@ -143,9 +143,9 @@ test("an unreadable save shows the recovery card and a restored backup opens the
     window.dispatchEvent(new Event("blur"));
     window.dispatchEvent(new Event("pagehide"));
   });
-  expect(
-    await page.evaluate(() => localStorage.getItem("dead-air-save-v1")),
-  ).toBe("synthetic damaged checkpoint");
+  expect(await page.evaluate(() => localStorage.getItem("study-save-v1"))).toBe(
+    "synthetic damaged checkpoint",
+  );
   await page.locator("#save-recovery-import").setInputFiles({
     name: "invalid.json",
     mimeType: "application/json",

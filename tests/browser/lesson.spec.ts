@@ -30,7 +30,7 @@ const savedRecord = (page: Page) =>
       /* @vite-ignore */ root + "storage.ts"
     );
     const { decode } = await import(/* @vite-ignore */ root + "persistence.ts");
-    const stored = JSON.parse(await readDurable("dead-air-save-v1"));
+    const stored = JSON.parse(await readDurable("study-save-v1"));
     const g = decode(stored.data);
     return JSON.stringify([
       g.study.knowledgeGaps,
@@ -44,7 +44,7 @@ const lessonRows = (page: Page) =>
   page.evaluate(
     () =>
       new Promise<string[]>((resolve, reject) => {
-        const open = indexedDB.open("dead-air-lessons");
+        const open = indexedDB.open("study-lessons");
         open.onerror = () => reject(open.error);
         open.onsuccess = () => {
           const db = open.result;
@@ -325,6 +325,108 @@ test("reading, answering and chatting leave the saved record untouched and live 
     expect(JSON.stringify(call)).not.toContain("running total");
 });
 
+test("lessons left in the earlier database name are moved over unchanged and the old database is removed", async ({
+  page,
+}) => {
+  const study = await mockClaudeStudy(page);
+  await finishWithGap(page, study);
+  await page.locator("#lesson-offers button").click();
+  await expect(page.locator("#lesson-body .lesson-section")).not.toHaveCount(0);
+  await page.locator("#lesson-read").click();
+  await page.locator("#lesson-close").click();
+  await expect
+    .poll(async () => (await lessonRows(page)).join("\n"))
+    .toContain("readAt");
+  await flushStudySave(page);
+  // Put the rows back where an earlier build kept them, with one value the
+  // reader skips, and remove the current database.
+  const legacy = await page.evaluate(async () => {
+    const done = (req: IDBRequest | IDBTransaction) =>
+      new Promise<void>((resolve, reject) => {
+        if ("oncomplete" in req) {
+          req.oncomplete = () => resolve();
+          req.onabort = () => reject(req.error);
+        } else {
+          req.onsuccess = () => resolve();
+          req.onerror = () => reject(req.error);
+        }
+      });
+    const open = (name: string, version?: number) =>
+      new Promise<IDBDatabase>((resolve, reject) => {
+        const req = indexedDB.open(name, version);
+        req.onupgradeneeded = () => {
+          if (!req.result.objectStoreNames.contains("lessons"))
+            req.result.createObjectStore("lessons");
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    const current = await open("study-lessons");
+    const read = current.transaction("lessons").objectStore("lessons");
+    const keys = read.getAllKeys(),
+      values = read.getAll();
+    await done(read.transaction);
+    current.close();
+    const rows: Record<string, unknown> = {};
+    keys.result.forEach((k, i) => (rows[String(k)] = values.result[i]));
+    rows["unsound"] = "{{{ kept as it is";
+    const old = await open("dead-air-lessons", 1);
+    const tx = old.transaction("lessons", "readwrite");
+    for (const [k, v] of Object.entries(rows))
+      tx.objectStore("lessons").put(v, k);
+    await done(tx);
+    old.close();
+    await done(indexedDB.deleteDatabase("study-lessons"));
+    return rows;
+  });
+  await page.reload();
+  await expect
+    .poll(async () =>
+      (await page.evaluate(() => indexedDB.databases())).map((d) => d.name),
+    )
+    .not.toContain("dead-air-lessons");
+  expect((await lessonRows(page)).sort()).toEqual(
+    Object.values(legacy).map(String).sort(),
+  );
+  // Without a database listing, and on a fresh state with no migration
+  // marker, the store probes the old name, and the probe never creates it.
+  const probe = await page.evaluate(async () => {
+    await new Promise<void>((resolve, reject) => {
+      const req = indexedDB.deleteDatabase("study-lessons");
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+    const before = (await indexedDB.databases()).map((d) => d.name);
+    const calls: [string, number | "none"][] = [];
+    const root = "/src/";
+    const { createLessonStore } = await import(
+      /* @vite-ignore */ root + "lesson-store.ts"
+    );
+    const store = createLessonStore(() => ({
+      open: (name: string, version?: number) => {
+        calls.push([name, version ?? "none"]);
+        return version === undefined
+          ? indexedDB.open(name)
+          : indexedDB.open(name, version);
+      },
+      deleteDatabase: indexedDB.deleteDatabase.bind(indexedDB),
+    }));
+    await store.all();
+    return {
+      before,
+      calls,
+      names: (await indexedDB.databases()).map((d) => d.name),
+    };
+  });
+  expect(probe.before).not.toContain("study-lessons");
+  expect(probe.before).not.toContain("dead-air-lessons");
+  // The probe really ran: the legacy name was opened, without a version.
+  expect(probe.calls).toContainEqual(["dead-air-lessons", "none"]);
+  const names = probe.names;
+  expect(names).toContain("study-lessons");
+  expect(names).not.toContain("dead-air-lessons");
+});
+
 test("an older bridge without the lesson operations says so, and checking again finds a newer one", async ({
   page,
 }) => {
@@ -541,7 +643,7 @@ test("a practice question survives a reload as the open question", async ({
         const { decode } = await import(
           /* @vite-ignore */ root + "persistence.ts"
         );
-        const stored = JSON.parse(await readDurable("dead-air-save-v1"));
+        const stored = JSON.parse(await readDurable("study-save-v1"));
         const g = decode(stored.data);
         return Object.values(g.encounters).some(
           (e: any) => e.problem?.contract?.practice === true,

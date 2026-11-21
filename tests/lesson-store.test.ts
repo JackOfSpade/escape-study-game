@@ -3,77 +3,23 @@ import test from "node:test";
 import { fnv1a } from "../src/hash";
 import {
   createLessonStore,
+  LESSON_DB,
   validLessonRecord,
   type LessonEntry,
 } from "../src/lesson-store";
+import { fakeLessonIdb } from "./helpers/fake-lesson-idb";
 
-/** A small in-memory IndexedDB: one object store per database, with the
- * handful of calls the lesson store makes, answered asynchronously. */
+/** The shared IndexedDB fake, with the lesson store's rows at hand. */
 function fakeIdb() {
-  const opened: string[] = [],
-    rows = new Map<string, unknown>();
-  let blocked = false,
-    createdStores = 0;
-  const factory = {
-    open(name: string, version?: number) {
-      opened.push(`${name}@${version}`);
-      const req = {} as IDBOpenDBRequest;
-      queueMicrotask(() => {
-        if (blocked) {
-          req.onblocked?.call(req, {} as IDBVersionChangeEvent);
-          return;
-        }
-        const stores = new Set<string>();
-        const db = {} as IDBDatabase;
-        Object.assign(db, {
-          objectStoreNames: { contains: (n: string) => stores.has(n) },
-          createObjectStore(n: string) {
-            stores.add(n);
-            createdStores++;
-          },
-          close() {},
-          transaction() {
-            const tx = {} as IDBTransaction;
-            const done = () =>
-              queueMicrotask(() => tx.oncomplete?.call(tx, new Event("x")));
-            Object.assign(tx, {
-              objectStore() {
-                return {
-                  getAll() {
-                    const r = {} as IDBRequest;
-                    queueMicrotask(() => {
-                      Object.assign(r, { result: [...rows.values()] });
-                      r.onsuccess?.call(r, new Event("success"));
-                      done();
-                    });
-                    return r;
-                  },
-                  put(value: unknown, key: string) {
-                    rows.set(key, value);
-                    done();
-                  },
-                  delete(key: string) {
-                    rows.delete(key);
-                    done();
-                  },
-                };
-              },
-            });
-            return tx;
-          },
-        });
-        Object.assign(req, { result: db });
-        req.onupgradeneeded?.call(req, {} as IDBVersionChangeEvent);
-        req.onsuccess?.call(req, new Event("success"));
-      });
-      return req;
-    },
-  };
+  let blocked = false;
+  const fake = fakeLessonIdb({ blockOpen: () => blocked });
   return {
-    factory,
-    opened,
-    rows,
-    created: () => createdStores,
+    factory: fake.factory,
+    opened: fake.log.opened,
+    get rows() {
+      return fake.rows(LESSON_DB, "lessons")!;
+    },
+    created: () => fake.log.created,
     block: (on: boolean) => (blocked = on),
   };
 }
@@ -164,9 +110,12 @@ test("only the lesson database is ever opened", async () => {
   await s.all();
   await s.remove("gap-1");
   assert.ok(h.opened.length >= 1);
-  assert.deepEqual([...new Set(h.opened)], ["dead-air-lessons@1"]);
+  assert.deepEqual([...new Set(h.opened)], ["study-lessons@1"]);
   assert.ok(!h.opened.some((o) => o.includes("durable-state")));
-  assert.equal(h.created(), 1);
+  assert.deepEqual(h.created(), [
+    "study-lessons/lessons",
+    "study-lessons/meta",
+  ]);
 });
 
 test("remove deletes one record and leaves the others", async () => {

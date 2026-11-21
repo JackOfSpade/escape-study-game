@@ -188,10 +188,21 @@ test("the lesson modules reach neither the save nor anything that records learni
     for (const name of forbidden)
       assert.ok(!text.includes(name), `${file} mentions ${name}`);
     assert.ok(!/\.resolved\s*=[^=]/.test(text), `${file} sets a resolved flag`);
-    assert.ok(!text.includes("dead-air-durable-state"));
+    // Neither the save's database nor its earlier name.
+    for (const name of [
+      "study-durable-state",
+      "dead-air-durable-state",
+      "durable-state",
+      "study-save-v1",
+      "dead-air-save-v1",
+    ])
+      assert.ok(!text.includes(name), `${file} names ${name}`);
     assert.ok(!/\bsave\(|\bpersist\(/.test(text), `${file} saves the record`);
   }
-  assert.match(source("src/lesson-store.ts"), /"dead-air-lessons"/);
+  const store = source("src/lesson-store.ts");
+  assert.match(store, /const DB = "study-lessons"/);
+  // The earlier name is kept only to move its lessons over.
+  assert.match(store, /LEGACY_LESSON_DB = "dead-air-lessons"/);
   assert.ok(!imports(source("src/lesson.ts")).includes("./model-writes"));
 });
 

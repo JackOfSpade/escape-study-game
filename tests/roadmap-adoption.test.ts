@@ -63,13 +63,14 @@ test("the reconcile instruction names the app's own evidence modes and incoming 
     instruction = p.instruction;
     return reply(p);
   });
-  for (const mode of [
-    "GAME_AI_ASSESSED_INDEPENDENT",
-    "GAME_AI_ASSESSED_ASSISTED",
-    "GAME_AI_ASSESSED_CONTRADICTED",
-    "GAME_AI_ASSESSED_UNKNOWN",
-  ])
-    assert.ok(instruction.includes(mode), `instruction omits ${mode}`);
+  // Current exports write STUDY_AI_ASSESSED_*; files saved by earlier builds
+  // carry GAME_AI_ASSESSED_*, so the instruction names both.
+  for (const outcome of ["INDEPENDENT", "ASSISTED", "CONTRADICTED", "UNKNOWN"])
+    for (const prefix of ["STUDY_AI_ASSESSED_", "GAME_AI_ASSESSED_"])
+      assert.ok(
+        instruction.includes(prefix + outcome),
+        `instruction omits ${prefix + outcome}`,
+      );
   assert.ok(
     instruction.includes("source records from the device that saved it"),
     "instruction does not treat incoming descendant records as source records",
@@ -595,6 +596,52 @@ for (const provider of ["study-mode", "chatgpt-handoff"] as const)
       external.file.gapIds["PE:X09.1/D1"],
     );
   });
+/** The same export as an earlier build wrote it: legacy evidence modes and
+ * the legacy 0.12 heading. */
+function legacyWording(raw: string) {
+  return raw
+    .replaceAll("STUDY_AI_ASSESSED_", "GAME_AI_ASSESSED_")
+    .replaceAll(
+      "### 0.12 Study semantic scope and continuation state\n",
+      "### 0.12 Game semantic scope and continuation state\n",
+    );
+}
+test("a file saved by an earlier build with legacy GAME_AI_ASSESSED_* modes still imports its assessed evidence", async () => {
+  const external = await externallyAssessedFile(),
+    { g } = fixture(),
+    incoming = legacyWording(external.file.content);
+  assert.ok(external.file.content.includes("STUDY_AI_ASSESSED_INDEPENDENT"));
+  assert.equal(external.file.content.includes("GAME_AI_ASSESSED_"), false);
+  assert.ok(incoming.includes("GAME_AI_ASSESSED_INDEPENDENT"));
+  await reconcileRoadmap(g, r, incoming, async (p) => ({
+    ...external.make(p),
+    canonical: p.candidate,
+  }));
+  const job = g.study.roadmapReconciliations![0];
+  assert.equal(job.state, "ready", job.error);
+  await adoptReconciledRoadmap(g, r, job.id);
+  assert.equal(g.study.learner!.cells["PE:X09.1"].states[0], "P");
+});
+test("a legacy GAME_AI_ASSESSED_* mode is still held to its exact named outcome", async () => {
+  const external = await externallyAssessedFile(),
+    { g, l } = fixture();
+  let incoming = legacyWording(external.file.content);
+  const row = incoming
+    .split("\n")
+    .find((line) => line.startsWith("| S0008-EV03 |"))!;
+  incoming = incoming.replace(
+    row,
+    row.replace("GAME_AI_ASSESSED_INDEPENDENT", "GAME_AI_ASSESSED_ASSISTED"),
+  );
+  await reconcileRoadmap(g, r, incoming, async (p) => ({
+    ...external.make(p),
+    canonical: p.candidate,
+  }));
+  const job = g.study.roadmapReconciliations![0];
+  assert.equal(job.state, "error");
+  assert.match(job.error!, /outcome or named facet does not match/);
+  assert.equal(l.cells["PE:X09.1"].states[0], "U");
+});
 test("guided, missing-scope and fabricated imported passes cannot be promoted by native prose or score alone", async () => {
   const external = await externallyAssessedFile();
   for (const bad of [
@@ -631,7 +678,7 @@ test("guided, missing-scope and fabricated imported passes cannot be promoted by
           "| 1 | ",
         );
       if (bad === "mixed-guided")
-        changed = changed.replace("GAME_AI_ASSESSED_INDEPENDENT", "GUIDED");
+        changed = changed.replace("STUDY_AI_ASSESSED_INDEPENDENT", "GUIDED");
       incoming = incoming.replace(row, changed);
     }
     if (bad === "invalidated") {

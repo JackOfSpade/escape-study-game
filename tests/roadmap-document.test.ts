@@ -373,26 +373,34 @@ test("legacy saved counters preserve PE position only with a verified source off
     await assert.rejects(parseRoadmapDocument(raw, r), /ratio/);
   }
 });
-test("legacy exported supplements without exact retention and suspended metadata remain reviewable but cannot silently reset those fields", async () => {
-  const text =
-    "\n### 0.12 Game semantic scope and continuation state\n\nLegacy partial source claims, no complete metadata.\n";
-  const raw = next(
-    r.raw.replace(
-      "<!-- END PY_PROGRESS -->",
-      text + "<!-- END PY_PROGRESS -->",
-    ),
-  );
-  const parsed = await parseRoadmapDocument(raw, r);
-  assert.ok(
-    parsed.resume!.issues.some((i) => i.includes("legacy exported progress")),
-  );
-  assert.throws(() => initialLearner(parsed), /needs reconciliation/);
-  const report = await reviewRoadmap(r, r.raw, raw);
-  assert.equal(report.issues.filter((i) => i.severity === "invalid").length, 0);
-  assert.ok(
-    report.issues.some((i) => /legacy exported progress/.test(i.detail)),
-  );
-});
+// Current exports write the Study heading; exports from earlier builds carry
+// the Game heading, and both must be read the same way.
+for (const heading of [
+  "0.12 Study semantic scope and continuation state",
+  "0.12 Game semantic scope and continuation state",
+])
+  test(`legacy exported supplements without exact retention and suspended metadata remain reviewable but cannot silently reset those fields (${heading})`, async () => {
+    const text = `\n### ${heading}\n\nLegacy partial source claims, no complete metadata.\n`;
+    const raw = next(
+      r.raw.replace(
+        "<!-- END PY_PROGRESS -->",
+        text + "<!-- END PY_PROGRESS -->",
+      ),
+    );
+    const parsed = await parseRoadmapDocument(raw, r);
+    assert.ok(
+      parsed.resume!.issues.some((i) => i.includes("legacy exported progress")),
+    );
+    assert.throws(() => initialLearner(parsed), /needs reconciliation/);
+    const report = await reviewRoadmap(r, r.raw, raw);
+    assert.equal(
+      report.issues.filter((i) => i.severity === "invalid").length,
+      0,
+    );
+    assert.ok(
+      report.issues.some((i) => /legacy exported progress/.test(i.detail)),
+    );
+  });
 test("evidence must cite an assessment task issued on its own track", async () => {
   const row = "| S0004-EV03 | S0004-A02 |";
   assert.ok(r.raw.includes(row), "the source has this PE evidence row");

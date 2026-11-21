@@ -2,6 +2,7 @@ import { sha256 } from "./digest";
 import { finalRequirements } from "./final-requirements";
 import type { Objective, Roadmap, Track } from "./model";
 import { readIdentifierCounters } from "./roadmap-identifiers";
+import { supplementHeadingIn } from "./roadmap-export-names";
 import { inspectMergedDocument } from "./roadmap-structure";
 import { CELL_SEPARATOR } from "./table-row";
 const validDay = (value: string) =>
@@ -352,13 +353,10 @@ export async function parseRoadmapDocument(
     throw Error("Saved ratio position contradicts its next track");
   const reviews: NonNullable<Roadmap["resume"]>["reviews"] = {};
   for (const t of ["PY", "PE"] as Track[]) {
-    const supplement = tracks[t].progress.includes(
-      "### 0.12 Game semantic scope and continuation state\n",
-    )
-      ? part(
-          tracks[t].progress,
-          "0.12 Game semantic scope and continuation state",
-        )
+    // Exports from earlier builds carry the legacy 0.12 heading.
+    const supplementHeading = supplementHeadingIn(tracks[t].progress);
+    const supplement = supplementHeading
+      ? part(tracks[t].progress, supplementHeading)
       : "";
     if (
       supplement &&

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { decode, encode, load, recover } from "../src/persistence";
+import { fakeIndexedDB, fakeLocalStorage } from "./helpers/fake-indexeddb";
 
 /**
  * `tests/fixtures/legacy-save/save.json` is a synthetic save written by the
@@ -75,41 +76,23 @@ test("saving again writes every legacy field back unchanged", () => {
   assert.deepEqual(again.encounters, g.encounters);
 });
 
-test("the stored copy goes through load() like any save", async () => {
-  const durable = stored;
-  Object.defineProperty(globalThis, "indexedDB", {
-    configurable: true,
-    value: {
-      open() {
-        const db = {
-          transaction() {
-            const tx = {} as IDBTransaction;
-            Object.assign(tx, {
-              objectStore: () => ({
-                get() {
-                  const req = { result: durable } as IDBRequest;
-                  queueMicrotask(() => {
-                    req.onsuccess?.call(req, new Event("success"));
-                    tx.oncomplete?.call(tx, new Event("complete"));
-                  });
-                  return req;
-                },
-              }),
-            });
-            return tx;
-          },
-        };
-        const req = { result: db } as unknown as IDBOpenDBRequest;
-        queueMicrotask(() => req.onsuccess?.call(req, new Event("success")));
-        return req;
-      },
-    },
-  });
-  Object.defineProperty(globalThis, "localStorage", {
-    configurable: true,
-    value: { getItem: () => null, setItem() {} },
-  });
-  const g = recover((await load())!);
+test("the stored copy goes through load() like any save, under its earlier storage names", async () => {
+  // The earlier build stored this save in IndexedDB database
+  // "dead-air-durable-state" and in localStorage, both under the key
+  // "dead-air-save-v1". Each copy alone must still load.
+  const idb = fakeIndexedDB(),
+    local = fakeLocalStorage();
+  idb.install();
+  local.install();
+  idb.seed("dead-air-durable-state", { "dead-air-save-v1": stored });
+  let g = recover((await load())!);
   assert.equal(g.id, expected.id);
   assert.deepEqual(g.study, expected.study);
+
+  idb.reset();
+  local.items.set("dead-air-save-v1", stored);
+  g = recover((await load())!);
+  assert.equal(g.id, expected.id);
+  assert.deepEqual(g.study, expected.study);
+  assert.ok(!idb.has("dead-air-durable-state"), "reading never creates it");
 });

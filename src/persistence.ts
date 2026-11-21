@@ -8,11 +8,22 @@ import {
   recoverDirectStudy,
   releaseSettledRequests,
 } from "./run-learning";
-import { readDurable, writeDurable } from "./storage";
+import {
+  readCurrentDurable,
+  readLegacyDurable,
+  retireLegacyDurable,
+  writeDurable,
+} from "./storage";
 import { briefError, studyEvent } from "./study-events";
-// Storage name kept from an earlier build; renaming it needs a migration
-// (see AGENTS.md).
-const KEY = "dead-air-save-v1";
+const KEY = "study-save-v1";
+/**
+ * The save's key before the rename, in localStorage and in the earlier
+ * database (`LEGACY_DB` in storage.ts). Both copies are still read, so a save
+ * from before the update, or from a tab still running the earlier build, is
+ * never shadowed by an older one. A legacy copy is removed only after a copy
+ * at least as new is safely written under the new names (see AGENTS.md).
+ */
+const LEGACY_KEY = "dead-air-save-v1";
 interface Envelope {
   schema: 1;
   payload: string;
@@ -74,8 +85,75 @@ const checkpoints = createCheckpointQueue<{
     } catch {
       throw error;
     }
+    retireLegacyLocal(checkpointSerial);
+    return;
   }
+  // The strict transaction completed: this checkpoint is on disk under the new
+  // name, so older legacy copies are redundant. Removing the localStorage one
+  // also frees quota for the next synchronous mirror.
+  retireLegacyLocal(checkpointSerial);
+  retireLegacyStore(checkpointSerial);
 });
+/** Whether a legacy copy may go now that `written` is safely stored. A valid
+ * copy may go when it is not newer. A damaged one has no readable serial, so
+ * it goes only once `load()` offered its bytes to the learner, exactly as a
+ * damaged copy under the new name is replaced by the next save. */
+function legacyDiscardable(raw: unknown, written: number) {
+  if (typeof raw !== "string") return false;
+  try {
+    return unpack(raw).serial <= written;
+  } catch {
+    return (
+      rejected?.raw === raw ||
+      !!rejected?.others?.some((copy) => copy.raw === raw)
+    );
+  }
+}
+function retireLegacyLocal(written: number) {
+  try {
+    const raw = localStorage.getItem(LEGACY_KEY);
+    if (raw === null || !legacyDiscardable(raw, written)) return;
+    localStorage.removeItem(LEGACY_KEY);
+    studyEvent("save-legacy-copy-removed", { store: "legacy-local" });
+  } catch (error) {
+    studyEvent("save-legacy-cleanup-failed", {
+      store: "legacy-local",
+      error: briefError(error),
+    });
+  }
+}
+let legacyStoreGone = false,
+  legacyRetiring: Promise<void> | undefined;
+/** Best effort and never awaited by a save: a delete blocked by another tab
+ * stays pending in the browser, and a failure is retried by a later save. */
+function retireLegacyStore(written: number) {
+  if (legacyStoreGone || legacyRetiring) return;
+  const retiring = retireLegacyDurable(
+    LEGACY_KEY,
+    (raw) => legacyDiscardable(raw, written),
+    () =>
+      studyEvent("save-legacy-cleanup-blocked", { store: "legacy-durable" }),
+  ).then(
+    (result) => {
+      if (result !== "kept") legacyStoreGone = true;
+      if (result === "deleted")
+        studyEvent("save-legacy-copy-removed", { store: "legacy-durable" });
+    },
+    (error) =>
+      studyEvent("save-legacy-cleanup-failed", {
+        store: "legacy-durable",
+        error: briefError(error),
+      }),
+  );
+  legacyRetiring = retiring;
+  void retiring.finally(() => {
+    if (legacyRetiring === retiring) legacyRetiring = undefined;
+  });
+}
+/** Settles once a running legacy cleanup finishes (for tests). */
+export function legacyCleanupSettled() {
+  return legacyRetiring ?? Promise.resolve();
+}
 interface StoredSave {
   format: 2;
   serial: number;
@@ -114,6 +192,7 @@ export function save(g: StudyRecord, options: { background?: boolean } = {}) {
     try {
       localStorage.setItem(KEY, payload);
       checkpoint = true;
+      retireLegacyLocal(serial);
     } catch (error) {
       // IndexedDB still takes this save, so nothing is shown to the learner;
       // the fallback copy, though, now stays at an older checkpoint.
@@ -129,39 +208,54 @@ export function save(g: StudyRecord, options: { background?: boolean } = {}) {
   }
   return checkpoints.enqueue({ payload, checkpoint, serial });
 }
-async function storedCopies() {
-  let durable: string | null = null,
-    local: string | null = null,
-    durableError: string | undefined,
-    localError: string | undefined;
+async function attempt(read: () => string | null | Promise<string | null>) {
   try {
-    durable = await readDurable(KEY);
+    return { raw: await read() };
   } catch (error) {
-    durableError = String(error);
+    return { raw: null, error: String(error) };
   }
-  try {
-    local = localStorage.getItem(KEY);
-  } catch (error) {
-    localError = String(error);
-  }
-  return { durable, local, durableError, localError };
 }
-/** Preserve the original stored bytes, including a damaged or unreadable copy. */
+async function storedCopies() {
+  const durable = await attempt(() => readCurrentDurable(KEY)),
+    local = await attempt(() => localStorage.getItem(KEY)),
+    legacyDurable = await attempt(() => readLegacyDurable(LEGACY_KEY)),
+    legacyLocal = await attempt(() => localStorage.getItem(LEGACY_KEY));
+  return {
+    durable: durable.raw,
+    local: local.raw,
+    legacyDurable: legacyDurable.raw,
+    legacyLocal: legacyLocal.raw,
+    durableError: durable.error,
+    localError: local.error,
+    legacyDurableError: legacyDurable.error,
+    legacyLocalError: legacyLocal.error,
+  };
+}
+/** Preserve the original stored bytes, including a damaged or unreadable copy.
+ * Nothing in the app reads a recovery file back (a backup is imported as a
+ * plain encoded record), so the format name changed with the storage names
+ * and needs no reader for the earlier "dead-air-recovery-v1" name. */
 export async function exportRecoveryBackup() {
   return JSON.stringify(
-    // The "dead-air-" format name is kept from an earlier build: files already
-    // downloaded carry it.
-    { format: "dead-air-recovery-v1", key: KEY, ...(await storedCopies()) },
+    {
+      format: "study-recovery-v1",
+      key: KEY,
+      legacyKey: LEGACY_KEY,
+      ...(await storedCopies()),
+    },
     null,
     2,
   );
 }
 /** A stored copy that failed validation while the other copy loaded. */
 export interface RejectedCopy {
-  store: "durable" | "local";
+  store: "durable" | "local" | "legacy-durable" | "legacy-local";
   /** The stored bytes exactly as they were read. */
   raw: string;
   reason: string;
+  /** Further refused copies when more than one store held damaged bytes;
+   * they ride along in the same download. */
+  others?: Omit<RejectedCopy, "others">[];
 }
 let rejected: RejectedCopy | undefined;
 /** The copy the last `load()` refused although it returned the other one.
@@ -170,19 +264,37 @@ export function rejectedCopy() {
   return rejected;
 }
 export async function load() {
-  const { durable, local, durableError, localError } = await storedCopies();
+  const copies = await storedCopies();
+  // A fresh look at storage: the first save checks for the legacy database again.
+  legacyStoreGone = false;
+  const unreadable = Error(
+    "Saved checkpoints could not be read. Reload to retry storage access, or export a recovery backup before importing a backup.",
+  );
   // An unreadable store may hold a newer checkpoint than the readable copy.
   // Starting from that older copy would overwrite unseen learning on save.
-  if (durableError || localError)
-    throw Error(
-      "Saved checkpoints could not be read. Reload to retry storage access, or export a recovery backup before importing a backup.",
-    );
+  if (copies.durableError || copies.localError) throw unreadable;
+  // An unreadable legacy copy only blocks loading while the same store has no
+  // copy under the new name; once it has, the legacy one predates it.
+  for (const [store, error, replacement] of [
+    ["legacy-durable", copies.legacyDurableError, copies.durable],
+    ["legacy-local", copies.legacyLocalError, copies.local],
+  ] as const)
+    if (error) {
+      if (replacement === null) throw unreadable;
+      studyEvent("save-legacy-read-failed", {
+        store,
+        error: briefError(error),
+      });
+    }
   const valid: { serial: number; record: StudyRecord }[] = [];
   const refused: RejectedCopy[] = [];
-  for (const [store, raw] of [
-    ["durable", durable],
-    ["local", local],
-  ] as const)
+  const stored = [
+    ["durable", copies.durable],
+    ["local", copies.local],
+    ["legacy-durable", copies.legacyDurable],
+    ["legacy-local", copies.legacyLocal],
+  ] as const;
+  for (const [store, raw] of stored)
     if (raw !== null)
       try {
         valid.push(unpack(raw));
@@ -191,9 +303,13 @@ export async function load() {
       }
   // A refused copy has no readable serial, so it may be the newer one. Keep
   // its bytes: the next save overwrites it in storage.
-  rejected = valid.length ? refused[0] : undefined;
+  rejected = valid.length
+    ? refused.length > 1
+      ? { ...refused[0], others: refused.slice(1) }
+      : refused[0]
+    : undefined;
   if (!valid.length) {
-    if (durable !== null || local !== null)
+    if (stored.some(([, raw]) => raw !== null))
       throw Error(
         "Saved checkpoints failed integrity checks. Export a recovery backup before starting over.",
       );

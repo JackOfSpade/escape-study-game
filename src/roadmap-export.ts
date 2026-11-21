@@ -25,6 +25,12 @@ import {
   baselineReviewSuspended,
 } from "./observation-validity";
 import { retentionEventText } from "./retention-history";
+import {
+  assessedToken,
+  isAssessedTokenFor,
+  SUPPLEMENT_HEADING,
+  SUPPLEMENT_HEADINGS,
+} from "./roadmap-export-names";
 import { externalResolutionRow } from "./roadmap-active-work";
 import { terminalCorrectionRow } from "./roadmap-attempt-updates";
 import {
@@ -558,7 +564,7 @@ export async function prepareRoadmapExport(
     !l.roadmapAdoptions?.length &&
     !l.environmentEvidence?.length
   ) {
-    // Merely playing, previewing scope definitions, or inspecting the roadmap is
+    // Merely opening, previewing scope definitions, or inspecting the roadmap is
     // administrative and cannot allocate a study session or revision.
     return {
       fingerprint,
@@ -838,7 +844,7 @@ export async function prepareRoadmapExport(
         "Due reviews": reviewText(r, l, t),
         "Unfinished attempt": pendingText(l, t),
         "Next action in this conversation": next,
-        "Next action after a new-session upload": `${current} must be treated as INTERRUPTED_AT_LAST_SAVE if it was open. Allocate the next shared session only on actual new study; preserve the queue, partial facets and reserved IDs. ${next}. Original task drafts are kept in the game backup, not in this roadmap; if unavailable, issue a fresh same-scope continuation linked to its attempt instead of inventing or transferring the task.`,
+        "Next action after a new-session upload": `${current} must be treated as INTERRUPTED_AT_LAST_SAVE if it was open. Allocate the next shared session only on actual new study; preserve the queue, partial facets and reserved IDs. ${next}. Original task drafts are kept in the study backup, not in this roadmap; if unavailable, issue a fresh same-scope continuation linked to its attempt instead of inventing or transferring the task.`,
         "Next decision rule": `1 PY : 2 PE primary visits; one bounded due review before ordinary breadth; preserve partial independent facets. ${next}`,
         "Tier 2 gate":
           state.cleared >= 1
@@ -888,8 +894,25 @@ export async function prepareRoadmapExport(
         ];
       }),
     );
-    p = inSection(p, "0.5 Assessment evidence register", (s) =>
-      upsert(
+    p = inSection(p, "0.5 Assessment evidence register", (s) => {
+      // An evidence row is an immutable fact once exported. A parent written
+      // by an earlier build names its mode with the legacy token; keep that
+      // exact mode so the row stays byte-identical across re-exports and
+      // devices. Rows this export adds use the current token.
+      const parentModes = new Map(
+        s
+          .split("\n")
+          .filter((line) => line.startsWith("| "))
+          .map((line) => split(line))
+          .map((c) => [c[0], c[5]] as const),
+      );
+      const mode = (e: (typeof evs)[number]) => {
+        const kept = parentModes.get(e.id);
+        return kept !== undefined && isAssessedTokenFor(kept, e.outcome)
+          ? kept
+          : assessedToken(e.outcome);
+      };
+      return upsert(
         s,
         evs.map((e) => [
           e.id,
@@ -897,7 +920,7 @@ export async function prepareRoadmapExport(
           localDate(e.at),
           short(e.objectiveId),
           `${isFinalTarget(e.objectiveId) ? "Tier 4 final requirement" : `D${e.depth}`} / ${e.facet}: ${l.scopes[scopeKey(e.objectiveId, e.depth)].facets.find((f) => f.id === e.facet)!.description}`,
-          `GAME_AI_ASSESSED_${e.outcome.toUpperCase()}`,
+          mode(e),
           e.outcome === "assisted"
             ? "ASSISTED"
             : e.outcome === "independent"
@@ -912,8 +935,8 @@ export async function prepareRoadmapExport(
                 : "N/A",
           `${e.outcome}; artifact references ${e.artifactSequences.join(", ") || "none"}; ${e.execution === "executed" ? "Actual recorded execution evidence" : "Text/artifacts reviewed; not executed"}; observed ${e.observedAt ?? "time unknown"}; assistance source references ${e.helpMessageIds.join(", ") || "none"}. Raw work and task text excluded.`,
         ]),
-      ),
-    );
+      );
+    });
     p = inSection(p, "0.5.1 Attempt status register", (s) =>
       upsert(
         s,
@@ -1297,19 +1320,22 @@ export async function prepareRoadmapExport(
         [
           `Merged ${revision}`,
           date,
-          "Source-preserving game progress save; full original history retained; semantic facet scope and exact queue exported",
-          `${evs.length} cumulative new evidence rows; no credit from saving, NPC work or defense`,
+          "Source-preserving study progress save; full original history retained; semantic facet scope and exact queue exported",
+          `${evs.length} cumulative new evidence rows; no credit from saving, tutor work or defense`,
         ],
       ]),
     );
     const historical = (l.historicalReviews ?? []).filter((m) =>
       l.scopes[m.scopeId].objectiveId.startsWith(`${t}:`),
     );
-    const supplementHeading = "0.12 Game semantic scope and continuation state";
-    if (p.includes(`### ${supplementHeading}\n`)) {
-      const old = section(p, supplementHeading);
-      p = p.slice(0, old.start) + p.slice(old.end);
-    }
+    // A parent written by an earlier build carries the legacy 0.12 heading;
+    // remove the section under either heading so it is never duplicated.
+    for (const heading of SUPPLEMENT_HEADINGS)
+      while (p.includes(`### ${heading}\n`)) {
+        const old = section(p, heading);
+        p = p.slice(0, old.start) + p.slice(old.end);
+      }
+    const supplementHeading = SUPPLEMENT_HEADING;
     const scopes = Object.values(l.scopes).filter(
       (d) =>
         d.objectiveId.startsWith(`${t}:`) &&
@@ -1325,7 +1351,7 @@ export async function prepareRoadmapExport(
     );
     p =
       p.trimEnd() +
-      `\n\n### ${supplementHeading}\n\nProgress only. Original task prompts, code, solutions and transcripts are intentionally excluded. The game backup retains them. If unavailable, use a fresh same-scope continuation and preserve independent facets rather than reconstructing the old task. Generated scope criteria require independent whole-scope coverage review before a new P is valid. Historical imported facets remain in the original evidence and gap registers; new facet definitions do not erase them.\n\n`;
+      `\n\n### ${supplementHeading}\n\nProgress only. Original task prompts, code, solutions and transcripts are intentionally excluded. The study backup retains them. If unavailable, use a fresh same-scope continuation and preserve independent facets rather than reconstructing the old task. Generated scope criteria require independent whole-scope coverage review before a new P is valid. Historical imported facets remain in the original evidence and gap registers; new facet definitions do not erase them.\n\n`;
     if (historical.length)
       p +=
         "Historical facet reconciliation (no new observation IDs):\n\n" +
@@ -1454,7 +1480,7 @@ export async function prepareRoadmapExport(
               line.startsWith("| Track served by the last primary visit |"),
             )!,
         )[1],
-      "Next track in alternation": `${(["PY", "PE", "PE"] as const)[studyRatioPosition(l)]}; pattern position ${studyRatioPosition(l)}; ${l.cycle} game-recorded served visit(s) since source revision ${r.revision}; imported source visits remain in their original history; unfinished visit and gate exceptions take precedence`,
+      "Next track in alternation": `${(["PY", "PE", "PE"] as const)[studyRatioPosition(l)]}; pattern position ${studyRatioPosition(l)}; ${l.cycle} app-recorded served visit(s) since source revision ${r.revision}; imported source visits remain in their original history; unfinished visit and gate exceptions take precedence`,
       "Planned continuation order": next,
       "Tier-lead status": `PY cleared through ${l.tracks.PY.cleared}; PE cleared through ${l.tracks.PE.cleared}. A track may not start a tier more than one above the other track's current tier; independent gate evidence required.`,
       "Next action in this conversation": next,
@@ -1538,7 +1564,7 @@ export async function prepareRoadmapExport(
             result[2] = [
               original[2],
               addedVisits.length
-                ? `Additional game visits: ${addedVisits.map((a) => `${a.id} ${a.contract.track} ${a.contract.objectiveIds.map(short).join(", ")} D${a.contract.depth}`).join("; ")}`
+                ? `Additional study visits: ${addedVisits.map((a) => `${a.id} ${a.contract.track} ${a.contract.objectiveIds.map(short).join(", ")} D${a.contract.depth}`).join("; ")}`
                 : "",
             ]
               .filter(Boolean)
@@ -1546,7 +1572,7 @@ export async function prepareRoadmapExport(
             result[3] = [
               original[3],
               addedEvidence.length
-                ? `Additional game evidence: ${addedEvidence.map((e) => e.id).join(", ")}`
+                ? `Additional study evidence: ${addedEvidence.map((e) => e.id).join(", ")}`
                 : "",
             ]
               .filter(Boolean)
@@ -1562,7 +1588,7 @@ export async function prepareRoadmapExport(
       [
         String(revision),
         date,
-        `Complete semantic game progress save from actual revision ${revision - 1}; parent SHA-256 ${parentHash}; no original curriculum or historical evidence removed`,
+        `Complete semantic study progress save from actual revision ${revision - 1}; parent SHA-256 ${parentHash}; no original curriculum or historical evidence removed`,
         `${l.evidence.length} cumulative additional assessed evidence rows; ${served.length} unique additional primary visits; saving itself awards no credit`,
       ],
     ]),

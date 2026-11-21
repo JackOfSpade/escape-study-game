@@ -1,6 +1,6 @@
 # Local diagnostics and bug reports
 
-Diagnostics stay in this browser under `recent-study-diagnostics-v1` (in the durable store `dead-air-durable-state`, a name kept from an earlier build), separate from the learning save. They are for agents and bug reports, not for download from the interface: read them with `window.__studyApp.logs()` on the page. No upload or model request is involved. Earlier builds wrote `recent-game-diagnostics-v1`; when the new key is absent the app reads that one, and every write goes to the new key. The old entry is never deleted.
+Diagnostics stay in this browser under `recent-study-diagnostics-v1` (in the durable store `study-durable-state`; earlier builds used `dead-air-durable-state`, which is carried over), separate from the learning save. They are for agents and bug reports, not for download from the interface: read them with `window.__studyApp.logs()` on the page. No upload or model request is involved. Earlier builds wrote `recent-game-diagnostics-v1`; when the new key is absent the app reads that one, and every write goes to the new key. The old entry is never deleted.
 
 ## What is recorded
 

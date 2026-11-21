@@ -36,6 +36,8 @@ test("a failed older durable write cannot overwrite a newer successful local che
   Object.defineProperty(globalThis, "indexedDB", {
     configurable: true,
     value: {
+      // No database from the earlier build exists in this browser.
+      databases: async () => [],
       open() {
         const req = { result: db } as unknown as IDBOpenDBRequest;
         queueMicrotask(() => req.onsuccess?.call(req, new Event("success")));

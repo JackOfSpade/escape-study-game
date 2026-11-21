@@ -187,11 +187,11 @@ test("roadmap export: complete source-preserving partial save, stable redownload
     /\| X09.1 \| D3 \| U \| U \| U \| — \|/,
   );
   assert.match(
-    part(pe, "0.12 Game semantic scope and continuation state"),
+    part(pe, "0.12 Study semantic scope and continuation state"),
     /purpose \| Explain the mechanism and its purpose \| independent/,
   );
   assert.match(
-    part(pe, "0.12 Game semantic scope and continuation state"),
+    part(pe, "0.12 Study semantic scope and continuation state"),
     /boundary \| Explain the relevant boundary behavior \| unknown/,
   );
   assert.match(
@@ -303,7 +303,7 @@ test("roadmap export: reopened facet keeps siblings and history; session close d
   assert.equal(l.cells["PE:X09.1"].states[0], "R");
   const semantic = part(
     block(two.content, "PE_PROGRESS"),
-    "0.12 Game semantic scope and continuation state",
+    "0.12 Study semantic scope and continuation state",
   );
   assert.match(
     semantic,
@@ -423,7 +423,7 @@ test("roadmap export: preview-only scope generation cannot create a revision; pe
   assert.match(
     part(
       block(pending.content, "PE_PROGRESS"),
-      "0.12 Game semantic scope and continuation state",
+      "0.12 Study semantic scope and continuation state",
     ),
     /pending-scope \| Explain the relevant source distinction \| unknown/,
   );
