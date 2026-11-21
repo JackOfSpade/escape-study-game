@@ -4,14 +4,17 @@
  * noise floor a difference has to beat to mean anything. */
 import { spawn } from "node:child_process";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   defaultOut,
   parseArgs,
+  parseSetting,
   readCases,
   readLadderRows,
 } from "./ai-ladder.mjs";
+import { claudeChildEnv, resolveClaudeBinary } from "./claude-gateway.mjs";
 import { taskInstructions } from "./lib/ai-contracts.mjs";
 
 export const JUDGE_SYSTEM =
@@ -232,7 +235,7 @@ export function createOffloadCompleter({
   timeoutMs = 180000,
   env = process.env,
 } = {}) {
-  return (request) =>
+  const completer = (request) =>
     new Promise((resolve, reject) => {
       const child = spawn(bin, ["complete"], {
         stdio: ["pipe", "pipe", "pipe"],
@@ -299,6 +302,236 @@ export function createOffloadCompleter({
       });
       child.stdin.end(`${JSON.stringify(request)}\n`);
     });
+  completer.judge = "offload:deepseek-flash";
+  return completer;
+}
+
+/** The CLI flags for one judgment: the same lock-down production uses
+ * (no tools, settings, MCP, slash commands or saved session), plain JSON out,
+ * and the prompt read from stdin because judge payloads are large. */
+export function claudeJudgeArgs({ model, effort, system }) {
+  return [
+    "-p",
+    "--no-session-persistence",
+    "--model",
+    model,
+    "--effort",
+    effort,
+    "--system-prompt",
+    system,
+    "--tools",
+    "",
+    "--setting-sources",
+    "",
+    "--strict-mcp-config",
+    "--disable-slash-commands",
+    "--input-format",
+    "text",
+    "--output-format",
+    "json",
+  ];
+}
+
+/** Only the ladder's aliases and efforts: never `max`, never a pinned id. */
+export function parseJudgeSetting(model = "opus", effort = "high") {
+  if (String(effort).trim() === "max")
+    throw Error(
+      'Judge effort "max" is never allowed; the highest is xhigh (docs/AI_MODEL_SELECTION.md, Hard exclusions)',
+    );
+  return parseSetting(`${model}:${effort}`);
+}
+
+/** The `--judge-setting` value as one strict `<model>:<effort>` string: a
+ * missing effort or extra parts fail instead of falling back to a default. */
+export function parseJudgeSettingArg(value = "opus:high") {
+  const text = String(value ?? "").trim();
+  if (/:max$/.test(text))
+    throw Error(
+      'Judge effort "max" is never allowed; the highest is xhigh (docs/AI_MODEL_SELECTION.md, Hard exclusions)',
+    );
+  return parseSetting(text);
+}
+
+/** The newest judgment per row identity. A retried `judge-error` is
+ * superseded by the later row instead of being counted twice. */
+export function latestJudgments(judgments) {
+  const latest = new Map();
+  for (const judgment of Array.isArray(judgments) ? judgments : []) {
+    const key = judgmentKey(judgment);
+    latest.delete(key);
+    latest.set(key, judgment);
+  }
+  return [...latest.values()];
+}
+
+/** One signed-in Claude CLI call per judgment, run from a neutral directory
+ * so no project CLAUDE.md is picked up, with any API key stripped so the
+ * login pays. Resolves `{text, costUsd}`. */
+export function createClaudeCompleter({
+  bin,
+  model = "opus",
+  effort = "high",
+  timeoutMs = 600000,
+  env = process.env,
+  cwd = tmpdir(),
+} = {}) {
+  const setting = parseJudgeSetting(model, effort);
+  const completer = ({ messages } = {}) =>
+    new Promise((resolve, reject) => {
+      const list = Array.isArray(messages) ? messages : [];
+      const system = list
+        .filter((message) => message?.role === "system")
+        .map((message) => String(message.content ?? ""))
+        .join("\n\n");
+      const user = list
+        .filter((message) => message?.role === "user")
+        .map((message) => String(message.content ?? ""))
+        .join("\n\n");
+      if (!user.trim()) {
+        reject(Error("claude judge request has no user message"));
+        return;
+      }
+      let binary;
+      try {
+        binary = bin ?? env.CLAUDE_BIN ?? resolveClaudeBinary(env);
+      } catch (error) {
+        reject(Error(`claude CLI not found: ${error.message}`));
+        return;
+      }
+      const child = spawn(
+        binary,
+        claudeJudgeArgs({
+          model: setting.model,
+          effort: setting.effort,
+          system,
+        }),
+        {
+          cwd,
+          env: claudeChildEnv(env, binary),
+          stdio: ["pipe", "pipe", "pipe"],
+        },
+      );
+      let stdout = "";
+      let stderr = "";
+      let settled = false;
+      let killer;
+      const finish = (error, value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (error) reject(error);
+        else resolve(value);
+      };
+      const timer = setTimeout(() => {
+        child.kill("SIGTERM");
+        killer = setTimeout(() => child.kill("SIGKILL"), 5000);
+        killer.unref?.();
+        finish(Error(`claude timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+      child.stdout.setEncoding("utf8");
+      child.stderr.setEncoding("utf8");
+      child.stdout.on("data", (chunk) => (stdout += chunk));
+      child.stderr.on("data", (chunk) => {
+        if (stderr.length < 4000) stderr += chunk;
+      });
+      child.on("error", (error) =>
+        finish(Error(`could not spawn ${binary}: ${error.message}`)),
+      );
+      child.on("close", (code) => {
+        clearTimeout(killer);
+        let result = null;
+        try {
+          result = JSON.parse(stdout.trim());
+        } catch {
+          result = firstJsonObject(stdout);
+        }
+        if (code !== 0) {
+          const detail =
+            typeof result?.result === "string" && result.result
+              ? result.result
+              : stderr || stdout;
+          finish(Error(`claude exited ${code}: ${detail.slice(0, 400)}`));
+          return;
+        }
+        if (!result || typeof result !== "object") {
+          finish(
+            Error(`claude printed no JSON result: ${stdout.slice(0, 400)}`),
+          );
+          return;
+        }
+        if (
+          result.is_error ||
+          (result.subtype && result.subtype !== "success")
+        ) {
+          finish(
+            Error(
+              `claude failed: ${result.subtype ?? "error"} ${String(
+                result.result ?? "",
+              ).slice(0, 400)}`.trim(),
+            ),
+          );
+          return;
+        }
+        const usedModels =
+          result.modelUsage && typeof result.modelUsage === "object"
+            ? Object.keys(result.modelUsage)
+            : [];
+        if (
+          usedModels.length &&
+          !usedModels.some((id) => id.includes(setting.model))
+        ) {
+          finish(
+            Error(
+              `claude ran ${usedModels.join(", ")} instead of ${setting.model}`,
+            ),
+          );
+          return;
+        }
+        const text = String(result.result ?? "").trim();
+        if (!text) {
+          finish(Error("claude returned an empty reply"));
+          return;
+        }
+        finish(undefined, {
+          text,
+          costUsd: isNumber(result.total_cost_usd)
+            ? result.total_cost_usd
+            : null,
+        });
+      });
+      child.stdin.on("error", () => {});
+      child.stdin.end(user);
+    });
+  completer.judge = `claude:${setting.setting}`;
+  return completer;
+}
+
+/** The judge label a completer carries, for the `judge` field on each row. */
+export const judgeLabel = (completer) =>
+  typeof completer?.judge === "string" && completer.judge
+    ? completer.judge
+    : "custom";
+
+/** Distinct judge labels in a run's judgments; rows written before the label
+ * existed count as "unrecorded". */
+export function judgesOf(judgments) {
+  return [
+    ...new Set(
+      (Array.isArray(judgments) ? judgments : []).map((judgment) =>
+        typeof judgment?.judge === "string" && judgment.judge
+          ? judgment.judge
+          : "unrecorded",
+      ),
+    ),
+  ].sort();
+}
+
+/** A warning line when one run's judgments come from more than one judge. */
+export function mixedJudgeWarning(judgments) {
+  const judges = judgesOf(judgments);
+  return judges.length > 1
+    ? `Warning: judgments.jsonl mixes ${judges.length} judges (${judges.join(", ")}); scores are not comparable across judges. Judge each run with one backend, or into a fresh --out.`
+    : null;
 }
 
 const replyText = (reply) =>
@@ -369,7 +602,13 @@ export async function judgeLadder({
   for (const row of rows)
     if (row.setting === resolved.setting && row.rep === resolved.rep)
       referenceRows.set(row.caseId, row);
-  const done = new Set(readJudgments(out).map(judgmentKey));
+  // A `judge-error` row (e.g. a transient CLI or rate-limit failure) is not
+  // done: a later run retries it and the newer row supersedes it.
+  const done = new Set(
+    latestJudgments(readJudgments(out))
+      .filter((judgment) => judgment.verdict !== "judge-error")
+      .map(judgmentKey),
+  );
   const jobs = [];
   let skipped = 0;
   for (const row of rows) {
@@ -382,6 +621,7 @@ export async function judgeLadder({
     }
     jobs.push({ row, referenceRow });
   }
+  const judge = judgeLabel(completer);
   const judgments = [];
   const record = (judgment) => {
     appendFileSync(judgmentsFile, `${JSON.stringify(judgment)}\n`, {
@@ -396,6 +636,7 @@ export async function judgeLadder({
       operation: row.operation,
       setting: row.setting,
       rep: row.rep,
+      judge,
     };
     const referenceAnswer = lastAnswer(referenceRow);
     if (row.outcome !== "valid")
@@ -463,6 +704,7 @@ export async function judgeLadder({
     out,
     judgmentsFile,
     reference: resolved,
+    judge,
     judgments,
     skipped,
     pending: jobs.length,
@@ -482,7 +724,7 @@ const noiseFloorEntry = (summary, reference) => {
 /** Per operation × setting × rep quality, agreement, validity and cost. */
 export function summarizeJudgments(judgments, rows, { reference } = {}) {
   const rowList = Array.isArray(rows) ? rows : [];
-  const list = Array.isArray(judgments) ? judgments : [];
+  const list = latestJudgments(judgments);
   const resolved = resolveReference(rowList, reference);
   const referenceMeans = new Map();
   for (const judgment of list) {
@@ -694,7 +936,7 @@ async function main(argv) {
   const args = parseArgs(rest);
   if (!["run", "report"].includes(command))
     throw Error(
-      "Usage: ai-judge.mjs run --name <ladder name> | --out <dir> --cases <file|dir> [--parallel N] | report --name <name> | --out <dir> [--json]",
+      "Usage: ai-judge.mjs run --name <ladder name> | --out <dir> --cases <file|dir> [--judge offload|claude] [--judge-setting opus:high] [--parallel N] | report --name <name> | --out <dir> [--json]",
     );
   if (!args.name && !args.out) throw Error("Pass --name <name> or --out <dir>");
   const out = args.out ?? defaultOut(args.name);
@@ -708,25 +950,48 @@ async function main(argv) {
       }
     : undefined;
   if (command === "run") {
+    const backend = args.judge ?? "offload";
+    if (!["offload", "claude"].includes(backend))
+      throw Error(`--judge must be offload or claude (got "${backend}")`);
+    if (backend !== "claude" && args["judge-setting"] !== undefined)
+      throw Error("--judge-setting applies only to --judge claude");
+    const { model, effort } = parseJudgeSettingArg(
+      args["judge-setting"] ?? "opus:high",
+    );
+    const completer =
+      backend === "claude"
+        ? createClaudeCompleter({ model, effort })
+        : createOffloadCompleter();
     const result = await judgeLadder({
       out,
       cases: readCases(args.cases),
       reference,
+      completer,
       parallel: args.parallel === undefined ? 4 : Number(args.parallel),
       only: args.only ? String(args.only).split(",") : undefined,
     });
     console.log(
-      `${result.judgments.length} new judgment(s) in ${result.judgmentsFile} (reference ${result.reference.setting} rep ${result.reference.rep}); ${result.skipped} already judged`,
+      `${result.judgments.length} new judgment(s) by ${result.judge} in ${result.judgmentsFile} (reference ${result.reference.setting} rep ${result.reference.rep}); ${result.skipped} already judged`,
     );
   }
-  const summary = summarizeJudgments(readJudgments(out), readLadderRows(out), {
+  const judgments = latestJudgments(readJudgments(out));
+  const summary = summarizeJudgments(judgments, readLadderRows(out), {
     reference,
   });
   const knee = kneeReport(summary);
+  const judges = judgesOf(judgments);
+  const warning = mixedJudgeWarning(judgments);
   if (args.json) {
-    console.log(JSON.stringify({ out, summary, knee }, null, 2));
+    console.log(
+      JSON.stringify(
+        { out, summary, knee, judges, mixedJudges: !!warning, warning },
+        null,
+        2,
+      ),
+    );
     return;
   }
+  if (warning) console.log(warning);
   if (!summary.length)
     console.log(`No judgments in ${join(out, "judgments.jsonl")}`);
   else {

@@ -61,8 +61,8 @@ test("both lesson operations are served and have their own profile", () => {
   for (const operation of AI_OPERATIONS) taskProfile(operation, {});
   assert.equal(taskProfile("lesson").model, "opus");
   assert.equal(taskProfile("lesson").effort, "high");
-  assert.equal(taskProfile("lesson-chat").model, "sonnet");
-  assert.equal(taskProfile("lesson-chat").effort, "medium");
+  assert.equal(taskProfile("lesson-chat").model, "haiku");
+  assert.equal(taskProfile("lesson-chat").effort, "high");
 });
 
 test("lesson instructions open as a lesson writer and carry the policy", () => {

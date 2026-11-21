@@ -78,15 +78,14 @@ export const TASK_PROFILES = Object.freeze({
     stableKeys: ["instruction", "definition"],
   },
   "reconcile-roadmap": { ...authoring("high"), stableKeys: ["instruction"] },
-  // Chosen by judgement, not measured (docs/AI_MODEL_SELECTION.md): a lesson
-  // is authored like a question, one step above `generate`; the side chat is
-  // a short live reply like `tutor`, one step above its setting.
+  // Measured 2026-11-20 (docs/AI_MODEL_SELECTION.md): Opus high is the
+  // `lesson` knee, and Haiku high is the side chat's.
   lesson: {
     ...authoring("high"),
     stableKeys: ["curriculum", "lessonPolicy"],
   },
   "lesson-chat": {
-    ...live(120_000, "sonnet", "medium"),
+    ...live(120_000, "haiku", "high"),
     stableKeys: [
       "instruction",
       "responseFormat",

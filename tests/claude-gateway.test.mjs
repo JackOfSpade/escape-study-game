@@ -313,7 +313,7 @@ test("each task runs its chosen model and effort, latest aliases only", () => {
       "review-environment": "haiku/medium",
       "reconcile-roadmap": "opus/high",
       lesson: "opus/high",
-      "lesson-chat": "sonnet/medium",
+      "lesson-chat": "haiku/high",
     },
   );
   assert.deepEqual(taskProfile("lesson").stableKeys, [

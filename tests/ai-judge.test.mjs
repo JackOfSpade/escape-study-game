@@ -1,20 +1,34 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   JUDGE_SYSTEM,
   candidateFirst,
+  createClaudeCompleter,
   fieldAgreement,
   judgeLadder,
+  judgeMessages,
+  judgesOf,
+  mixedJudgeWarning,
   kneeReport,
+  latestJudgments,
   mapJudgment,
+  parseJudgeSettingArg,
   parseJudgeReply,
   readJudgments,
   summarizeJudgments,
 } from "../scripts/ai-judge.mjs";
 
+const realpathOf = (path) => realpathSync(path);
 const tempOut = () => mkdtempSync(join(tmpdir(), "ai-judge-test-"));
 const CASES = [
   { id: "case-a", operation: "generate", payload: { focus: "binary search" } },
@@ -347,6 +361,83 @@ test("rerunning resumes by skipping already judged rows", async (t) => {
   assert.equal(readJudgments(out).length, 3);
 });
 
+test("a resumed run retries judge errors and the newer row supersedes them", async (t) => {
+  const out = tempOut();
+  t.after(() => rmSync(out, { recursive: true, force: true }));
+  writeRows(out, [
+    ladderRow({ setting: "sonnet:high", rep: 0 }),
+    ladderRow({ setting: "haiku:low", rep: 0 }),
+  ]);
+  const reference = { setting: "sonnet:high", rep: 0 };
+  await judgeLadder({
+    out,
+    cases: CASES,
+    reference,
+    completer: fakeCompleter(() => {
+      throw Error("usage limit reached");
+    }),
+  });
+  assert.equal(readJudgments(out)[0].verdict, "judge-error");
+  const retry = fakeCompleter({
+    text: '{"scoreA": 6, "scoreB": 8, "better": "B"}',
+    costUsd: 0.001,
+  });
+  const resumed = await judgeLadder({
+    out,
+    cases: CASES,
+    reference,
+    completer: retry,
+  });
+  assert.equal(retry.calls.length, 1);
+  assert.equal(resumed.skipped, 0);
+  assert.equal(resumed.judgments.length, 1);
+  const all = readJudgments(out);
+  assert.equal(all.length, 2);
+  const latest = latestJudgments(all);
+  assert.equal(latest.length, 1);
+  assert.notEqual(latest[0].verdict, "judge-error");
+  const [line] = summarizeJudgments(all, [
+    ladderRow({ setting: "sonnet:high", rep: 0 }),
+    ladderRow({ setting: "haiku:low", rep: 0 }),
+  ]).filter((entry) => entry.setting === "haiku:low");
+  assert.equal(line.n, 1);
+  assert.equal(line.errors, 0);
+  const third = fakeCompleter(() => {
+    throw Error("a judged row must not be judged again");
+  });
+  const again = await judgeLadder({
+    out,
+    cases: CASES,
+    reference,
+    completer: third,
+  });
+  assert.equal(third.calls.length, 0);
+  assert.equal(again.skipped, 1);
+});
+
+test("--judge-setting must be a strict <model>:<effort> and never max", () => {
+  assert.deepEqual(parseJudgeSettingArg("opus:high"), {
+    model: "opus",
+    effort: "high",
+    setting: "opus:high",
+  });
+  assert.equal(parseJudgeSettingArg().setting, "opus:high");
+  assert.equal(parseJudgeSettingArg("sonnet:medium").setting, "sonnet:medium");
+  for (const bad of [
+    "opus",
+    "sonnet",
+    "opus:high:extra",
+    "opus:",
+    ":high",
+    "gpt:high",
+  ])
+    assert.throws(() => parseJudgeSettingArg(bad), /Invalid setting/, bad);
+  assert.throws(
+    () => parseJudgeSettingArg("opus:max"),
+    /"max" is never allowed/,
+  );
+});
+
 const summaryRows = [
   ladderRow({ setting: "cheap", rep: 0, costUsd: 0.01 }),
   ladderRow({ setting: "cheap", rep: 0, costUsd: 0.01, caseId: "case-b" }),
@@ -540,4 +631,212 @@ test("kneeReport asks for more arms when fewer than two dearer settings exist", 
   assert.equal(report[0].knee, null);
   assert.equal(report[0].noiseFloorDelta, 1);
   assert.equal(report[0].settings.length, 2);
+});
+
+// A stand-in for the Claude CLI: records its argv, cwd and stdin, then prints
+// whatever CLI-shaped result STUB_REPLY holds (or sleeps, or exits non-zero).
+const STUB = `#!/usr/bin/env node
+const { writeFileSync } = require("node:fs");
+let input = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => (input += chunk));
+process.stdin.on("end", () => {
+  writeFileSync(process.env.STUB_RECORD, JSON.stringify({
+    argv: process.argv.slice(2),
+    cwd: process.cwd(),
+    stdin: input,
+    apiKey: process.env.ANTHROPIC_API_KEY ?? null,
+  }));
+  const mode = process.env.STUB_MODE ?? "ok";
+  if (mode === "sleep") return setTimeout(() => {}, 60000);
+  if (mode === "fail") {
+    process.stderr.write("boom from stub");
+    process.exit(3);
+  }
+  process.stdout.write(process.env.STUB_REPLY);
+});
+`;
+const cliResult = (overrides = {}) => ({
+  type: "result",
+  subtype: "success",
+  is_error: false,
+  result: '{"scoreA": 7, "scoreB": 4, "better": "A", "reason": "closer"}',
+  total_cost_usd: 0.0421,
+  modelUsage: { "claude-opus-4-7": { costUSD: 0.0421 } },
+  ...overrides,
+});
+const stubCli = (t, { mode = "ok", reply = cliResult() } = {}) => {
+  const dir = mkdtempSync(join(tmpdir(), "ai-judge-cli-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const bin = join(dir, "claude-stub");
+  writeFileSync(bin, STUB);
+  chmodSync(bin, 0o755);
+  const recordFile = join(dir, "record.json");
+  const env = {
+    PATH: process.env.PATH,
+    STUB_RECORD: recordFile,
+    STUB_MODE: mode,
+    STUB_REPLY: typeof reply === "string" ? reply : JSON.stringify(reply),
+    ANTHROPIC_API_KEY: "sk-test-not-real",
+  };
+  return {
+    bin,
+    env,
+    record: () => JSON.parse(readFileSync(recordFile, "utf8")),
+  };
+};
+const flagValue = (argv, flag) => argv[argv.indexOf(flag) + 1];
+
+test("the Claude judge runs one locked-down CLI call and parses the result", async (t) => {
+  const stub = stubCli(t);
+  const neutral = mkdtempSync(join(tmpdir(), "ai-judge-cwd-"));
+  t.after(() => rmSync(neutral, { recursive: true, force: true }));
+  const completer = createClaudeCompleter({
+    bin: stub.bin,
+    env: stub.env,
+    cwd: neutral,
+  });
+  assert.equal(completer.judge, "claude:opus:high");
+  const messages = judgeMessages({
+    instructions: "Write one question.",
+    payload: { focus: "heaps", big: "x".repeat(5000) },
+    answerA: { title: "A" },
+    answerB: { title: "B" },
+  });
+  const reply = await completer({
+    route: "deepseek-flash",
+    caller: "study-ai-judge",
+    tag: "judge",
+    maxTokens: 32000,
+    messages,
+  });
+  assert.deepEqual(reply, {
+    text: '{"scoreA": 7, "scoreB": 4, "better": "A", "reason": "closer"}',
+    costUsd: 0.0421,
+  });
+  const { argv, stdin, cwd, apiKey } = stub.record();
+  assert.equal(argv[0], "-p");
+  for (const flag of [
+    "--no-session-persistence",
+    "--strict-mcp-config",
+    "--disable-slash-commands",
+  ])
+    assert.ok(argv.includes(flag), flag);
+  assert.equal(flagValue(argv, "--tools"), "");
+  assert.equal(flagValue(argv, "--setting-sources"), "");
+  assert.equal(flagValue(argv, "--output-format"), "json");
+  assert.equal(flagValue(argv, "--model"), "opus");
+  assert.equal(flagValue(argv, "--effort"), "high");
+  assert.equal(flagValue(argv, "--system-prompt"), JUDGE_SYSTEM);
+  // The large user content goes through stdin, never argv.
+  assert.equal(stdin, messages[1].content);
+  assert.equal(
+    argv.some((value) => value.includes("x".repeat(100))),
+    false,
+  );
+  assert.equal(realpathOf(cwd), realpathOf(neutral));
+  // An API key in the environment would bill it instead of the login.
+  assert.equal(apiKey, null);
+});
+
+test("the Claude judge honours a lower setting and refuses max or unknown models", async (t) => {
+  const stub = stubCli(t, {
+    reply: cliResult({ modelUsage: { "claude-sonnet-4-6": {} } }),
+  });
+  const completer = createClaudeCompleter({
+    bin: stub.bin,
+    env: stub.env,
+    model: "sonnet",
+    effort: "xhigh",
+  });
+  assert.equal(completer.judge, "claude:sonnet:xhigh");
+  await completer({ messages: judgeMessages({ instructions: "x" }) });
+  const { argv } = stub.record();
+  assert.equal(flagValue(argv, "--model"), "sonnet");
+  assert.equal(flagValue(argv, "--effort"), "xhigh");
+  assert.throws(() => createClaudeCompleter({ effort: "max" }), /max/);
+  assert.throws(() => createClaudeCompleter({ model: "fable" }), /model/);
+  assert.throws(
+    () => createClaudeCompleter({ model: "claude-opus-4-7" }),
+    /Invalid setting/,
+  );
+});
+
+test("the Claude judge reports CLI failures clearly", async (t) => {
+  const messages = judgeMessages({ instructions: "x" });
+  const run = (options, completerOptions = {}) => {
+    const stub = stubCli(t, options);
+    return createClaudeCompleter({
+      bin: stub.bin,
+      env: stub.env,
+      ...completerOptions,
+    })({ messages });
+  };
+  await assert.rejects(
+    run({ mode: "fail" }),
+    /claude exited 3: boom from stub/,
+  );
+  await assert.rejects(
+    run({
+      reply: cliResult({
+        is_error: true,
+        subtype: "error_during_execution",
+        result: "usage limit",
+      }),
+    }),
+    /claude failed: error_during_execution usage limit/,
+  );
+  await assert.rejects(
+    run({ reply: cliResult({ result: "   " }) }),
+    /empty reply/,
+  );
+  await assert.rejects(run({ reply: "not json" }), /no JSON result/);
+  await assert.rejects(
+    run({ reply: cliResult({ modelUsage: { "claude-haiku-4-5": {} } }) }),
+    /instead of opus/,
+  );
+  await assert.rejects(
+    run({ mode: "sleep" }, { timeoutMs: 300 }),
+    /timed out after 300ms/,
+  );
+});
+
+test("every judgment row names its judge and the report warns on a mix", async (t) => {
+  const out = tempOut();
+  t.after(() => rmSync(out, { recursive: true, force: true }));
+  writeRows(out, [
+    ladderRow({ setting: "sonnet:high", rep: 0 }),
+    ladderRow({ setting: "sonnet:high", rep: 1 }),
+    ladderRow({
+      setting: "haiku:low",
+      rep: 0,
+      outcome: "invalid",
+      answers: [],
+    }),
+  ]);
+  const stub = stubCli(t);
+  const result = await judgeLadder({
+    out,
+    cases: CASES,
+    reference: { setting: "sonnet:high", rep: 0 },
+    completer: createClaudeCompleter({ bin: stub.bin, env: stub.env }),
+  });
+  assert.equal(result.judge, "claude:opus:high");
+  const rows = readJudgments(out);
+  assert.equal(rows.length, 2);
+  assert.deepEqual(
+    rows.map((row) => row.judge),
+    ["claude:opus:high", "claude:opus:high"],
+  );
+  const judged = rows.find((row) => row.verdict !== "invalid");
+  assert.equal(judged.judgeCostUsd, 0.0421);
+  assert.deepEqual(judgesOf(rows), ["claude:opus:high"]);
+  assert.equal(mixedJudgeWarning(rows), null);
+  const mixed = [...rows, { ...rows[0], judge: "offload:deepseek-flash" }, {}];
+  assert.deepEqual(judgesOf(mixed), [
+    "claude:opus:high",
+    "offload:deepseek-flash",
+    "unrecorded",
+  ]);
+  assert.match(mixedJudgeWarning(mixed), /^Warning: .*mixes 3 judges/);
 });

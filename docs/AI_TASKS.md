@@ -12,7 +12,7 @@ The operation names, their instructions and the validators that check each answe
 | `review-environment` | Review of a practical environment observation ([practical observations](ENVIRONMENT_OBSERVATIONS.md)).                                                                                                          |
 | `reconcile-roadmap`  | A proposal for reconciling an uploaded roadmap revision, returned as exact `{find, replace}` edits to the local roadmap or `outcome: "keep-local"` (`scripts/lib/roadmap-edits.mjs`).                           |
 | `lesson`             | One lesson that teaches the single knowledge gap in `payload.gap`, returned as `{requestId, gapId, lesson}` where `lesson` is a typed JSON document (`scripts/lib/lesson-schema.mjs`), never markup. Opus high. |
-| `lesson-chat`        | One reply from the tutor beside a lesson, `{text, section?}`: it answers questions about the lesson and records nothing. The reply streams, and `text` is written first. Sonnet medium.                         |
+| `lesson-chat`        | One reply from the tutor beside a lesson, `{text, section?}`: it answers questions about the lesson and records nothing. The reply streams, and `text` is written first. Haiku high.                            |
 
 ## What the app keeps for itself
 
