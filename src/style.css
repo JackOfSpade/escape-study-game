@@ -564,10 +564,6 @@ pre {
   line-height: 1.5;
   max-height: 220px;
 }
-#saved-answer pre {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
 .dialogue-terminal .message p {
   white-space: pre-wrap;
   overflow-wrap: anywhere;

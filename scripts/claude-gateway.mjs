@@ -13,7 +13,7 @@ import {
 import { homedir, tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { taskInstructions, validateAnswer } from "./lib/ai-contracts.mjs";
-import { helpStreamGate } from "./lib/help-gate.mjs";
+import { fillClosingHelp, helpStreamGate } from "./lib/help-gate.mjs";
 import { isRecord } from "./lib/is-record.mjs";
 import { privateDirectory, writePrivate } from "./lib/private-fs.mjs";
 
@@ -844,6 +844,14 @@ export function createClaudeGateway({
               `Tutor reply (attempt ${attempt}) omitted complete; read as complete:false`,
             );
           }
+          if (
+            operation === "tutor" &&
+            payload?.mode === "terminal-dialogue" &&
+            fillClosingHelp(payload, answer)
+          )
+            console.error(
+              `Tutor reply (attempt ${attempt}) omitted help on a closing reply with nothing unlocked; read as no help`,
+            );
           validate(job, answer, { final: attempt === attempts - 1 });
           logCall(call, measured, "accepted", replyShape(job, answer));
           answered = answer;

@@ -19,3 +19,7 @@ export function helpGateProblem(
 export function helpStreamGate(
   payload: unknown,
 ): ((raw: string) => boolean) | undefined;
+export function fillClosingHelp(
+  payload: unknown,
+  answer: Record<string, unknown>,
+): boolean;

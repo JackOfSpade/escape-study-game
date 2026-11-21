@@ -417,6 +417,30 @@ test("a tutor follow-up that omits complete continues the conversation", async (
   );
 });
 
+test("a closing tutor reply that omits help is accepted without a correction round", async () => {
+  const closing =
+    '{"text":"All four parts are answered.","complete":true,"partComplete":false,"outcome":"solved"}';
+  const calls = [];
+  const answer = await gateway([closing], calls, {
+    validate: validateAnswer,
+  }).run("tutor", { mode: "terminal-dialogue", helpPolicy: { unlocked: [] } });
+  assert.equal(calls.length, 1);
+  assert.deepEqual(answer.help, {
+    nudges: [],
+    hints: [],
+    gives: [],
+    offers: [],
+  });
+  // Once a hint was unlocked the declaration may record a given step: still required.
+  await assert.rejects(
+    gateway([closing, closing], [], { validate: validateAnswer }).run("tutor", {
+      mode: "terminal-dialogue",
+      helpPolicy: { unlocked: ["f"] },
+    }),
+    { code: "CLAUDE_INVALID_ANSWER" },
+  );
+});
+
 test("a rejected reply's logged skeleton keeps structure and drops long text", () => {
   assert.equal(
     replySkeleton(

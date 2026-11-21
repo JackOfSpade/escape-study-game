@@ -97,6 +97,27 @@ export function helpGateProblem(payload, answer, required = false) {
 }
 
 /**
+ * A closing reply (complete:true) that leaves out its help declaration when
+ * no facet was ever unlocked is read as declaring no help: with nothing
+ * unlocked the tutor may not hint or give a step, and the gate does not check
+ * a closing reply's rungs, so a correction round would only repeat the same
+ * verdict at full cost. Returns true when it filled the declaration in.
+ */
+export function fillClosingHelp(payload, answer) {
+  const unlocked = unlockedBy(payload);
+  if (
+    !unlocked ||
+    unlocked.length ||
+    !object(answer) ||
+    answer.help !== undefined ||
+    answer.complete !== true
+  )
+    return false;
+  answer.help = { nudges: [], hints: [], gives: [], offers: [] };
+  return true;
+}
+
+/**
  * Holds a streamed reply back until its help declaration has been read and
  * passes, so a rejected hint never appears word by word. Returns undefined
  * when the request has no ladder; otherwise a function of the raw reply so far.

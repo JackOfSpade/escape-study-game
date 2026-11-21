@@ -4,6 +4,7 @@ import test from "node:test";
 import { taskInstructions, validateAnswer } from "../scripts/lib/ai-contracts.mjs"; // prettier-ignore
 import {
   HELP_GATE_GUIDANCE,
+  fillClosingHelp,
   helpGateProblem,
   helpStreamGate,
   unlockedHelp,
@@ -96,6 +97,31 @@ test("the relay requires the declaration; the app tolerates an older relay", () 
     helpGateProblem(gated(), reply({ hints: "a" }))!,
     /requires help/,
   );
+});
+
+test("a closing reply without a declaration reads as no help only while nothing is unlocked", () => {
+  const closing = reply(undefined, true) as Record<string, unknown>;
+  assert.equal(fillClosingHelp(gated(), closing), true);
+  assert.deepEqual(closing.help, help());
+  assert.equal(helpGateProblem(gated(), closing, true), undefined);
+  // A hint was unlocked: the declaration may record a given step, so it stays required.
+  const unlocked = reply(undefined, true) as Record<string, unknown>;
+  assert.equal(fillClosingHelp(gated(["a"]), unlocked), false);
+  assert.match(helpGateProblem(gated(["a"]), unlocked, true)!, /requires help/);
+  // A follow-up still has to declare its rung.
+  const open = reply(undefined) as Record<string, unknown>;
+  assert.equal(fillClosingHelp(gated(), open), false);
+  assert.equal(open.help, undefined);
+  // A request from before the ladder is left alone.
+  const old = reply(undefined, true) as Record<string, unknown>;
+  assert.equal(fillClosingHelp({ mode: "terminal-dialogue" }, old), false);
+  // A declaration that is present is never replaced.
+  const declared = reply(help({ nudges: ["a"] }), true) as Record<
+    string,
+    unknown
+  >;
+  assert.equal(fillClosingHelp(gated(), declared), false);
+  assert.deepEqual(declared.help, help({ nudges: ["a"] }));
 });
 
 test("the relay's answer validation applies the ladder", () => {

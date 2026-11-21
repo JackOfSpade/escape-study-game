@@ -820,8 +820,6 @@ function renderHeading(e: Encounter) {
   const progress = dialogueStatus(studyRecord, e);
   $("#dialogue-status").hidden = progress.hidden;
   setText("#dialogue-status", progress.text);
-  $("#saved-answer").hidden = !e.workspace;
-  setText("#saved-answer-text", e.workspace);
   presentProblem(studyRecord, e, roadmap);
   setText("#terminal-type", "QUESTION");
   setText(
